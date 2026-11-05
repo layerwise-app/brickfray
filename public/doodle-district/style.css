@@ -214,3 +214,8 @@ canvas#c { position: fixed; inset: 0; width: 100vw; height: 100vh; display: bloc
 .lobbyrow { display: grid; grid-template-columns: 96px 1fr auto auto; gap: 12px; align-items: center; font-size: 19px; padding: 3px 8px; border-bottom: 1.5px solid rgba(26,48,192,.2); }
 .lobbyrow .code { font-size: 22px; letter-spacing: 3px; padding: 0 8px; border-width: 2px; }
 .lobbyrow button { font-size: 18px; padding: 3px 12px; }
+
+/* "made with" link: start screens only, tucked into the screen's top padding so it never covers the menu */
+.screen .lw-promo { display: none; position: absolute; top: 3px; right: 14px; font-size: 14px; line-height: 16px; color: var(--ink); opacity: .65; text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; white-space: nowrap; }
+.screen.promo .lw-promo { display: block; }
+.screen .lw-promo:hover, .screen .lw-promo:focus-visible { opacity: 1; }

@@ -22,7 +22,11 @@ export const Route = createRootRouteWithContext<{
     meta: [
       { charSet: 'utf-8' },
       { name: 'viewport', content: 'width=device-width, initial-scale=1' },
-      ...seo({ title: 'My App', description: 'Built with TanStack Start' })
+      ...seo({
+        title: 'Doodle District',
+        description:
+          'A doodle-style first-person survival shooter you play in the browser, solo or online.'
+      })
     ],
     links: [{ rel: 'icon', href: '/favicon.ico' }]
   }),

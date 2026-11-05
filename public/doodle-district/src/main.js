@@ -704,7 +704,7 @@ function showStart() {
   hud.setGameplayVisible(false);
   if (game.state === 'lobby') screen = 'lobby';
   const html = screen === 'lobby' ? lobbyHTML() : screen === 'online' ? onlineHTML() : mainHTML();
-  hud.showScreen(html);
+  hud.showScreen(html, true);
   const p = hud.el.panel;
   if (screen === 'main') {
     wireSettings(); wireCheckpoints((w) => beginAtWave(w)); wireMap((k) => { mapKey = k; localStorage.setItem('doodle_map', k); showStart(); });

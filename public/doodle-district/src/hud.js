@@ -9,6 +9,9 @@ export class HUD {
     this._msgT = 0; this._scope = false; this._nades = -1; this._pad = false; this.onDevice = null; this._fmShow = false; this._fmFrac = -1; this._fmReady = false; this._lastTally = -1; this._lastSlots = ''; this._ads = false; this._mode = ''; this.onScreenClick = null; this._tipT = 0;
     this.onLangChange = null; this._lang = currentLang();
     this.el.screen.addEventListener('click', () => { if (this.onScreenClick) this.onScreenClick(); });
+    // small 'made with' link, shown on the start screens only; its click must not reach the screen (which starts a run)
+    const promo = document.createElement('a'); promo.className = 'lw-promo'; promo.href = 'https://layerwise.app'; promo.target = '_blank'; promo.rel = 'noopener';
+    promo.textContent = 'Make your own game with Layerwise'; promo.addEventListener('click', (e) => e.stopPropagation()); this.el.screen.appendChild(promo);
   }
   // katana charge gauge: fills with katana kills, catches fire when a focus slash is ready
   setFocusMeter(show, frac, ready, label = t('focusMeterLabel')) {
@@ -62,7 +65,7 @@ export class HUD {
     setTimeout(() => d.remove(), 1700); while (this.el.killfeed.children.length > 6) this.el.killfeed.firstChild.remove();
   }
   damageFrom(angle) { const i = document.createElement('i'); i.style.transform = `rotate(${(angle * 180 / Math.PI).toFixed(1)}deg)`; this.el.dmg.appendChild(i); setTimeout(() => i.remove(), 1000); }
-  showScreen(html) { this.el.panel.innerHTML = html; this.el.screen.classList.add('show'); }
+  showScreen(html, promo = false) { this.el.panel.innerHTML = html; this.el.screen.classList.toggle('promo', promo); this.el.screen.classList.add('show'); }
   hideScreen() { this.el.screen.classList.remove('show'); }
   setGameplayVisible(v) { this.root.classList.toggle('nogame', !v); }
   update(dt) {
