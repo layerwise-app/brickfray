@@ -8,6 +8,7 @@ import * as THREE from 'three';
 import { FOCUS_SCALE, KATANA_CHARGE_KILLS } from './config';
 import type { GameContext } from './context';
 import { audio } from './core/audio';
+import type { TuneKey } from './core/audio';
 import { t } from './core/i18n';
 import { Input } from './core/input';
 import { clamp } from './core/math';
@@ -85,6 +86,9 @@ function disposeGeometries(root: THREE.Object3D): void {
   });
 }
 
+/** The music for a map: Mexico has its own, every other map plays the district tune. */
+const tuneFor = (key: MapKey): TuneKey => (key === 'mexico' ? 'mexico' : 'district');
+
 export function startGame(root: HTMLElement): GameHandle {
   const lifetime = new AbortController();
   const { signal } = lifetime;
@@ -102,7 +106,7 @@ export function startGame(root: HTMLElement): GameHandle {
   let nav = new NavGrid(world, level.bounds, 1).build();
   let loadedKey: MapKey = prefs.map;
   let arenaLoaded = false;
-  audio.setTune(prefs.map === 'mexico' ? 'mexico' : 'district');
+  audio.setTune(tuneFor(prefs.map));
 
   const input = new Input(canvas, signal);
   const hud = new HUD(hudRoot);
@@ -158,7 +162,7 @@ export function startGame(root: HTMLElement): GameHandle {
       window.__game.level = level;
       window.__game.nav = nav;
     }
-    audio.setTune(key === 'mexico' ? 'mexico' : 'district');
+    audio.setTune(tuneFor(key));
   }
   const setArena = (on: boolean): void => setLevel(knownMap(net.active ? lobby.map || prefs.map : prefs.map), on);
 
@@ -420,6 +424,21 @@ export function startGame(root: HTMLElement): GameHandle {
     } else if ((st === 'play' || st === 'dying') && game.menu && (input.pressed('jump') || input.pressed('confirm'))) resume();
   }
 
+  // level hazards (the metro's trains): a hit hurts and throws you clear, then a short grace period
+  let hazardCd = 0;
+  function touchHazards(dt: number): void {
+    hazardCd = Math.max(0, hazardCd - dt);
+    if (!player.alive) return;
+    for (const h of level.hazards) {
+      const hit = h.touch(player.body, dt);
+      if (!hit || hazardCd > 0) continue;
+      hazardCd = 1;
+      player.body.vel.add(hit.push);
+      player.body.onGround = false;
+      player.takeDamage(hit.damage, hit.from);
+    }
+  }
+
   /** Dying: solo moves on to the death screen; a match counts down, then waits for a press to respawn. */
   function updateDying(dt: number): void {
     game.deathT += dt;
@@ -529,6 +548,7 @@ export function startGame(root: HTMLElement): GameHandle {
       const B = level.bounds;
       const bp = player.body.pos;
       if (bp.x < B.minX - 8 || bp.x > B.maxX + 8 || bp.z < B.minZ - 8 || bp.z > B.maxZ + 8 || bp.y > 150) bp.y = -100;
+      touchHazards(sdt);
       player.update(sdt);
       enemies.update(sdt);
       effects.update(sdt);

@@ -19,6 +19,11 @@ Layerwise to make your own version.
   waves can roll a random modifier. Every fifth wave brings a boss: The
   Doodler, The Eraser, or The Inkblot, in turn. Reaching wave 5, 10, 15 and so
   on saves a checkpoint you can restart from.
+- **Three maps.** Doodle District (streets and rooftops), Desk Top (shrunk on a
+  school desk with no walls, so stepping off the edge is fatal; a mug, a pencil
+  bridge, a desk lamp to swing from) and Ink Metro
+  (a two-level station where trains roar through and hurt anyone on the
+  tracks). Pick one on the start menu; in a match the host picks.
 - **Weapons and moves.** You get a rifle, a shotgun, a sniper rifle, a katana,
   and grenades, plus a grappling hook, wall jumps, double jumps, slides, and
   air dashes.

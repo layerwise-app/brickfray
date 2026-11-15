@@ -1,4 +1,4 @@
-// Level construction. Two maps share one builder: everything is merged ink geometry plus
+// Level construction. Every map shares one builder: everything is merged ink geometry plus
 // axis-aligned box colliders, which is what the navigation grid is generated from.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
@@ -7,10 +7,12 @@ import type { InkId } from '../render/ink-renderer';
 import { rand, TAU } from '../core/math';
 import { buildHumanoid } from '../entities/enemies';
 import { t } from '../core/i18n';
-import type { Collider, ColliderData, World } from './physics';
+import type { Body, Collider, ColliderData, World } from './physics';
+import { buildDesk } from './maps/desk';
+import { buildMetro } from './maps/metro';
 
 /** Every map that exists, whether or not it is offered on the menu. */
-export type MapKey = 'district' | 'mexico';
+export type MapKey = 'district' | 'mexico' | 'desk' | 'metro';
 
 /** A map as listed on the menu. */
 export interface LevelInfo {
@@ -25,6 +27,8 @@ export const MEXICO_READY = false;
 /** The maps offered on the menu, in order; the first is the default. */
 export const LEVELS: readonly LevelInfo[] = [
   { key: 'district', name: t('mapDistrict'), blurb: t('mapDistrictBlurb') },
+  { key: 'desk', name: t('mapDesk'), blurb: t('mapDeskBlurb') },
+  { key: 'metro', name: t('mapMetro'), blurb: t('mapMetroBlurb') },
   ...(MEXICO_READY ? [{ key: 'mexico' as const, name: t('mapMexico'), blurb: t('mapMexicoBlurb') }] : []),
 ];
 
@@ -66,6 +70,21 @@ export interface Breakable {
   readonly box: Collider;
 }
 
+/** What a hazard does to the player when it catches them. */
+export interface HazardHit {
+  damage: number;
+  /** Where the hit came from (for the damage indicator). */
+  from: THREE.Vector3;
+  /** Velocity added to the player. */
+  push: THREE.Vector3;
+}
+
+/** Something in the level that hurts the player on contact (the metro's trains). */
+export interface Hazard {
+  /** Checks the player's body every frame; may also move it (riding on top). */
+  touch(body: Body, dt: number): HazardHit | null;
+}
+
 /** Everything `buildLevel` produces besides the colliders it adds to the world. */
 export interface Level {
   key: MapKey;
@@ -86,6 +105,11 @@ export interface Level {
   rings: THREE.Vector3[];
   grappleMovers: GrappleMover[];
   breakables: Breakable[];
+  hazards: Hazard[];
+  /** Falling off the map kills instead of putting you back at the start (the desk has no walls). */
+  fallKills?: boolean;
+  /** Height of the roof over the play area, if it is low enough to matter (flyers spawn under it). */
+  ceiling?: number;
   /** Two teams' spawn points (district only; not used by any mode yet). */
   teamSpawns?: [THREE.Vector3[], THREE.Vector3[]];
 }
@@ -167,6 +191,20 @@ export interface LevelBuilder {
   spawn(x: number, y: number, z: number): void;
   sniper(x: number, y: number, z: number): void;
   pickup(x: number, y: number, z: number): void;
+  /** A mesh in one ink, for props built outside the merged geometry. */
+  inkMesh(geo: THREE.BufferGeometry, ink: InkId): THREE.Mesh;
+  /** A prop that can be broken: `build` fills its group, the collider is w x h x d based at (x, y, z). */
+  breakable(
+    kind: BreakableKind,
+    x: number,
+    y: number,
+    z: number,
+    w: number,
+    h: number,
+    d: number,
+    build: (g: THREE.Group) => void,
+    o?: { hp?: number; ink?: InkId },
+  ): Breakable;
   /** `n` hookable paper planes looping overhead. */
   planes(n: number, baseR: number, baseH: number, o?: PlaneOpts): void;
   /** Merges the geometry into meshes, finalizes the world and returns the level. */
@@ -189,6 +227,7 @@ function createBuilder(scene: THREE.Scene, world: World): LevelBuilder {
     arenaSpawns: [],
     grappleMovers: [],
     breakables: [],
+    hazards: [],
     key: 'district',
   };
   const addGeo = (g: THREE.BufferGeometry, ink: InkId): void => {
@@ -317,6 +356,30 @@ function createBuilder(scene: THREE.Scene, world: World): LevelBuilder {
   const pickup = (x: number, y: number, z: number): void => {
     L.pickups.push(new THREE.Vector3(x, y, z));
   };
+  const inkMesh = (geo: THREE.BufferGeometry, ink: InkId): THREE.Mesh => new THREE.Mesh(geo, makeInkMaterial({ ink }));
+  function breakable(
+    kind: BreakableKind,
+    x: number,
+    y: number,
+    z: number,
+    w: number,
+    h: number,
+    d: number,
+    build: (g: THREE.Group) => void,
+    o: { hp?: number; ink?: InkId } = {},
+  ): Breakable {
+    const g = new THREE.Group();
+    build(g);
+    g.position.set(x, y, z);
+    scene.add(g);
+    L.meshes.push(g);
+    const pos = new THREE.Vector3(x, y + h / 2, z);
+    const box = collider(x, y, z, w, h, d, { noNav: true });
+    const br: Breakable = { id: L.breakables.length, kind, group: g, hp: o.hp ?? 1, pos, alive: true, ink: o.ink ?? INK.ORANGE, box };
+    box.data.breakable = br;
+    L.breakables.push(br);
+    return br;
+  }
   // ---------------- shared finish ----------------
   function finish(): Level {
     // one mesh per ink, in ink order
@@ -355,7 +418,7 @@ function createBuilder(scene: THREE.Scene, world: World): LevelBuilder {
       });
     }
   }
-  return { L, addGeo, collider, box, slab, wallX, wallZ, stairs, rail, cyl, sphere, ring, spawn, sniper, pickup, finish, planes, scene, world };
+  return { L, addGeo, collider, box, slab, wallX, wallZ, stairs, rail, cyl, sphere, ring, spawn, sniper, pickup, inkMesh, breakable, finish, planes, scene, world };
 }
 
 /** Vector3s from [x, y, z] triples. */
@@ -866,16 +929,6 @@ function buildDistrict(B: LevelBuilder, arena = false): Level {
   return B.finish();
 }
 
-// ============================ map 2: The Desk ============================
-// You are two inches tall on somebody's desk. Everything is a stationery object at monstrous
-// scale: an open book whose pages are ramps, keyboard keys you hop between, a mug you spiral up,
-// pen barrels laid as beams, paper clips arching overhead to swing from. Wide open in between,
-// nothing enclosed, and every high place is in the open where anyone can shoot you off it.
-// ============================ map 2: Paper Canyon ============================
-// A gorge cut into the notebook. An ink river runs along the bottom, terraced cliffs step up on
-// both sides (each ledge reachable by cut-in stairs, so enemies climb too), rock spires and a
-// rope bridge give the grapple something to bite, and the top ledges are exposed sniper ground.
-
 // ============================ map 2: Doodle Mexico ============================
 // A sun-baked pueblo: a plaza with a fountain and a floating sombrero, a bandstand full of mariachis,
 // a church with a bell tower, adobe houses, a market of piñatas, a taco cart, and mesas all around.
@@ -892,33 +945,8 @@ function buildMexico(B: LevelBuilder, _arena = false): Level {
   L.playerStart.set(0, 0, 16);
   const P = 62;
   L.bounds = { minX: -P, maxX: P, minZ: -P, maxZ: P };
-  const mat = (ink: InkId, fill = false) =>
-    makeInkMaterial({ ink, fill, side: fill ? THREE.DoubleSide : THREE.FrontSide });
-  const mesh = (geo: THREE.BufferGeometry, ink: InkId, fill = false): THREE.Mesh => new THREE.Mesh(geo, mat(ink, fill));
-  // a prop that can be broken: its own meshes (so they can fly off) and a tagged collider
-  const breakable = (
-    kind: BreakableKind,
-    x: number,
-    y: number,
-    z: number,
-    w: number,
-    h: number,
-    d: number,
-    build: (g: THREE.Group) => void,
-    o: { hp?: number; ink?: InkId } = {},
-  ): Breakable => {
-    const g = new THREE.Group();
-    build(g);
-    g.position.set(x, y, z);
-    scene.add(g);
-    L.meshes.push(g);
-    const pos = new THREE.Vector3(x, y + h / 2, z);
-    const box = collider(x, y, z, w, h, d, { noNav: true });
-    const br: Breakable = { id: L.breakables.length, kind, group: g, hp: o.hp ?? 1, pos, alive: true, ink: o.ink ?? OR, box };
-    box.data.breakable = br;
-    L.breakables.push(br);
-    return br;
-  };
+  const mesh = B.inkMesh;
+  const { breakable } = B;
   const pot = (x: number, z: number, big = false) =>
     breakable('pot', x, 0, z, big ? 1.2 : 0.9, big ? 1.3 : 0.9, big ? 1.2 : 0.9, (g) => {
       const r = big ? 0.55 : 0.4;
@@ -1282,5 +1310,14 @@ function buildMexico(B: LevelBuilder, _arena = false): Level {
  */
 export function buildLevel(scene: THREE.Scene, world: World, key: MapKey = 'district', opts: BuildLevelOptions = {}): Level {
   const B = createBuilder(scene, world);
-  return key === 'mexico' ? buildMexico(B, !!opts.arena) : buildDistrict(B, !!opts.arena);
+  switch (key) {
+    case 'mexico':
+      return buildMexico(B, !!opts.arena);
+    case 'desk':
+      return buildDesk(B);
+    case 'metro':
+      return buildMetro(B);
+    default:
+      return buildDistrict(B, !!opts.arena);
+  }
 }

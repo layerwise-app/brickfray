@@ -57,6 +57,20 @@ export class Pickups {
       const m = new THREE.Mesh(new THREE.BoxGeometry(0.66, 0.08, 0.14), pmat.cap);
       m.position.y = 0.1;
       g.add(m);
+    } else if (this.s.ctx.level.key === 'desk') {
+      // a cookie: a fat disc with a few chocolate chips
+      g.add(new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 0.14, 14).rotateX(Math.PI / 2), pmat.health));
+      for (const [x, y] of [[-0.15, 0.12], [0.16, 0.05], [0, -0.17]]) {
+        const c = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 0.2), pmat.cap);
+        c.position.set(x, y, 0);
+        g.add(c);
+      }
+    } else if (this.s.ctx.level.key === 'metro') {
+      // a soda can with a ring pull
+      g.add(new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.56, 12), pmat.health));
+      const c = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.22, 0.08, 12), pmat.cap);
+      c.position.y = 0.32;
+      g.add(c);
     } else {
       g.add(
         new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.2, 0.2), pmat.health),
@@ -103,7 +117,8 @@ export class Pickups {
       hud.kill(t('ammoPickup'), 0);
     } else {
       player.hp = Math.min(player.maxHp, player.hp + 35);
-      hud.kill(level.key === 'mexico' ? t('tacoPickup') : t('healthPickup'), 0);
+      const name = { mexico: 'tacoPickup', desk: 'cookiePickup', metro: 'sodaPickup', district: 'healthPickup' } as const;
+      hud.kill(t(name[level.key]), 0);
     }
     audio.pickup();
     effects.strokeBurst(p.mesh.position, p.kind === 'ammo' ? INK.BLUE : INK.GREEN, 12, 4, { life: 0.3 });

@@ -126,7 +126,7 @@ export class WaveDirector {
       const r = 22 + Math.random() * 10;
       return new THREE.Vector3(
         clamp(pp.x + Math.cos(a) * r, level.bounds.minX + 4, level.bounds.maxX - 4),
-        pp.y + 12 + Math.random() * 6,
+        Math.min(pp.y + 12 + Math.random() * 6, (level.ceiling ?? Infinity) - 2),
         clamp(pp.z + Math.sin(a) * r, level.bounds.minZ + 4, level.bounds.maxZ - 4),
       );
     }

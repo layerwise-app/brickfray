@@ -689,7 +689,17 @@ export class Player {
     const spd = b.vel.length();
     if (spd > 48) b.vel.multiplyScalar(48 / spd);
     ctx.world.moveBody(b, dt);
-    if (b.pos.y < -12 || Math.abs(b.pos.x) > 95 || Math.abs(b.pos.z) > 95) {
+    if (ctx.level.fallKills) {
+      // off the edge of a map with no walls (the desk): the fall is fatal, and the body stays put below the edge
+      if (b.pos.y < -12) {
+        b.pos.y = -12;
+        b.vel.set(0, 0, 0);
+        if (this.alive) {
+          this.detachGrapple(false);
+          this.takeDamage(this.hp, null);
+        }
+      }
+    } else if (b.pos.y < -12 || Math.abs(b.pos.x) > 95 || Math.abs(b.pos.z) > 95) {
       this.detachGrapple(false);
       b.pos.copy(ctx.level.playerStart);
       b.vel.set(0, 0, 0);
