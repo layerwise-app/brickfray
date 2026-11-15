@@ -1,4 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router';
+import { DoodleDistrict } from '~/components/DoodleDistrict';
 import { seo } from '~/utils/seo';
 
 const homePageTitle = '涂鸦街区';
@@ -16,14 +17,5 @@ export const Route = createFileRoute('/')({
 });
 
 function Home() {
-  return (
-    <div className='h-[100dvh] w-full overflow-hidden bg-background'>
-      <iframe
-        src='/doodle-district/'
-        title='涂鸦街区'
-        className='h-full w-full border-0'
-        allow='autoplay; clipboard-read; clipboard-write; fullscreen; gamepad'
-      />
-    </div>
-  );
+  return <DoodleDistrict />;
 }

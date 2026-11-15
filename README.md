@@ -37,43 +37,61 @@ Layerwise to make your own version.
 
 ## How it's built
 
-The game is plain JavaScript ES modules in `public/doodle-district/`, served as
-static files with no build step. three.js and PeerJS are vendored under
-`public/doodle-district/vendor/`. The home page, `src/routes/index.tsx`, is a
-TanStack Start route that fills the screen with the game in an iframe.
+The game is strict TypeScript in `src/game/`, bundled by the project's Vite
+build. three.js and PeerJS come from npm (`three`, `peerjs`). The home page,
+`src/routes/index.tsx`, renders `src/components/DoodleDistrict.tsx`, which
+lazy-loads the game on the client only and calls `startGame(root)`; the
+returned `dispose()` tears everything down again when the page unmounts.
+
+```
+src/game/
+  index.ts          public entry: startGame() and the game stylesheet
+  game.ts           orchestrator: wiring, level swaps, run control, frame loop
+  context.ts        GameContext, the contract every system receives
+  config.ts         match rules, wave roster and modifiers, focus tuning
+  storage.ts        typed localStorage preferences (doodle_* keys)
+  core/             math helpers, i18n, synthesized audio, keyboard/mouse/gamepad input
+  render/           ink-on-paper renderer and materials
+  world/            physics, nav grid, maps
+  entities/         player, weapons, enemies, remote players, effects
+  net/              peer-to-peer lobby networking
+  session/          solo waves, focus, pickups, props, combat, lobby, online match, scores
+  ui/               HUD, menu screens, game.css (scoped to .dd-root)
+```
 
 | What to change | Where |
 | --- | --- |
-| All game text, in both languages | `public/doodle-district/src/lang.js`: the `ZH` and `EN` dictionaries, plus the HUD and controls markup |
-| Menu and HUD colors and font | `public/doodle-district/style.css`: `--ink`, `--red` and `--paper` on the first line, and the font stack on `html, body` |
-| 3D pen colors and paper | `public/doodle-district/src/render.js`: `INK_COLORS`, plus `uPaper` and `uLineSpacing` in the paper shader's uniforms |
-| Match rules | `public/doodle-district/src/main.js`: `FFA_TARGET` (kills to win), `FFA_TIME` (seconds) and `RESPAWN` (seconds); player health is set in `resetGame()` |
-| Waves | `public/doodle-district/src/main.js`: `ROSTER` (which enemies appear and from which wave), `MODIFIERS`, and `startWave()` |
-| Weapon stats | `public/doodle-district/src/weapons.js`: `GUNS`, the gun stats table (magazine, reserve, damage, spread, reload time and more) |
-| Enemy stats | `public/doodle-district/src/enemies.js`: `TYPES` (health, speed, damage, score) and `BOSSES` |
-| The map | `public/doodle-district/src/level.js`; a second map is switched off with `MEXICO_READY = false` |
-| Lobby size | `maxPlayers` in `public/doodle-district/src/net.js`; the "up to 10 players" copy is in `lang.js` |
-| Sound effects and music | `public/doodle-district/src/audio.js`: everything is synthesized with the Web Audio API, so there are no audio files |
+| All game text, in both languages | `src/game/core/i18n.ts`: the `ZH` and `EN` dictionaries (keys are type-checked), plus the HUD and controls markup |
+| Menu and HUD colors and font | `src/game/ui/game.css`: `--ink`, `--red`, `--paper` and the font stack on `.dd-root` |
+| 3D pen colors and paper | `src/game/render/ink-renderer.ts`: `INK_COLORS`, plus `uPaper` and `uLineSpacing` in the paper shader's uniforms |
+| Match rules | `src/game/config.ts`: `FFA_TARGET` (kills to win), `FFA_TIME` (seconds) and `RESPAWN` (seconds); player health is set in `resetGame()` in `src/game/game.ts` |
+| Waves | `src/game/config.ts`: `ROSTER` (which enemies appear and from which wave) and `MODIFIERS`; the director is `src/game/session/waves.ts` |
+| Weapon stats | `src/game/entities/weapons.ts`: `GUNS`, the typed gun stats table (magazine, reserve, damage, spread, reload time and more) |
+| Enemy stats | `src/game/entities/enemies.ts`: `TYPES` (health, speed, damage, score) and `BOSSES` |
+| The map | `src/game/world/level.ts`; a second map is switched off with `MEXICO_READY = false` |
+| Lobby size | `maxPlayers` in `src/game/net/net.ts`; the "up to 10 players" copy is in `i18n.ts` |
+| Sound effects and music | `src/game/core/audio.ts`: everything is synthesized with the Web Audio API, so there are no audio files |
 | Page title and description | `src/routes/index.tsx`, with fallbacks in `src/routes/__root.tsx` |
 | Logo and icons | `public/logo.svg`, `public/logo.png`, and the favicons and `android-chrome-*` icons in `public/` |
-| "Make your own game with Layerwise" | Created in `public/doodle-district/src/hud.js` and styled by `.lw-promo` in `style.css`; it shows on the start, online and lobby screens only |
+| "Make your own game with Layerwise" | Created in `src/game/ui/hud.ts` and styled by `.lw-promo` in `game.css`; it shows on the start, online and lobby screens only |
 
 ### Add an enemy type
 
-1. In `public/doodle-district/src/enemies.js`, copy an entry in `TYPES` under a
-   new key and tune its numbers. Its `weapon` value decides how it fights:
+1. In `src/game/entities/enemies.ts`, add a key to `EnemyTypeKey`, copy an
+   entry in `TYPES` under it and tune its numbers. Its `weapon` value decides how it fights:
    `rifle`, `pistol`, `shotgun`, `sniper`, `blade` (melee), or `bomb` (runs up
    and explodes).
-2. In `public/doodle-district/src/lang.js`, add the enemy's name to both `ZH`
+2. In `src/game/core/i18n.ts`, add the enemy's name to both `ZH`
    and `EN`, and point the entry's `name` at it with `t('yourKey')`.
-3. In `public/doodle-district/src/main.js`, add it to `ROSTER` with `from` (the
+3. In `src/game/config.ts`, add it to `ROSTER` with `from` (the
    first wave it can appear in) and `w` (how often it spawns compared with the
    others).
 
 ### Add or change text
 
-Every string lives in `public/doodle-district/src/lang.js` and is read with
-`t('key')`. Chinese is the source locale, so add new keys to both `ZH` and `EN`.
+Every string lives in `src/game/core/i18n.ts` and is read with `t('key')`.
+Keys come from `EN` and `ZH` must match it, so a missing or misspelled key is a
+type error.
 
 ## Commands
 
@@ -84,8 +102,7 @@ pnpm check-types
 pnpm build
 ```
 
-The game files are static, so changes under `public/doodle-district/` show up
-when you reload the page. `pnpm build` runs the type check and then the
+Changes under `src/game/` hot-reload in `pnpm dev`. `pnpm build` runs the type check and then the
 production build.
 
 The project still contains the Layerwise starter's sign-in pages, dashboard,

@@ -3,6 +3,9 @@
 @import 'shadcn/tailwind.css';
 @import '@fontsource-variable/outfit';
 
+/* The game ships its own scoped stylesheet; keep Tailwind from generating utilities for its markup strings. */
+@source not '../game';
+
 @custom-variant dark (&:is(.dark *));
 
 @layer base {
