@@ -3,7 +3,7 @@
  * once when the game starts and written back the moment they change.
  */
 import { NAME_MAX } from './config';
-import { isZh } from './core/i18n';
+import { normalizeLang, t, type Lang } from './core/i18n';
 import { LEVELS } from './world/level';
 import type { MapKey } from './world/level';
 
@@ -32,7 +32,7 @@ export class Preferences {
   music = localStorage.getItem(KEY.music) !== '0';
   /** Highest checkpoint wave reached (every fifth wave). */
   checkpoint = Number(localStorage.getItem(KEY.checkpoint) || 0);
-  name = (localStorage.getItem(KEY.name) || '').slice(0, NAME_MAX) || (isZh ? '涂鸦' : 'Doodle') + Math.floor(Math.random() * 90 + 10);
+  name = (localStorage.getItem(KEY.name) || '').slice(0, NAME_MAX) || t('playerName') + Math.floor(Math.random() * 90 + 10);
   /** Look sensitivity in percent. */
   sens = Number(localStorage.getItem(KEY.sens) || 100);
   invert = localStorage.getItem(KEY.invert) === '1';
@@ -69,10 +69,10 @@ export class Preferences {
   }
 
   /** The interface language the player picked, or null for automatic. */
-  static readUiLang(): 'en' | 'zh' | null {
+  static readUiLang(): Lang | null {
     try {
       const saved = localStorage.getItem(KEY.uiLang);
-      if (saved === 'en' || saved === 'zh') return saved;
+      return normalizeLang(saved);
     } catch {
       /* ignore storage failures */
     }
@@ -81,7 +81,9 @@ export class Preferences {
 
   static writeUiLang(value: string): void {
     try {
-      localStorage.setItem(KEY.uiLang, value);
+      const language = normalizeLang(value);
+      if (language) localStorage.setItem(KEY.uiLang, language);
+      else localStorage.removeItem(KEY.uiLang);
     } catch {
       /* ignore storage failures */
     }

@@ -57,6 +57,7 @@ export interface WelcomeInfo {
   max: number;
   inMatch: boolean;
   hostName: string;
+  map?: string;
 }
 
 /** What a full or closed host answers instead of a welcome. */
@@ -67,6 +68,7 @@ export interface RefusedInfo {
   max: number;
   inMatch: boolean;
   hostName: string;
+  map?: string;
 }
 
 /** Connection metadata a joining peer introduces itself with. */
@@ -87,6 +89,7 @@ export interface LobbyInfo {
   inMatch: boolean;
   hostName: string;
   full: boolean;
+  map?: string;
 }
 
 type EmptyPayload = Record<string, never>;
@@ -109,7 +112,6 @@ export interface NetPayloads {
     map: string;
     shown: string | null;
   };
-  startreq: EmptyPayload;
   start: {
     late?: boolean;
     spawn?: number;
@@ -218,6 +220,7 @@ export class Net {
   maxPlayers = 10;
   accepting = true;
   hostName = '';
+  map = 'district';
   /** Host only: whether a match is running, reported to anyone knocking. Set by the game. */
   inMatch = false;
   readonly stats = { sent: 0, recv: 0 };
@@ -229,6 +232,7 @@ export class Net {
   private readonly handlers = new Map<string, WireHandler>();
   private leaving = false;
   private aliasTimer: Timer | undefined = undefined;
+  private connection = new AbortController();
 
   get active(): boolean {
     return !!this.peer && this.connected;
@@ -249,27 +253,39 @@ export class Net {
     if (h) h(data, from);
   }
 
-  private newPeer(id: string | null): Promise<Peer> {
+  private newPeer(id: string | null, signal = this.connection.signal): Promise<Peer> {
+    signal.throwIfAborted();
     return new Promise((resolve, reject) => {
       // no id: the signalling server assigns one
       const peer = id === null ? new Peer(PEER_OPTS) : new Peer(id, PEER_OPTS);
       let settled = false;
+      const abort = (): void => {
+        const pending = !settled;
+        settled = true;
+        clearTimeout(timer);
+        peer.destroy();
+        if (pending) reject(signal.reason);
+      };
       const timer = setTimeout(() => {
         if (!settled) {
           settled = true;
+          signal.removeEventListener('abort', abort);
           peer.destroy();
           reject(new Error('signalling server timed out'));
         }
       }, SIGNAL_TIMEOUT);
+      signal.addEventListener('abort', abort, { once: true });
       peer.on('open', () => {
         if (settled) return;
         settled = true;
+        signal.removeEventListener('abort', abort);
         clearTimeout(timer);
         resolve(peer);
       });
       peer.on('error', (err) => {
         if (settled) return;
         settled = true;
+        signal.removeEventListener('abort', abort);
         clearTimeout(timer);
         peer.destroy();
         reject(err);
@@ -279,12 +295,16 @@ export class Net {
 
   private wire(conn: DataConnection): void {
     conn.on('data', (msg) => {
+      if (this.conns.get(conn.peer) !== conn) return;
       this.stats.recv++;
       if (!isEnvelope(msg)) return;
       this.route(msg, conn.peer);
     });
-    conn.on('close', () => this.drop(conn.peer));
-    conn.on('error', () => this.drop(conn.peer));
+    const drop = (): void => {
+      if (this.conns.get(conn.peer) === conn) this.drop(conn.peer);
+    };
+    conn.on('close', drop);
+    conn.on('error', drop);
   }
 
   private drop(pid: string): void {
@@ -336,47 +356,60 @@ export class Net {
   /** Open a lobby. Returns its code. */
   async host({ isPublic = false, code = null }: { isPublic?: boolean; code?: string | null } = {}): Promise<string | null> {
     this.leave();
+    const signal = this.connection.signal;
+    let opened: Peer | null = null;
+    let openedCode = code ? String(code).toUpperCase() : null;
     this.isHost = true;
     this.isPublic = isPublic;
     if (code) {
-      this.code = String(code).toUpperCase();
-      this.peer = await this.newPeer(PREFIX + this.code);
+      opened = await this.newPeer(PREFIX + openedCode, signal);
     } else if (isPublic) {
       for (let slot = 0; slot < PUBLIC_SLOTS; slot++) {
         try {
-          this.peer = await this.newPeer(PREFIX + 'PUB' + slot);
-          this.code = 'PUB' + slot;
+          opened = await this.newPeer(PREFIX + 'PUB' + slot, signal);
+          openedCode = 'PUB' + slot;
           break;
         } catch (e) {
           if (errorType(e) !== 'unavailable-id') throw e;
         }
       }
-      if (!this.peer) throw new Error('all public lobbies are busy - host a private one');
+      if (!opened) throw new Error('all public lobbies are busy - host a private one');
     } else {
-      for (let tries = 0; tries < 3 && !this.peer; tries++) {
-        this.code = makeCode();
+      for (let tries = 0; tries < 3 && !opened; tries++) {
+        openedCode = makeCode();
         try {
-          this.peer = await this.newPeer(PREFIX + this.code);
+          opened = await this.newPeer(PREFIX + openedCode, signal);
         } catch (e) {
           if (errorType(e) !== 'unavailable-id' || tries === 2) throw e;
         }
       }
     }
-    const peer = this.peer;
+    if (signal.aborted) {
+      opened?.destroy();
+      signal.throwIfAborted();
+    }
+    const peer = opened;
+    this.peer = peer;
+    this.code = openedCode;
     // unreachable: every branch above either opened a peer or threw
     if (!peer) throw new Error('could not open a lobby');
     this.id = peer.id;
     this.hostId = this.id;
     this.connected = true;
     this.accepting = true;
-    peer.on('connection', (conn) => this.incoming(conn));
+    peer.on('connection', (conn) => {
+      if (this.peer === peer) this.incoming(conn);
+      else closeQuietly(conn);
+    });
     this.keepAlive(peer);
     return this.code;
   }
 
   // someone knocking: a quick-play probe is told how full we are and only seated once it says it is staying
   private incoming(conn: DataConnection): void {
+    const signal = this.connection.signal;
     conn.on('open', () => {
+      if (signal.aborted) { closeQuietly(conn); return; }
       // a full lobby still says who it is, so the lobby list can show it
       if (!this.accepting || this.conns.size >= this.maxPlayers - 1) {
         const refused: RefusedInfo = {
@@ -386,6 +419,7 @@ export class Net {
           max: this.maxPlayers,
           inMatch: !!this.inMatch,
           hostName: this.hostName,
+          map: this.map,
         };
         conn.send({ t: 'refused', d: refused });
         setTimeout(() => closeQuietly(conn), 600);
@@ -393,6 +427,7 @@ export class Net {
       }
       const meta: PeerMeta | undefined = conn.metadata;
       const seat = (): void => {
+        if (signal.aborted) { closeQuietly(conn); return; }
         if (this.conns.has(conn.peer)) return;
         this.conns.set(conn.peer, conn);
         this.wire(conn);
@@ -406,6 +441,7 @@ export class Net {
         max: this.maxPlayers,
         inMatch: !!this.inMatch,
         hostName: this.hostName,
+        map: this.map,
       };
       if (meta && meta.probe) {
         conn.send({ t: 'welcome', d: welcome, from: this.id });
@@ -427,21 +463,25 @@ export class Net {
   // as a second front door so it stays the code people know
   claimAlias(code: string, tries = 20): void {
     if (!this.isHost || this.alias || this.aliasTimer) return;
+    const signal = this.connection.signal;
     const attempt = async (): Promise<void> => {
       this.aliasTimer = undefined;
-      if (!this.isHost || this.alias) return;
+      if (signal.aborted || !this.isHost || this.alias) return;
       try {
-        const peer = await this.newPeer(PREFIX + code);
-        if (!this.isHost) {
+        const peer = await this.newPeer(PREFIX + code, signal);
+        if (signal.aborted || !this.isHost) {
           peer.destroy();
           return;
         }
         this.alias = peer;
         this.aliasCode = code;
-        peer.on('connection', (conn) => this.incoming(conn));
+        peer.on('connection', (conn) => {
+          if (this.alias === peer) this.incoming(conn);
+          else closeQuietly(conn);
+        });
         if (this.onAlias) this.onAlias(code);
       } catch {
-        if (--tries > 0) this.aliasTimer = setTimeout(attempt, 6000);
+        if (!signal.aborted && --tries > 0) this.aliasTimer = setTimeout(attempt, 6000);
       }
     };
     this.aliasTimer = setTimeout(attempt, 1500);
@@ -450,10 +490,12 @@ export class Net {
   /** Join a lobby by code. Returns the code the lobby reports. */
   async join(code: string | null | undefined, meta: PeerMeta = {}): Promise<string> {
     this.leave();
+    const signal = this.connection.signal;
     this.isHost = false;
     code = String(code || '').trim().toUpperCase();
     if (!code) throw new Error('enter a lobby code');
-    const peer = await this.newPeer(null);
+    const peer = await this.newPeer(null, signal);
+    if (signal.aborted) { peer.destroy(); signal.throwIfAborted(); }
     this.peer = peer;
     this.id = peer.id;
     this.keepAlive(peer);
@@ -462,11 +504,12 @@ export class Net {
     const ids = [code, ...['-1', '-2', '-3'].map((suf) => base + suf).filter((c) => c !== code)].map((c) => PREFIX + c);
     let res: Offer;
     try {
-      res = await this.knockAny(peer, ids, meta, JOIN_TIMEOUT);
+      res = await this.knockAny(peer, ids, meta, JOIN_TIMEOUT, signal);
     } catch (e) {
-      this.leave();
+      if (!signal.aborted) this.leave();
       throw e;
     }
+    signal.throwIfAborted();
     const { hostId, conn, welcome } = res;
     this.adopt(hostId, conn, welcome);
     this.code = (welcome && welcome.code) || hostId.slice(PREFIX.length);
@@ -476,8 +519,10 @@ export class Net {
   // try every public slot at the same time and take the first host that says welcome
   async quickJoin(meta: PeerMeta = {}, onStatus: ((status: string) => void) | null = null): Promise<string> {
     this.leave();
+    const signal = this.connection.signal;
     this.isHost = false;
-    const peer = await this.newPeer(null);
+    const peer = await this.newPeer(null, signal);
+    if (signal.aborted) { peer.destroy(); signal.throwIfAborted(); }
     this.peer = peer;
     this.id = peer.id;
     this.keepAlive(peer);
@@ -499,6 +544,7 @@ export class Net {
         done = true;
         clearTimeout(timer);
         clearTimeout(gather);
+        signal.removeEventListener('abort', settle);
         peer.off('error', onErr);
         const val = pick();
         for (const a of attempts) {
@@ -520,6 +566,7 @@ export class Net {
       };
       peer.on('error', onErr);
       const timer = setTimeout(settle, QUICK_TIMEOUT);
+      signal.addEventListener('abort', settle, { once: true });
       const probeMeta: PeerMeta = { ...meta, probe: true };
       for (const hostId of ids) {
         let conn: DataConnection;
@@ -549,6 +596,7 @@ export class Net {
       }
       if (pending <= 0) settle();
     });
+    signal.throwIfAborted();
     if (!winner) {
       this.leave();
       throw new Error('no open public lobbies');
@@ -562,7 +610,9 @@ export class Net {
   // a look at every public lobby: who is hosting, how full, whether a match is on. Nothing is joined.
   async listLobbies(meta: PeerMeta = {}, onStatus: ((status: string) => void) | null = null): Promise<LobbyInfo[]> {
     if (this.active) throw new Error('leave the lobby first');
-    const peer = await this.newPeer(null);
+    const signal = this.connection.signal;
+    const peer = await this.newPeer(null, signal);
+    if (signal.aborted) { peer.destroy(); signal.throwIfAborted(); }
     const ids = publicIds();
     const found = await new Promise<LobbyInfo[]>((resolve) => {
       let pending = ids.length;
@@ -575,6 +625,7 @@ export class Net {
         done = true;
         clearTimeout(timer);
         clearTimeout(gather);
+        signal.removeEventListener('abort', settle);
         peer.off('error', onErr);
         for (const a of attempts) closeQuietly(a.conn);
         resolve(offers);
@@ -593,6 +644,7 @@ export class Net {
       };
       peer.on('error', onErr);
       const timer = setTimeout(settle, QUICK_TIMEOUT);
+      signal.addEventListener('abort', settle, { once: true });
       const probeMeta: PeerMeta = { ...meta, probe: true };
       for (const hostId of ids) {
         let conn: DataConnection;
@@ -618,6 +670,7 @@ export class Net {
               inMatch: !!d.inMatch,
               hostName: d.hostName || '',
               full: msg.t === 'refused',
+              map: d.map,
             });
             if (onStatus) onStatus(t('foundCount', { count: offers.length }));
             if (pending <= 0) settle();
@@ -634,6 +687,7 @@ export class Net {
     } catch {
       /* ignore */
     }
+    signal.throwIfAborted();
     // one lobby can answer on more than one id after a host change; keep the fuller answer per code
     const byCode = new Map<string, LobbyInfo>();
     for (const o of found) {
@@ -645,7 +699,7 @@ export class Net {
   }
 
   // knock on several ids at once; the first welcome wins, a refusal or a missing lobby on every one fails
-  private knockAny(peer: Peer, ids: string[], meta: PeerMeta, timeoutMs: number): Promise<Offer> {
+  private knockAny(peer: Peer, ids: string[], meta: PeerMeta, timeoutMs: number, signal: AbortSignal): Promise<Offer> {
     return new Promise((resolve, reject) => {
       let pending = ids.length;
       let done = false;
@@ -655,6 +709,7 @@ export class Net {
         if (done) return;
         done = true;
         clearTimeout(timer);
+        signal.removeEventListener('abort', abort);
         peer.off('error', onErr);
         for (const a of attempts) {
           if (!val || a.conn !== val.conn) closeQuietly(a.conn);
@@ -677,6 +732,8 @@ export class Net {
       };
       peer.on('error', onErr);
       const timer = setTimeout(() => finish(new Error('no answer from that lobby')), timeoutMs);
+      const abort = (): void => finish(signal.reason);
+      signal.addEventListener('abort', abort, { once: true });
       for (const hostId of ids) {
         let conn: DataConnection;
         try {
@@ -715,6 +772,8 @@ export class Net {
   leave(): void {
     // closing our own connections must not look like other people leaving
     this.leaving = true;
+    this.connection.abort();
+    this.connection = new AbortController();
     clearTimeout(this.aliasTimer);
     this.aliasTimer = undefined;
     if (this.alias) {

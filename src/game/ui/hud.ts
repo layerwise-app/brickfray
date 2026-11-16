@@ -1,5 +1,5 @@
 // DOM heads-up display drawn in "pen" style (multiplied over the paper canvas).
-import { t, isZh, currentLang, hudHTML, controlsHTML, type Lang } from '../core/i18n';
+import { t, hudHTML } from '../core/i18n';
 
 /** Every element of the HUD markup (see `hudHTML`) the HUD writes to, keyed by its id. */
 export interface HudElements {
@@ -72,6 +72,7 @@ export class HUD {
   private _scope = false;
   private _nades = -1;
   private _pad = false;
+  private _controlsDevice: 'mouse' | 'controller' = 'mouse';
   private _fmShow = false;
   private _fmFrac = -1;
   private _fmReady = false;
@@ -80,7 +81,6 @@ export class HUD {
   private _lastSlots = '';
   private _ads = false;
   private _mode: CrosshairMode = '';
-  private _lang: Lang;
 
   constructor(root: HTMLElement) {
     this.root = root;
@@ -129,19 +129,9 @@ export class HUD {
       gstam: q('gstam'),
       gstamfill: q('gstamfill'),
     };
-    this._lang = currentLang();
     this.el.screen.addEventListener('click', () => {
       if (this.onScreenClick) this.onScreenClick();
     });
-    // small 'made with' link, shown on the start screens only; its click must not reach the screen (which starts a run)
-    const promo = document.createElement('a');
-    promo.className = 'lw-promo';
-    promo.href = 'https://layerwise.app';
-    promo.target = '_blank';
-    promo.rel = 'noopener';
-    promo.textContent = 'Make your own game with Layerwise';
-    promo.addEventListener('click', (e) => e.stopPropagation());
-    this.el.screen.appendChild(promo);
   }
 
   // katana charge gauge: fills with katana kills, catches fire when a focus slash is ready
@@ -373,10 +363,43 @@ export class HUD {
     setTimeout(() => i.remove(), 1000);
   }
 
-  /** Shows the overlay screen with `html` in its panel; `promo` reveals the Layerwise link. */
-  showScreen(html: string, promo = false): void {
+  private selectControlsTab(device: 'mouse' | 'controller', focus = false): void {
+    this._controlsDevice = device;
+    for (const tab of this.el.panel.querySelectorAll<HTMLButtonElement>('[data-controls-tab]')) {
+      const selected = tab.dataset.controlsTab === device;
+      tab.setAttribute('aria-selected', String(selected));
+      tab.tabIndex = selected ? 0 : -1;
+      if (selected && focus) tab.focus();
+    }
+    for (const panel of this.el.panel.querySelectorAll<HTMLElement>('[data-controls-panel]')) {
+      panel.hidden = panel.dataset.controlsPanel !== device;
+    }
+  }
+
+  /** Shows the overlay screen with `html` in its panel. */
+  showScreen(html: string): void {
     this.el.panel.innerHTML = html;
-    this.el.screen.classList.toggle('promo', promo);
+    const controls = this.el.panel.querySelector<HTMLElement>('.controls');
+    if (controls) {
+      this.selectControlsTab(this._controlsDevice);
+      controls.addEventListener('click', (event) => {
+        event.stopPropagation();
+        const tab = event.target instanceof Element ? event.target.closest<HTMLButtonElement>('[data-controls-tab]') : null;
+        if (tab) this.selectControlsTab(tab.dataset.controlsTab === 'controller' ? 'controller' : 'mouse');
+      });
+      controls.addEventListener('keydown', (event) => {
+        // Only the tab keys stop here; Space and the pause key still reach the game's Input.
+        if (!(event.target instanceof Element) || !event.target.closest('[data-controls-tab]')) return;
+        let device: 'mouse' | 'controller';
+        if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') device = this._controlsDevice === 'mouse' ? 'controller' : 'mouse';
+        else if (event.key === 'Home') device = 'mouse';
+        else if (event.key === 'End') device = 'controller';
+        else return;
+        event.preventDefault();
+        event.stopPropagation();
+        this.selectControlsTab(device, true);
+      });
+    }
     this.el.screen.classList.add('show');
   }
 
@@ -416,8 +439,8 @@ export const KB_KEYS = {
   melee: 'F',
   reload: 'R',
   grenade: 'G',
-  focus: isZh ? '左右键同按（或 X）' : 'LMB + RMB (or X)',
-  next: isZh ? '滚轮' : 'Wheel',
+  get focus() { return t('keyFocus'); },
+  get next() { return t('keyWheel'); },
   pause: 'Esc',
   confirm: 'Space',
   score: 'Tab',
@@ -445,6 +468,3 @@ export const PAD_KEYS: Record<ControlName, string> = {
   confirm: '✕',
   score: 'Create',
 };
-
-/** Controls help markup, in the language active at load. */
-export const CONTROLS_HTML = controlsHTML();

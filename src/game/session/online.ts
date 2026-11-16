@@ -193,6 +193,7 @@ export class Online {
   /** Host: everyone gets a different spot and the match starts for all. */
   hostStart(): void {
     const { scores, lobby, net, prefs } = this.s;
+    if (!net.isHost || this.s.game.state !== 'lobby') return;
     scores.clear();
     for (const [id, p] of lobby.players) scores.set(id, { name: p.name, kills: 0, deaths: 0 });
     // deal everyone a different spot, shuffled so the same people do not always start together
@@ -284,9 +285,6 @@ export class Online {
           if (br) props.break(br, null, false, true);
         }
       }
-    });
-    net.on('startreq', () => {
-      if (net.isHost && game.state === 'lobby') this.hostStart();
     });
     net.on('end', (d) => this.endMatch(d));
     net.on('backtolobby', () => {

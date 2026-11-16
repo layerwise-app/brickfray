@@ -15,8 +15,7 @@ import type { Session, Winner } from './state';
 export interface OnlineUi {
   showStart(): void;
   renderLobby(): void;
-  setStatus(text: string): void;
-  unlockButtons(): void;
+  setStatus(text: string, error?: boolean): void;
   showClickToPlay(): void;
   showOver(winner: Winner): void;
 }
@@ -53,6 +52,7 @@ export class LobbySession {
   private migratingNow = false;
   private idleWarned = false;
   private idleCheckT = 0;
+  private connectionAttempt = 0;
 
   constructor(
     private readonly s: Session,
@@ -105,17 +105,16 @@ export class LobbySession {
   /** Host: shares the lobby (players, visibility, map) and redraws it here. */
   broadcastLobby(): void {
     const { net, lobby, prefs } = this.s;
+    net.map = lobby.map || prefs.map;
     net.send('lobby', { players: this.lobbyRows(), hostId: net.id, isPublic: lobby.isPublic, map: lobby.map || prefs.map, shown: net.aliasCode || net.code });
     this.deps.ui.renderLobby();
   }
 
   /** Drops out of online play back to the online screen, with `reason` as its status line. */
   leaveOnline(reason: string): void {
-    const { game, net, remote, lobby, scores } = this.s;
+    const { game, lobby, scores } = this.s;
     const { hud } = this.s.ctx;
-    net.leave();
-    for (const id of [...remote.keys()]) this.removeRemote(id);
-    lobby.players.clear();
+    this.cancelConnection();
     scores.clear();
     hud.setBoard(null);
     if (game.state !== 'start') {
@@ -139,24 +138,27 @@ export class LobbySession {
   }
 
   private enterLobby(): void {
+    // A running room can send its start packet before the join promise settles.
+    if (inMatch(this.s.game)) return;
     this.s.game.state = 'lobby';
     this.s.screen = 'lobby';
     this.deps.ui.showStart();
   }
 
   async createLobby(isPublic: boolean): Promise<void> {
+    const attempt = ++this.connectionAttempt;
     const { net, lobby, prefs } = this.s;
     const { ui } = this.deps;
     ui.setStatus(t('creatingLobby'));
+    net.map = prefs.map;
     try {
       await net.host({ isPublic });
     } catch (err) {
-      if (this.disposed()) return;
-      ui.setStatus(friendlyError(err));
-      ui.unlockButtons();
+      if (!this.currentConnection(attempt)) return;
+      ui.setStatus(friendlyError(err), true);
       return;
     }
-    if (this.disposed()) return;
+    if (!this.currentConnection(attempt)) return;
     lobby.isPublic = isPublic;
     lobby.map = prefs.map;
     lobby.players.clear();
@@ -168,18 +170,18 @@ export class LobbySession {
   }
 
   async joinLobby(code: string): Promise<void> {
+    const attempt = ++this.connectionAttempt;
     const { net, lobby } = this.s;
     const { ui } = this.deps;
     ui.setStatus(t('connecting'));
     try {
       await net.join(code, { name: this.myName });
     } catch (err) {
-      if (this.disposed()) return;
-      ui.setStatus(friendlyError(err));
-      ui.unlockButtons();
+      if (!this.currentConnection(attempt)) return;
+      ui.setStatus(friendlyError(err), true);
       return;
     }
-    if (this.disposed()) return;
+    if (!this.currentConnection(attempt)) return;
     lobby.isPublic = net.isPublic;
     lobby.status = '';
     this.enterLobby();
@@ -187,25 +189,39 @@ export class LobbySession {
 
   /** Joins the fullest open public lobby, or hosts one if there is none. */
   async quickPlay(): Promise<void> {
+    const attempt = ++this.connectionAttempt;
     const { net, lobby } = this.s;
     const { ui } = this.deps;
     try {
-      await net.quickJoin({ name: this.myName }, (text: string) => ui.setStatus(text));
-      if (this.disposed()) return;
+      await net.quickJoin({ name: this.myName }, (text: string) => {
+        if (this.currentConnection(attempt)) ui.setStatus(text);
+      });
+      if (!this.currentConnection(attempt)) return;
       lobby.isPublic = true;
       lobby.status = '';
       this.enterLobby();
       return;
     } catch (err) {
-      if (this.disposed()) return;
+      if (!this.currentConnection(attempt)) return;
       if (!/no open public/.test(String(messageOf(err)))) {
-        ui.setStatus(friendlyError(err));
-        ui.unlockButtons();
+        ui.setStatus(friendlyError(err), true);
         return;
       }
     }
     ui.setStatus(t('noOpenLobby'));
     await this.createLobby(true);
+  }
+
+  /** Cancel the attempt as well as its peers; late results must not reopen the room. */
+  cancelConnection(): void {
+    this.connectionAttempt++;
+    this.s.net.leave();
+    for (const id of this.s.remote.keys()) this.removeRemote(id);
+    this.s.lobby.players.clear();
+  }
+
+  private currentConnection(attempt: number): boolean {
+    return attempt === this.connectionAttempt && !this.disposed();
   }
 
   // ---- host transfer: when the host goes, the earliest-joined player left takes over on a generation
@@ -223,6 +239,8 @@ export class LobbySession {
   private async doMigrateHost(): Promise<void> {
     const { game, net, remote, lobby, scores, clock, prefs } = this.s;
     const { hud } = this.s.ctx;
+    // Leave, Cancel or a new connection bumps the attempt; the retries below must stop then.
+    const attempt = this.connectionAttempt;
     const oldHost = lobby.hostId;
     const myId = net.id;
     const gen = (lobby.gen || 0) + 1;
@@ -246,15 +264,17 @@ export class LobbySession {
     hud.message(t('hostLeft'), successor === myId ? t('promotedHost') : t('migratingHost'), 2.6);
     if (successor === myId) {
       let ok = false;
+      net.map = lobby.map || prefs.map;
       for (let tries = 0; tries < 2 && !ok; tries++) {
         try {
           await net.host({ isPublic: lobby.isPublic, code });
           ok = true;
         } catch {
+          if (!this.currentConnection(attempt)) return;
           await this.s.sleep(800);
         }
+        if (!this.currentConnection(attempt)) return;
       }
-      if (this.disposed()) return;
       if (!ok) {
         this.leaveOnline(t('hostFailed'));
         return;
@@ -288,6 +308,7 @@ export class LobbySession {
       this.broadcastLobby();
     } else {
       await this.s.sleep(1200);
+      if (!this.currentConnection(attempt)) return;
       const deadline = performance.now() + 20000;
       let joined = false;
       while (!joined && performance.now() < deadline) {
@@ -295,9 +316,10 @@ export class LobbySession {
           await net.join(code, { name: prefs.name, prev: myId });
           joined = true;
         } catch {
+          if (!this.currentConnection(attempt)) return;
           await this.s.sleep(1200);
         }
-        if (this.disposed()) return;
+        if (!this.currentConnection(attempt)) return;
       }
       if (!joined) {
         this.leaveOnline(t('matchLost'));

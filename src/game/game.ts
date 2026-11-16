@@ -9,7 +9,7 @@ import { FOCUS_SCALE, KATANA_CHARGE_KILLS } from './config';
 import type { GameContext } from './context';
 import { audio } from './core/audio';
 import type { TuneKey } from './core/audio';
-import { t } from './core/i18n';
+import { currentLang, t } from './core/i18n';
 import { Input } from './core/input';
 import { clamp } from './core/math';
 import { Effects } from './entities/effects';
@@ -90,6 +90,7 @@ function disposeGeometries(root: THREE.Object3D): void {
 const tuneFor = (key: MapKey): TuneKey => (key === 'mexico' ? 'mexico' : 'district');
 
 export function startGame(root: HTMLElement): GameHandle {
+  root.lang = currentLang();
   const lifetime = new AbortController();
   const { signal } = lifetime;
   const canvas = document.createElement('canvas');
@@ -180,8 +181,7 @@ export function startGame(root: HTMLElement): GameHandle {
     ui: {
       showStart: () => screens.showStart(),
       renderLobby: () => screens.renderLobby(),
-      setStatus: (text) => screens.setStatus(text),
-      unlockButtons: () => screens.unlockButtons(),
+      setStatus: (text, error) => screens.setStatus(text, error),
       showClickToPlay: () => screens.showClickToPlay(),
       showOver: (winner) => screens.showOver(winner),
     },
