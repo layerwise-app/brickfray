@@ -12,11 +12,11 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
+import { Route as LabRouteImport } from './routes/lab'
 import { Route as RobotsDottxtRouteImport } from './routes/robots[.]txt'
 import { Route as SignInRouteImport } from './routes/sign-in'
 import { Route as SignUpRouteImport } from './routes/sign-up'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
-import { Route as LabMapRouteImport } from './routes/lab.$map'
 import { Route as SignInOtpRouteImport } from './routes/sign-in_.otp'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
 
@@ -33,6 +33,11 @@ const DashboardRoute = DashboardRouteImport.update({
 const ForgotPasswordRoute = ForgotPasswordRouteImport.update({
   id: '/forgot-password',
   path: '/forgot-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LabRoute = LabRouteImport.update({
+  id: '/lab',
+  path: '/lab',
   getParentRoute: () => rootRouteImport,
 } as any)
 const RobotsDottxtRoute = RobotsDottxtRouteImport.update({
@@ -55,11 +60,6 @@ const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
   path: '/sitemap.xml',
   getParentRoute: () => rootRouteImport,
 } as any)
-const LabMapRoute = LabMapRouteImport.update({
-  id: '/lab/$map',
-  path: '/lab/$map',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const SignInOtpRoute = SignInOtpRouteImport.update({
   id: '/sign-in_/otp',
   path: '/sign-in/otp',
@@ -75,11 +75,11 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRoute
   '/forgot-password': typeof ForgotPasswordRoute
+  '/lab': typeof LabRoute
   '/robots.txt': typeof RobotsDottxtRoute
   '/sign-in': typeof SignInRoute
   '/sign-up': typeof SignUpRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
-  '/lab/$map': typeof LabMapRoute
   '/sign-in/otp': typeof SignInOtpRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
 }
@@ -87,11 +87,11 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRoute
   '/forgot-password': typeof ForgotPasswordRoute
+  '/lab': typeof LabRoute
   '/robots.txt': typeof RobotsDottxtRoute
   '/sign-in': typeof SignInRoute
   '/sign-up': typeof SignUpRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
-  '/lab/$map': typeof LabMapRoute
   '/sign-in/otp': typeof SignInOtpRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
 }
@@ -100,11 +100,11 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRoute
   '/forgot-password': typeof ForgotPasswordRoute
+  '/lab': typeof LabRoute
   '/robots.txt': typeof RobotsDottxtRoute
   '/sign-in': typeof SignInRoute
   '/sign-up': typeof SignUpRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
-  '/lab/$map': typeof LabMapRoute
   '/sign-in_/otp': typeof SignInOtpRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
 }
@@ -114,11 +114,11 @@ export interface FileRouteTypes {
     | '/'
     | '/dashboard'
     | '/forgot-password'
+    | '/lab'
     | '/robots.txt'
     | '/sign-in'
     | '/sign-up'
     | '/sitemap.xml'
-    | '/lab/$map'
     | '/sign-in/otp'
     | '/api/auth/$'
   fileRoutesByTo: FileRoutesByTo
@@ -126,11 +126,11 @@ export interface FileRouteTypes {
     | '/'
     | '/dashboard'
     | '/forgot-password'
+    | '/lab'
     | '/robots.txt'
     | '/sign-in'
     | '/sign-up'
     | '/sitemap.xml'
-    | '/lab/$map'
     | '/sign-in/otp'
     | '/api/auth/$'
   id:
@@ -138,11 +138,11 @@ export interface FileRouteTypes {
     | '/'
     | '/dashboard'
     | '/forgot-password'
+    | '/lab'
     | '/robots.txt'
     | '/sign-in'
     | '/sign-up'
     | '/sitemap.xml'
-    | '/lab/$map'
     | '/sign-in_/otp'
     | '/api/auth/$'
   fileRoutesById: FileRoutesById
@@ -151,11 +151,11 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   DashboardRoute: typeof DashboardRoute
   ForgotPasswordRoute: typeof ForgotPasswordRoute
+  LabRoute: typeof LabRoute
   RobotsDottxtRoute: typeof RobotsDottxtRoute
   SignInRoute: typeof SignInRoute
   SignUpRoute: typeof SignUpRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
-  LabMapRoute: typeof LabMapRoute
   SignInOtpRoute: typeof SignInOtpRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
 }
@@ -181,6 +181,13 @@ declare module '@tanstack/react-router' {
       path: '/forgot-password'
       fullPath: '/forgot-password'
       preLoaderRoute: typeof ForgotPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/lab': {
+      id: '/lab'
+      path: '/lab'
+      fullPath: '/lab'
+      preLoaderRoute: typeof LabRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/robots.txt': {
@@ -211,13 +218,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SitemapDotxmlRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/lab/$map': {
-      id: '/lab/$map'
-      path: '/lab/$map'
-      fullPath: '/lab/$map'
-      preLoaderRoute: typeof LabMapRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/sign-in_/otp': {
       id: '/sign-in_/otp'
       path: '/sign-in/otp'
@@ -239,11 +239,11 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   DashboardRoute: DashboardRoute,
   ForgotPasswordRoute: ForgotPasswordRoute,
+  LabRoute: LabRoute,
   RobotsDottxtRoute: RobotsDottxtRoute,
   SignInRoute: SignInRoute,
   SignUpRoute: SignUpRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
-  LabMapRoute: LabMapRoute,
   SignInOtpRoute: SignInOtpRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
 }

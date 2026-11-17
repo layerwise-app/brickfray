@@ -1,0 +1,127 @@
+import * as THREE from 'three';
+import { BrickBuilder } from '../../engine/bricks';
+import { buildGround } from '../../engine/ground';
+import { PLASTIC } from '../../engine/palette';
+import type { CharacterId } from '../../characters/types';
+import { createViewModel, type ViewAction, type ViewInput } from '../../weapons';
+import type { WeaponId } from '../../weapons/defs';
+import type { LabContext } from '../types';
+
+/**
+ * First-person view model over a simple brick street. Scripts drive it:
+ * equip, act, setInput, then step(seconds) for deterministic frames.
+ */
+export default function setup(ctx: LabContext) {
+  const { renderer: gr, scene } = ctx;
+  const kit = { profile: gr.profile, materials: gr.materials };
+  scene.add(
+    buildGround(
+      [
+        { x0: -20, z0: -40, x1: 20, z1: 10, y: 0, color: PLASTIC.sandGreen },
+        { x0: -3, z0: -40, x1: 3, z1: 10, y: 0.02, color: PLASTIC.darkGray, smooth: true }
+      ],
+      gr.profile
+    )
+  );
+  const b = new BrickBuilder(gr.profile, gr.materials);
+  const colors = [PLASTIC.tan, PLASTIC.offWhite, PLASTIC.tan, PLASTIC.darkTan];
+  for (const side of [-1, 1]) {
+    for (let layer = 0; layer < 24; layer += 3) {
+      for (let gz = -60; gz < -8; gz += 2) {
+        b.grid({ w: 1, d: 2, h: 3 }, side * 12 + (side < 0 ? -1 : 0), layer, gz + ((layer / 3) % 2), { color: colors[(gz + layer) & 3]! });
+      }
+    }
+  }
+  for (let i = 0; i < 6; i++) b.grid({ w: 2, d: 2, h: 3 }, -4 + i * 1.5, 0, -30 - i * 3, { color: [PLASTIC.red, PLASTIC.blue, PLASTIC.yellow][i % 3]! });
+  b.grid({ w: 4, d: 2, h: 6 }, 3, 0, -20, { color: PLASTIC.orange });
+  scene.add(b.build());
+
+  const view = createViewModel(kit);
+  ctx.setViewLayer(view.scene, view.camera);
+  ctx.camera.fov = 74;
+  ctx.camera.position.set(0, 1.7, 2);
+  ctx.controls.target.set(0, 1.62, -8);
+  ctx.controls.enabled = false;
+  ctx.camera.updateProjectionMatrix();
+
+  const input: ViewInput = { speed: 0, sprint: false, grounded: true, crouch: 0, ads: 0, look: { yaw: 0, pitch: 0 }, time: 0 };
+  let manual = false;
+  const cues: string[] = [];
+  view.onCue = (cue) => cues.push(`${input.time.toFixed(2)} ${cue}`);
+  const advance = (dt: number) => {
+    input.time += dt;
+    view.update(dt, input);
+  };
+  ctx.onFrame((dt) => {
+    view.orient(ctx.camera.quaternion);
+    if (!manual) advance(dt);
+  });
+  advance(0.5);
+
+  return {
+    resize: (w: number, h: number) => view.resize(w, h),
+    dispose: () => view.dispose(),
+    api: {
+      setCharacter: (id: unknown) => view.setCharacter(id as CharacterId),
+      equip: (id: unknown) => view.equip(id as WeaponId),
+      act: (action: unknown) => view.act(action as ViewAction),
+      setInput: (partial: unknown) => void Object.assign(input, partial as Partial<ViewInput>),
+      setTime: (t: unknown) => {
+        manual = true;
+        input.time = Number(t);
+      },
+      /** Advance by `seconds` in 1/120 s steps (manual mode: frames no longer advance it). */
+      step: (seconds: unknown) => {
+        manual = true;
+        let left = Number(seconds);
+        while (left > 1e-6) {
+          const h = Math.min(1 / 120, left);
+          left -= h;
+          advance(h);
+        }
+        return cues.slice(-12);
+      },
+      /** Muzzle in view space and its screen position (NDC), to check tracer origins. */
+      muzzle: () => {
+        const p = view.muzzleViewPosition(new THREE.Vector3());
+        const ndc = p.clone().project(view.camera);
+        return { view: p.toArray().map((v) => +v.toFixed(3)), ndc: [+ndc.x.toFixed(3), +ndc.y.toFixed(3)] };
+      },
+      cues: () => cues.slice(-30),
+      /** Draw calls and triangles of the view layer alone. */
+      viewStats: () => {
+        let calls = 0;
+        let tris = 0;
+        view.scene.traverseVisible((o) => {
+          const m = o as THREE.Mesh;
+          if (!m.isMesh) return;
+          calls++;
+          const g = m.geometry;
+          const n = (g.index ? g.index.count : g.getAttribute('position').count) / 3;
+          tris += (m as THREE.InstancedMesh).isInstancedMesh ? n * (m as THREE.InstancedMesh).count : n;
+        });
+        return { calls, tris };
+      },
+      /** Where the sight node sits in view space (on the camera axis when fully aimed). */
+      sight: () => {
+        let found: THREE.Object3D | undefined;
+        view.scene.traverse((o) => {
+          if (o.name === 'sight' && o.parent?.visible !== false && !found && o.parent?.parent === view.scene) found = o;
+        });
+        const p = found ? found.getWorldPosition(new THREE.Vector3()) : null;
+        return p?.toArray().map((v) => +v.toFixed(4));
+      },
+      /** Inspect the rig from outside: move the view camera (meters, view space). */
+      viewCam: (pos: unknown, target: unknown, fov: unknown) => {
+        const [x, y, z] = pos as number[];
+        const [tx, ty, tz] = target as number[];
+        view.camera.position.set(x!, y!, z!);
+        view.camera.lookAt(tx!, ty!, tz!);
+        if (fov) view.camera.fov = Number(fov);
+        view.camera.updateProjectionMatrix();
+        view.camera.updateMatrixWorld();
+      },
+      hide: (hidden: unknown) => view.setHidden(Boolean(hidden))
+    }
+  };
+}

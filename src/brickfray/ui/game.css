@@ -1,0 +1,315 @@
+@import '@fontsource/lilita-one/400.css';
+@import '@fontsource-variable/rubik';
+
+.bf-root {
+  --bf-ink: #0f1a2e;
+  --bf-panel: rgba(14, 24, 44, 0.86);
+  --bf-panel-solid: #15233f;
+  --bf-line: rgba(255, 255, 255, 0.14);
+  --bf-yellow: #ffcd2e;
+  --bf-yellow-dark: #c98f00;
+  --bf-red: #ea3d32;
+  --bf-blue: #2f7dff;
+  --bf-orange: #ff7a1a;
+  --bf-green: #3cc46a;
+  --bf-text: #f4f6fb;
+  --bf-muted: rgba(244, 246, 251, 0.62);
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: #0b1222;
+  color: var(--bf-text);
+  font-family: 'Rubik Variable', system-ui, -apple-system, 'PingFang SC', 'Hiragino Sans', 'Malgun Gothic', sans-serif;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.bf-root canvas.bf-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  outline: none;
+}
+
+.bf-display {
+  font-family: 'Lilita One', 'Rubik Variable', system-ui, 'PingFang SC', 'Hiragino Sans', 'Malgun Gothic', sans-serif;
+  font-weight: 400;
+  letter-spacing: 0.01em;
+}
+
+/* Wordmark: chunky letters with a plastic edge. */
+.bf-logo {
+  font-family: 'Lilita One', system-ui, sans-serif;
+  font-size: clamp(44px, 7.2vw, 104px);
+  line-height: 0.9;
+  color: var(--bf-yellow);
+  -webkit-text-stroke: 0.035em #3a2400;
+  paint-order: stroke fill;
+  text-shadow:
+    0 0.05em 0 #c98f00,
+    0 0.1em 0 #3a2400,
+    0 0.16em 0.22em rgba(0, 0, 0, 0.35);
+  transform: rotate(-2.5deg);
+}
+
+/* A row of studs along the top edge of a panel. */
+.bf-studs {
+  position: relative;
+}
+.bf-studs::before {
+  content: '';
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  top: -7px;
+  height: 9px;
+  background:
+    radial-gradient(circle at 50% 40%, rgba(255, 255, 255, 0.55) 0 2px, transparent 3px),
+    radial-gradient(circle at 50% 50%, var(--stud, var(--bf-panel-solid)) 0 6px, transparent 6.5px);
+  background-size: 22px 9px;
+  background-repeat: repeat-x;
+  pointer-events: none;
+}
+
+.bf-panel {
+  background: var(--bf-panel);
+  backdrop-filter: blur(10px) saturate(1.2);
+  -webkit-backdrop-filter: blur(10px) saturate(1.2);
+  border: 1px solid var(--bf-line);
+  border-radius: 18px;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
+}
+
+/* Chunky toy button: colored face, darker lip below, presses down. */
+.bf-btn {
+  --face: #2a3b60;
+  --lip: #16223a;
+  --ink: var(--bf-text);
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 0 20px;
+  height: 48px;
+  border-radius: 14px;
+  background: var(--face);
+  color: var(--ink);
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.22),
+    0 5px 0 var(--lip),
+    0 9px 16px rgba(0, 0, 0, 0.3);
+  transform: translateY(0);
+  transition:
+    transform 0.08s ease,
+    box-shadow 0.08s ease,
+    filter 0.12s ease;
+  cursor: pointer;
+  border: 0;
+  outline: none;
+}
+.bf-btn:hover {
+  filter: brightness(1.08);
+}
+.bf-btn:active,
+.bf-btn[data-pressed='true'] {
+  transform: translateY(4px);
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.18),
+    0 1px 0 var(--lip),
+    0 3px 8px rgba(0, 0, 0, 0.3);
+}
+.bf-btn:focus-visible {
+  outline: 3px solid #fff;
+  outline-offset: 3px;
+}
+.bf-btn:disabled {
+  filter: grayscale(0.6) brightness(0.8);
+  cursor: default;
+}
+.bf-btn-primary {
+  --face: var(--bf-yellow);
+  --lip: var(--bf-yellow-dark);
+  --ink: #2a1a00;
+}
+.bf-btn-red {
+  --face: #e8453a;
+  --lip: #9b2018;
+}
+.bf-btn-blue {
+  --face: #2f7dff;
+  --lip: #1a4aa8;
+}
+.bf-btn-ghost {
+  --face: rgba(255, 255, 255, 0.1);
+  --lip: rgba(0, 0, 0, 0.35);
+}
+.bf-icon-btn {
+  width: 48px;
+  padding: 0;
+}
+
+.bf-input {
+  height: 44px;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.32);
+  border: 2px solid rgba(255, 255, 255, 0.12);
+  color: var(--bf-text);
+  padding: 0 14px;
+  outline: none;
+  font: inherit;
+  user-select: text;
+}
+.bf-input:focus {
+  border-color: var(--bf-yellow);
+}
+
+.bf-seg {
+  display: flex;
+  gap: 6px;
+  background: rgba(0, 0, 0, 0.3);
+  padding: 4px;
+  border-radius: 12px;
+}
+.bf-seg button {
+  flex: 1;
+  height: 36px;
+  border-radius: 9px;
+  color: var(--bf-muted);
+  font-weight: 600;
+  cursor: pointer;
+}
+.bf-seg button[aria-pressed='true'] {
+  background: var(--bf-yellow);
+  color: #2a1a00;
+  box-shadow: 0 2px 0 var(--bf-yellow-dark);
+}
+
+.bf-range {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 8px;
+  border-radius: 99px;
+  background: linear-gradient(to right, var(--bf-yellow) var(--fill, 50%), rgba(255, 255, 255, 0.15) var(--fill, 50%));
+  outline: none;
+}
+.bf-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+}
+.bf-range::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #fff;
+  border: 0;
+}
+
+.bf-fade-in {
+  animation: bf-fade-in 0.28s ease both;
+}
+@keyframes bf-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+.bf-pop {
+  animation: bf-pop 0.42s cubic-bezier(0.2, 1.6, 0.4, 1) both;
+}
+@keyframes bf-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+}
+@keyframes bf-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.bf-spinner {
+  width: 46px;
+  height: 46px;
+  border-radius: 10px;
+  background: var(--bf-yellow);
+  box-shadow: inset 0 -5px 0 var(--bf-yellow-dark);
+  animation: bf-bounce 0.9s cubic-bezier(0.5, 0, 0.5, 1) infinite;
+  position: relative;
+}
+.bf-spinner::after {
+  content: '';
+  position: absolute;
+  left: 9px;
+  top: -6px;
+  width: 28px;
+  height: 8px;
+  background:
+    radial-gradient(circle at 25% 50%, var(--bf-yellow) 0 5px, transparent 5.5px),
+    radial-gradient(circle at 75% 50%, var(--bf-yellow) 0 5px, transparent 5.5px);
+}
+@keyframes bf-bounce {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-14px) rotate(90deg);
+  }
+}
+
+/* HUD numerals stay legible over any background. */
+.bf-hud-text {
+  text-shadow:
+    0 2px 0 rgba(0, 0, 0, 0.45),
+    0 0 12px rgba(0, 0, 0, 0.35);
+}
+
+.bf-vignette {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse at center, transparent 55%, rgba(200, 20, 10, 0.55) 100%);
+  transition: opacity 0.25s ease;
+}
+
+.bf-scope {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(circle at center, transparent 0, transparent min(36vh, 36vw), rgba(0, 0, 0, 0.92) calc(min(36vh, 36vw) + 2px));
+}
+.bf-scope::before,
+.bf-scope::after {
+  content: '';
+  position: absolute;
+  background: rgba(0, 0, 0, 0.85);
+  left: 50%;
+  top: 50%;
+}
+.bf-scope::before {
+  width: min(72vh, 72vw);
+  height: 2px;
+  transform: translate(-50%, -50%);
+}
+.bf-scope::after {
+  width: 2px;
+  height: min(72vh, 72vw);
+  transform: translate(-50%, -50%);
+}
+
+.bf-scroll::-webkit-scrollbar {
+  width: 8px;
+}
+.bf-scroll::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 99px;
+}

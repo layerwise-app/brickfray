@@ -1,0 +1,71 @@
+import { createContext, useContext, useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { Game } from '../game/game';
+import { loadSettings } from '../game/settings';
+import { Connecting, ErrorBanner } from './Connecting';
+import { Hud } from './hud/Hud';
+import { Lobby } from './Lobby';
+import { MainMenu } from './MainMenu';
+import { PauseMenu } from './PauseMenu';
+import { SettingsPanel } from './SettingsPanel';
+import './game.css';
+
+const GameContext = createContext<Game | null>(null);
+
+export function useGame(): Game {
+  const game = useContext(GameContext);
+  if (!game) throw new Error('useGame outside the game');
+  return game;
+}
+
+export function useApp() {
+  const game = useGame();
+  return useSyncExternalStore(game.app.subscribe, game.app.getSnapshot, game.app.getSnapshot);
+}
+
+export function useHud() {
+  const game = useGame();
+  return useSyncExternalStore(game.hud.subscribe, game.hud.getSnapshot, game.hud.getSnapshot);
+}
+
+/** Client-only root: owns the canvas and the Game, and switches screens. */
+export default function App() {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const tagsRef = useRef<HTMLDivElement>(null);
+  const [game, setGame] = useState<Game | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- the WebGL game is created once per mount
+  useEffect(() => {
+    const instance = new Game(canvasRef.current!, tagsRef.current!, loadSettings());
+    setGame(instance);
+    (window as Window & { __game?: Game }).__game = instance;
+    return () => instance.dispose();
+  }, []);
+
+  return (
+    <div className='bf-root'>
+      <canvas ref={canvasRef} className='bf-canvas' tabIndex={-1} />
+      <div ref={tagsRef} className='pointer-events-none absolute inset-0 overflow-hidden' />
+      {game && (
+        <GameContext.Provider value={game}>
+          <Screens openSettings={() => setSettingsOpen(true)} />
+          {settingsOpen && <SettingsPanel onClose={() => setSettingsOpen(false)} />}
+        </GameContext.Provider>
+      )}
+    </div>
+  );
+}
+
+function Screens({ openSettings }: { openSettings: () => void }) {
+  const app = useApp();
+  return (
+    <>
+      {app.screen === 'menu' && <MainMenu openSettings={openSettings} />}
+      {app.screen === 'connecting' && <Connecting />}
+      {app.screen === 'lobby' && <Lobby />}
+      {app.screen === 'match' && <Hud />}
+      {app.screen === 'match' && app.paused && <PauseMenu openSettings={openSettings} />}
+      {app.error && <ErrorBanner error={app.error} />}
+    </>
+  );
+}

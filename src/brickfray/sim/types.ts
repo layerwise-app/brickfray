@@ -1,0 +1,135 @@
+import type { BotKind, CharacterId } from '../characters/types';
+import type { WeaponId } from '../weapons/defs';
+import type { MapId } from '../world/types';
+import type { MoveState } from './movement';
+
+export const BUTTON = {
+  fire: 1,
+  ads: 2,
+  jump: 4,
+  crouch: 8,
+  sprint: 16,
+  reload: 32,
+  melee: 64,
+  grenade: 128,
+  grenadeLow: 256
+} as const;
+
+/** One fixed tick of player intent. The client predicts with it; the host replays it. */
+export interface Command {
+  seq: number;
+  /** -1…1, quantized to 1/127 on the wire. */
+  forward: number;
+  right: number;
+  yaw: number;
+  pitch: number;
+  buttons: number;
+  /** Weapon slot the player wants (0…3). */
+  slot: number;
+  /** Host-clock time the player was looking at when this command was made (lag compensation). */
+  viewTime: number;
+  /** The player's life (spawn count, mod 256) when this was made; the host drops commands from an earlier life. */
+  life: number;
+}
+
+export type ModeId = 'solo' | 'ffa' | 'tdm';
+
+export interface ArmsState {
+  weapon: WeaponId;
+  /** Weapon being switched to while `switchTime` runs down (holster then draw). */
+  next: WeaponId | null;
+  switchTime: number;
+  ammo: Record<WeaponId, number>;
+  cooldown: number;
+  /** Remaining reload seconds (shotgun: of the current shell); 0 = not reloading. */
+  reload: number;
+  reloadTotal: number;
+  reloadEmpty: boolean;
+  /** Next recoil-pattern index; resets after a pause. */
+  burst: number;
+  sinceShot: number;
+  sprintRecovery: number;
+  /** Mallet: cooldown left and time since the swing started (-1 = none). */
+  meleeCooldown: number;
+  meleeTime: number;
+  grenades: number;
+  /** Cooking time while the grenade button is held (-1 = none). */
+  cook: number;
+  /** Seconds left in the throw motion (blocks firing). */
+  throwTime: number;
+  ads: number;
+  /** A press during cooldown fires as soon as allowed. */
+  queuedFire: number;
+  prevButtons: number;
+  /** Counts shots so remote clients can trigger muzzle flashes from snapshots. */
+  shots: number;
+}
+
+export interface PlayerState {
+  id: number;
+  name: string;
+  character: CharacterId | BotKind;
+  bot: BotKind | null;
+  team: 0 | 1 | -1;
+  move: MoveState;
+  yaw: number;
+  pitch: number;
+  arms: ArmsState;
+  health: number;
+  maxHealth: number;
+  alive: boolean;
+  /** Host time when the player may respawn / when spawn protection ends. */
+  respawnAt: number;
+  protectedUntil: number;
+  kills: number;
+  deaths: number;
+  assists: number;
+  score: number;
+  ping: number;
+  /** Players who damaged this one in the current life (for assists). */
+  damagers: Map<number, number>;
+  lastSeq: number;
+  /** Spawn count mod 256, so commands made before the client saw a respawn don't undo its position and facing. */
+  life: number;
+  /** Size multiplier for hitboxes and visuals (bosses). */
+  scale: number;
+}
+
+export interface MatchSettings {
+  mode: ModeId;
+  map: MapId;
+  minutes: number;
+  bots: number;
+}
+
+export type MatchPhase = 'warmup' | 'playing' | 'intermission' | 'ended';
+
+export interface MatchState {
+  phase: MatchPhase;
+  /** Host time the current phase ends (0 = open-ended). */
+  phaseEnds: number;
+  teamScore: [number, number];
+  wave: number;
+  winner: number | null;
+}
+
+export type HitKind = 'body' | 'head';
+
+/** Shot result shared with every client so they can draw tracers and impacts. */
+export interface ShotTrace {
+  shooter: number;
+  weapon: WeaponId;
+  origin: [number, number, number];
+  ends: { point: [number, number, number]; surface: string; hitPlayer: number; normal: [number, number, number] }[];
+}
+
+export type GameEvent =
+  | { type: 'kill'; killer: number; victim: number; weapon: WeaponId | 'grenade' | 'mallet'; headshot: boolean; assister: number | null }
+  | { type: 'damage'; attacker: number; victim: number; amount: number; kind: HitKind; from: [number, number, number]; fatal: boolean }
+  | { type: 'explosion'; position: [number, number, number]; owner: number }
+  | { type: 'spawn'; player: number }
+  | { type: 'melee'; player: number; hit: boolean }
+  | { type: 'chat'; player: number; text: string }
+  | { type: 'wave'; wave: number }
+  | { type: 'join'; player: number; name: string }
+  | { type: 'leave'; player: number; name: string };
