@@ -221,47 +221,6 @@ export function thump(
   });
 }
 
-/** Feedback echo; returns the input to send into. Output is wet only. */
-export function echo(
-  s: Synth,
-  o: { delay: number; feedback: number; cutoff: number; wet?: number; dest?: AudioNode }
-): GainNode {
-  const input = s.ctx.createGain();
-  const delay = s.ctx.createDelay(4);
-  delay.delayTime.value = o.delay;
-  const lp = s.ctx.createBiquadFilter();
-  lp.type = 'lowpass';
-  lp.frequency.value = o.cutoff;
-  lp.Q.value = -3;
-  const fb = s.ctx.createGain();
-  fb.gain.value = o.feedback;
-  const wet = s.ctx.createGain();
-  wet.gain.value = o.wet ?? 1;
-  input.connect(delay).connect(lp);
-  lp.connect(fb).connect(delay);
-  lp.connect(wet).connect(o.dest ?? s.out);
-  return input;
-}
-
-/** Discrete reflections (distant walls, terrain) each with its own darkening. */
-export function taps(
-  s: Synth,
-  list: readonly { delay: number; gain: number; cutoff: number }[],
-  dest: AudioNode = s.out
-): GainNode {
-  const input = s.ctx.createGain();
-  for (const tap of list) {
-    const d = s.ctx.createDelay(4);
-    d.delayTime.value = tap.delay;
-    const lp = s.ctx.createBiquadFilter();
-    lp.type = 'lowpass';
-    lp.frequency.value = tap.cutoff;
-    lp.Q.value = -3;
-    input.connect(d).connect(lp).connect(gainNode(s, tap.gain, dest));
-  }
-  return input;
-}
-
 /** Soft saturation (tanh) for punch; input above ±1 clamps smoothly. */
 export function drive(s: Synth, amount: number, dest: AudioNode = s.out): WaveShaperNode {
   const ws = s.ctx.createWaveShaper();

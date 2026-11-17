@@ -139,7 +139,7 @@ export class WebAudioEngine implements AudioEngine {
     out.connect(cat.bus === 'ui' ? graph.ui : graph.effectsIn);
     if (cat.reverb > 0 && cat.bus === 'effects') {
       const send = ctx.createGain();
-      send.gain.value = cat.reverb * Math.min(1 + distance / 15, 3);
+      send.gain.value = cat.reverb * Math.min(1 + distance / 25, 1.8);
       out.connect(send).connect(graph.reverb);
       nodes.push(send);
     }

@@ -43,18 +43,18 @@ export interface CategoryMix {
 }
 
 export const CATEGORIES: Record<Category, CategoryMix> = {
-  gun: { loudness: -9, priority: 8, bus: 'effects', reverb: 0.32, falloff: 'loud', jitter: 0.025, burst: 2 },
+  gun: { loudness: -9, priority: 8, bus: 'effects', reverb: 0.12, falloff: 'loud', jitter: 0.025, burst: 2 },
   gunFar: { loudness: -11, priority: 6, bus: 'effects', reverb: 0.12, falloff: 'loud', jitter: 0.03, burst: 2 },
-  boom: { loudness: -9, priority: 9, bus: 'effects', reverb: 0.4, falloff: 'loud', jitter: 0.04, burst: 2 },
-  mech: { loudness: -22, priority: 6, bus: 'effects', reverb: 0.05, falloff: 'quiet', jitter: 0.03, burst: 2 },
-  step: { loudness: -24, priority: 3, bus: 'effects', reverb: 0.06, falloff: 'normal', jitter: 0.06, burst: 2 },
-  move: { loudness: -22, priority: 4, bus: 'effects', reverb: 0.08, falloff: 'normal', jitter: 0.04, burst: 1 },
-  impact: { loudness: -19, priority: 4, bus: 'effects', reverb: 0.15, falloff: 'normal', jitter: 0.06, burst: 2 },
-  hit: { loudness: -17, priority: 7, bus: 'effects', reverb: 0.1, falloff: 'normal', jitter: 0.03, burst: 2 },
+  boom: { loudness: -9, priority: 9, bus: 'effects', reverb: 0.18, falloff: 'loud', jitter: 0.04, burst: 2 },
+  mech: { loudness: -22, priority: 6, bus: 'effects', reverb: 0.03, falloff: 'quiet', jitter: 0.03, burst: 2 },
+  step: { loudness: -24, priority: 3, bus: 'effects', reverb: 0.03, falloff: 'normal', jitter: 0.06, burst: 2 },
+  move: { loudness: -22, priority: 4, bus: 'effects', reverb: 0.04, falloff: 'normal', jitter: 0.04, burst: 1 },
+  impact: { loudness: -19, priority: 4, bus: 'effects', reverb: 0.08, falloff: 'normal', jitter: 0.06, burst: 2 },
+  hit: { loudness: -17, priority: 7, bus: 'effects', reverb: 0.05, falloff: 'normal', jitter: 0.03, burst: 2 },
   marker: { loudness: -19, priority: 9, bus: 'effects', reverb: 0, falloff: 'normal', jitter: 0, burst: 1 },
-  debris: { loudness: -27, priority: 2, bus: 'effects', reverb: 0.08, falloff: 'quiet', jitter: 0.08, burst: 2 },
-  fx: { loudness: -18, priority: 5, bus: 'effects', reverb: 0.2, falloff: 'normal', jitter: 0.03, burst: 2 },
-  player: { loudness: -17, priority: 7, bus: 'effects', reverb: 0.05, falloff: 'normal', jitter: 0.03, burst: 1 },
+  debris: { loudness: -27, priority: 2, bus: 'effects', reverb: 0.05, falloff: 'quiet', jitter: 0.08, burst: 2 },
+  fx: { loudness: -18, priority: 5, bus: 'effects', reverb: 0.1, falloff: 'normal', jitter: 0.03, burst: 2 },
+  player: { loudness: -17, priority: 7, bus: 'effects', reverb: 0.03, falloff: 'normal', jitter: 0.03, burst: 1 },
   ui: { loudness: -27, priority: 10, bus: 'ui', reverb: 0, falloff: 'normal', jitter: 0.01, burst: 1 },
   stinger: { loudness: -19, priority: 10, bus: 'ui', reverb: 0, falloff: 'normal', jitter: 0, burst: 1 }
 };

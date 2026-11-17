@@ -62,22 +62,33 @@ export function MainMenu({ openSettings }: { openSettings: () => void }) {
             <div className='mt-1 text-sm font-semibold text-white drop-shadow-[0_1px_2px_rgba(0,0,0,.7)]'>{t(`style.${character}`)}</div>
             <Loadout character={character} />
           </div>
-          <div className='flex flex-wrap gap-2.5'>
-            {CHARACTER_IDS.map((id) => (
-              <button
-                key={id}
-                onClick={() => pick(id)}
-                aria-label={ROSTER[id].name}
-                aria-pressed={id === character}
-                className='relative h-14 w-14 rounded-2xl transition-transform hover:-translate-y-0.5'
-                style={{
-                  background: `linear-gradient(160deg, ${ROSTER[id].primary} 0 58%, ${ROSTER[id].secondary} 58% 100%)`,
-                  boxShadow: id === character ? '0 0 0 3px #fff, 0 6px 0 rgba(0,0,0,.35)' : '0 5px 0 rgba(0,0,0,.35)'
-                }}
-              >
-                <span className='bf-display absolute inset-x-0 bottom-1 text-center text-lg text-white drop-shadow-[0_2px_0_rgba(0,0,0,.5)]'>{ROSTER[id].name[0]}</span>
-              </button>
-            ))}
+          <div className='flex flex-wrap gap-2'>
+            {CHARACTER_IDS.map((id) => {
+              const selected = id === character;
+              return (
+                <button
+                  key={id}
+                  onClick={() => pick(id)}
+                  aria-pressed={selected}
+                  className='group flex w-[4.5rem] flex-col items-center gap-1 transition-transform hover:-translate-y-0.5'
+                >
+                  <span
+                    className='relative block h-16 w-16 overflow-hidden rounded-2xl'
+                    style={{
+                      background: `linear-gradient(160deg, ${ROSTER[id].primary} 0 55%, ${ROSTER[id].secondary} 55% 100%)`,
+                      boxShadow: selected ? '0 0 0 3px #fff, 0 6px 0 rgba(0,0,0,.35)' : '0 5px 0 rgba(0,0,0,.35)'
+                    }}
+                  >
+                    {app.portraits && <img src={app.portraits[id]} alt='' draggable={false} className='absolute inset-0 h-full w-full object-cover' />}
+                  </span>
+                  <span
+                    className={`max-w-full truncate text-xs font-semibold drop-shadow-[0_1px_2px_rgba(0,0,0,.8)] ${selected ? 'text-white' : 'text-white/75 group-hover:text-white'}`}
+                  >
+                    {ROSTER[id].name}
+                  </span>
+                </button>
+              );
+            })}
           </div>
           <input className='bf-input w-64' placeholder={t('namePlaceholder')} value={name} maxLength={16} onChange={(e) => rename(e.target.value)} />
         </section>

@@ -10,6 +10,7 @@ import { CollisionWorld } from '../sim/collision';
 import { INTERP_DELAY, TICK } from '../sim/constants';
 import { rayHitPlayer } from '../sim/hitboxes';
 import { eyeHeight } from '../sim/movement';
+import { StepSmoother } from './step-smoother';
 import { BUTTON, type Command, type MatchSettings } from '../sim/types';
 import { WEAPONS, type WeaponId } from '../weapons/defs';
 import { LOADOUTS, slotOf } from '../weapons/loadouts';
@@ -44,8 +45,9 @@ export class MatchView {
   private acc = 0;
   private latched = 0;
   private slot = 0;
-  private prevMove = { x: 0, y: 0, z: 0 };
+  private prevMove = { x: 0, y: 0, z: 0, grounded: false };
   private eye = v3();
+  private readonly steps = new StepSmoother();
   private tmp = v3();
   private tmp2 = v3();
   private lastSnapshot: Snapshot | null = null;
@@ -193,7 +195,7 @@ export class MatchView {
   /** Fixed-rate command generation and prediction. */
   private tick(input: FrameInput) {
     const m = this.me.move;
-    this.prevMove = { x: m.x, y: m.y, z: m.z };
+    this.prevMove = { x: m.x, y: m.y, z: m.z, grounded: m.grounded };
     if (input.slot !== null) this.slot = input.slot;
     if (input.cycle) this.slot = (this.slot + input.cycle + 2) % 2;
     const cmd: Command = {
@@ -211,6 +213,7 @@ export class MatchView {
     input.slot = null;
     input.cycle = 0;
     this.predictor.apply(cmd, this.hooks);
+    this.steps.tick(this.prevMove, m);
     this.session.sendCommands(this.predictor.unacked(4));
     if (m.landed > 4) {
       this.fp.land(m.landed);
@@ -256,9 +259,12 @@ export class MatchView {
     const s = this.predictor.smoothing;
     this.eye.set(
       this.prevMove.x + (m.x - this.prevMove.x) * alpha + s.x,
-      this.prevMove.y + (m.y - this.prevMove.y) * alpha + s.y + eyeHeight(m),
+      this.prevMove.y + (m.y - this.prevMove.y) * alpha + s.y,
       this.prevMove.z + (m.z - this.prevMove.z) * alpha + s.z
     );
+    if (alive) this.eye.y += this.steps.frame(alpha, dt);
+    else this.steps.reset();
+    this.eye.y += eyeHeight(m);
     const speed = Math.hypot(m.vx, m.vz);
     const def = WEAPONS[p.arms.weapon];
     this.scoped = alive && p.arms.weapon === 'sniper' && p.arms.ads > 0.85;
@@ -393,7 +399,7 @@ export class MatchView {
       const wasAlive = this.me.alive;
       if (first || (!wasAlive && snap.self.alive)) {
         this.predictor.reset(snap.self);
-        this.prevMove = { x: snap.self.move.x, y: snap.self.move.y, z: snap.self.move.z };
+        this.prevMove = { x: snap.self.move.x, y: snap.self.move.y, z: snap.self.move.z, grounded: snap.self.move.grounded };
         const mine = snap.players.find((p) => p.id === this.session.you);
         if (mine) {
           this.fp.yaw = mine.yaw;

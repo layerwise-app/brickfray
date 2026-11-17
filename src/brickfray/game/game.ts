@@ -17,7 +17,8 @@ import { HudStore } from './hud';
 import { Input } from './input';
 import { MatchView } from './match-view';
 import { saveSettings, type Settings } from './settings';
-import { Showroom } from './showroom';
+import { IDLE, Showroom } from './showroom';
+import { renderPortraits } from './portraits';
 
 const MAP_IDS: MapId[] = ['plaza', 'fortress', 'docks'];
 
@@ -64,6 +65,12 @@ export class Game {
     this.view.setCharacter(settings.character);
     this.view.onCue = (cue) => this.audio.play(`cue:${cue}`, { volume: 0.8, priority: 6 });
     this.showroom = new Showroom(this.kit, this.renderer, settings.character);
+    // After the first frame so the menu paints first.
+    requestAnimationFrame(() =>
+      setTimeout(() => {
+        if (!this.disposed) this.app.set({ portraits: renderPortraits(this.kit, this.renderer, IDLE, this.showroom.scene.environment) });
+      })
+    );
     this.input = new Input(canvas, settings.input);
     this.input.onMenu = () => this.setPaused(!this.app.state.paused);
     this.input.onCtrlHint = () => this.ctrlHint();

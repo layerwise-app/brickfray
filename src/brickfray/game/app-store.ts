@@ -1,3 +1,4 @@
+import type { CharacterId } from '../characters/types';
 import type { LobbyState } from '../net/protocol';
 import type { PublicLobby } from '../net/matchmaking';
 
@@ -15,10 +16,12 @@ export interface AppState {
   error: AppError;
   lobbies: PublicLobby[] | null;
   audioReady: boolean;
+  /** Character picker images (data URLs), rendered shortly after start. */
+  portraits: Record<CharacterId, string> | null;
 }
 
 export class AppStore {
-  state: AppState = { screen: 'menu', busy: null, lobby: null, isHost: false, paused: false, error: null, lobbies: null, audioReady: false };
+  state: AppState = { screen: 'menu', busy: null, lobby: null, isHost: false, paused: false, error: null, lobbies: null, audioReady: false, portraits: null };
   private listeners = new Set<() => void>();
 
   subscribe = (fn: () => void) => {

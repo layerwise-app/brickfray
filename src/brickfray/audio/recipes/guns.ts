@@ -1,18 +1,13 @@
 import type { WeaponId } from '../../weapons/defs';
 import type { SoundSpec } from '../catalog';
-import { clack, drive, echo, gainNode, noise, rand, taps, thump, tone, vary, type Synth } from '../synth';
+import { clack, drive, gainNode, noise, rand, thump, tone, vary, type Synth } from '../synth';
 
 type GunIds = `fire:${WeaponId}` | `fireFar:${WeaponId}` | 'dryFire';
 
-interface Reflection {
-  delay: number;
-  gain: number;
-  cutoff: number;
-}
-
 /**
  * Three layers per shot: mechanical (toy plastic), body (crack + blast +
- * band burst + thump, saturated together) and tail (decay + echo).
+ * band burst + thump, saturated together) and a short decaying tail. Space
+ * comes from the mixer's shared room; baked echoes repeat on every shot.
  * Gains are relative RMS: band-limited noise keeps only a fraction of its
  * power, so noise layers carry larger numbers than the sine thump.
  */
@@ -26,14 +21,13 @@ interface GunVoice {
   burst: { freq: number; to: number; q: number; decay: number; gain: number };
   thump: { from: number; to: number; glide: number; decay: number; gain: number };
   drive: number;
-  tail: { cutoff: number; to: number; decay: number; gain: number; delay: number; feedback: number; echoCut: number };
-  reflections?: readonly Reflection[];
-  far: { duration: number; cutoff: number; body: number; tail: number; decay: number; thump: number; echo: number };
+  tail: { cutoff: number; to: number; decay: number; gain: number };
+  far: { duration: number; cutoff: number; body: number; tail: number; decay: number; thump: number };
 }
 
 const BASE = {
   ar: {
-    duration: 0.95,
+    duration: 0.7,
     loudness: [-9.5, -11.5],
     mech: (s) => {
       clack(s, 0, { pitch: 2300, gain: 0.7, decay: 0.04 });
@@ -45,11 +39,11 @@ const BASE = {
     burst: { freq: 1500, to: 600, q: 0.8, decay: 0.13, gain: 3.2 },
     thump: { from: 165, to: 55, glide: 0.05, decay: 0.17, gain: 0.45 },
     drive: 2,
-    tail: { cutoff: 2600, to: 900, decay: 0.55, gain: 0.6, delay: 0.075, feedback: 0.28, echoCut: 2000 },
-    far: { duration: 1.9, cutoff: 1400, body: 2.4, tail: 1, decay: 1.4, thump: 0.3, echo: 0.21 }
+    tail: { cutoff: 3200, to: 1300, decay: 0.32, gain: 0.42 },
+    far: { duration: 1.3, cutoff: 1400, body: 2.4, tail: 1, decay: 0.9, thump: 0.3 }
   },
   shotgun: {
-    duration: 1.7,
+    duration: 1.1,
     loudness: [-9, -11],
     mech: (s) => {
       clack(s, 0, { pitch: 1500, gain: 0.6, decay: 0.06 });
@@ -61,14 +55,13 @@ const BASE = {
     crack: { hp: 1200, decay: 0.035, gain: 1.4 },
     blast: { cutoff: 3000, decay: 0.12, gain: 1 },
     burst: { freq: 1000, to: 300, q: 0.6, decay: 0.26, gain: 3.4 },
-    thump: { from: 120, to: 36, glide: 0.11, decay: 0.5, gain: 0.75 },
+    thump: { from: 120, to: 40, glide: 0.1, decay: 0.34, gain: 0.7 },
     drive: 2.4,
-    tail: { cutoff: 1800, to: 500, decay: 1.15, gain: 0.7, delay: 0.12, feedback: 0.38, echoCut: 1400 },
-    reflections: [{ delay: 0.31, gain: 0.22, cutoff: 900 }],
-    far: { duration: 2.6, cutoff: 900, body: 3, tail: 1.2, decay: 2, thump: 0.55, echo: 0.27 }
+    tail: { cutoff: 2400, to: 800, decay: 0.55, gain: 0.5 },
+    far: { duration: 1.7, cutoff: 900, body: 3, tail: 1.2, decay: 1.2, thump: 0.55 }
   },
   sniper: {
-    duration: 2.9,
+    duration: 1.6,
     loudness: [-9, -11],
     mech: (s) => {
       clack(s, 0, { pitch: 2000, gain: 0.4, decay: 0.05 });
@@ -79,17 +72,11 @@ const BASE = {
     burst: { freq: 2200, to: 500, q: 0.7, decay: 0.13, gain: 3 },
     thump: { from: 110, to: 42, glide: 0.07, decay: 0.32, gain: 0.55 },
     drive: 2.2,
-    tail: { cutoff: 1600, to: 350, decay: 2.1, gain: 0.75, delay: 0.16, feedback: 0.3, echoCut: 1200 },
-    reflections: [
-      { delay: 0.23, gain: 0.3, cutoff: 1000 },
-      { delay: 0.48, gain: 0.22, cutoff: 750 },
-      { delay: 0.81, gain: 0.16, cutoff: 520 },
-      { delay: 1.22, gain: 0.1, cutoff: 400 }
-    ],
-    far: { duration: 3.4, cutoff: 1100, body: 2.6, tail: 1.3, decay: 2.6, thump: 0.35, echo: 0.33 }
+    tail: { cutoff: 2600, to: 900, decay: 0.8, gain: 0.5 },
+    far: { duration: 2.1, cutoff: 1100, body: 2.6, tail: 1.3, decay: 1.5, thump: 0.35 }
   },
   pistol: {
-    duration: 0.65,
+    duration: 0.5,
     loudness: [-10.5, -12.5],
     mech: (s) => {
       clack(s, 0, { pitch: 3000, gain: 0.7, decay: 0.035 });
@@ -101,8 +88,8 @@ const BASE = {
     burst: { freq: 2800, to: 1200, q: 1, decay: 0.09, gain: 2.6 },
     thump: { from: 200, to: 85, glide: 0.04, decay: 0.13, gain: 0.3 },
     drive: 1.8,
-    tail: { cutoff: 4000, to: 1600, decay: 0.36, gain: 0.45, delay: 0.05, feedback: 0.22, echoCut: 3000 },
-    far: { duration: 1.6, cutoff: 1700, body: 2.2, tail: 0.9, decay: 1.1, thump: 0.2, echo: 0.18 }
+    tail: { cutoff: 4500, to: 2000, decay: 0.22, gain: 0.32 },
+    far: { duration: 1.0, cutoff: 1700, body: 2.2, tail: 0.9, decay: 0.7, thump: 0.2 }
   }
 } satisfies Record<string, GunVoice>;
 
@@ -111,7 +98,7 @@ const VOICES: Record<WeaponId, GunVoice> = {
   // Nailer: rapid, light and snappy; a pneumatic hiss under the crack.
   nailer: {
     ...BASE.ar,
-    duration: 0.7,
+    duration: 0.5,
     loudness: [-10.5, -12.5],
     mech: (s) => {
       clack(s, 0, { pitch: 2900, gain: 0.6, decay: 0.03 });
@@ -119,7 +106,7 @@ const VOICES: Record<WeaponId, GunVoice> = {
     },
     burst: { freq: 2000, to: 900, q: 0.9, decay: 0.09, gain: 2.8 },
     thump: { from: 190, to: 80, glide: 0.04, decay: 0.12, gain: 0.3 },
-    tail: { ...BASE.ar.tail, decay: 0.4, gain: 0.5 }
+    tail: { ...BASE.ar.tail, decay: 0.25, gain: 0.35 }
   },
   // Pulse Carbine: a bright electric zap riding on a rifle report.
   pulse: {
@@ -134,7 +121,7 @@ const VOICES: Record<WeaponId, GunVoice> = {
   // Harpooner: a deep pneumatic thunk, less crack than a rifle.
   harpoon: {
     ...BASE.sniper,
-    duration: 1.8,
+    duration: 1.2,
     mech: (s) => {
       clack(s, 0, { pitch: 1300, gain: 0.7, decay: 0.07 });
       noise(s, 0, { attack: 0.002, decay: 0.12, gain: 0.5, filter: { type: 'bandpass', freq: 900, q: 1 } });
@@ -145,12 +132,12 @@ const VOICES: Record<WeaponId, GunVoice> = {
   // Hand Cannon: a heavy revolver boom.
   cannon: {
     ...BASE.pistol,
-    duration: 1.2,
+    duration: 0.9,
     loudness: [-9.5, -11.5],
     crack: { hp: 1800, decay: 0.024, gain: 1.7 },
     burst: { freq: 1600, to: 500, q: 0.8, decay: 0.16, gain: 3.2 },
     thump: { from: 140, to: 48, glide: 0.07, decay: 0.3, gain: 0.6 },
-    tail: { ...BASE.pistol.tail, cutoff: 2600, decay: 0.8, gain: 0.6 }
+    tail: { cutoff: 3000, to: 1100, decay: 0.45, gain: 0.45 }
   },
   // Buzzer: a thin, fast machine-pistol rattle.
   buzzer: {
@@ -164,17 +151,7 @@ const VOICES: Record<WeaponId, GunVoice> = {
 
 function nearShot(g: GunVoice) {
   return (s: Synth) => {
-    const tailBus = gainNode(s, 1);
-    const room = echo(s, {
-      delay: g.tail.delay * vary(s, 0.1),
-      feedback: g.tail.feedback,
-      cutoff: g.tail.echoCut,
-      wet: 0.55
-    });
-    tailBus.connect(room);
-    if (g.reflections) tailBus.connect(taps(s, g.reflections));
     const shaped = drive(s, g.drive);
-    shaped.connect(gainNode(s, 0.3, tailBus));
     const body = gainNode(s, 0.5, shaped);
     noise(s, 0, {
       attack: 0.0003,
@@ -210,31 +187,17 @@ function nearShot(g: GunVoice) {
       filter: [
         { type: 'lowpass', freq: g.tail.cutoff, sweep: [[g.tail.decay * 0.5, g.tail.to]] },
         { type: 'highpass', freq: 70 }
-      ],
-      dest: tailBus
+      ]
     });
     g.mech(s);
   };
 }
 
-/** Distant shot: air eats the highs and the crack, terrain stretches the tail. */
+/** Distant shot: air eats the highs and the crack; a longer, darker tail sells the distance. */
 function farShot(g: GunVoice) {
   return (s: Synth) => {
     const f = g.far;
-    const tailBus = gainNode(s, 1);
-    tailBus.connect(echo(s, { delay: f.echo * vary(s, 0.1), feedback: 0.42, cutoff: f.cutoff * 0.6, wet: 0.6 }));
-    tailBus.connect(
-      taps(
-        s,
-        (g.reflections ?? [{ delay: 0.35, gain: 0.2, cutoff: 800 }]).map((r) => ({
-          ...r,
-          delay: r.delay * 1.4 * vary(s, 0.1),
-          cutoff: r.cutoff * 0.7
-        }))
-      )
-    );
     const body = gainNode(s, 1);
-    body.connect(gainNode(s, 0.4, tailBus));
     noise(s, 0, {
       attack: 0.006,
       decay: g.burst.decay * 2.2,
@@ -258,8 +221,7 @@ function farShot(g: GunVoice) {
       filter: [
         { type: 'lowpass', freq: f.cutoff * 0.7, sweep: [[f.decay * 0.6, f.cutoff * 0.25]] },
         { type: 'highpass', freq: 55 }
-      ],
-      dest: tailBus
+      ]
     });
   };
 }

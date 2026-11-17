@@ -6,15 +6,13 @@ export interface ImpulseOptions {
   t60: number;
   /** Early reflections in seconds with gains (a small room). */
   early: readonly (readonly [number, number])[];
-  /** Outdoor slap-back from a distant wall. */
-  slap?: { time: number; gain: number };
   /** Tail brightness: low-pass cutoff in Hz at the start and the end. */
   bright: [number, number];
   gain: number;
   seed: number;
 }
 
-/** Generated stereo impulse response: early taps, optional slap, then a darkening noise tail. */
+/** Generated stereo impulse response: early taps, then a darkening noise tail. */
 export function makeImpulse(ctx: BaseAudioContext, o: ImpulseOptions): AudioBuffer {
   const sr = ctx.sampleRate;
   const length = Math.ceil(o.seconds * sr);
@@ -38,29 +36,30 @@ export function makeImpulse(ctx: BaseAudioContext, o: ImpulseOptions): AudioBuff
       for (let j = 0; j < 4 && at + j < length; j++) data[at + j]! += gain * (1 - j * 0.3);
     };
     for (const [time, gain] of o.early) put(time * spread, gain * (rng() < 0.5 ? -1 : 1));
-    if (o.slap) {
-      put(o.slap.time * (ch === 0 ? 1 : 1.04), o.slap.gain);
-      put(o.slap.time * 1.9, o.slap.gain * 0.35);
-    }
     for (let i = 0; i < length; i++) data[i]! *= o.gain;
   }
   return buffer;
 }
 
-/** The game's shared space: small outdoor slap plus a short room. */
+/**
+ * The game's shared space: a short, bright ambience that fuses with the dry
+ * sound. No discrete echoes; they read as a cheap slap-back on every shot.
+ */
 export const WORLD_IMPULSE: Omit<ImpulseOptions, 'seed'> = {
-  seconds: 1.3,
-  t60: 0.75,
+  seconds: 0.8,
+  t60: 0.42,
   early: [
-    [0.011, 0.45],
-    [0.017, 0.35],
-    [0.024, 0.3],
-    [0.033, 0.24],
-    [0.047, 0.18]
+    [0.006, 0.22],
+    [0.009, 0.18],
+    [0.013, 0.16],
+    [0.017, 0.13],
+    [0.022, 0.11],
+    [0.028, 0.09],
+    [0.035, 0.07],
+    [0.043, 0.05]
   ],
-  slap: { time: 0.095, gain: 0.32 },
-  bright: [7000, 1800],
-  gain: 0.5
+  bright: [10000, 4000],
+  gain: 0.2
 };
 
 export const MUSIC_IMPULSE: Omit<ImpulseOptions, 'seed'> = {

@@ -1,6 +1,6 @@
 import type { Surface } from '../../world/types';
 import type { SoundSpec } from '../catalog';
-import { clack, drive, echo, gainNode, grains, noise, rand, strike, thump, tone, vary, type Synth } from '../synth';
+import { clack, drive, gainNode, grains, noise, rand, strike, thump, tone, vary, type Synth } from '../synth';
 import { bounces, metal, rustle, splash, whoosh } from './parts';
 
 const crack = (s: Synth, at: number, hp: number, gain: number, decay = 0.016) =>
@@ -69,9 +69,7 @@ const IMPACT_SOUNDS = Object.fromEntries(
 ) as Record<`impact:${Surface}`, SoundSpec>;
 
 function explosion(s: Synth) {
-  const tail = echo(s, { delay: 0.3 * vary(s, 0.1), feedback: 0.35, cutoff: 600, wet: 0.5 });
   const shaped = drive(s, 2.5);
-  shaped.connect(gainNode(s, 0.3, tail));
   const body = gainNode(s, 0.5, shaped);
   crack(s, 0, 1000, 1.5, 0.05);
   noise(s, 0, {

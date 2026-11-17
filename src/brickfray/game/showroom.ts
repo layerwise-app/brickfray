@@ -10,7 +10,7 @@ import { createWeaponModel } from '../weapons';
 import { LOADOUTS } from '../weapons/loadouts';
 import type { WeaponModel } from '../weapons/types';
 
-const IDLE: AnimState = {
+export const IDLE: AnimState = {
   localVelocity: { x: 0, z: 0 },
   speed: 0,
   grounded: true,
