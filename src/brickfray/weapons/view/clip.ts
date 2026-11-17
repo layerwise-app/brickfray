@@ -14,8 +14,8 @@ export interface ClipCtx {
   tuning: Tuning;
   view: THREE.Object3D;
   goals: Record<string, Goal>;
-  /** Extra flags: shotgun reload began empty, grenade throw is low, etc. */
-  flags: { empty: boolean; low: boolean; autoThrow: boolean };
+  /** Extra flags: shotgun reload began empty. */
+  flags: { empty: boolean };
 }
 
 /** What a clip contributes this frame, on top of the procedural pose. */

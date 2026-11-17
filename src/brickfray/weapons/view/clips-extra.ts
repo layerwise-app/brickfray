@@ -21,6 +21,7 @@ export function extraGoals(view: THREE.Object3D): Record<string, Goal> {
     malletHit: goal(view, [-0.06, -0.15, -0.42], holdQuat([0.05, 0.4, -0.92], [1, 0.05, 0.05])),
     malletFollow: goal(view, [0.2, -0.24, -0.36], holdQuat([0.8, 0.25, -0.55], [0.55, -0.1, 0.83])),
     grenadeHold: goal(view, [-0.09, -0.13, -0.4], holdQuat([0.2, 0.9, 0.4], [0.3, 0.2, 0.95])),
+    grenadeCocked: goal(view, [-0.15, -0.035, -0.4], holdQuat([0.25, 0.9, 0.35], [0.35, 0.1, -0.93])),
     overWind: goal(view, [-0.2, 0.1, -0.16], holdQuat([0.1, 0.6, 0.8], [0.3, 0.3, -0.9])),
     overRelease: goal(view, [-0.05, 0.06, -0.55], holdQuat([0.1, 0.95, -0.3], [0.1, -0.4, -0.9])),
     overFollow: goal(view, [0.08, -0.38, -0.45], holdQuat([0.3, 0.3, -0.9], [0.1, -0.95, -0.2])),
@@ -62,30 +63,34 @@ export function meleeClip(): Clip {
   });
 }
 
-/** Gun lowered, bomb up in the left hand, right hand pulls the pin. Holds until the throw. */
-export function cookClip(duration: number): Clip {
-  const pin: Keys = [[0.7, Z], [0.84, [0.075, 0.012, 0.02]]];
-  return clip('cook', duration, [[0.04, 'cloth'], [0.74, 'pinPull']], (u, f, c) => {
+/** Gun lowered, bomb up in the left hand, right hand pulls the pin, then the arm cocks back and holds until the throw. */
+export function cookClip(): Clip {
+  const pin: Keys = [[0.54, Z], [0.65, [0.075, 0.012, 0.02]]];
+  return clip('cook', 0.8, [[0.03, 'cloth'], [0.57, 'pinPull']], (u, f, c) => {
     const g = c.goals;
-    f.gun(track(u, [[0, Z], [0.4, GRENADE_DOWN]]));
-    f.left = hand(u, [[0, g.leftRest!], [0.2, g.low!], [0.48, g.grenadeHold!]]);
-    f.right = hand(u, [[0, g.rightRest!], [0.46, g.rightRest!], [0.64, g.ring!], [0.72, g.ring!], [0.86, g.ring!], [1, g.rightRest!]]);
+    f.gun(track(u, [[0, Z], [0.31, GRENADE_DOWN]]));
+    f.left = hand(u, [[0, g.leftRest!], [0.16, g.low!], [0.37, g.grenadeHold!], [0.74, g.grenadeHold!], [1, g.grenadeCocked!]]);
+    f.right = hand(u, [[0, g.rightRest!], [0.36, g.rightRest!], [0.5, g.ring!], [0.56, g.ring!], [0.67, g.ring!], [0.78, g.rightRest!]]);
     f.part('pin', track(u, pin));
-    f.show.grenade = u > 0.12;
-    f.show.pin = u < 0.95;
+    f.show.grenade = u > 0.09;
+    f.show.pin = u < 0.74;
     f.busy = Math.min(1, u * 4);
   }, true);
 }
 
-/** Overhand (or underhand when low) throw, then the gun comes back up. */
+/**
+ * Overhand (or underhand when low) throw from the raised arm, then the gun comes back up.
+ * The bomb leaves the hand ~0.1 s in, when the host's grenade first shows through the interpolation delay.
+ */
 export function throwClip(low: boolean): Clip {
-  return clip('throw', 0.85, [[0.05, 'cloth'], [0.33, 'throw'], [0.33, 'release']], (u, f, c) => {
+  const out = low ? 0.16 : 0.14;
+  return clip('throw', 0.75, [[0.02, 'cloth'], [out, 'throw'], [out, 'release']], (u, f, c) => {
     const g = c.goals;
-    const [wind, release, follow] = low ? [g.underWind!, g.underRelease!, g.underFollow!] : [g.overWind!, g.overRelease!, g.overFollow!];
-    f.gun(track(u, [[0, GRENADE_DOWN], [0.55, GRENADE_DOWN], [1, Z]]));
-    f.left = hand(u, [[0, g.grenadeHold!], [0.2, wind], [0.34, release], [0.5, follow], [0.62, g.low!], [0.92, g.leftRest!]]);
-    f.show.grenade = u < 0.34;
+    const [release, follow] = low ? [g.underRelease!, g.underFollow!] : [g.overRelease!, g.overFollow!];
+    f.gun(track(u, [[0, GRENADE_DOWN], [0.5, GRENADE_DOWN], [1, Z]]));
+    f.left = hand(u, [[0, g.grenadeCocked!], [0.05, g.overWind!], [out, release], [out + 0.18, follow], [out + 0.32, g.low!], [0.88, g.leftRest!]]);
+    f.show.grenade = u < out + 0.01;
     f.show.pin = false;
-    f.busy = 1 - seg(u, 0.75, 1);
+    f.busy = 1 - seg(u, 0.7, 1);
   });
 }

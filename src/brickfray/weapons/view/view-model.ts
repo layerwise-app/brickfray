@@ -77,7 +77,7 @@ class FirstPersonView implements ViewModel {
     this.arms.left.hand.add(this.shell);
     this.pinRest = this.grenade.parts.get('pin')?.position.clone() ?? new THREE.Vector3();
     this.extra = extraGoals(this.scene);
-    this.ctx = { id: 'ar', tuning: null!, view: this.scene, goals: {}, flags: { empty: false, low: false, autoThrow: false } };
+    this.ctx = { id: 'ar', tuning: null!, view: this.scene, goals: {}, flags: { empty: false } };
     this.setCharacter('rivet');
     this.equip('ar');
   }
@@ -153,14 +153,10 @@ class FirstPersonView implements ViewModel {
       case 'melee':
         return this.play(meleeClip());
       case 'grenadeCook':
-        this.ctx.flags.autoThrow = false;
-        return this.play(cookClip(0.62));
+        return this.play(cookClip());
       case 'grenadeThrow':
-        this.ctx.flags.low = action.low;
-        if (this.player.clip?.name === 'cook' && this.player.u >= 1) return this.play(throwClip(action.low));
-        this.ctx.flags.autoThrow = true;
-        if (this.player.clip?.name !== 'cook') this.play(cookClip(0.42));
-        return;
+        // The host throws on release, so a quick tap skips the rest of the cook and blends straight into the throw.
+        return this.play(throwClip(action.low));
       case 'switch':
         this.pendingWeapon = action.to;
         this.pendingDraw = action.draw;
@@ -218,10 +214,6 @@ class FirstPersonView implements ViewModel {
     const f = this.frame;
     f.reset();
     this.player.update(dt, this.onEvent);
-    if (this.player.clip?.name === 'cook' && this.ctx.flags.autoThrow && this.player.u >= 1) {
-      this.ctx.flags.autoThrow = false;
-      this.play(throwClip(this.ctx.flags.low));
-    }
     this.player.clip?.sample(this.player.u, f, this.ctx);
     this.slideKick = Math.min(1, this.slideKick + dt / 0.1);
     this.fade = Math.max(0, this.fade - dt / FADE);
@@ -289,6 +281,14 @@ class FirstPersonView implements ViewModel {
       }
     }
     root.updateMatrixWorld(true);
+    // Shots leave from the screen center, so an aimed sight must stay on it; sway, bob and recoil swing the gun around the dot.
+    const dot = this.gun.rigged.model.sight;
+    if (ads > 0 && dot) {
+      dot.getWorldPosition(this.tmpV);
+      root.position.x -= this.tmpV.x * ads;
+      root.position.y -= this.tmpV.y * ads;
+      root.updateMatrixWorld(true);
+    }
   }
 
   private slideOffset() {

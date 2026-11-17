@@ -72,18 +72,20 @@ export class Motion {
     this.recoilRot.step(dt);
     this.flinch.step(dt);
 
+    // Aiming straightens the crouch cant.
+    const cant = this.crouch * (1 - ads);
     const t = input.time;
     const breathe = (0.35 + 0.65 * calm) * (1 - this.sprint);
     this.pos.set(
-      s1 * 0.0085 * amp - this.crouch * 0.008,
-      s2 * 0.0052 * amp - Math.abs(s1) * 0.002 * amp + this.air * 0.009 + this.land.value.y * 0.06 - this.crouch * 0.01 + Math.sin(t * 1.55) * 0.0013 * breathe,
-      this.crouch * 0.008 + this.land.value.x * 0.04
+      s1 * 0.0085 * amp - cant * 0.008,
+      s2 * 0.0052 * amp - Math.abs(s1) * 0.002 * amp + this.air * 0.009 + this.land.value.y * 0.06 - cant * 0.01 + Math.sin(t * 1.55) * 0.0013 * breathe,
+      cant * 0.008 + this.land.value.x * 0.04
     );
     this.pos.add(this.swayPos.value).add(this.recoilPos.value);
     this.rot.set(
-      s2 * 0.007 * amp + this.air * 0.035 + this.land.value.y * 0.28 + this.crouch * 0.02 + Math.sin(t * 1.55 + 0.7) * 0.0045 * breathe,
+      s2 * 0.007 * amp + this.air * 0.035 + this.land.value.y * 0.28 + cant * 0.02 + Math.sin(t * 1.55 + 0.7) * 0.0045 * breathe,
       s1 * 0.009 * amp * (1 + this.sprint) + Math.sin(t * 0.71) * 0.0025 * breathe,
-      -s1 * 0.014 * amp + this.crouch * 0.075
+      -s1 * 0.014 * amp + cant * 0.075
     );
     this.rot.add(this.swayRot.value).add(this.recoilRot.value).add(this.flinch.value);
   }
