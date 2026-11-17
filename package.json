@@ -16,7 +16,8 @@
     "cf-typegen": "wrangler types",
     "auth:generate": "pnpm dlx auth@latest generate",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "node scripts/migrate-local.mjs"
+    "db:migrate": "node scripts/migrate-local.mjs",
+    "test:brickfray": "node --import ./scripts/register-typescript.mjs --test scripts/brickfray.test.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",

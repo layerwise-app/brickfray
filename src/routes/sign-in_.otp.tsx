@@ -1,3 +1,4 @@
+import { seo } from '~/utils/seo';
 import { useState } from 'react';
 import {
   createFileRoute,
@@ -28,6 +29,7 @@ export const Route = createFileRoute('/sign-in_/otp')({
   beforeLoad: ({ search }) => {
     if (!search.email) throw redirect({ to: '/sign-in' });
   },
+  head: () => seo({title: 'Account — Brickfray', noindex: true}),
   component: EmailOtpPage
 });
 

@@ -1,3 +1,4 @@
+import { seo } from '~/utils/seo';
 import { useState } from 'react';
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router';
 import { useMutation } from '@tanstack/react-query';
@@ -21,6 +22,7 @@ import { Label } from '~/components/ui/label';
 import { Separator } from '~/components/ui/separator';
 
 export const Route = createFileRoute('/sign-in')({
+  head: () => seo({title: 'Account — Brickfray', noindex: true}),
   component: SignInPage
 });
 

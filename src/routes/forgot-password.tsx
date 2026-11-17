@@ -1,3 +1,4 @@
+import { seo } from '~/utils/seo';
 import { useState } from 'react';
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { useMutation } from '@tanstack/react-query';
@@ -19,6 +20,7 @@ import {
 } from '~/components/ui/input-otp';
 
 export const Route = createFileRoute('/forgot-password')({
+  head: () => seo({title: 'Account — Brickfray', noindex: true}),
   component: ForgotPasswordPage
 });
 

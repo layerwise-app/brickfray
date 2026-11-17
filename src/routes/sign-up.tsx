@@ -1,3 +1,4 @@
+import { seo } from '~/utils/seo';
 import { useState } from 'react';
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router';
 import { useMutation } from '@tanstack/react-query';
@@ -14,6 +15,7 @@ import { Input } from '~/components/ui/input';
 import { Label } from '~/components/ui/label';
 
 export const Route = createFileRoute('/sign-up')({
+  head: () => seo({title: 'Account — Brickfray', noindex: true}),
   component: SignUpPage
 });
 

@@ -23,12 +23,12 @@ export const Route = createRootRouteWithContext<{
       { charSet: 'utf-8' },
       { name: 'viewport', content: 'width=device-width, initial-scale=1' },
       ...seo({
-        title: 'Doodle District',
+        title: 'Brickfray',
         description:
-          'A doodle-style first-person survival shooter you play in the browser, solo or online.'
-      })
+          'An original brick-built online FPS with Snapbots, four weapons and three colorful arenas.'
+      }).meta
     ],
-    links: [{ rel: 'icon', href: '/favicon.ico' }]
+    links: [{ rel: 'icon', href: '/brickfray-icon.svg' }]
   }),
   errorComponent: (props) => (
     <RootDocument>

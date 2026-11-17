@@ -7,14 +7,14 @@
 // every slot at once - a directory with no directory server. A connection only counts once the
 // host has answered with a welcome, so a full or closed lobby can be skipped for the next one.
 
-import Peer, { type DataConnection, type PeerOptions } from 'peerjs';
+import Peer, { util, type DataConnection, type PeerOptions } from 'peerjs';
 import type { DamageSource } from '../context';
 import type { PlayerSnapshot } from '../entities/remote-player';
 import { t } from '../core/i18n';
 
 // a local dev server gets its own namespace so testing can never wander into a live lobby
 const LOCAL = typeof location !== 'undefined' && /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname);
-const PREFIX = LOCAL ? 'doodledev-' : 'doodledistrict-';
+const PREFIX = LOCAL ? 'brickfraydev-' : 'brickfray-';
 const PUBLIC_SLOTS = 16;
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
@@ -26,8 +26,8 @@ const PEER_OPTS: PeerOptions = {
   debug: 0,
   config: {
     iceServers: [
-      { urls: 'stun:stun.l.google.com:19302' },
-      { urls: 'stun:stun1.l.google.com:19302' },
+      // Keep PeerJS's bundled TURN fallback; STUN-only breaks restrictive NATs.
+      ...util.defaultConfig.iceServers,
       { urls: 'stun:stun.cloudflare.com:3478' },
     ],
   },
@@ -98,6 +98,7 @@ type Vec3Array = number[];
 
 /** Payload (`d`) of every message type, keyed by the message's `t`. */
 export interface NetPayloads {
+  bf: unknown;
   // connection handshake (handled inside Net, except `refused` which the game also listens to)
   welcome: WelcomeInfo;
   refused: RefusedInfo;
@@ -205,6 +206,11 @@ const publicIds = (): string[] => {
 
 /** Lobby hosting/joining and message passing between the host and its clients. */
 export class Net {
+  readonly diagnostics: string[] = [];
+  private diagnostic(message: string): void {
+    this.diagnostics.push(message);
+    if (this.diagnostics.length > 12) this.diagnostics.shift();
+  }
   peer: Peer | null = null;
   readonly conns = new Map<string, DataConnection>();
   isHost = false;
@@ -283,6 +289,7 @@ export class Net {
         resolve(peer);
       });
       peer.on('error', (err) => {
+        this.diagnostic('signal ' + String(err));
         if (settled) return;
         settled = true;
         signal.removeEventListener('abort', abort);
@@ -294,6 +301,7 @@ export class Net {
   }
 
   private wire(conn: DataConnection): void {
+    conn.on('iceStateChanged', (state) => this.diagnostic('ICE ' + state));
     conn.on('data', (msg) => {
       if (this.conns.get(conn.peer) !== conn) return;
       this.stats.recv++;
@@ -320,6 +328,13 @@ export class Net {
   }
 
   private route(msg: NetEnvelope, from: string): void {
+    // Brickfray commands must reach the authority with their authenticated connection ID.
+    // Never trust sender-selected identities or relay authoritative game packets.
+    if (msg.t === 'bf') {
+      if (!this.isHost && from !== this.hostId) return;
+      this.emit('bf', msg.d, from);
+      return;
+    }
     // clients can address each other; the host forwards those
     if (this.isHost && msg.to && msg.to !== this.id) {
       const c = this.conns.get(msg.to);
@@ -429,6 +444,11 @@ export class Net {
       const seat = (): void => {
         if (signal.aborted) { closeQuietly(conn); return; }
         if (this.conns.has(conn.peer)) return;
+        if (!this.accepting || this.conns.size >= this.maxPlayers - 1) {
+          conn.send({ t: 'refused', d: { reason: 'that lobby is full' } });
+          setTimeout(() => closeQuietly(conn), 200);
+          return;
+        }
         this.conns.set(conn.peer, conn);
         this.wire(conn);
         if (this.onPeerJoin) this.onPeerJoin(conn.peer, meta || {});
@@ -576,6 +596,8 @@ export class Net {
           pending--;
           continue;
         }
+        conn.on('iceStateChanged', (state) => this.diagnostic('ICE '+state));
+        conn.on('error', err => this.diagnostic('connection '+String(err)));
         const a: Attempt = { conn, hostId, done: false };
         attempts.push(a);
         conn.on('data', (msg) => {
@@ -654,6 +676,8 @@ export class Net {
           pending--;
           continue;
         }
+        conn.on('iceStateChanged', (state) => this.diagnostic('ICE '+state));
+        conn.on('error', err => this.diagnostic('connection '+String(err)));
         const a: Attempt = { conn, hostId, done: false };
         attempts.push(a);
         conn.on('data', (msg) => {
@@ -742,6 +766,8 @@ export class Net {
           pending--;
           continue;
         }
+        conn.on('iceStateChanged', (state) => this.diagnostic('ICE '+state));
+        conn.on('error', err => this.diagnostic('connection '+String(err)));
         const a: Attempt = { conn, hostId, done: false };
         attempts.push(a);
         conn.on('data', (msg) => {

@@ -1,21 +1,20 @@
-import { createFileRoute } from '@tanstack/react-router';
-import { DoodleDistrict } from '~/components/DoodleDistrict';
-import { seo } from '~/utils/seo';
+import { createFileRoute } from "@tanstack/react-router";
+import { Brickfray } from "~/components/Brickfray";
+import { seo } from "~/utils/seo";
 
-const homePageTitle = '涂鸦街区';
+const homePageTitle = "Brickfray — Small bricks. Big battles.";
 
-export const Route = createFileRoute('/')({
-  head: () => ({
-    meta: [
-      ...seo({
-        title: homePageTitle,
-        description: '一款涂鸦风第一人称生存射击游戏，复刻自 doodleshooter'
-      })
-    ]
-  }),
-  component: Home
+export const Route = createFileRoute("/")({
+  head: () =>
+    seo({
+      title: homePageTitle,
+      description:
+        "An original brick-built online FPS. Battle with up to 10 players or survive waves of Snapbots in three colorful arenas.",
+      path: "/",
+    }),
+  component: Home,
 });
 
 function Home() {
-  return <DoodleDistrict />;
+  return <Brickfray />;
 }

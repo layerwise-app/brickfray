@@ -1,115 +1,42 @@
-<a href="https://layerwise.app"><picture><source media="(prefers-color-scheme: dark)" srcset="https://layerwise.app/powered-by-dark.png"><img src="https://layerwise.app/powered-by.png" alt="Powered by Layerwise" width="174" height="28"></picture></a>
+# Brickfray
 
-# Doodle Shooter
+An original plastic-brick FPS with square-headed Snapbots, three arenas, four weapons, solo waves and browser-hosted multiplayer. All materials, models, effects and audio are procedural. No external texture or audio samples are used.
 
-Doodle Shooter is a first-person survival shooter that looks like blue ballpoint
-pen on lined notebook paper, and it runs right in the browser. In the game it
-is called Doodle District (涂鸦街区). It's a starting point for anyone who wants
-to make their own browser shooter or 3D game without setting up an engine.
-Visitors can play solo against waves of doodled enemies, with a boss every
-fifth wave. They can also join a free-for-all online match with up to 10
-players. Try the live demo at <https://doodleshooter.layerwise.site/>.
+## Run and validate
 
-It was built with [Layerwise](https://layerwise.app), and you can open it in
-Layerwise to make your own version.
+Layerwise owns the development server. Use the preview and `.layerwise/dev-server.log`; do not start a second server.
 
-## What's in the game
-
-- **Solo waves.** Each wave is bigger than the last, and from wave 4 regular
-  waves can roll a random modifier. Every fifth wave brings a boss: The
-  Doodler, The Eraser, or The Inkblot, in turn. Reaching wave 5, 10, 15 and so
-  on saves a checkpoint you can restart from.
-- **Three maps.** Doodle District (streets and rooftops), Desk Top (shrunk on a
-  school desk with no walls, so stepping off the edge is fatal; a mug, a pencil
-  bridge, a desk lamp to swing from) and Ink Metro
-  (a two-level station where trains roar through and hurt anyone on the
-  tracks). Pick one on the start menu; in a match the host picks.
-- **Weapons and moves.** You get a rifle, a shotgun, a sniper rifle, a katana,
-  and grenades, plus a grappling hook, wall jumps, double jumps, slides, and
-  air dashes.
-- **Online free-for-all.** The first player to 20 kills wins, and a match lasts
-  at most 10 minutes. Players can quick match, browse public lobbies, or share
-  a private lobby code. Matches are peer-to-peer over WebRTC: the host's
-  browser runs the match, the public PeerJS signalling service connects the
-  players, and there is no game server.
-- **Controls.** Use a mouse and keyboard, or a gamepad (its button labels
-  follow the PS5 layout).
-- **Two languages.** The game picks English or Chinese from the browser
-  language. Force one with `?lang=en` or `?lang=zh`, or change it in the start
-  menu.
-- **Saved in the browser.** The best score, checkpoint, player name, and
-  settings are kept in `localStorage`.
-
-## How it's built
-
-The game is strict TypeScript in `src/game/`, bundled by the project's Vite
-build. three.js and PeerJS come from npm (`three`, `peerjs`). The home page,
-`src/routes/index.tsx`, renders `src/components/DoodleDistrict.tsx`, which
-lazy-loads the game on the client only and calls `startGame(root)`; the
-returned `dispose()` tears everything down again when the page unmounts.
-
-```
-src/game/
-  index.ts          public entry: startGame() and the game stylesheet
-  game.ts           orchestrator: wiring, level swaps, run control, frame loop
-  context.ts        GameContext, the contract every system receives
-  config.ts         match rules, wave roster and modifiers, focus tuning
-  storage.ts        typed localStorage preferences (doodle_* keys)
-  core/             math helpers, i18n, synthesized audio, keyboard/mouse/gamepad input
-  render/           ink-on-paper renderer and materials
-  world/            physics, nav grid, maps
-  entities/         player, weapons, enemies, remote players, effects
-  net/              peer-to-peer lobby networking
-  session/          solo waves, focus, pickups, props, combat, lobby, online match, scores
-  ui/               HUD, menu screens, game.css (scoped to .dd-root)
+```sh
+pnpm run check-types
+pnpm run test:brickfray
+pnpm run test:online
+pnpm run test:locales
+pnpm run build
 ```
 
-| What to change | Where |
-| --- | --- |
-| All game text, in both languages | `src/game/core/i18n.ts`: the `ZH` and `EN` dictionaries (keys are type-checked), plus the HUD and controls markup |
-| Menu and HUD colors and font | `src/game/ui/game.css`: `--ink`, `--red`, `--paper` and the font stack on `.dd-root` |
-| 3D pen colors and paper | `src/game/render/ink-renderer.ts`: `INK_COLORS`, plus `uPaper` and `uLineSpacing` in the paper shader's uniforms |
-| Match rules | `src/game/config.ts`: `FFA_TARGET` (kills to win), `FFA_TIME` (seconds) and `RESPAWN` (seconds); player health is set in `resetGame()` in `src/game/game.ts` |
-| Waves | `src/game/config.ts`: `ROSTER` (which enemies appear and from which wave) and `MODIFIERS`; the director is `src/game/session/waves.ts` |
-| Weapon stats | `src/game/entities/weapons.ts`: `GUNS`, the typed gun stats table (magazine, reserve, damage, spread, reload time and more) |
-| Enemy stats | `src/game/entities/enemies.ts`: `TYPES` (health, speed, damage, score) and `BOSSES` |
-| The map | `src/game/world/level.ts`; a second map is switched off with `MEXICO_READY = false` |
-| Lobby size | `maxPlayers` in `src/game/net/net.ts`; the "up to 10 players" copy is in `i18n.ts` |
-| Sound effects and music | `src/game/core/audio.ts`: everything is synthesized with the Web Audio API, so there are no audio files |
-| Page title and description | `src/routes/index.tsx`, with fallbacks in `src/routes/__root.tsx` |
-| Logo and icons | `public/logo.svg`, `public/logo.png`, and the favicons and `android-chrome-*` icons in `public/` |
-| "Make your own game with Layerwise" | Created in `src/game/ui/hud.ts` and styled by `.lw-promo` in `game.css`; it shows on the start, online and lobby screens only |
+The browser game loads lazily at `/`. The authenticated account routes remain separate. Development builds also expose `/lab/plaza`, `/lab/fortress` and `/lab/docks`: stationary targets, weapon controls and actual simulation telemetry. These routes return 404 in production.
 
-### Add an enemy type
+## Implementation
 
-1. In `src/game/entities/enemies.ts`, add a key to `EnemyTypeKey`, copy an
-   entry in `TYPES` under it and tune its numbers. Its `weapon` value decides how it fights:
-   `rifle`, `pistol`, `shotgun`, `sniper`, `blade` (melee), or `bomb` (runs up
-   and explodes).
-2. In `src/game/core/i18n.ts`, add the enemy's name to both `ZH`
-   and `EN`, and point the entry's `name` at it with `t('yourKey')`.
-3. In `src/game/config.ts`, add it to `ROSTER` with `from` (the
-   first wave it can appear in) and `w` (how often it spawns compared with the
-   others).
+- `src/brickfray/config.ts`: all weapon values, recoil patterns, match rules, quality presets and default bindings.
+- `simulation.ts`: shared fixed-step movement, collision, authoritative combat, spawn selection, waves and history for hitbox rewind.
+- `render.ts` / `world.ts`: plastic ShaderMaterial, three arenas, instanced parts/studs and reusable effects pools. The view model has its own camera and depth pass.
+- `input.ts` / `audio.ts`: raw pointer input, remapping, gamepads, procedural sound and priority-based voice limiting.
+- `protocol.ts` / `network.ts`: quantized state, deltas against identified full snapshots, protocol validation, latency/jitter/loss simulation.
+- `game.ts`: prediction/reconciliation, interpolation, room lifecycle, replay and integration. A dedicated worker supplies simulation ticks while the host tab is hidden.
+- `src/game/net/net.ts`: preserved PeerJS room discovery/transport. The `bf` channel stamps the actual peer identity and prevents client relaying of authority messages. PeerJS's bundled TURN fallback is retained.
+- `src/components/Brickfray.tsx`, `i18n.ts`, `style.css`: menus, HUD, settings and translations. Chinese and English cover all new game UI; five other language choices retain translated main menus with English fallback for some detailed labels.
 
-### Add or change text
+The earlier game's unused modules remain in `src/game/` for history and its existing tests. They are not the playable entry point.
 
-Every string lives in `src/game/core/i18n.ts` and is read with `t('key')`.
-Keys come from `EN` and `ZH` must match it, so a missing or misspelled key is a
-type error.
+## Match defaults
 
-## Commands
+FFA: 30 kills or 10 minutes. Team deathmatch: 50 kills or the host-selected time limit, with higher score winning at the limit. Tied matches stay tied. Ten seats, friendly damage disabled, 3-second respawn and 1.5-second protection. A reconnecting player retains the reserved seat and state for 30 seconds. A departed host ends the match.
 
-```bash
-pnpm install
-pnpm dev
-pnpm check-types
-pnpm build
-```
+The exact requested AR values give an ideal five-body-hit kill in 4 × 60/660 = 0.364 seconds from the first impact. A carried firing deadline preserves 660 RPM across fixed simulation ticks. Damage values are unchanged; the supplied ~0.45-second feel target is approximate.
 
-Changes under `src/game/` hot-reload in `pnpm dev`. `pnpm build` runs the type check and then the
-production build.
+New players start on Medium quality (85% resolution scale, 8 stud segments, 192 loose bricks). High remains available, as do individual overrides. Pixel ratio is capped at 2.
 
-The project still contains the Layerwise starter's sign-in pages, dashboard,
-Better Auth setup, and D1 database (`src/routes/`, `src/lib/auth.ts`,
-`src/db/`). The game doesn't use them.
+## Testing status
+
+See [the acceptance record](docs/BRICKFRAY_ACCEPTANCE.md). As requested, localhost connectivity is excluded from multiplayer acceptance; the user will publish to an online domain for cross-browser testing. Rendering and deterministic tests do not establish target integrated-GPU performance or replace tactile/audio checks.

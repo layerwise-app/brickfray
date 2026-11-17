@@ -35,7 +35,7 @@ Object.defineProperties(globalThis, {
 });
 registerHooks({
   resolve(specifier, context, next) {
-    if (specifier === 'peerjs') return { url: 'data:text/javascript,export default globalThis.__OnlineTestPeer', shortCircuit: true };
+    if (specifier === 'peerjs') return { url: 'data:text/javascript,export const util={defaultConfig:{iceServers:[]}};export default globalThis.__OnlineTestPeer', shortCircuit: true };
     if (specifier.startsWith('.') && !extname(specifier) && context.parentURL?.includes('/src/game/')) return next(`${specifier}.ts`, context);
     return next(specifier, context);
   },

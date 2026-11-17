@@ -30,14 +30,7 @@ export const Route = createFileRoute('/dashboard')({
 
     return { user: session.user };
   },
-  head: () => ({
-    meta: [
-      ...seo({
-        title: 'Dashboard',
-        description: 'View your account information'
-      })
-    ]
-  }),
+  head: () => seo({title: 'Account — Brickfray', noindex: true}),
   component: DashboardPage
 });
 
