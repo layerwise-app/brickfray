@@ -5,7 +5,7 @@ import { BrickBuilder } from '../engine/bricks';
 import { buildGround } from '../engine/ground';
 import type { Kit } from '../engine/kit';
 import { PLASTIC } from '../engine/palette';
-import type { GameRenderer } from '../engine/renderer';
+import type { Atmosphere, GameRenderer } from '../engine/renderer';
 import { createWeaponModel } from '../weapons';
 import type { WeaponModel } from '../weapons/types';
 
@@ -27,6 +27,16 @@ const IDLE: AnimState = {
   hurtDirection: { x: 0, z: 0 }
 };
 
+const ATMOSPHERE: Atmosphere = {
+  zenith: '#4f8fe0',
+  horizon: '#f3d7b5',
+  ground: '#c9b79c',
+  sunColor: '#fff0d8',
+  sunIntensity: 2.6,
+  sunDirection: new THREE.Vector3(-0.45, 0.62, 0.64).normalize(),
+  fogNear: 18
+};
+
 /** Main-menu backdrop: the chosen character idling on a little brick stage. */
 export class Showroom {
   readonly scene = new THREE.Scene();
@@ -40,23 +50,22 @@ export class Showroom {
 
   constructor(
     private readonly kit: Kit,
-    renderer: GameRenderer,
+    private readonly renderer: GameRenderer,
     character: CharacterId
   ) {
-    renderer.atmosphere = {
-      zenith: '#4f8fe0',
-      horizon: '#f3d7b5',
-      ground: '#c9b79c',
-      sunColor: '#fff0d8',
-      sunIntensity: 2.6,
-      sunDirection: new THREE.Vector3(-0.45, 0.62, 0.64).normalize(),
-      fogNear: 18
-    };
-    renderer.dress(this.scene);
-    this.scene.fog = new THREE.Fog('#f0d9bd', 18, 70);
+    this.enter();
     this.stage = this.buildStage();
     this.scene.add(this.stage);
     this.setCharacter(character);
+  }
+
+  /** The renderer's lights, sky and reflections move to whichever scene was dressed last; a match takes them. */
+  enter() {
+    this.renderer.atmosphere = ATMOSPHERE;
+    this.renderer.dress(this.scene);
+    this.renderer.sun.position.set(0, 1, 0);
+    this.renderer.sun.target.position.set(0, 0, 0);
+    this.scene.fog = new THREE.Fog('#f0d9bd', 18, 70);
   }
 
   private buildStage() {
@@ -65,7 +74,7 @@ export class Showroom {
     group.add(buildGround([{ x0: -24, z0: -24, x1: 24, z1: 24, y: 0, color: PLASTIC.sandGreen }], p));
     const b = new BrickBuilder(p, this.kit.materials);
     // Round display stand.
-    b.part({ w: 6, d: 6, h: 1, shape: 'round' }, 0, 0, 0, { color: PLASTIC.darkGray });
+    b.part({ w: 6, d: 6, h: 1, shape: 'round', studs: false }, 0, 0, 0, { color: PLASTIC.darkGray });
     b.part({ w: 5, d: 5, h: 1, shape: 'round' }, 0, 0.16, 0, { color: PLASTIC.yellow });
     // A few stacks and a wall corner behind, for depth.
     const colors = [PLASTIC.red, PLASTIC.blue, PLASTIC.white, PLASTIC.orange, PLASTIC.azure, PLASTIC.lime];

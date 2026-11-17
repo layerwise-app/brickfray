@@ -164,12 +164,11 @@ export function partGeometry(spec: PartSpec, profile: QualityProfile): THREE.Buf
     const shape = spec.shape ?? 'box';
     const pieces: THREE.BufferGeometry[] = [];
     let topY = height;
+    const radius = Math.min(width, depth) / 2;
     if (shape === 'round') {
-      const radius = Math.min(width, depth) / 2;
       const segments = profile.level === 'low' ? 10 : profile.level === 'medium' ? 20 : 32;
       pieces.push(roundedCylinder(radius, height, segments, profile.bevel * 0.8, profile.bevel * 0.5));
     } else if (shape === 'cone') {
-      const radius = Math.min(width, depth) / 2;
       const segments = profile.level === 'low' ? 10 : profile.level === 'medium' ? 20 : 32;
       const cone = normalizeGeometry(new THREE.CylinderGeometry(radius * 0.45, radius, height, segments));
       cone.translate(0, height / 2, 0);
@@ -190,9 +189,12 @@ export function partGeometry(spec: PartSpec, profile: QualityProfile): THREE.Buf
       const rows = shape === 'slope' ? 1 : spec.d;
       for (let x = 0; x < spec.w; x++) {
         for (let z = 0; z < rows; z++) {
-          const s = stud.clone();
+          const sx = (x - (spec.w - 1) / 2) * PITCH;
           const sz = shape === 'slope' ? -depth / 2 + PITCH / 2 : (z - (spec.d - 1) / 2) * PITCH;
-          s.translate((x - (spec.w - 1) / 2) * PITCH, topY, sz);
+          // Round parts drop grid studs past their rim; a 2×2 round's studs reach 5 mm over it, as on the real part.
+          if (shape === 'round' && Math.hypot(sx, sz) + STUD_RADIUS > radius + 0.01) continue;
+          const s = stud.clone();
+          s.translate(sx, topY, sz);
           pieces.push(s);
         }
       }

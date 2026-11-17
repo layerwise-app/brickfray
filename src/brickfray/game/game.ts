@@ -280,6 +280,7 @@ export class Game {
   private exitMatch(to: 'menu' | 'lobby') {
     this.match?.dispose();
     this.match = null;
+    this.showroom.enter();
     this.input.enabled = false;
     this.input.unlock();
     this.hud.reset();
