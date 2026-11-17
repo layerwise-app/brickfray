@@ -3,13 +3,16 @@ import { ROSTER } from '../../characters/roster';
 import type { CharacterId } from '../../characters/types';
 import type { Kit } from '../../engine/kit';
 import type { Atmosphere } from '../../engine/renderer';
-import type { WeaponId } from '../defs';
+import { MELEES, type MeleeId, type WeaponId } from '../defs';
+import { LOADOUTS } from '../loadouts';
 import { createRiggedModel, type RiggedModel } from '../model';
 import type { ViewAction, ViewCue, ViewInput, ViewModel } from '../types';
 import { Arms } from './arms';
 import { ClipPlayer, Frame, type Clip, type ClipCtx, type ClipEvent } from './clip';
 import { arReload, pistolReload, shotgunLoadIn, shotgunLoadOut, shotgunPump, shotgunShell, sniperCycle, sniperReload, SLIDE_LOCK } from './clips-guns';
 import { cookClip, drawClip, extraGoals, holsterClip, meleeClip, restClip, throwClip } from './clips-extra';
+import { harpoonReload } from './clips-harpoon';
+import { REVOLVER_CYCLE, revolverAction, revolverReload } from './clips-revolver';
 import { ViewFx } from './fx';
 import { blendGoals, blendMatrices, goal, holdQuat } from './goals';
 import { ViewLighting } from './lighting';
@@ -23,6 +26,19 @@ export function createViewModel(kit: Kit): ViewModel {
 }
 
 const FADE = 0.12;
+
+/** Which reload and cycling animations each gun uses. */
+const RELOAD: Record<WeaponId, 'rifle' | 'pistol' | 'pump' | 'bolt' | 'revolver' | 'harpoon'> = {
+  ar: 'rifle',
+  nailer: 'rifle',
+  pulse: 'rifle',
+  shotgun: 'pump',
+  sniper: 'bolt',
+  harpoon: 'harpoon',
+  pistol: 'pistol',
+  cannon: 'revolver',
+  buzzer: 'pistol'
+};
 const ONE = new THREE.Vector3(1, 1, 1);
 const IDLE: ViewInput = { speed: 0, sprint: false, grounded: true, crouch: 0, ads: 0, look: { yaw: 0, pitch: 0 }, time: 0 };
 
@@ -38,7 +54,7 @@ class FirstPersonView implements ViewModel {
   private readonly motion = new Motion();
   private readonly player = new ClipPlayer();
   private readonly frame = new Frame();
-  private readonly mallet: RiggedModel;
+  private melee: RiggedModel;
   private readonly grenade: RiggedModel;
   private readonly shell: THREE.Mesh;
   private readonly extra: ReturnType<typeof extraGoals>;
@@ -48,7 +64,10 @@ class FirstPersonView implements ViewModel {
   private pendingWeapon: WeaponId | null = null;
   private loading = false;
   private slideLocked = false;
+  /** The Harpooner's spear has been fired and not yet replaced. */
+  private spearOut = false;
   private slideKick = 1;
+  private cylinderKick = 1;
   private sprintCue = false;
   private adsCue = false;
   private fade = 0;
@@ -67,9 +86,9 @@ class FirstPersonView implements ViewModel {
     this.arms = new Arms(kit);
     this.scene.add(this.arms.root);
     this.fx = new ViewFx(this.scene, kit);
-    this.mallet = createRiggedModel('mallet', kit, 'first');
+    this.melee = createRiggedModel('mallet', kit, 'first');
     this.grenade = createRiggedModel('grenade', kit, 'first');
-    this.arms.left.hand.add(this.mallet.model.root, this.grenade.model.root);
+    this.arms.left.hand.add(this.melee.model.root, this.grenade.model.root);
     this.grenade.model.root.position.set(-0.004, 0.034, -0.004);
     this.shell = new THREE.Mesh(this.fx.shellGeometry, surfaceMaterial(kit.materials));
     this.shell.position.set(-0.012, 0.05, -0.03);
@@ -84,12 +103,21 @@ class FirstPersonView implements ViewModel {
 
   setCharacter(id: CharacterId) {
     this.arms.setColors(ROSTER[id]);
+    this.setMelee(LOADOUTS[id].melee);
+  }
+
+  private setMelee(id: MeleeId) {
+    if (this.melee.model.id === id) return;
+    this.melee.model.root.removeFromParent();
+    this.melee = createRiggedModel(id, this.kit, 'first');
+    this.arms.left.hand.add(this.melee.model.root);
   }
 
   equip(id: WeaponId) {
     this.player.stop();
     this.loading = false;
     this.slideLocked = false;
+    this.spearOut = false;
     this.fade = 0;
     this.pendingWeapon = null;
     this.setGun(id);
@@ -118,28 +146,39 @@ class FirstPersonView implements ViewModel {
         this.motion.kick(this.lastAds);
         this.fx.fire(g.rigged.model.muzzle, g.flash);
         if (g.casing && g.rigged.model.ejectPort) this.fx.eject(g.casing, g.rigged.model.ejectPort);
-        if (g.id === 'pistol') {
+        if (g.rest.has('slide')) {
           this.slideKick = 0;
           if (action.empty) this.slideLocked = true;
         }
+        if (g.rest.has('spear')) this.spearOut = true;
+        if (g.rest.has('cylinder')) this.cylinderKick = 0;
         return;
       }
       case 'reload':
         this.ctx.flags.empty = action.empty;
-        if (g.id === 'shotgun') {
-          this.loading = true;
-          return this.play(shotgunLoadIn(action.duration < 0.6 ? action.duration : 0.28));
+        switch (RELOAD[g.id]) {
+          case 'pump':
+            this.loading = true;
+            return this.play(shotgunLoadIn(action.duration < 0.6 ? action.duration : 0.28));
+          case 'rifle':
+            return this.play(arReload(action.empty, action.duration));
+          case 'bolt':
+            return this.play(sniperReload(action.empty, action.duration));
+          case 'pistol':
+            return this.play(pistolReload(action.empty, action.duration));
+          case 'revolver':
+            return this.play(revolverReload(action.empty, action.duration));
+          case 'harpoon':
+            return this.play(harpoonReload(action.empty, action.duration));
         }
-        if (g.id === 'ar') return this.play(arReload(action.empty, action.duration));
-        if (g.id === 'sniper') return this.play(sniperReload(action.empty, action.duration));
-        return this.play(pistolReload(action.empty, action.duration));
+        return;
       case 'reloadShell':
-        if (g.id !== 'shotgun') return;
+        if (RELOAD[g.id] !== 'pump') return;
         this.loading = true;
         return this.play(shotgunShell(action.duration));
       case 'reloadEnd':
       case 'cancelReload':
-        if (g.id === 'shotgun' && this.loading) {
+        if (RELOAD[g.id] === 'pump' && this.loading) {
           this.loading = false;
           const rack = this.ctx.flags.empty;
           return this.play(shotgunLoadOut(rack ? 0.75 : 0.32, rack));
@@ -147,11 +186,11 @@ class FirstPersonView implements ViewModel {
         if (action.type === 'cancelReload' && this.player.clip) this.play(restClip(0.25));
         return;
       case 'cycle':
-        if (g.id === 'shotgun') return this.play(shotgunPump(action.duration, true));
-        if (g.id === 'sniper') return this.play(sniperCycle(action.duration));
+        if (RELOAD[g.id] === 'pump') return this.play(shotgunPump(action.duration, true));
+        if (RELOAD[g.id] === 'bolt') return this.play(sniperCycle(action.duration));
         return;
       case 'melee':
-        return this.play(meleeClip());
+        return this.play(meleeClip(MELEES[this.melee.model.id as MeleeId].cooldown * 0.75));
       case 'grenadeCook':
         return this.play(cookClip());
       case 'grenadeThrow':
@@ -200,6 +239,9 @@ class FirstPersonView implements ViewModel {
       case 'slideForward':
         this.slideLocked = false;
         break;
+      case 'magIn':
+        if (g.rest.has('spear')) this.spearOut = false;
+        break;
       case 'shellLoaded':
       case 'release':
       case 'boltRelease':
@@ -216,6 +258,7 @@ class FirstPersonView implements ViewModel {
     this.player.update(dt, this.onEvent);
     this.player.clip?.sample(this.player.u, f, this.ctx);
     this.slideKick = Math.min(1, this.slideKick + dt / 0.1);
+    this.cylinderKick = Math.min(1, this.cylinderKick + dt / REVOLVER_CYCLE);
     this.fade = Math.max(0, this.fade - dt / FADE);
     const k = smooth01(1 - this.fade);
 
@@ -278,7 +321,10 @@ class FirstPersonView implements ViewModel {
         part.quaternion.multiply(this.tmpQ.setFromEuler(this.tmpE.set(o[3] ?? 0, o[4] ?? 0, o[5] ?? 0)));
       } else if (name === 'slide') {
         part.position.z += this.slideLocked ? SLIDE_LOCK : this.slideOffset();
+      } else if ((name === 'cylinder' || name === 'hammer') && this.gun.rest.has('cylinder')) {
+        part.quaternion.multiply(revolverAction(name, this.cylinderKick, this.tmpQ));
       }
+      if (name === 'spear') part.visible = !this.spearOut || !!o;
     }
     root.updateMatrixWorld(true);
     // Shots leave from the screen center, so an aimed sight must stay on it; sway, bob and recoil swing the gun around the dot.
@@ -305,7 +351,7 @@ class FirstPersonView implements ViewModel {
     else this.leftMat.copy(left);
     this.leftMat.decompose(this.arms.left.hand.position, this.arms.left.hand.quaternion, this.tmpV);
     this.arms.left.hand.scale.copy(ONE);
-    this.mallet.model.root.visible = f.show.mallet;
+    this.melee.model.root.visible = f.show.mallet;
     this.grenade.model.root.visible = f.show.grenade;
     const pin = this.grenade.parts.get('pin');
     const pinOffset = f.parts.get('pin');

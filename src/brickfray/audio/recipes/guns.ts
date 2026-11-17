@@ -31,7 +31,7 @@ interface GunVoice {
   far: { duration: number; cutoff: number; body: number; tail: number; decay: number; thump: number; echo: number };
 }
 
-const VOICES: Record<WeaponId, GunVoice> = {
+const BASE = {
   ar: {
     duration: 0.95,
     loudness: [-9.5, -11.5],
@@ -103,6 +103,62 @@ const VOICES: Record<WeaponId, GunVoice> = {
     drive: 1.8,
     tail: { cutoff: 4000, to: 1600, decay: 0.36, gain: 0.45, delay: 0.05, feedback: 0.22, echoCut: 3000 },
     far: { duration: 1.6, cutoff: 1700, body: 2.2, tail: 0.9, decay: 1.1, thump: 0.2, echo: 0.18 }
+  }
+} satisfies Record<string, GunVoice>;
+
+const VOICES: Record<WeaponId, GunVoice> = {
+  ...BASE,
+  // Nailer: rapid, light and snappy; a pneumatic hiss under the crack.
+  nailer: {
+    ...BASE.ar,
+    duration: 0.7,
+    loudness: [-10.5, -12.5],
+    mech: (s) => {
+      clack(s, 0, { pitch: 2900, gain: 0.6, decay: 0.03 });
+      noise(s, 0.004, { attack: 0.001, decay: 0.05, gain: 0.25, filter: { type: 'highpass', freq: 5000, q: 0 } });
+    },
+    burst: { freq: 2000, to: 900, q: 0.9, decay: 0.09, gain: 2.8 },
+    thump: { from: 190, to: 80, glide: 0.04, decay: 0.12, gain: 0.3 },
+    tail: { ...BASE.ar.tail, decay: 0.4, gain: 0.5 }
+  },
+  // Pulse Carbine: a bright electric zap riding on a rifle report.
+  pulse: {
+    ...BASE.ar,
+    mech: (s) => {
+      clack(s, 0, { pitch: 2600, gain: 0.5, decay: 0.035 });
+      tone(s, 0, { freq: 1800 * vary(s, 0.03), decay: 0.08, gain: 0.12 });
+      tone(s, 0.004, { freq: 3600 * vary(s, 0.03), decay: 0.05, gain: 0.06 });
+    },
+    burst: { freq: 1700, to: 700, q: 1.2, decay: 0.11, gain: 3 }
+  },
+  // Harpooner: a deep pneumatic thunk, less crack than a rifle.
+  harpoon: {
+    ...BASE.sniper,
+    duration: 1.8,
+    mech: (s) => {
+      clack(s, 0, { pitch: 1300, gain: 0.7, decay: 0.07 });
+      noise(s, 0, { attack: 0.002, decay: 0.12, gain: 0.5, filter: { type: 'bandpass', freq: 900, q: 1 } });
+    },
+    crack: { hp: 1600, decay: 0.02, gain: 1.2 },
+    thump: { from: 95, to: 38, glide: 0.09, decay: 0.38, gain: 0.7 }
+  },
+  // Hand Cannon: a heavy revolver boom.
+  cannon: {
+    ...BASE.pistol,
+    duration: 1.2,
+    loudness: [-9.5, -11.5],
+    crack: { hp: 1800, decay: 0.024, gain: 1.7 },
+    burst: { freq: 1600, to: 500, q: 0.8, decay: 0.16, gain: 3.2 },
+    thump: { from: 140, to: 48, glide: 0.07, decay: 0.3, gain: 0.6 },
+    tail: { ...BASE.pistol.tail, cutoff: 2600, decay: 0.8, gain: 0.6 }
+  },
+  // Buzzer: a thin, fast machine-pistol rattle.
+  buzzer: {
+    ...BASE.pistol,
+    duration: 0.5,
+    loudness: [-11, -13],
+    burst: { freq: 3200, to: 1500, q: 1, decay: 0.07, gain: 2.4 },
+    thump: { from: 220, to: 100, glide: 0.03, decay: 0.1, gain: 0.25 }
   }
 };
 

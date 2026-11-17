@@ -11,7 +11,8 @@ import { INTERP_DELAY, TICK } from '../sim/constants';
 import { rayHitPlayer } from '../sim/hitboxes';
 import { eyeHeight } from '../sim/movement';
 import { BUTTON, type Command, type MatchSettings } from '../sim/types';
-import { WEAPON_IDS, WEAPONS, type WeaponId } from '../weapons/defs';
+import { WEAPONS, type WeaponId } from '../weapons/defs';
+import { LOADOUTS, slotOf } from '../weapons/loadouts';
 import type { ViewModel } from '../weapons/types';
 import { MAPS } from '../world';
 import type { MapLayout, MapVisual } from '../world/types';
@@ -79,7 +80,7 @@ export class MatchView {
     this.scene.add(this.remotes.group);
     this.grenades = new GrenadeView(kit, audio);
     this.scene.add(this.grenades.group);
-    this.predictor = new Predictor(this.world, session.you, 'rivet');
+    this.predictor = new Predictor(this.world, session.you, session.roster.get(session.you)?.character ?? 'rivet');
     this.events = new MatchEvents(this);
     this.remotes.onFire = (r) => {
       // Flash at the gun; the tracer and sound come with the shot trace.
@@ -194,7 +195,7 @@ export class MatchView {
     const m = this.me.move;
     this.prevMove = { x: m.x, y: m.y, z: m.z };
     if (input.slot !== null) this.slot = input.slot;
-    if (input.cycle) this.slot = (this.slot + input.cycle + 4) % 4;
+    if (input.cycle) this.slot = (this.slot + input.cycle + 2) % 2;
     const cmd: Command = {
       seq: ++this.seq,
       forward: input.forward,
@@ -398,7 +399,7 @@ export class MatchView {
           this.fp.yaw = mine.yaw;
           this.fp.pitch = 0;
         }
-        this.slot = WEAPON_IDS.indexOf(snap.self.arms.weapon);
+        this.slot = slotOf(LOADOUTS[this.predictor.player.character], snap.self.arms.weapon);
         this.view.equip(snap.self.arms.weapon);
       } else this.predictor.reconcile(snap.ack, snap.self);
     }

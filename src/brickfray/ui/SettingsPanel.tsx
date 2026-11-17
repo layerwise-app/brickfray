@@ -7,7 +7,7 @@ import { BackIcon } from './icons';
 
 type Tab = 'graphics' | 'controls' | 'audio' | 'interface';
 const TABS: Tab[] = ['graphics', 'controls', 'audio', 'interface'];
-const ACTIONS: Action[] = ['forward', 'back', 'left', 'right', 'jump', 'crouch', 'sprint', 'fire', 'ads', 'reload', 'melee', 'grenade', 'weapon1', 'weapon2', 'weapon3', 'weapon4', 'scoreboard', 'chat'];
+const ACTIONS: Action[] = ['forward', 'back', 'left', 'right', 'jump', 'crouch', 'sprint', 'fire', 'ads', 'reload', 'melee', 'grenade', 'weapon1', 'weapon2', 'scoreboard', 'chat'];
 const CROSSHAIR_COLORS = ['#ffffff', '#ffe14d', '#4dff88', '#4de3ff', '#ff4dd2'];
 
 export function SettingsPanel({ onClose }: { onClose: () => void }) {

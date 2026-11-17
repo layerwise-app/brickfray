@@ -1,6 +1,6 @@
 import type { CharacterId, CharacterInfo } from './types';
 
-/** Playable roster; purely cosmetic, every character has the same size and stats. */
+/** Playable roster: same size and health for all; their loadout (weapons/loadouts.ts) sets how they fight. */
 export const ROSTER: Record<CharacterId, CharacterInfo> = {
   rivet: { id: 'rivet', name: 'Rivet', primary: '#f58a1f', secondary: '#2b3a55', glove: '#f6c624', sleeve: '#2b3a55' },
   vega: { id: 'vega', name: 'Vega', primary: '#1fa7a0', secondary: '#f2f2ee', glove: '#2a2f38' },

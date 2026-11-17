@@ -53,8 +53,8 @@ export function restClip(duration: number): Clip {
 }
 
 /** Gun dips, the left hand hooks the Brick Mallet across from the left. */
-export function meleeClip(): Clip {
-  return clip('melee', 0.6, [[0.06, 'swing'], [0.1, 'cloth']], (u, f, c) => {
+export function meleeClip(duration: number): Clip {
+  return clip('melee', duration, [[0.06, 'swing'], [0.1, 'cloth']], (u, f, c) => {
     const g = c.goals;
     f.gun(track(u, [[0, Z], [0.12, DIP], [0.55, DIP], [1, Z]]));
     f.left = hand(u, [[0, g.leftRest!], [0.1, g.malletWind!], [0.13, g.malletWind!], [0.25, g.malletHit!], [0.42, g.malletFollow!], [0.56, g.low!], [0.88, g.leftRest!]]);

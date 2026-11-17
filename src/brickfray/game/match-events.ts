@@ -15,9 +15,6 @@ export class MatchEvents {
   private bannerUntil = 0;
   private clock = 0;
   private hudTimer = 0;
-  private fpsFrames = 0;
-  private fpsTime = 0;
-  private fps = 0;
 
   constructor(private readonly mv: MatchView) {}
 
@@ -167,13 +164,6 @@ export class MatchEvents {
   frame(dt: number) {
     const mv = this.mv;
     this.clock += dt;
-    this.fpsFrames++;
-    this.fpsTime += dt;
-    if (this.fpsTime > 0.5) {
-      this.fps = Math.round(this.fpsFrames / this.fpsTime);
-      this.fpsFrames = 0;
-      this.fpsTime = 0;
-    }
     const before = this.feed.length;
     this.feed = this.feed.filter((f) => this.clock - f.at < FEED_LIFE);
     if (this.feed.length !== before) this.pushFeed();
@@ -209,7 +199,8 @@ export class MatchEvents {
       winner: match?.winner ?? null,
       rows: this.rows(),
       ping: Math.round(mv.session.rtt * 1000),
-      fps: this.fps,
+      fps: mv.renderer.timer.fps,
+      frameMs: mv.renderer.timer.ms,
       stats: { calls: info.calls, triangles: info.triangles }
     });
     mv.hud.pulse({ type: 'spread', px: this.spreadPx() });

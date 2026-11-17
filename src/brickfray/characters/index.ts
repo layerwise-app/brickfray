@@ -1,9 +1,12 @@
 import type { Kit } from '../engine/kit';
+import { LOADOUTS } from '../weapons/loadouts';
 import { disposePieceMaterials } from './material';
 import { clearShapeCache } from './shapes';
 import { DESIGNS } from './designs';
+import { meleeProp } from './melee';
 import { PartSet, type BakedCharacter } from './parts';
 import { Rig } from './rig';
+import { ROSTER } from './roster';
 import { restModelPositions, restOffsets } from './skeleton';
 import { STYLES } from './style';
 import type { BotKind, CharacterId, CharacterRig } from './types';
@@ -24,6 +27,7 @@ export function createCharacter(id: CharacterId | BotKind, kit: Kit): CharacterR
   if (!baked) {
     const parts = new PartSet(kit.profile);
     design.build(parts);
+    meleeProp(parts, LOADOUTS[id].melee, !(id in ROSTER));
     baked = parts.bake(restModelPositions(rest));
     cache.set(key, baked);
   }

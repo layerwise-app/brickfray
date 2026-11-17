@@ -130,8 +130,9 @@ export class Game {
   /** Must be called from a click: unlocks audio and enters the game view. */
   async unlockAudio() {
     if (this.app.state.audioReady) return;
-    await this.audio.unlock();
+    // Ask before awaiting: the bank renders for seconds, and a match started meanwhile must win.
     this.audio.playMusic?.('menu');
+    await this.audio.unlock();
     this.app.set({ audioReady: true });
   }
 
@@ -345,6 +346,7 @@ export class Game {
   private loop = () => {
     if (this.disposed) return;
     this.raf = requestAnimationFrame(this.loop);
+    this.renderer.timer.begin();
     const now = performance.now();
     const dt = Math.min(0.1, (now - this.last) / 1000);
     this.last = now;
@@ -365,6 +367,7 @@ export class Game {
       this.showroom.update(dt);
       this.renderer.render(this.showroom.scene, this.showroom.camera);
     }
+    this.renderer.timer.end();
   };
 
   dispose() {

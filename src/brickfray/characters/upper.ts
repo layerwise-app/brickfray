@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import type { WeaponId } from '../weapons/defs';
+import { SIDEARMS, type WeaponId } from '../weapons/defs';
 import { emptyAction, meleeAction, reloadAt, throwAction, type HandAction, type ReloadFrame } from './actions';
 import { clamp, hprQuat, lookRotation, smooth, twoBoneIK, UP } from './ik';
 import type { Pose } from './pose';
@@ -50,7 +50,7 @@ const PISTOL = {
   sprint: { pos: [0.14, -0.24, -0.2], rot: [-0.2, -0.9, 0] },
   lowered: { pos: [0.2, -0.28, -0.16], rot: [0.1, -1.1, 0.1] }
 } satisfies Record<string, GunPose>;
-const KICK: Record<WeaponId, number> = { ar: 0.4, pistol: 0.45, shotgun: 1, sniper: 1.1 };
+const KICK: Record<WeaponId, number> = { ar: 0.4, pistol: 0.45, shotgun: 1, sniper: 1.1, nailer: 0.3, pulse: 0.45, harpoon: 0.9, cannon: 0.9, buzzer: 0.35 };
 
 const v1 = new THREE.Vector3();
 const v2 = new THREE.Vector3();
@@ -147,7 +147,7 @@ export function poseUpper(pose: Pose, I: UpperInput) {
   pose.solveChain('clavL', 'clavR', 'upperArmL', 'upperArmR');
 
   // Gun: an aim frame at the shoulder center, pitched with the look.
-  const P = s.weapon === 'pistol' ? PISTOL : RIFLE;
+  const P = SIDEARMS.has(s.weapon) ? PISTOL : RIFLE;
   const rot: [number, number, number] = [0, 0, 0];
   const pos = v1;
   blendPose(P.hip, P.ads, I.ads, pos, rot);
@@ -185,7 +185,7 @@ export function poseUpper(pose: Pose, I: UpperInput) {
   gun.pos.copy(SOCKET_R).applyQuaternion(gun.q).add(pose.mp[BONE.handR]!);
 
   // Left hand: support grip, blended toward an action or fidget target.
-  m1.compose(gun.pos, gun.q, v3.set(1, 1, 1)).multiply(I.support ?? (s.weapon === 'pistol' ? PISTOL_SUPPORT : DEFAULT_SUPPORT));
+  m1.compose(gun.pos, gun.q, v3.set(1, 1, 1)).multiply(I.support ?? (SIDEARMS.has(s.weapon) ? PISTOL_SUPPORT : DEFAULT_SUPPORT));
   m1.decompose(v1, qa, v3);
   const supportPos = v1;
   const supportQ = qa;

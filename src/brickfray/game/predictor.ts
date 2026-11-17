@@ -1,5 +1,6 @@
 import { WEAPONS } from '../weapons/defs';
 import { copyArms, createArms, stepArms, type ArmsHooks } from '../sim/arms';
+import { LOADOUTS } from '../weapons/loadouts';
 import type { CollisionWorld } from '../sim/collision';
 import { TICK } from '../sim/constants';
 import { cmdToMove } from '../sim/host';
@@ -33,7 +34,7 @@ export class Predictor {
       move: createMoveState(),
       yaw: 0,
       pitch: 0,
-      arms: createArms(),
+      arms: createArms(LOADOUTS[character]),
       health: 100,
       maxHealth: 100,
       alive: false,

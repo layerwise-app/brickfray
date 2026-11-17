@@ -7,6 +7,7 @@ import type { Kit } from '../engine/kit';
 import { PLASTIC } from '../engine/palette';
 import type { Atmosphere, GameRenderer } from '../engine/renderer';
 import { createWeaponModel } from '../weapons';
+import { LOADOUTS } from '../weapons/loadouts';
 import type { WeaponModel } from '../weapons/types';
 
 const IDLE: AnimState = {
@@ -43,6 +44,7 @@ export class Showroom {
   readonly camera = new THREE.PerspectiveCamera(30, 1, 0.1, 300);
   private rig: CharacterRig | null = null;
   private gun: WeaponModel | null = null;
+  private pose: AnimState = IDLE;
   private stage: THREE.Object3D;
   private time = 0;
   private narrow = false;
@@ -101,7 +103,12 @@ export class Showroom {
       this.rig.dispose();
     }
     this.rig = createCharacter(id, this.kit);
-    this.gun ??= createWeaponModel('ar', this.kit, 'third');
+    const primary = LOADOUTS[id].primary;
+    if (this.gun?.id !== primary) {
+      this.gun?.dispose();
+      this.gun = createWeaponModel(primary, this.kit, 'third');
+    }
+    this.pose = { ...IDLE, weapon: primary };
     this.rig.setWeapon(this.gun.root, this.gun.supportGrip);
     this.rig.root.position.set(0, 0.32, 0);
     this.spin = 0;
@@ -122,7 +129,7 @@ export class Showroom {
       // Slow turn toward the camera with a gentle sway.
       const ease = 1 - (1 - this.spin) ** 3;
       this.rig.root.rotation.y = Math.PI * 0.82 + (1 - ease) * Math.PI * 1.2 + Math.sin(this.time * 0.35) * 0.12;
-      this.rig.update(dt, IDLE);
+      this.rig.update(dt, this.pose);
     }
     const t = this.time * 0.05;
     // Wide screens keep the character on the left third, leaving room for the menu.

@@ -3,7 +3,9 @@ import { ROSTER, CHARACTER_IDS } from '../characters/roster';
 import type { CharacterId } from '../characters/types';
 import { useApp, useGame } from './App';
 import { LANGUAGES, setLang, useT } from './i18n';
-import { BotIcon, FullscreenIcon, GearIcon, GlobeIcon, PlayIcon, UsersIcon } from './icons';
+import { MELEES, WEAPONS } from '../weapons/defs';
+import { LOADOUTS } from '../weapons/loadouts';
+import { BotIcon, FullscreenIcon, GearIcon, GlobeIcon, PlayIcon, UsersIcon, WeaponIcon } from './icons';
 import { RoomsPanel } from './RoomsPanel';
 
 export function MainMenu({ openSettings }: { openSettings: () => void }) {
@@ -53,10 +55,12 @@ export function MainMenu({ openSettings }: { openSettings: () => void }) {
       <div className='relative mt-auto flex flex-col-reverse items-stretch gap-6 lg:flex-row lg:items-end lg:justify-between'>
         <section className='flex flex-col gap-3'>
           <div className='bf-fade-in' key={character}>
-            <div className='text-sm font-semibold uppercase tracking-[0.2em]' style={{ color: info.primary }}>
+            <div className='text-sm font-semibold uppercase tracking-[0.2em] drop-shadow-[0_1px_2px_rgba(0,0,0,.7)]' style={{ color: info.primary }}>
               {t(`role.${character}`)}
             </div>
             <div className='bf-display text-5xl leading-none sm:text-6xl'>{info.name}</div>
+            <div className='mt-1 text-sm font-semibold text-white drop-shadow-[0_1px_2px_rgba(0,0,0,.7)]'>{t(`style.${character}`)}</div>
+            <Loadout character={character} />
           </div>
           <div className='flex flex-wrap gap-2.5'>
             {CHARACTER_IDS.map((id) => (
@@ -91,6 +95,28 @@ export function MainMenu({ openSettings }: { openSettings: () => void }) {
       </div>
       {rooms && <RoomsPanel onClose={() => setRooms(false)} />}
     </div>
+  );
+}
+
+/** The character's kit: picking a character picks these three. */
+function Loadout({ character }: { character: CharacterId }) {
+  const { t } = useT();
+  const kit = LOADOUTS[character];
+  const items = [
+    { slot: t('action.weapon1'), id: kit.primary, name: WEAPONS[kit.primary].name },
+    { slot: t('action.weapon2'), id: kit.secondary, name: WEAPONS[kit.secondary].name },
+    { slot: t('action.melee'), id: kit.melee, name: MELEES[kit.melee].name }
+  ];
+  return (
+    <ul className='mt-3 flex gap-2'>
+      {items.map((item) => (
+        <li key={item.slot} className='flex w-[112px] flex-col gap-1 rounded-xl bg-black/40 px-2.5 py-2 backdrop-blur-sm'>
+          <span className='text-[10px] font-semibold uppercase tracking-[0.16em] text-white/60'>{item.slot}</span>
+          <WeaponIcon weapon={item.id} size={item.id in WEAPONS ? 64 : 48} className='h-6 text-white' />
+          <span className='truncate text-xs font-semibold'>{item.name}</span>
+        </li>
+      ))}
+    </ul>
   );
 }
 

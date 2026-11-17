@@ -39,7 +39,7 @@ export function Hud() {
       {hud.scoped && <div className='absolute bottom-[18%] left-1/2 -translate-x-1/2 text-sm font-semibold text-white/70'>{t('scopeHint')}</div>}
       {game.settings.showStats && hud.stats && (
         <div className='absolute left-3 top-3 rounded-md bg-black/55 px-2 py-1 font-mono text-[11px] leading-4 text-white/85'>
-          {hud.fps} fps · {hud.stats.calls} calls · {(hud.stats.triangles / 1000).toFixed(0)}k tris · {hud.ping} ms
+          {hud.fps} fps ({hud.frameMs.toFixed(1)} ms) · {hud.stats.calls} calls · {(hud.stats.triangles / 1000).toFixed(0)}k tris · ping {hud.ping} ms
         </div>
       )}
       {!app.paused && !game.input.active && hud.phase !== 'ended' && <ClickToPlay />}
@@ -165,7 +165,7 @@ function KillFeed() {
           style={{ background: f.mine ? 'rgba(255,205,46,.85)' : f.victimIsMe ? 'rgba(234,61,50,.85)' : 'rgba(0,0,0,.5)', color: f.mine ? '#2a1a00' : '#fff' }}
         >
           {!f.self && <span style={{ color: !f.mine && f.killerTeam !== -1 ? TEAM_COLORS[f.killerTeam] : undefined }}>{f.killer}</span>}
-          {f.weapon === 'grenade' || f.weapon === 'mallet' ? <WeaponIcon weapon={f.weapon} size={30} /> : <WeaponIcon weapon={f.weapon} size={42} />}
+          <WeaponIcon weapon={f.weapon} size={f.weapon in WEAPONS ? 42 : 30} />
           {f.headshot && <HeadshotIcon size={15} />}
           {f.self && <SkullIcon size={15} />}
           <span style={{ color: !f.mine && f.victimTeam !== -1 ? TEAM_COLORS[f.victimTeam] : undefined }}>{f.victim}</span>

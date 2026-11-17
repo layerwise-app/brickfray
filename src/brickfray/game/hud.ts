@@ -1,6 +1,6 @@
 import type { BotKind, CharacterId } from '../characters/types';
 import type { MatchPhase, MatchSettings } from '../sim/types';
-import type { WeaponId } from '../weapons/defs';
+import type { MeleeId, WeaponId } from '../weapons/defs';
 
 export interface FeedEntry {
   key: number;
@@ -8,7 +8,7 @@ export interface FeedEntry {
   killerTeam: number;
   victim: string;
   victimTeam: number;
-  weapon: WeaponId | 'grenade' | 'mallet';
+  weapon: WeaponId | MeleeId | 'grenade';
   headshot: boolean;
   mine: boolean;
   victimIsMe: boolean;
@@ -57,6 +57,7 @@ export interface HudState {
   chat: { key: number; name: string; text: string; team: number }[];
   ping: number;
   fps: number;
+  frameMs: number;
   stats: { calls: number; triangles: number } | null;
   hint: 'ctrl' | null;
 }
@@ -92,6 +93,7 @@ export function initialHud(): HudState {
     chat: [],
     ping: 0,
     fps: 0,
+    frameMs: 0,
     stats: null,
     hint: null
   };

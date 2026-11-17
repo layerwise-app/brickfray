@@ -1,16 +1,26 @@
 import type * as THREE from 'three';
 import type { Kit } from '../engine/kit';
 import { instantiate, lodFor, ModelBuilder, type Instance, type Template, type View } from './builder';
-import type { WeaponId } from './defs';
+import type { MeleeId, WeaponId } from './defs';
+import { buildAnchor } from './models/anchor';
 import { buildAr } from './models/ar';
+import { buildBuzzer } from './models/buzzer';
+import { buildCannon } from './models/cannon';
 import { buildGrenade } from './models/grenade';
+import { buildHarpoon } from './models/harpoon';
+import { buildHatchet } from './models/hatchet';
+import { buildKnife } from './models/knife';
 import { buildMallet } from './models/mallet';
+import { buildNailer } from './models/nailer';
 import { buildPistol } from './models/pistol';
+import { buildPulse } from './models/pulse';
 import { buildShotgun } from './models/shotgun';
 import { buildSniper } from './models/sniper';
+import { buildSword } from './models/sword';
+import { buildWrench } from './models/wrench';
 import type { WeaponModel } from './types';
 
-export type ModelId = WeaponId | 'grenade' | 'mallet';
+export type ModelId = WeaponId | MeleeId | 'grenade';
 
 export function createWeaponModel(id: ModelId, kit: Kit, view: View): WeaponModel {
   return createRiggedModel(id, kit, view).model;
@@ -29,7 +39,17 @@ const BUILDERS: Record<ModelId, (b: ModelBuilder) => void> = {
   sniper: buildSniper,
   pistol: buildPistol,
   grenade: buildGrenade,
-  mallet: buildMallet
+  mallet: buildMallet,
+  nailer: buildNailer,
+  pulse: buildPulse,
+  harpoon: buildHarpoon,
+  cannon: buildCannon,
+  buzzer: buildBuzzer,
+  sword: buildSword,
+  knife: buildKnife,
+  anchor: buildAnchor,
+  hatchet: buildHatchet,
+  wrench: buildWrench
 };
 
 const templates = new Map<string, Template>();

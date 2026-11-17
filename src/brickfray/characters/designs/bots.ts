@@ -77,8 +77,6 @@ function frame(b: PartSet, p: BotPalette) {
 }
 
 function props(b: PartSet) {
-  b.cyl('mallet', 0.014, 0.014, 0.34, '#8c949b', { at: [0, 0, -0.08], rot: [Math.PI / 2, 0, 0], look: 'metal' });
-  b.box('mallet', [0.15, 0.09, 0.09], '#f5a623', { at: [0, 0, -0.27], look: 'gloss' });
   b.ball('grenade', 0.036, '#3a4047', { at: [0, 0.012, -0.005], look: 'metal' });
   b.ball('grenade', 0.014, '#ff3b2f', { at: [0, 0.04, -0.03], look: 'glow' });
 }

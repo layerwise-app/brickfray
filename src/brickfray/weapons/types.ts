@@ -2,13 +2,14 @@ import type * as THREE from 'three';
 import type { CharacterId } from '../characters/types';
 import type { Atmosphere } from '../engine/renderer';
 import type { WeaponId } from './defs';
+import type { ModelId } from './model';
 
 /**
  * A gun model. Origin = where the right hand holds the pistol grip, barrel
  * along -Z, top up +Y. Units are meters at real-world gun scale.
  */
 export interface WeaponModel {
-  readonly id: WeaponId | 'grenade' | 'mallet';
+  readonly id: ModelId;
   readonly root: THREE.Group;
   /** Tip of the barrel; flash and tracers start here. -Z points out of the barrel. */
   readonly muzzle: THREE.Object3D;

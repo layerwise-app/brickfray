@@ -1,5 +1,5 @@
 import type { BotKind, CharacterId } from '../characters/types';
-import type { WeaponId } from '../weapons/defs';
+import type { MeleeId, WeaponId } from '../weapons/defs';
 import type { MapId } from '../world/types';
 import type { MoveState } from './movement';
 
@@ -41,6 +41,8 @@ export interface ArmsState {
   switchTime: number;
   ammo: Record<WeaponId, number>;
   cooldown: number;
+  /** Rounds still to come in the current burst (burst-fire guns). */
+  burstLeft: number;
   /** Remaining reload seconds (shotgun: of the current shell); 0 = not reloading. */
   reload: number;
   reloadTotal: number;
@@ -49,7 +51,7 @@ export interface ArmsState {
   burst: number;
   sinceShot: number;
   sprintRecovery: number;
-  /** Mallet: cooldown left and time since the swing started (-1 = none). */
+  /** Melee: cooldown left and time since the swing started (-1 = none). */
   meleeCooldown: number;
   meleeTime: number;
   grenades: number;
@@ -129,7 +131,7 @@ export interface ShotTrace {
 }
 
 export type GameEvent =
-  | { type: 'kill'; killer: number; victim: number; weapon: WeaponId | 'grenade' | 'mallet'; headshot: boolean; assister: number | null }
+  | { type: 'kill'; killer: number; victim: number; weapon: WeaponId | MeleeId | 'grenade'; headshot: boolean; assister: number | null }
   | { type: 'damage'; attacker: number; victim: number; amount: number; kind: HitKind; from: [number, number, number]; fatal: boolean }
   | { type: 'explosion'; position: [number, number, number]; owner: number }
   | { type: 'spawn'; player: number }

@@ -1,4 +1,5 @@
-import { WEAPON_IDS, WEAPONS, type WeaponId } from '../weapons/defs';
+import { WEAPONS, type WeaponId } from '../weapons/defs';
+import { LOADOUTS } from '../weapons/loadouts';
 import type { Waypoint } from '../world/types';
 import { PLAYER, TICK } from './constants';
 import type { HostSim } from './host';
@@ -33,10 +34,23 @@ interface Brain {
 }
 
 const PROFILE = {
-  grunt: { weapon: 'ar' as WeaponId, reaction: 0.42, turn: 4.2, error: 0.08, range: 34, keep: 14 },
-  rusher: { weapon: 'pistol' as WeaponId, reaction: 0.3, turn: 6.5, error: 0.1, range: 24, keep: 2 },
-  sniper: { weapon: 'sniper' as WeaponId, reaction: 0.65, turn: 2.6, error: 0.035, range: 70, keep: 30 },
-  boss: { weapon: 'shotgun' as WeaponId, reaction: 0.35, turn: 3.2, error: 0.06, range: 22, keep: 6 }
+  grunt: { reaction: 0.42, turn: 4.2, error: 0.08, range: 34, keep: 14 },
+  rusher: { reaction: 0.3, turn: 6.5, error: 0.1, range: 24, keep: 2 },
+  sniper: { reaction: 0.65, turn: 2.6, error: 0.035, range: 70, keep: 30 },
+  boss: { reaction: 0.35, turn: 3.2, error: 0.06, range: 22, keep: 6 }
+};
+
+/** Fill bots play their character's primary: how far they engage and the distance they hold. */
+const ENGAGE: Record<WeaponId, { range: number; keep: number }> = {
+  ar: { range: 34, keep: 14 },
+  shotgun: { range: 24, keep: 5 },
+  sniper: { range: 70, keep: 30 },
+  pistol: { range: 26, keep: 10 },
+  nailer: { range: 26, keep: 8 },
+  pulse: { range: 45, keep: 18 },
+  harpoon: { range: 55, keep: 24 },
+  cannon: { range: 30, keep: 12 },
+  buzzer: { range: 20, keep: 6 }
 };
 
 /** Snapbot and fill-bot brains: perceive, navigate the waypoint graph, aim with human-like lag, shoot. */
@@ -48,8 +62,6 @@ export class BotDirector {
   constructor(private readonly host: HostSim) {}
 
   add(player: PlayerState) {
-    const p = PROFILE[player.bot ?? 'grunt'];
-    const weapon = player.bot === 'grunt' && player.character !== 'grunt' ? WEAPON_IDS[player.id % 4]! : p.weapon;
     this.brains.set(player.id, {
       seq: 0,
       target: 0,
@@ -73,7 +85,7 @@ export class BotDirector {
       avoid: new Map(),
       graphOnly: 0,
       fireHeld: false,
-      slot: WEAPON_IDS.indexOf(weapon)
+      slot: 0
     });
   }
 
@@ -95,7 +107,9 @@ export class BotDirector {
 
   private decide(bot: PlayerState, b: Brain): Command {
     const host = this.host;
-    const prof = PROFILE[bot.bot ?? 'grunt'];
+    const base = PROFILE[bot.bot ?? 'grunt'];
+    const fill = bot.character !== bot.bot;
+    const prof = fill ? { ...base, ...ENGAGE[LOADOUTS[bot.character].primary] } : base;
     b.seq++;
     const cmd: Command = { seq: b.seq, forward: 0, right: 0, yaw: b.aimYaw, pitch: b.aimPitch, buttons: 0, slot: b.slot, viewTime: host.time, life: bot.life };
     if (!bot.alive) {
@@ -135,7 +149,7 @@ export class BotDirector {
         else if (!b.fireHeld) cmd.buttons |= BUTTON.fire;
       }
       b.fireHeld = (cmd.buttons & BUTTON.fire) !== 0;
-      if (bot.bot === 'sniper' && dist > 12) cmd.buttons |= BUTTON.ads;
+      if (def.zoom > 2 && dist > 12) cmd.buttons |= BUTTON.ads;
       if (dist < 1.9 && bot.arms.meleeCooldown <= 0) cmd.buttons |= BUTTON.melee;
       // Keep a preferred distance and strafe.
       b.strafeTime -= TICK;

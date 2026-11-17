@@ -15,8 +15,6 @@ export type Action =
   | 'ads'
   | 'weapon1'
   | 'weapon2'
-  | 'weapon3'
-  | 'weapon4'
   | 'scoreboard'
   | 'chat';
 
@@ -38,8 +36,6 @@ export const DEFAULT_BINDINGS: Bindings = {
   ads: ['Mouse2'],
   weapon1: ['Digit1'],
   weapon2: ['Digit2'],
-  weapon3: ['Digit3'],
-  weapon4: ['Digit4'],
   scoreboard: ['Tab'],
   chat: ['Enter', 'KeyT']
 };
@@ -61,7 +57,7 @@ export interface FrameInput {
   forward: number;
   right: number;
   buttons: number;
-  /** Requested slot change this frame: 0…3, or +1/-1 cycle via `cycle`. */
+  /** Requested slot change this frame: 0 primary, 1 sidearm; or +1/-1 cycle via `cycle`. */
   slot: number | null;
   cycle: number;
   scoreboard: boolean;
@@ -219,7 +215,7 @@ export class Input {
     set(BUTTON.grenade, this.held('grenade'));
     set(BUTTON.grenadeLow, this.held('grenade') && this.held('sprint'));
     let slot: number | null = null;
-    (['weapon1', 'weapon2', 'weapon3', 'weapon4'] as const).forEach((a, i) => {
+    (['weapon1', 'weapon2'] as const).forEach((a, i) => {
       if (this.pressed(a)) slot = i;
     });
     let cycle = Math.sign(this.wheel);

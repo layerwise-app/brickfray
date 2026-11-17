@@ -79,14 +79,20 @@ export function box(w: number, h: number, d: number, bevel = 0): THREE.BufferGeo
 }
 
 /**
- * A solid of revolution around Z. `profile` is [radius, z] from back to front
- * (or any order); corners sharper than the crease stay crisp.
+ * A solid of revolution around Z. `profile` is [radius, z] in either winding;
+ * faces always point out of the solid. Corners sharper than the crease stay crisp.
  */
 export function latheZ(profile: readonly (readonly [number, number])[], seg: number): THREE.BufferGeometry {
   seg = segs(seg);
   const key = `lathe:${seg}:${profile.map((p) => p.join(',')).join(';')}`;
   return cached(key, () => {
-    const pts = profile.map(([r, z]) => new THREE.Vector2(Math.max(r, 0), z));
+    // LatheGeometry faces point outward only for a counter-clockwise (r, z) outline.
+    const area = profile.reduce((sum, [r, z], i) => {
+      const [r2, z2] = profile[(i + 1) % profile.length]!;
+      return sum + r * z2 - r2 * z;
+    }, 0);
+    const ordered = area < 0 ? [...profile].reverse() : profile;
+    const pts = ordered.map(([r, z]) => new THREE.Vector2(Math.max(r, 0), z));
     const g = new THREE.LatheGeometry(pts, Math.max(4, seg));
     g.rotateX(Math.PI / 2);
     return toCreasedNormals(g, Math.min(1.2, Math.max(0.5, ((Math.PI * 2) / seg) * 1.25)));

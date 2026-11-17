@@ -193,6 +193,7 @@ function writeSelf(w: Writer, p: PlayerState) {
   w.f32(a.switchTime);
   for (const id of WEAPON_IDS) w.u8(a.ammo[id]);
   w.f32(a.cooldown);
+  w.u8(a.burstLeft);
   w.f32(a.reload);
   w.f32(a.reloadTotal);
   w.u8(a.burst);
@@ -231,6 +232,7 @@ function readSelf(r: Reader): SelfState {
     switchTime,
     ammo,
     cooldown: r.f32(),
+    burstLeft: r.u8(),
     reload: r.f32(),
     reloadTotal: r.f32(),
     reloadEmpty: (flags & 16) !== 0,

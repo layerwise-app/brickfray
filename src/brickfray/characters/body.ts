@@ -158,12 +158,8 @@ export function supportHand(b: PartSet, s: BodyStyle) {
   b.blob('handL', [0.02, 0.022, 0.062], g, { at: [0.0, 0.042, -0.072], rot: [0, -0.15, 0], look, e: 0.6 });
 }
 
-/** Melee mallet and grenade, held in the left hand; their bones are scaled to zero until used. */
+/** Grenade held in the left hand, its bone scaled to zero until used; `createCharacter` adds the melee weapon. */
 function props(b: PartSet) {
-  const seg = b.seg(5, 8, 10);
-  b.cyl('mallet', 0.014, 0.014, 0.34, '#c9a06a', { at: [0, 0, -0.08], rot: [Math.PI / 2, 0, 0], look: 'cloth', seg: 6 });
-  b.cyl('mallet', 0.055, 0.055, 0.15, '#d8452e', { at: [0, 0, -0.27], rot: [0, 0, Math.PI / 2], look: 'gloss', seg });
-  if (b.detail > 0) b.mirror((_, sign) => b.cyl('mallet', 0.058, 0.058, 0.016, '#2f363d', { at: [sign * 0.068, 0, -0.27], rot: [0, 0, Math.PI / 2], look: 'rubber', seg }));
   b.ball('grenade', 0.036, '#5c7a3a', { at: [0, 0.012, -0.005], scale: [1, 1.15, 1], look: 'plastic' });
   b.cyl('grenade', 0.017, 0.02, 0.03, '#3a4047', { at: [0, 0.058, -0.005], look: 'metal', seg: 6 });
 }

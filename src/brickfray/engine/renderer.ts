@@ -5,6 +5,7 @@ import { GTAOPass } from 'three/examples/jsm/postprocessing/GTAOPass.js';
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { QUALITY, type QualityLevel, type QualityProfile } from './quality';
 import { Materials } from './materials';
+import { FrameTimer } from './frame-timer';
 
 export interface Atmosphere {
   zenith: string;
@@ -66,6 +67,7 @@ void main() {
 
 export class GameRenderer {
   readonly renderer: THREE.WebGLRenderer;
+  readonly timer: FrameTimer;
   profile: QualityProfile;
   materials: Materials;
   readonly hemi: THREE.HemisphereLight;
@@ -91,6 +93,7 @@ export class GameRenderer {
     this.renderer.toneMappingExposure = 1.02;
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
     this.renderer.info.autoReset = false;
+    this.timer = new FrameTimer(this.renderer.getContext() as WebGL2RenderingContext);
     // GTAO renders the scene a second time; shadows only need one update per frame.
     this.renderer.shadowMap.autoUpdate = false;
     this.materials = new Materials(this.profile);

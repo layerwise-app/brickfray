@@ -2,10 +2,11 @@ import * as THREE from 'three';
 import { BrickBuilder } from '../../engine/bricks';
 import { buildGround } from '../../engine/ground';
 import { PLASTIC } from '../../engine/palette';
-import { createWeaponModel } from '../../weapons';
+import { createWeaponModel, type ModelId } from '../../weapons';
+import { MELEES } from '../../weapons/defs';
 import type { LabContext } from '../types';
 
-type Id = 'ar' | 'shotgun' | 'sniper' | 'pistol' | 'grenade' | 'mallet';
+type Id = ModelId;
 
 /** Where each model hangs on the rack (first-person build); third-person copies sit 2.4 m to the right. */
 const SLOTS: Record<Id, [number, number]> = {
@@ -14,8 +15,19 @@ const SLOTS: Record<Id, [number, number]> = {
   sniper: [-0.3, 1.02],
   pistol: [0.62, 1.98],
   grenade: [0.55, 1.5],
-  mallet: [0.78, 1.32]
+  mallet: [0.78, 1.32],
+  nailer: [4.55, 1.95],
+  pulse: [4.6, 1.5],
+  harpoon: [4.7, 1.02],
+  cannon: [5.62, 1.98],
+  buzzer: [5.55, 1.5],
+  sword: [9.4, 1.3],
+  knife: [9.9, 1.9],
+  anchor: [10.4, 1.3],
+  hatchet: [10.9, 1.9],
+  wrench: [11.4, 1.3]
 };
+const HELD = (id: Id) => id === 'grenade' || id in MELEES;
 const THIRD_X = 2.4;
 
 /** Display rack of every weapon model, first-person builds on the left, third-person on the right. */
@@ -45,14 +57,14 @@ export default function setup(ctx: LabContext) {
       const model = createWeaponModel(id, kit, view);
       const [x, y] = SLOTS[id];
       model.root.position.set(x + (view === 'third' ? THIRD_X : 0), y, 0);
-      if (id === 'grenade' || id === 'mallet') model.root.rotation.set(0, -0.6, 0);
+      if (HELD(id)) model.root.rotation.set(0, -0.6, 0);
       else model.root.rotation.set(0, -Math.PI / 2, 0);
       display.add(model.root);
       models.push({ id, view, root: model.root });
       const peg = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.38, 10), gr.materials.get(PLASTIC.silver, 'metal'));
       peg.rotation.x = Math.PI / 2;
       peg.position.set(model.root.position.x, y - 0.075, -0.21);
-      if (id !== 'grenade' && id !== 'mallet') display.add(peg);
+      if (!HELD(id)) display.add(peg);
     }
   }
 

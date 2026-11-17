@@ -1,4 +1,5 @@
-import { GRENADE, MELEE, WEAPON_IDS, WEAPONS, type WeaponId } from '../weapons/defs';
+import { GRENADE, MELEES, WEAPON_IDS, WEAPONS, type WeaponId } from '../weapons/defs';
+import { LOADOUTS, slotWeapon, type Loadout } from '../weapons/loadouts';
 import type { ViewAction } from '../weapons/types';
 import { MOVE } from './constants';
 import { BUTTON, type ArmsState, type Command, type PlayerState } from './types';
@@ -12,13 +13,17 @@ export interface ArmsHooks {
   dryFire?(): void;
 }
 
-export function createArms(weapon: WeaponId = 'ar'): ArmsState {
+/** Full magazines, holding `weapon` (the loadout's primary unless it is one of its guns). */
+export function createArms(loadout: Loadout = LOADOUTS.grunt, weapon?: WeaponId): ArmsState {
+  const ammo = {} as Record<WeaponId, number>;
+  for (const id of WEAPON_IDS) ammo[id] = WEAPONS[id].mag;
   return {
-    weapon,
+    weapon: weapon === loadout.primary || weapon === loadout.secondary ? weapon : loadout.primary,
     next: null,
     switchTime: 0,
-    ammo: { ar: WEAPONS.ar.mag, shotgun: WEAPONS.shotgun.mag, sniper: WEAPONS.sniper.mag, pistol: WEAPONS.pistol.mag },
+    ammo,
     cooldown: 0,
+    burstLeft: 0,
     reload: 0,
     reloadTotal: 0,
     reloadEmpty: false,
@@ -150,11 +155,15 @@ export function stepArms(player: PlayerState, cmd: Command, dt: number, hooks: A
   arms.sprintRecovery = sprinting ? MOVE.sprintRecovery : Math.max(0, arms.sprintRecovery - dt);
   if (arms.sinceShot > 0.45) arms.burst = 0;
 
+  const loadout = LOADOUTS[player.character];
+  const melee = MELEES[loadout.melee];
+
   // Weapon switch: holster, swap, draw.
-  const wanted = WEAPON_IDS[cmd.slot] ?? arms.weapon;
+  const wanted = slotWeapon(loadout, cmd.slot);
   const target = arms.next ?? arms.weapon;
   if (wanted !== target && arms.cook < 0) {
     cancelReload(arms, hooks);
+    arms.burstLeft = 0;
     const holster = arms.next ? 0 : WEAPONS[arms.weapon].holsterTime;
     arms.next = wanted;
     arms.switchTime = holster + WEAPONS[wanted].drawTime;
@@ -169,16 +178,17 @@ export function stepArms(player: PlayerState, cmd: Command, dt: number, hooks: A
     }
   }
 
-  // Mallet.
+  // Melee.
   if (arms.meleeTime >= 0) {
     const before = arms.meleeTime;
     arms.meleeTime += dt;
-    if (before < MELEE.windup && arms.meleeTime >= MELEE.windup) hooks?.melee(player, cmd.seq);
-    if (arms.meleeTime > 0.5) arms.meleeTime = -1;
+    if (before < melee.windup && arms.meleeTime >= melee.windup) hooks?.melee(player, cmd.seq);
+    if (arms.meleeTime > melee.cooldown * 0.62) arms.meleeTime = -1;
   } else if (pressed & BUTTON.melee && arms.meleeCooldown <= 0 && arms.cook < 0) {
     cancelReload(arms, hooks);
     arms.meleeTime = 0;
-    arms.meleeCooldown = MELEE.cooldown;
+    arms.meleeCooldown = melee.cooldown;
+    arms.burstLeft = 0;
     hooks?.view?.({ type: 'melee' });
   }
 
@@ -207,11 +217,11 @@ export function stepArms(player: PlayerState, cmd: Command, dt: number, hooks: A
     arms.reload = Math.max(0, arms.reload - dt);
     if (arms.reload === 0) {
       if (def.mode === 'pump') {
-        if (arms.reloadTotal !== LOAD_IN) arms.ammo.shotgun = Math.min(def.mag, arms.ammo.shotgun + 1);
-        if (arms.ammo.shotgun < def.mag) {
+        if (arms.reloadTotal !== LOAD_IN) arms.ammo[arms.weapon] = Math.min(def.mag, arms.ammo[arms.weapon] + 1);
+        if (arms.ammo[arms.weapon] < def.mag) {
           arms.reload = def.reload;
           arms.reloadTotal = def.reload;
-          hooks?.view?.({ type: 'reloadShell', index: arms.ammo.shotgun, duration: def.reload });
+          hooks?.view?.({ type: 'reloadShell', index: arms.ammo[arms.weapon], duration: def.reload });
         } else {
           hooks?.view?.({ type: 'reloadEnd' });
           // The view racks the pump after an empty reload.
@@ -231,11 +241,13 @@ export function stepArms(player: PlayerState, cmd: Command, dt: number, hooks: A
   // Fire.
   const edge = (pressed & BUTTON.fire) !== 0;
   if (edge) arms.queuedFire = 0.18;
-  const wantsFire = def.mode === 'auto' ? (b & BUTTON.fire) !== 0 : arms.queuedFire > 0;
-  const shotgunInterrupt = def.mode === 'pump' && arms.reload > 0 && arms.ammo.shotgun > 0;
+  const wantsFire = def.mode === 'auto' ? (b & BUTTON.fire) !== 0 : arms.queuedFire > 0 || arms.burstLeft > 0;
+  const shotgunInterrupt = def.mode === 'pump' && arms.reload > 0 && arms.ammo[arms.weapon] > 0;
+  if (busy || sprinting || arms.reload > 0) arms.burstLeft = 0;
   if (!wantsFire || busy || sprinting || arms.sprintRecovery > 0 || arms.cooldown > 0) return;
   if (arms.reload > 0 && !shotgunInterrupt) return;
   if (arms.ammo[arms.weapon] <= 0) {
+    arms.burstLeft = 0;
     if (edge) {
       hooks?.dryFire?.();
       startReload(arms, hooks);
@@ -248,6 +260,10 @@ export function stepArms(player: PlayerState, cmd: Command, dt: number, hooks: A
   arms.ammo[arms.weapon]--;
   arms.shots++;
   arms.cooldown = Math.max(60 / def.rpm, def.cycle ?? 0);
+  if (def.burst) {
+    arms.burstLeft = (arms.burstLeft || def.burst.count) - 1;
+    if (arms.burstLeft === 0) arms.cooldown = def.burst.pause;
+  }
   hooks?.fire(player, arms.weapon, pelletDirections(player, cmd.seq), cmd.seq);
   arms.sinceShot = 0;
   arms.burst++;

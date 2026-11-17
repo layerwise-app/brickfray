@@ -53,8 +53,8 @@ export class Match {
   private waveSpawnTimer = 0;
   private wave = waveTuning('normal', 1);
 
-  constructor(layout: MapLayout, readonly settings: MatchSettings) {
-    this.sim = new HostSim(layout, settings);
+  constructor(layout: MapLayout, readonly settings: MatchSettings, seed?: number) {
+    this.sim = new HostSim(layout, settings, seed);
     this.bots = new BotDirector(this.sim);
     this.sim.onKill = (victim, killer) => this.onKill(victim, killer);
   }

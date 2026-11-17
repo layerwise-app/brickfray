@@ -1,5 +1,6 @@
 import type { BotKind, CharacterId } from '../characters/types';
-import { GRENADE, MELEE, WEAPONS, type WeaponId } from '../weapons/defs';
+import { GRENADE, MELEES, WEAPONS, type MeleeId, type WeaponId } from '../weapons/defs';
+import { LOADOUTS } from '../weapons/loadouts';
 import type { MapLayout } from '../world/types';
 import { aimDirection, createArms, stepArms, type ArmsHooks } from './arms';
 import { CollisionWorld } from './collision';
@@ -21,7 +22,7 @@ interface PoseRecord extends HitPose {
 
 export interface DamageSource {
   attacker: number;
-  weapon: WeaponId | 'grenade' | 'mallet';
+  weapon: WeaponId | MeleeId | 'grenade';
   kind: HitKind;
   from: [number, number, number];
 }
@@ -44,13 +45,16 @@ export class HostSim {
   private lastHurt = new Map<number, number>();
   private nextId = 1;
   private nextGrenade = 1;
-  private seed = 0x2468ace;
+  private seed: number;
 
+  /** `seed` fixes spawns and bot choices for tests; matches roll a new one so spawns differ every game. */
   constructor(
     readonly layout: MapLayout,
-    public settings: MatchSettings
+    public settings: MatchSettings,
+    seed = Math.floor(Math.random() * 4294967296)
   ) {
     this.world = new CollisionWorld(layout.colliders);
+    this.seed = seed >>> 0;
   }
 
   random() {
@@ -71,7 +75,7 @@ export class HostSim {
       move: createMoveState(),
       yaw: 0,
       pitch: 0,
-      arms: createArms(),
+      arms: createArms(LOADOUTS[character]),
       health,
       maxHealth: health,
       alive: false,
@@ -105,7 +109,7 @@ export class HostSim {
     player.pitch = 0;
     player.life = (player.life + 1) & 255;
     const keep = player.arms;
-    player.arms = createArms(keep.next ?? keep.weapon);
+    player.arms = createArms(LOADOUTS[player.character], keep.next ?? keep.weapon);
     player.arms.prevButtons = keep.prevButtons;
     player.health = player.maxHealth;
     player.alive = true;
@@ -225,7 +229,8 @@ export class HostSim {
     const eye = this.eye(attacker);
     const fwd = aimDirection(attacker.yaw, 0);
     let best: PlayerState | null = null;
-    let bestD = MELEE.range + 0.4;
+    const melee = MELEES[LOADOUTS[attacker.character].melee];
+    let bestD = melee.range + 0.4;
     for (const p of this.players.values()) {
       if (!p.alive || !this.hostile(attacker, p)) continue;
       const pose = this.poseAt(p, t);
@@ -236,7 +241,7 @@ export class HostSim {
       const dy = headCenterY(pose) - 0.5 - eye[1];
       if (d > bestD || Math.abs(dy) > 1.4) continue;
       const cos = (dx * fwd[0] + dz * fwd[2]) / Math.max(d, 1e-4);
-      if (d > 0.5 && cos < Math.cos(MELEE.arc)) continue;
+      if (d > 0.5 && cos < Math.cos(melee.arc)) continue;
       best = p;
       bestD = d;
     }
@@ -246,7 +251,7 @@ export class HostSim {
     const facing = Math.cos(best.yaw - toVictim);
     // Victim facing away from the attacker: their forward points along attacker→victim.
     const backstab = facing > 0.5;
-    this.damage(best, backstab ? MELEE.backstab : MELEE.damage, { attacker: attacker.id, weapon: 'mallet', kind: 'body', from: eye });
+    this.damage(best, backstab ? melee.backstab : melee.damage, { attacker: attacker.id, weapon: melee.id, kind: 'body', from: eye });
   }
 
   damage(victim: PlayerState, amount: number, src: DamageSource) {
