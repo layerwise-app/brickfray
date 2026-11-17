@@ -173,7 +173,7 @@ export class Game {
   }
 
   private baseSettings(mode: MatchSettings['mode'], map?: MapId): MatchSettings {
-    return { mode, map: map ?? MAP_IDS[Math.floor(Math.random() * MAP_IDS.length)]!, minutes: 10, bots: mode === 'solo' ? 0 : 5 };
+    return { mode, map: map ?? MAP_IDS[Math.floor(Math.random() * MAP_IDS.length)]!, minutes: 10, bots: mode === 'solo' ? 0 : 5, difficulty: this.settings.difficulty };
   }
 
   /** Opens the solo setup screen; the run begins on Start. */
@@ -315,6 +315,10 @@ export class Game {
 
   setLobbySettings(settings: Partial<MatchSettings>) {
     this.host?.setSettings(settings);
+    if (settings.difficulty) {
+      this.settings = { ...this.settings, difficulty: settings.difficulty };
+      saveSettings(this.settings);
+    }
   }
 
   chat(text: string) {

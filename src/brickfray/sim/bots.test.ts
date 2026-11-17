@@ -5,7 +5,7 @@ import { Match } from './match';
 
 describe.each(['plaza', 'fortress', 'docks'] as const)('snapbots on %s', (id) => {
   it('reach an idle player, open fire and never walk into the kill zone', () => {
-    const match = new Match(MAPS[id].layout(), { mode: 'solo', map: id, minutes: 0, bots: 0 });
+    const match = new Match(MAPS[id].layout(), { mode: 'solo', map: id, minutes: 0, bots: 0, difficulty: 'normal' });
     const me = match.addHuman('Me', 'rivet');
     match.start();
     me.protectedUntil = Infinity;

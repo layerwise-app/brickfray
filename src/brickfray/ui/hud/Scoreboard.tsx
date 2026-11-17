@@ -105,7 +105,11 @@ export function Results() {
           {good && <CrownIcon size={44} className='text-[var(--bf-yellow)]' />}
           <h2 className={`bf-display text-7xl ${good ? 'text-[var(--bf-yellow)]' : ''}`}>{title}</h2>
         </div>
-        {mode === 'solo' && <div className='bf-display text-3xl text-white/85'>{t('reachedWave', { n: Math.max(1, hud.wave) })}</div>}
+        {mode === 'solo' && hud.settings && (
+          <div className='bf-display text-3xl text-white/85'>
+            {t('reachedWave', { n: Math.max(1, hud.wave) })} · {t(`difficulty.${hud.settings.difficulty}`)}
+          </div>
+        )}
         <div className='bf-panel bf-studs w-full p-5'>
           <Table rows={hud.rows} />
         </div>

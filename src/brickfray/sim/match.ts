@@ -4,11 +4,43 @@ import { BotDirector } from './bots';
 import { MATCH, PLAYER } from './constants';
 import { HostSim } from './host';
 import type { MapLayout } from '../world/types';
-import type { MatchSettings, MatchState, PlayerState } from './types';
+import type { Difficulty, MatchSettings, MatchState, PlayerState } from './types';
 
 const WARMUP = 4;
 const WAVE_BREAK = 7;
 const RESULTS = 12;
+interface Ramp {
+  /** [wave 1, added per wave, cap] */
+  skill: [number, number, number];
+  damage: [number, number, number];
+  /** [base, added per wave] */
+  count: [number, number];
+  /** [wave 1, cap] snapbots on the field at once. */
+  alive: [number, number];
+  /** Share of max health restored between waves. */
+  heal: number;
+}
+
+const RAMP: Record<Difficulty, Ramp> = {
+  easy: { skill: [0.05, 0.05, 0.6], damage: [0.2, 0.025, 0.45], count: [2, 1.2], alive: [2, 6], heal: 1 },
+  normal: { skill: [0.18, 0.07, 0.9], damage: [0.3, 0.04, 0.65], count: [3, 1.6], alive: [3, 8], heal: 1 },
+  hard: { skill: [0.4, 0.07, 1], damage: [0.45, 0.05, 0.9], count: [4, 2.2], alive: [4, 10], heal: 0.5 }
+};
+
+/** How hard a solo wave is: bot aim, bot damage to the player, wave size and how many fight at once. */
+export function waveTuning(difficulty: Difficulty, wave: number) {
+  const r = RAMP[difficulty];
+  const step = wave - 1;
+  return {
+    skill: Math.min(r.skill[2], r.skill[0] + r.skill[1] * step),
+    damage: Math.min(r.damage[2], r.damage[0] + r.damage[1] * step),
+    count: Math.floor(r.count[0] + r.count[1] * wave),
+    alive: Math.min(r.alive[1], r.alive[0] + step),
+    spawnEvery: Math.max(0.5, 1.4 - 0.08 * step),
+    heal: r.heal
+  };
+}
+
 const BOT_NAMES = ['Bolt', 'Pixel', 'Widget', 'Sprocket', 'Gizmo', 'Ratchet', 'Clicky', 'Dynamo', 'Fuse', 'Cog'];
 const SNAPBOT_NAMES: Record<BotKind, string> = { grunt: 'Snapbot', rusher: 'Zipbot', sniper: 'Scopebot', boss: 'Megabot' };
 
@@ -19,6 +51,7 @@ export class Match {
   state: MatchState = { phase: 'warmup', phaseEnds: 0, teamScore: [0, 0], wave: 0, winner: null };
   private waveQueue: BotKind[] = [];
   private waveSpawnTimer = 0;
+  private wave = waveTuning('normal', 1);
 
   constructor(layout: MapLayout, readonly settings: MatchSettings) {
     this.sim = new HostSim(layout, settings);
@@ -126,15 +159,18 @@ export class Match {
   private startWave() {
     const wave = ++this.state.wave;
     this.sim.events.push({ type: 'wave', wave });
-    this.bots.skill = Math.min(0.95, 0.12 + wave * 0.07);
-    this.sim.botDamage = Math.min(0.6, 0.3 + wave * 0.04);
-    const count = 3 + Math.floor(wave * 1.6);
+    this.wave = waveTuning(this.settings.difficulty, wave);
+    this.bots.skill = this.wave.skill;
+    this.sim.botDamage = this.wave.damage;
+    // Rushers join from wave 2 and snipers from wave 3, each taking a growing share; every fifth wave adds bosses.
+    const rushers = wave >= 2 ? Math.min(4, wave) : 0;
+    const snipers = wave >= 3 ? Math.min(2, wave - 2) : 0;
     const queue: BotKind[] = [];
-    for (let i = 0; i < count; i++) {
+    for (let i = 0; i < this.wave.count; i++) {
       const r = (i * 7 + wave * 3) % 10;
-      queue.push(wave >= 2 && r < 3 ? 'rusher' : wave >= 3 && r === 9 ? 'sniper' : 'grunt');
+      queue.push(r < rushers ? 'rusher' : r >= 10 - snipers ? 'sniper' : 'grunt');
     }
-    if (wave % 5 === 0) queue.push('boss');
+    if (wave % 5 === 0) for (let i = 0; i < wave / 5; i++) queue.push('boss');
     this.waveQueue = queue;
     this.waveSpawnTimer = 0;
   }
@@ -160,6 +196,7 @@ export class Match {
     }
     if (s.phase === 'intermission' && this.time >= s.phaseEnds) {
       s.phase = 'playing';
+      s.phaseEnds = 0;
       this.startWave();
     }
   }
@@ -168,8 +205,8 @@ export class Match {
     for (const p of [...this.sim.players.values()]) if (p.bot && !p.alive && this.time >= p.respawnAt) this.remove(p.id);
     const alive = [...this.sim.players.values()].filter((p) => p.bot && p.alive).length;
     this.waveSpawnTimer -= dt;
-    if (this.waveQueue.length && alive < 8 && this.waveSpawnTimer <= 0) {
-      this.waveSpawnTimer = 1.1;
+    if (this.waveQueue.length && alive < this.wave.alive && this.waveSpawnTimer <= 0) {
+      this.waveSpawnTimer = this.wave.spawnEvery;
       const bot = this.addBot(this.waveQueue.shift()!);
       this.sim.spawn(bot);
     }
@@ -177,7 +214,7 @@ export class Match {
       this.state.phase = 'intermission';
       this.state.phaseEnds = this.time + WAVE_BREAK;
       for (const p of this.sim.players.values()) {
-        p.health = p.maxHealth;
+        p.health = Math.min(p.maxHealth, p.health + p.maxHealth * this.wave.heal);
         p.arms.grenades = Math.min(4, p.arms.grenades + 1);
       }
     }

@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { MapLayout } from '../world/types';
 import { TICK } from './constants';
-import { Match } from './match';
-import { BUTTON } from './types';
+import { Match, waveTuning } from './match';
+import { BUTTON, DIFFICULTIES, type Difficulty } from './types';
 
 function arena(): MapLayout {
   const spawns = [];
@@ -29,7 +29,7 @@ function arena(): MapLayout {
 
 describe('Match', () => {
   it('bots fight in free-for-all and score kills', () => {
-    const match = new Match(arena(), { mode: 'ffa', map: 'plaza', minutes: 10, bots: 6 });
+    const match = new Match(arena(), { mode: 'ffa', map: 'plaza', minutes: 10, bots: 6, difficulty: 'normal' });
     match.start();
     let kills = 0;
     for (let t = 0; t < 90; t += TICK) {
@@ -41,7 +41,7 @@ describe('Match', () => {
   });
 
   it('a human shot to the head deals headshot damage through the command path', () => {
-    const match = new Match(arena(), { mode: 'ffa', map: 'plaza', minutes: 10, bots: 0 });
+    const match = new Match(arena(), { mode: 'ffa', map: 'plaza', minutes: 10, bots: 0, difficulty: 'normal' });
     const a = match.addHuman('A', 'rivet');
     const b = match.addHuman('B', 'vega');
     match.start();
@@ -59,7 +59,7 @@ describe('Match', () => {
   });
 
   it('commands made before the client saw a respawn keep the new spawn and facing', () => {
-    const match = new Match(arena(), { mode: 'ffa', map: 'plaza', minutes: 10, bots: 0 });
+    const match = new Match(arena(), { mode: 'ffa', map: 'plaza', minutes: 10, bots: 0, difficulty: 'normal' });
     const a = match.addHuman('A', 'rivet');
     match.start();
     const staleLife = a.life;
@@ -72,20 +72,48 @@ describe('Match', () => {
     expect(a.yaw).toBe(-2);
   });
 
-  it('solo waves spawn snapbots and advance', () => {
-    const match = new Match(arena(), { mode: 'solo', map: 'plaza', minutes: 0, bots: 0 });
+  it('solo keeps going wave after wave until the player falls', () => {
+    const match = new Match(arena(), { mode: 'solo', map: 'plaza', minutes: 0, bots: 0, difficulty: 'normal' });
     const human = match.addHuman('Me', 'nova');
     match.start();
     human.protectedUntil = Infinity;
     for (let t = 0; t < 6; t += TICK) match.tick(TICK);
     expect(match.state.wave).toBe(1);
-    // Kill every snapbot by hand.
-    for (let t = 0; t < 30 && match.state.phase !== 'intermission'; t += TICK) {
-      for (const p of match.sim.players.values()) if (p.bot && p.alive) match.sim.damage(p, 999, { attacker: human.id, weapon: 'ar', kind: 'body', from: [0, 0, 0] });
-      human.health = 100;
-      human.alive = true;
-      match.tick(TICK);
+    for (let wave = 1; wave <= 3; wave++) {
+      // Kill every snapbot by hand until the break.
+      for (let t = 0; t < 60 && match.state.phase !== 'intermission'; t += TICK) {
+        for (const p of match.sim.players.values()) if (p.bot && p.alive) match.sim.damage(p, 999, { attacker: human.id, weapon: 'ar', kind: 'body', from: [0, 0, 0] });
+        human.health = 100;
+        match.tick(TICK);
+      }
+      expect(match.state.phase).toBe('intermission');
+      for (let t = 0; t < 10 && match.state.phase === 'intermission'; t += TICK) match.tick(TICK);
+      for (let t = 0; t < 1; t += TICK) match.tick(TICK);
+      expect(match.state).toMatchObject({ phase: 'playing', wave: wave + 1 });
     }
-    expect(match.state.phase).toBe('intermission');
+  });
+});
+
+describe('solo difficulty', () => {
+  const tuning = (d: Difficulty) => Array.from({ length: 15 }, (_, i) => waveTuning(d, i + 1));
+  const keys = ['skill', 'damage', 'count', 'alive'] as const;
+
+  it.each(DIFFICULTIES)('%s gets harder every wave', (d) => {
+    const waves = tuning(d);
+    for (let i = 1; i < waves.length; i++) {
+      for (const k of keys) expect(waves[i]![k]).toBeGreaterThanOrEqual(waves[i - 1]![k]);
+      expect(waves[i]!.count).toBeGreaterThan(waves[i - 1]!.count);
+    }
+    expect(waves[4]!.skill).toBeGreaterThan(waves[0]!.skill);
+    expect(waves[4]!.damage).toBeGreaterThan(waves[0]!.damage);
+  });
+
+  it('harder settings start harder', () => {
+    const [easy, normal, hard] = DIFFICULTIES.map((d) => waveTuning(d, 1));
+    for (const k of keys) {
+      expect(normal![k]).toBeGreaterThanOrEqual(easy![k]);
+      expect(hard![k]).toBeGreaterThanOrEqual(normal![k]);
+    }
+    expect(hard!.skill).toBeGreaterThan(easy!.skill);
   });
 });

@@ -1,6 +1,7 @@
 import type { AudioMix } from '../audio/types';
 import type { CharacterId } from '../characters/types';
 import type { QualityLevel } from '../engine/quality';
+import type { Difficulty } from '../sim/types';
 import { DEFAULT_BINDINGS, type InputSettings } from './input';
 
 export interface CrosshairSettings {
@@ -21,6 +22,8 @@ export interface Settings {
   crosshair: CrosshairSettings;
   damageNumbers: boolean;
   showStats: boolean;
+  /** Last solo difficulty picked. */
+  difficulty: Difficulty;
 }
 
 const KEY = 'brickfray.settings.v2';
@@ -50,7 +53,8 @@ export function defaultSettings(): Settings {
     mix: { master: 0.8, effects: 1, music: 0.5, ui: 0.7 },
     crosshair: { color: '#ffffff', size: 1, gap: 1, dot: true },
     damageNumbers: false,
-    showStats: false
+    showStats: false,
+    difficulty: 'normal'
   };
 }
 

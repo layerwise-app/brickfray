@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { ROSTER } from '../characters/roster';
-import type { MatchSettings } from '../sim/types';
+import { DIFFICULTIES, type MatchSettings } from '../sim/types';
 import { MAP_PREVIEW } from './map-preview';
 import { useApp, useGame } from './App';
 import { useT } from './i18n';
@@ -75,6 +75,18 @@ export function Lobby() {
                 ))}
               </div>
             </Field>
+            {solo && (
+              <Field label={t('difficulty')}>
+                <div className='bf-seg'>
+                  {DIFFICULTIES.map((difficulty) => (
+                    <button key={difficulty} aria-pressed={s.difficulty === difficulty} onClick={() => set({ difficulty })}>
+                      {t(`difficulty.${difficulty}`)}
+                    </button>
+                  ))}
+                </div>
+                <p className='text-sm text-[var(--bf-muted)]'>{t(`difficultyHint.${s.difficulty}`)}</p>
+              </Field>
+            )}
             {!solo && (
             <div className='grid gap-5 sm:grid-cols-2'>
               <Field label={t('timeLimit')}>

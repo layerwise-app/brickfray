@@ -95,11 +95,16 @@ export interface PlayerState {
   scale: number;
 }
 
+export const DIFFICULTIES = ['easy', 'normal', 'hard'] as const;
+export type Difficulty = (typeof DIFFICULTIES)[number];
+
 export interface MatchSettings {
   mode: ModeId;
   map: MapId;
   minutes: number;
   bots: number;
+  /** Solo only: how fast the waves ramp up. */
+  difficulty: Difficulty;
 }
 
 export type MatchPhase = 'warmup' | 'playing' | 'intermission' | 'ended';
