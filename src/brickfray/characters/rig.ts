@@ -8,6 +8,7 @@ import type { Style } from './style';
 import type { AnimState, BotKind, CharacterId, CharacterRig, ShatterPiece } from './types';
 import { SOCKET_R } from './upper';
 
+const HEAD_BONES = new Set([BONE.head, BONE.hat, BONE.dangleHead]);
 const tmpM = new THREE.Matrix4();
 const tmpV = new THREE.Vector3();
 const tmpV2 = new THREE.Vector3();
@@ -117,7 +118,7 @@ export class Rig implements CharacterRig {
         .addScaledVector(out, 1.2 + this.rand() * 1.6 + strength * 0.08)
         .add(new THREE.Vector3((this.rand() - 0.5) * 1.2, 1.8 + this.rand() * 2.4, (this.rand() - 0.5) * 1.2));
       const angularVelocity = new THREE.Vector3(this.rand() - 0.5, this.rand() - 0.5, this.rand() - 0.5).multiplyScalar(14 + strength);
-      pieces.push({ mesh, velocity, angularVelocity });
+      pieces.push({ mesh, velocity, angularVelocity, head: HEAD_BONES.has(p.bone) });
     }
     this.body.visible = false;
     return pieces;

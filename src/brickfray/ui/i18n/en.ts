@@ -103,6 +103,7 @@ export const en = {
   ctrlHint: 'Ctrl+W closes the tab. Crouch with C, or play in fullscreen.',
   chatPlaceholder: 'Say something…',
   scopeHint: 'Hold Shift to steady',
+  headshot: 'Headshot',
 
   graphics: 'Graphics',
   controls: 'Controls',

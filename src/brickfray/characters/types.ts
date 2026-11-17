@@ -41,6 +41,8 @@ export interface ShatterPiece {
   /** World transform at the moment of death (already applied to mesh). */
   velocity: THREE.Vector3;
   angularVelocity: THREE.Vector3;
+  /** Part of the head or hat (headshot kills send these flying). */
+  head: boolean;
 }
 
 export interface CharacterRig {

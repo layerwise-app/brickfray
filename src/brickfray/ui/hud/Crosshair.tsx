@@ -1,21 +1,36 @@
 import { useEffect, useRef } from 'react';
 import type { HudPulse } from '../../game/hud';
 import { useGame } from '../App';
+import { useT } from '../i18n';
 
 /**
  * Crosshair, hit markers and damage arcs update every frame from HUD pulses,
  * by writing styles directly instead of re-rendering React.
  */
+const HEAD_GOLD = '#ffd23f';
+
 export function Crosshair({ hidden }: { hidden: boolean }) {
   const game = useGame();
+  const { t } = useT();
   const cross = useRef<HTMLDivElement>(null);
   const marker = useRef<HTMLDivElement>(null);
+  const ring = useRef<HTMLDivElement>(null);
+  const callout = useRef<HTMLDivElement>(null);
   const arcs = useRef<HTMLDivElement>(null);
   const numbers = useRef<HTMLDivElement>(null);
 
   // eslint-disable-next-line react-hooks/exhaustive-deps -- subscribes to the game's per-frame HUD pulses
   useEffect(() => {
     let markerTimer = 0;
+    let calloutTimer = 0;
+    // Restart a CSS transition from `from` styles to `to` styles.
+    const play = (el: HTMLElement, from: Partial<CSSStyleDeclaration>, to: Partial<CSSStyleDeclaration>, transition: string) => {
+      el.style.transition = 'none';
+      Object.assign(el.style, from);
+      void el.offsetWidth;
+      el.style.transition = transition;
+      Object.assign(el.style, to);
+    };
     const onPulse = (p: HudPulse) => {
       if (p.type === 'spread' && cross.current) {
         const gap = Math.max(5, Math.min(70, p.px)) * game.settings.crosshair.gap;
@@ -24,16 +39,33 @@ export function Crosshair({ hidden }: { hidden: boolean }) {
       }
       if (p.type === 'hit' && marker.current) {
         const el = marker.current;
-        const color = p.kind === 'kill' ? '#ff3b30' : p.kind === 'head' ? '#ffd23f' : '#ffffff';
+        const head = p.kind === 'head' || !!p.headshot;
+        const color = p.kind === 'kill' ? '#ff3b30' : head ? HEAD_GOLD : '#ffffff';
         el.style.setProperty('--hit', color);
-        el.style.setProperty('--scale', p.kind === 'body' ? '1' : '1.35');
+        el.style.setProperty('--thick', head ? '4px' : '3px');
+        el.style.setProperty('--len', head ? '13px' : '11px');
         el.style.opacity = '1';
         el.style.transition = 'none';
+        // Head hits pop in large and settle, so they read even mid-spray.
+        const settle = p.kind === 'body' ? 1 : 1.35;
+        play(el.firstElementChild as HTMLElement, { transform: `translate(-50%,-50%) scale(${head ? 1.9 : settle})` }, { transform: `translate(-50%,-50%) scale(${settle})` }, 'transform .14s ease-out');
         clearTimeout(markerTimer);
         markerTimer = window.setTimeout(() => {
           el.style.transition = 'opacity .18s ease';
           el.style.opacity = '0';
-        }, p.kind === 'kill' ? 260 : 110);
+        }, p.kind === 'kill' ? 260 : head ? 220 : 110);
+        if (head && ring.current) {
+          play(ring.current, { opacity: '1', transform: 'translate(-50%,-50%) scale(.45)' }, { opacity: '0', transform: 'translate(-50%,-50%) scale(1.5)' }, 'transform .32s ease-out, opacity .32s ease-in');
+        }
+        if (p.headshot && callout.current) {
+          const c = callout.current;
+          play(c, { opacity: '1', transform: 'translate(-50%, 0) scale(1.5)' }, { opacity: '1', transform: 'translate(-50%, 0) scale(1)' }, 'transform .18s cubic-bezier(.2,1.6,.4,1)');
+          clearTimeout(calloutTimer);
+          calloutTimer = window.setTimeout(() => {
+            c.style.transition = 'opacity .3s ease';
+            c.style.opacity = '0';
+          }, 900);
+        }
         if (game.settings.damageNumbers && p.amount > 0 && numbers.current) {
           const n = document.createElement('div');
           n.textContent = String(p.amount);
@@ -65,6 +97,7 @@ export function Crosshair({ hidden }: { hidden: boolean }) {
     return () => {
       off();
       clearTimeout(markerTimer);
+      clearTimeout(calloutTimer);
     };
   }, []);
 
@@ -82,16 +115,36 @@ export function Crosshair({ hidden }: { hidden: boolean }) {
         <span className='absolute' style={{ ...bar, height: 2, width: len, top: -1, left: 'var(--gap)' }} />
         {dot && <span className='absolute rounded-full' style={{ ...bar, width: 3, height: 3, left: -1.5, top: -1.5 }} />}
       </div>
-      <div ref={marker} className='pointer-events-none absolute left-1/2 top-1/2 opacity-0' style={{ ['--hit' as string]: '#fff', ['--scale' as string]: '1' }}>
-        <div className='absolute' style={{ transform: 'translate(-50%,-50%) scale(var(--scale))' }}>
+      <div ref={marker} className='pointer-events-none absolute left-1/2 top-1/2 opacity-0' style={{ ['--hit' as string]: '#fff', ['--thick' as string]: '3px', ['--len' as string]: '11px' }}>
+        <div className='absolute' style={{ transform: 'translate(-50%,-50%)' }}>
           {[45, 135, 225, 315].map((deg) => (
             <span
               key={deg}
               className='absolute'
-              style={{ width: 3, height: 11, background: 'var(--hit)', boxShadow: '0 0 0 1px rgba(0,0,0,.6)', left: -1.5, top: -5.5, transform: `rotate(${deg}deg) translateY(-13px)` }}
+              style={{
+                width: 'var(--thick)',
+                height: 'var(--len)',
+                background: 'var(--hit)',
+                boxShadow: '0 0 0 1px rgba(0,0,0,.6)',
+                left: 'calc(var(--thick) / -2)',
+                top: 'calc(var(--len) / -2)',
+                transform: `rotate(${deg}deg) translateY(-13px)`
+              }}
             />
           ))}
         </div>
+      </div>
+      <div
+        ref={ring}
+        className='pointer-events-none absolute left-1/2 top-1/2 h-14 w-14 rounded-full opacity-0'
+        style={{ border: `3px solid ${HEAD_GOLD}`, boxShadow: '0 0 0 1px rgba(0,0,0,.35), inset 0 0 0 1px rgba(0,0,0,.35)' }}
+      />
+      <div
+        ref={callout}
+        className='bf-display bf-hud-text pointer-events-none absolute left-1/2 top-[calc(50%+44px)] whitespace-nowrap text-2xl uppercase tracking-wide opacity-0'
+        style={{ color: HEAD_GOLD }}
+      >
+        {t('headshot')}
       </div>
     </>
   );

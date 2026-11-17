@@ -105,6 +105,7 @@ export const ko: Dictionary = {
   ctrlHint: 'Ctrl+W를 누르면 탭이 닫힙니다. C로 앉거나 전체 화면으로 플레이하세요.',
   chatPlaceholder: '메시지 입력…',
   scopeHint: 'Shift를 누르고 있으면 숨을 참습니다',
+  headshot: '헤드샷',
 
   graphics: '그래픽',
   controls: '조작',

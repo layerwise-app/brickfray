@@ -22,6 +22,8 @@ const SURFACE_COLOR: Record<string, string> = {
 const v = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
 
 /** Every world-space effect behind one facade; all pools live in `root`. */
+const HEAD_GOLD = '#ffd23f';
+
 export class Effects {
   readonly root = new THREE.Group();
   readonly tracers = new Tracers();
@@ -68,8 +70,19 @@ export class Effects {
 
   bodyHit(point: THREE.Vector3, dir: THREE.Vector3, color: THREE.ColorRepresentation, head: boolean) {
     const n = dir.clone().negate();
-    this.debris.burst(point, n, color, head ? 7 : 4, 3.5, 0.05);
-    this.glow.emit({ position: point, size: head ? 0.4 : 0.26, color: head ? '#ffe28a' : '#ffffff', life: 0.07, shape: 'star' });
+    if (!head) {
+      this.debris.burst(point, n, color, 4, 3.5, 0.05);
+      this.glow.emit({ position: point, size: 0.26, color: '#ffffff', life: 0.07, shape: 'star' });
+      return;
+    }
+    this.debris.burst(point, n, color, 6, 4, 0.05);
+    this.debris.burst(point, n, HEAD_GOLD, 5, 5, 0.04);
+    this.glow.emit({ position: point, size: 0.75, color: '#fff3c4', life: 0.1, shape: 'star' });
+    this.glow.emit({ position: point, size: 0.2, grow: 3, color: HEAD_GOLD, alpha: 0.9, life: 0.22, shape: 'ring' });
+    for (let i = 0; i < 9; i++) {
+      const velocity = n.clone().multiplyScalar(2.5).add(v((Math.random() - 0.5) * 5, 1 + Math.random() * 3.5, (Math.random() - 0.5) * 5));
+      this.glow.emit({ position: point, velocity, size: 0.05, color: '#ffe28a', life: 0.28 + Math.random() * 0.15, shape: 'soft', gravity: 11 });
+    }
   }
 
   /** Muzzle flash in world space for other players (the local one draws in the view layer). */

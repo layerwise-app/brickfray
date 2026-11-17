@@ -63,7 +63,7 @@ export interface HudState {
 }
 
 export type HudPulse =
-  | { type: 'hit'; kind: 'body' | 'head' | 'kill'; amount: number; at: [number, number, number] | null }
+  | { type: 'hit'; kind: 'body' | 'head' | 'kill'; amount: number; at: [number, number, number] | null; headshot?: boolean }
   | { type: 'hurt'; angle: number; amount: number }
   | { type: 'spread'; px: number };
 

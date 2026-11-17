@@ -105,6 +105,7 @@ export const zh: Dictionary = {
   ctrlHint: 'Ctrl+W 会关闭标签页。用 C 下蹲，或者全屏游玩。',
   chatPlaceholder: '说点什么…',
   scopeHint: '按住 Shift 屏息',
+  headshot: '爆头',
 
   graphics: '画面',
   controls: '操作',

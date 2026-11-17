@@ -105,6 +105,7 @@ export const de: Dictionary = {
   ctrlHint: 'Strg+W schließt den Tab. Duck dich mit C oder spiel im Vollbild.',
   chatPlaceholder: 'Schreib etwas …',
   scopeHint: 'Umschalt halten zum Stabilisieren',
+  headshot: 'Kopfschuss',
 
   graphics: 'Grafik',
   controls: 'Steuerung',

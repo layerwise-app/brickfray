@@ -105,6 +105,7 @@ export const fr: Dictionary = {
   ctrlHint: 'Ctrl+W ferme l’onglet. Accroupis-toi avec C ou joue en plein écran.',
   chatPlaceholder: 'Écris quelque chose…',
   scopeHint: 'Maintiens Maj pour stabiliser',
+  headshot: 'Tir à la tête',
 
   graphics: 'Graphismes',
   controls: 'Commandes',

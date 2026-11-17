@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import type { ShatterPiece } from '../characters/types';
 import { PLASTIC } from '../engine/palette';
 import type { GameEvent, ShotTrace } from '../sim/types';
 import { WEAPONS } from '../weapons/defs';
@@ -7,6 +8,16 @@ import type { MatchView } from './match-view';
 
 const FEED_LIFE = 6;
 let feedKey = 1;
+
+/** Headshot kills send the head (and hat) spinning up and away from the shot. */
+function popHead(pieces: ShatterPiece[], impulse: THREE.Vector3) {
+  const away = impulse.clone().setY(0).normalize();
+  for (const p of pieces) {
+    if (!p.head) continue;
+    p.velocity.addScaledVector(away, 2.5).setY(p.velocity.y + 4.5);
+    p.angularVelocity.multiplyScalar(1.8);
+  }
+}
 
 /** Turns host events and remote shots into effects, sounds and HUD state. */
 export class MatchEvents {
@@ -91,7 +102,9 @@ export class MatchEvents {
               if (killer) impulse.copy(victim.position.clone().sub(killer.position).setY(0).normalize().multiplyScalar(3.5));
             }
             impulse.y = 2;
-            mv.effects.shatter(victim.rig.shatter(impulse));
+            const pieces = victim.rig.shatter(impulse);
+            if (e.headshot) popHead(pieces, impulse);
+            mv.effects.shatter(pieces);
             mv.play('shatter', victim.position, 1, 7);
           }
           if (e.victim === me) {
@@ -100,8 +113,9 @@ export class MatchEvents {
             mv.hud.set({ death: { killer: e.killer === me ? '' : this.name(e.killer), weapon: e.weapon, respawnAt: mv.session.hostNow() + 3 } });
           }
           if (e.killer === me && e.victim !== me) {
-            mv.hud.pulse({ type: 'hit', kind: 'kill', amount: 0, at: null });
+            mv.hud.pulse({ type: 'hit', kind: 'kill', amount: 0, at: null, headshot: e.headshot });
             mv.play('killConfirm', null, 1, 9);
+            if (e.headshot) mv.play('headshotMarker', null, 1, 9);
           }
           this.feed.push({
             key: feedKey++,

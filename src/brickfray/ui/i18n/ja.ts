@@ -105,6 +105,7 @@ export const ja: Dictionary = {
   ctrlHint: 'Ctrl+W でタブが閉じます。しゃがみは C キーか、全画面でプレイしてください。',
   chatPlaceholder: 'メッセージを入力…',
   scopeHint: 'Shift 長押しで息を止める',
+  headshot: 'ヘッドショット',
 
   graphics: 'グラフィック',
   controls: '操作',

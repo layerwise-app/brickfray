@@ -105,6 +105,7 @@ export const es: Dictionary = {
   ctrlHint: 'Ctrl+W cierra la pestaña. Agáchate con C o juega en pantalla completa.',
   chatPlaceholder: 'Escribe algo…',
   scopeHint: 'Mantén Shift para estabilizar',
+  headshot: 'Tiro a la cabeza',
 
   graphics: 'Gráficos',
   controls: 'Controles',
