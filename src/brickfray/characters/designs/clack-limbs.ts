@@ -1,0 +1,239 @@
+import * as THREE from 'three';
+import type { HandShape, PartSet } from '../parts';
+import type { V3 } from '../skeleton';
+import { GOLD, MAIL, SHADOW, STEEL } from './clack-armor';
+import * as S from '../shapes';
+import { rivets } from './plate-fittings';
+import { Loft, pick, tier, type Spot } from './plate-forms';
+
+const ACROSS: V3 = [0, 0, Math.PI / 2];
+/** Lofts built along Y and laid along the foot: their y runs toward the heel, their front faces up. */
+const LAID: V3 = [Math.PI / 2, 0, 0];
+
+const CAP = new Loft([
+  { y: 0.012, w: 0.1, f: 0.1 },
+  { y: 0.03, w: 0.0925, f: 0.0925 },
+  { y: 0.056, w: 0.079, f: 0.079 },
+  { y: 0.077, w: 0.058, f: 0.058 },
+  { y: 0.091, w: 0.032, f: 0.032 },
+  { y: 0.097, w: 0, f: 0 }
+]);
+const LAME_A = new Loft([
+  { y: -0.078, w: 0.075, f: 0.077 },
+  { y: -0.04, w: 0.081, f: 0.083 },
+  { y: -0.004, w: 0.084, f: 0.086 }
+]);
+const LAME_B = new Loft([
+  { y: -0.13, w: 0.068, f: 0.07 },
+  { y: -0.095, w: 0.073, f: 0.075 },
+  { y: -0.058, w: 0.075, f: 0.077 }
+]);
+/** Where a weapon-holding hand sits off the wrist; mirrors the holds in body-hands. */
+const HAND_SEAT: Partial<Record<HandShape, { at: V3; rot: V3 }>> = {
+  grip: { at: [0.011, 0.03, 0], rot: [-0.22, 0, 0] },
+  cup: { at: [0.012, 0.012, -0.012], rot: [0, 0.87, -Math.PI / 2] }
+};
+
+/** Pauldrons (a fixed cap and two sliding lames), rerebrace, winged couter, vambrace, gauntlet. */
+export function arms(b: PartSet) {
+  const q = tier(b);
+  const around = pick(b, 8, 12, 20);
+  const stud = pick(b, 5, 5, 8);
+  b.mirror((side, sign) => {
+    const clav = `clav${side}` as const;
+    const ua = `upperArm${side}` as const;
+    const fa = `forearm${side}` as const;
+    const seat = { at: [sign * 0.145, 0, 0] as V3, rot: [0, 0, sign * -0.62] as V3, scale: [1.07, 1.05, 1.17] as V3 };
+    b.add(clav, CAP.mesh({ cols: around, rows: q === 3 ? 2 : 1, thick: 0.008, back: q === 3 }), STEEL, { ...seat, look: 'metal' });
+    if (q >= 2) {
+      b.add(clav, CAP.mesh({ cols: around, t0: 0, t1: 0.55, lift: 0.0045, thick: 0.0045, back: false }), GOLD, { ...seat, look: 'gold' });
+      b.add(clav, rivets(CAP.row(0.4, 1.5, 0.4 + Math.PI * 2 * (1 - 1 / 6), 1.5, 6), 0.0065, stud), GOLD, { ...seat, look: 'gold' });
+    }
+
+    const out = (sign * Math.PI) / 2;
+    const lame = (loft: Loft, reach: number) => loft.mesh({ from: out - reach, to: out + reach, cols: Math.round(around * 0.7), rows: q === 3 ? 2 : 1, thick: 0.007, back: q === 3 });
+    b.add(ua, lame(LAME_A, 2.2), STEEL, { look: 'metal' });
+    b.add(ua, lame(LAME_B, 2.05), STEEL, { look: 'metal' });
+    if (q >= 2) {
+      b.add(ua, rivets([...LAME_A.row(out - 1.75, 0.5, out + 1.75, 0.5, 2), ...LAME_B.row(out - 1.6, 0.5, out + 1.6, 0.5, 2)], 0.006, stud), GOLD, { look: 'gold' });
+      b.add(ua, LAME_B.mesh({ from: out - 2.05, to: out + 2.05, cols: Math.round(around * 0.7), t0: 0, t1: 0.3, lift: 0.004, thick: 0.004, back: false }), GOLD, { look: 'gold' });
+    }
+    b.cyl(ua, 0.066, 0.059, 0.14, STEEL, { at: [0, -0.18, 0], look: 'metal', seg: around, open: true });
+    b.cyl(ua, 0.0695, 0.0685, 0.034, '#ffffff', { at: [0, -0.166, 0], look: 'tint', seg: around });
+
+    // Couter: a domed cop with a point behind and a fan on the outside.
+    b.add(fa, S.sphere(0.061, pick(b, 8, 12, 20), pick(b, 5, 8, 14)), STEEL, { scale: [1, 1.12, 1.08], look: 'metal' });
+    if (q >= 2) {
+      b.cyl(fa, 0.004, 0.034, 0.045, STEEL, { at: [0, 0, 0.068], rot: [Math.PI / 2, 0, 0], look: 'metal', seg: around });
+      b.cyl(fa, 0.046, 0.05, 0.012, STEEL, { at: [sign * 0.064, 0, -0.012], rot: ACROSS, look: 'metal', seg: around });
+      b.add(fa, boss(0.016, sign, q), GOLD, { at: [sign * 0.069, 0, -0.012], look: 'gold' });
+    }
+
+    // Vambrace and the flared gauntlet cuff.
+    b.cyl(fa, 0.057, 0.049, 0.14, STEEL, { at: [0, -0.115, 0], look: 'metal', seg: around, open: true });
+    b.lathe(
+      fa,
+      [
+        [0.05, -0.27],
+        [0.052, -0.25],
+        [0.06, -0.208],
+        [0.073, -0.17],
+        [0.076, -0.16],
+        [0.07, -0.157],
+        [0.058, -0.168]
+      ],
+      STEEL,
+      { look: 'metal', seg: around }
+    );
+    if (q >= 2) {
+      b.cyl(fa, 0.0775, 0.0765, 0.009, GOLD, { at: [0, -0.161, 0], look: 'gold', seg: around, open: true });
+      b.add(fa, rivets([0, 1, 2].map((i) => [new THREE.Vector3(sign * (0.0555 - i * 0.0025), -0.07 - i * 0.04, 0), new THREE.Vector3(sign, 0, 0)] as Spot), 0.0055, stud), GOLD, { look: 'gold' });
+      gauntlet(b, side, sign);
+    }
+  });
+}
+
+/** Plate over the back of the hand with a knuckle bar. */
+function gauntlet(b: PartSet, side: 'L' | 'R', sign: number) {
+  const hold = HAND_SEAT[b.hands[side]];
+  const m = new THREE.Matrix4();
+  if (hold) m.compose(new THREE.Vector3(...hold.at), new THREE.Quaternion().setFromEuler(new THREE.Euler(hold.rot[0], hold.rot[1], hold.rot[2], 'YXZ')), new THREE.Vector3(1, 1, 1));
+  const flip = new THREE.Matrix4().makeScale(sign, 1, 1);
+  const e = new THREE.Euler();
+  const seated = (at: V3, rot: V3): { at: V3; rot: V3 } => {
+    const local = new THREE.Matrix4().compose(new THREE.Vector3(...at), new THREE.Quaternion().setFromEuler(new THREE.Euler(rot[0], rot[1], rot[2], 'YXZ')), new THREE.Vector3(1, 1, 1));
+    const world = flip.clone().multiply(m).multiply(local).multiply(flip);
+    e.setFromRotationMatrix(world, 'YXZ');
+    return { at: new THREE.Vector3().setFromMatrixPosition(world).toArray() as V3, rot: [e.x, e.y, e.z] };
+  };
+  const q = tier(b);
+  const bone = `hand${side}` as const;
+  b.add(bone, S.sphere(0.034, pick(b, 8, 8, 14), pick(b, 5, 5, 9)), STEEL, { look: 'metal' });
+  b.add(bone, S.blob(0.014, 0.086, 0.074, 0.6, pick(b, 6, 6, 14), 0), STEEL, { ...seated([0.02, 0.001, -0.05], [0, 0, 0]), look: 'metal' });
+  b.add(bone, S.blob(0.016, 0.09, 0.024, 0.6, pick(b, 6, 6, 12), 0), STEEL, { ...seated([0.018, 0.001, -0.09], [0, 0, 0]), look: 'metal' });
+  const knuckles = [-0.028, -0.009, 0.01, 0.03].map((y) => [new THREE.Vector3(0.026, y, -0.09), new THREE.Vector3(1, 0, 0)] as Spot);
+  b.add(bone, rivets(knuckles, 0.0065, q === 3 ? 8 : 5), GOLD, { ...seated([0, 0, 0], [0, 0, 0]), look: 'gold' });
+}
+
+/** A domed boss facing out along x. */
+function boss(r: number, sign: number, q: number) {
+  return rivets([[new THREE.Vector3(), new THREE.Vector3(sign, 0, 0)]], r, q === 3 ? 12 : 6, 1);
+}
+
+const TASSET = new Loft([
+  { y: -0.235, w: 0.086, f: 0.09, keel: 0.006 },
+  { y: -0.13, w: 0.1, f: 0.103, keel: 0.008 },
+  { y: -0.025, w: 0.104, f: 0.106, keel: 0.006 }
+]);
+const CUISSE = new Loft([
+  { y: -0.4, w: 0.071, f: 0.075, b: 0.07 },
+  { y: -0.31, w: 0.078, f: 0.083, b: 0.076, keel: 0.004 },
+  { y: -0.2, w: 0.09, f: 0.094, b: 0.088, keel: 0.004 },
+  { y: -0.14, w: 0.094, f: 0.097, b: 0.092 },
+  { y: -0.085, w: 0.092, f: 0.095, b: 0.09 }
+]);
+const POLEYN = new Loft([
+  { y: -0.068, w: 0.064, f: 0.068 },
+  { y: -0.032, w: 0.076, f: 0.084, keel: 0.008 },
+  { y: 0, w: 0.08, f: 0.09, keel: 0.014 },
+  { y: 0.032, w: 0.08, f: 0.088, keel: 0.008 },
+  { y: 0.062, w: 0.078, f: 0.084 }
+]);
+const GREAVE = new Loft([
+  { y: -0.385, w: 0.054, f: 0.056, b: 0.056 },
+  { y: -0.345, w: 0.047, f: 0.05, b: 0.049, keel: 0.003 },
+  { y: -0.22, w: 0.06, f: 0.058, b: 0.071, keel: 0.006 },
+  { y: -0.09, w: 0.065, f: 0.063, b: 0.068, keel: 0.006 },
+  { y: -0.03, w: 0.061, f: 0.061, b: 0.059, keel: 0.003 }
+]);
+
+/** Tassets and cuisses on the thighs, winged poleyns, ridged greaves. */
+export function legs(b: PartSet) {
+  const q = tier(b);
+  const cols = pick(b, 4, 6, 10);
+  const rows = q === 3 ? 3 : 1;
+  const stud = pick(b, 5, 6, 8);
+  b.mirror((side, sign) => {
+    const th = `thigh${side}` as const;
+    const sh = `shin${side}` as const;
+    const mid = sign * 0.5;
+    const cut = (t: number): [number, number] => {
+      const reach = 1.25 * Math.min(1, 0.22 + t * 1.7);
+      return [mid - reach, mid + reach];
+    };
+    b.add(th, TASSET.mesh({ cols: cols + 2, rows: q === 3 ? 4 : 2, thick: 0.008, back: q === 3, cut }), STEEL, { look: 'metal' });
+    if (q >= 2) b.add(th, rivets(TASSET.row(mid - 0.8, 1.75, mid + 0.8, 1.75, 3), 0.0065, stud), GOLD, { look: 'gold' });
+    b.add(th, CUISSE.mesh({ from: 0, to: Math.PI, cols, rows, thick: 0.008, back: false, mirror: true }), STEEL, { look: 'metal' });
+
+    b.cyl(sh, 0.058, 0.058, 0.132, MAIL, { rot: ACROSS, look: 'metal', seg: pick(b, 8, 12, 18) });
+    b.add(sh, POLEYN.mesh({ from: 0, to: 1.95, cols, rows: q === 3 ? 2 : 1, thick: 0.01, back: false, mirror: true }), STEEL, { look: 'metal' });
+    if (q >= 2) {
+      b.cyl(sh, 0.04, 0.046, 0.012, STEEL, { at: [sign * 0.08, 0, 0.004], rot: ACROSS, look: 'metal', seg: pick(b, 8, 12, 18) });
+      b.add(sh, boss(0.015, sign, q), GOLD, { at: [sign * 0.085, 0, 0.004], look: 'gold' });
+    }
+    b.add(sh, GREAVE.mesh({ from: 0, to: Math.PI, cols: cols + 1, rows, thick: 0.012, back: false, mirror: true }), STEEL, { look: 'metal' });
+    if (q >= 2) {
+      b.add(sh, GREAVE.mesh({ from: 0, to: Math.PI, cols: cols + 1, t0: 0, t1: 0.5, lift: 0.004, thick: 0.004, back: false, mirror: true }), GOLD, { look: 'gold' });
+      b.add(sh, rivets([...GREAVE.row(sign * 1.75, 1.6, sign * 1.75, 3.6, 3)], 0.0055, stud), GOLD, { look: 'gold' });
+    }
+  });
+}
+
+const SABATON = new Loft([
+  { y: -0.132, w: 0, f: 0, b: 0 },
+  { y: -0.124, w: 0.056, f: 0.04, b: 0.012, e: 0.85, keel: 0.004 },
+  { y: -0.07, w: 0.058, f: 0.052, b: 0.012, e: 0.85, keel: 0.006 },
+  { y: -0.02, w: 0.056, f: 0.084, b: 0.012, e: 0.85, keel: 0.006 },
+  { y: 0.03, w: 0.055, f: 0.094, b: 0.012, e: 0.85 },
+  { y: 0.076, w: 0.05, f: 0.074, b: 0.012, e: 0.85 },
+  { y: 0.097, w: 0.03, f: 0.046, b: 0.012, e: 0.85 },
+  { y: 0.102, w: 0, f: 0, b: 0 }
+]);
+const TOE = new Loft([
+  { y: -0.122, w: 0, f: 0, b: 0 },
+  { y: -0.108, w: 0.02, f: 0.015, b: 0.008, e: 0.85, keel: 0.003 },
+  { y: -0.072, w: 0.044, f: 0.028, b: 0.012, e: 0.85, keel: 0.006 },
+  { y: -0.026, w: 0.056, f: 0.038, b: 0.012, e: 0.85, keel: 0.006 },
+  { y: 0.012, w: 0.0575, f: 0.04, b: 0.012, e: 0.85, keel: 0.004 },
+  { y: 0.018, w: 0, f: 0, b: 0 }
+]);
+const TREAD = new Loft([
+  { y: -0.134, w: 0, f: 0 },
+  { y: -0.128, w: 0.058, f: 0.007, e: 0.5 },
+  { y: 0.08, w: 0.053, f: 0.007, e: 0.5 },
+  { y: 0.1, w: 0.034, f: 0.007, e: 0.5 },
+  { y: 0.104, w: 0, f: 0 }
+]);
+const TOE_TREAD = new Loft([
+  { y: -0.124, w: 0, f: 0 },
+  { y: -0.11, w: 0.022, f: 0.007, e: 0.5 },
+  { y: -0.072, w: 0.046, f: 0.007, e: 0.5 },
+  { y: 0.012, w: 0.0585, f: 0.007, e: 0.5 },
+  { y: 0.018, w: 0, f: 0 }
+]);
+
+/** Sabatons: a ridged shell over the foot under overlapping lames, a pointed toe, a gold prick spur. */
+export function sabatons(b: PartSet) {
+  const q = tier(b);
+  const cols = pick(b, 4, 6, 10);
+  const rows = q === 3 ? 3 : 1;
+  b.mirror((side) => {
+    const ft = `foot${side}` as const;
+    const toe = `toe${side}` as const;
+    const foot = { at: [0, -0.063, 0] as V3, rot: LAID };
+    const tip = { at: [0, -0.008, 0] as V3, rot: LAID };
+    b.add(ft, SABATON.mesh({ from: 0, to: Math.PI, cols, rows, mirror: true }), STEEL, { ...foot, look: 'metal' });
+    b.add(toe, TOE.mesh({ from: 0, to: Math.PI, cols, rows, mirror: true }), STEEL, { ...tip, look: 'metal' });
+    b.add(ft, TREAD.mesh({ cols: pick(b, 4, 6, 20) }), SHADOW, { at: [0, -0.078, 0], rot: LAID, look: 'rubber' });
+    b.add(toe, TOE_TREAD.mesh({ cols: pick(b, 4, 6, 20) }), SHADOW, { at: [0, -0.023, 0], rot: LAID, look: 'rubber' });
+    if (q < 2) return;
+    (q === 3 ? [-0.118, -0.086, -0.054, -0.022] : [-0.11, -0.066, -0.022]).forEach((y, i) => {
+      b.add(ft, SABATON.mesh({ from: 0, to: 1.95, t0: SABATON.tAt(y), t1: SABATON.tAt(y + 0.04), cols, lift: 0.0035 + i * 0.002, thick: 0.005, back: false, mirror: true }), STEEL, { ...foot, look: 'metal' });
+    });
+    (q === 3 ? [-0.07, -0.03] : [-0.03]).forEach((y, i) => {
+      b.add(toe, TOE.mesh({ from: 0, to: 1.95, t0: TOE.tAt(y), t1: TOE.tAt(y + 0.044), cols, lift: 0.003 + i * 0.002, thick: 0.005, back: false, mirror: true }), STEEL, { ...tip, look: 'metal' });
+    });
+    b.add(ft, SABATON.mesh({ from: 0, to: Math.PI, t0: SABATON.tAt(0.05), t1: SABATON.tAt(0.074), cols, lift: 0.004, thick: 0.004, back: false, mirror: true }), GOLD, { ...foot, look: 'gold' });
+    b.cyl(ft, 0.0015, 0.007, 0.05, GOLD, { at: [0, -0.02, 0.122], rot: [Math.PI / 2 + 0.25, 0, 0], look: 'gold', seg: pick(b, 5, 6, 8) });
+  });
+}

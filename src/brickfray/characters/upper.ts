@@ -234,7 +234,7 @@ const end = new THREE.Vector3();
 const qu = new THREE.Quaternion();
 const ql = new THREE.Quaternion();
 
-function limb(pose: Pose, side: 'L' | 'R', wrist: THREE.Vector3, poleDir: THREE.Vector3, hand: THREE.Quaternion) {
+export function limb(pose: Pose, side: 'L' | 'R', wrist: THREE.Vector3, poleDir: THREE.Vector3, hand: THREE.Quaternion) {
   const ua = BONE[`upperArm${side}`];
   const fa = BONE[`forearm${side}`];
   const h = BONE[`hand${side}`];

@@ -224,6 +224,25 @@ export class MatchView {
     this.wasGrounded = m.grounded;
   }
 
+  /**
+   * Take over a running match from the view this one replaces (quality change). The host only accepts
+   * rising command numbers, so restarting the sequence would freeze the player and desync the gun.
+   */
+  adopt(from: MatchView) {
+    this.seq = from.seq;
+    this.acc = from.acc;
+    this.latched = from.latched;
+    this.slot = from.slot;
+    this.prevMove = from.prevMove;
+    this.wasGrounded = from.wasGrounded;
+    this.lastSnapshot = from.lastSnapshot;
+    this.deathCam = from.deathCam;
+    this.fp.yaw = from.fp.yaw;
+    this.fp.pitch = from.fp.pitch;
+    this.predictor.adopt(from.predictor);
+    this.events.adopt(from.events);
+  }
+
   /** Every snapshot as it arrives: shots are drawn right away; reconciliation waits for the frame. */
   receive(snap: Snapshot) {
     this.pendingSnapshot = snap;

@@ -71,7 +71,7 @@ const CUES: Record<ViewCue, SoundSpec> = {
     rustle(s, 0, { dur: 0.12, gain: 0.25 });
     clack(s, 0.1, { pitch: 1700, gain: 0.35, decay: 0.045 });
   }),
-  cloth: cue(0.4, (s) => rustle(s, 0, { dur: 0.25, gain: 0.35 }))
+  cloth: { ...cue(0.4, (s) => rustle(s, 0, { dur: 0.25, gain: 0.35 })), loudness: -27 }
 };
 
 /** One foot contact (heel then toe) per surface. */

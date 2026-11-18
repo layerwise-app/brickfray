@@ -121,6 +121,36 @@ export default function setup(ctx: LabContext) {
         view.camera.updateProjectionMatrix();
         view.camera.updateMatrixWorld();
       },
+      /** Both hand-frame origins in view space, to aim an inspection camera at a grip. */
+      hands: () => {
+        const at = (name: string) => {
+          let found: THREE.Object3D | undefined;
+          view.scene.traverse((o) => {
+            if (o.name === name) found = o;
+          });
+          return found?.getWorldPosition(new THREE.Vector3()).toArray().map((v) => +v.toFixed(4));
+        };
+        const turn = (name: string) => view.scene.getObjectByName(name)?.getWorldQuaternion(new THREE.Quaternion()).toArray().map((v) => +v.toFixed(4));
+        return { right: at('hand:right'), left: at('hand:left'), rightTurn: turn('hand:right'), leftTurn: turn('hand:left') };
+      },
+      /**
+       * Degrees each wrist is bent: `bend` between the forearm and the hand's wrist-to-knuckle line, split into
+       * `flex` (toward the palm; negative is extension) and `tilt` (forearm arriving from the pinky side; a relaxed
+       * fist sits near 20, a human wrist manages about 0 … 50).
+       */
+      wrists: () => {
+        const bend = (side: string) => {
+          const fore = view.scene.getObjectByName(`forearm:${side}`);
+          const hand = view.scene.getObjectByName(`hand:${side}`);
+          if (!fore || !hand) return null;
+          const along = new THREE.Vector3(0, 1, 0).transformDirection(fore.matrixWorld);
+          const reach = new THREE.Vector3(0, 0, -1).transformDirection(hand.matrixWorld);
+          const local = along.clone().applyQuaternion(hand.getWorldQuaternion(new THREE.Quaternion()).invert());
+          const deg = (v: number) => Math.round(THREE.MathUtils.radToDeg(v));
+          return { bend: deg(along.angleTo(reach)), flex: deg(Math.atan2(side === 'left' ? -local.x : local.x, -local.z)), tilt: deg(Math.asin(local.y)) };
+        };
+        return { right: bend('right'), left: bend('left') };
+      },
       hide: (hidden: unknown) => view.setHidden(Boolean(hidden))
     }
   };

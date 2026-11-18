@@ -9,12 +9,15 @@ import { createRiggedModel, type RiggedModel } from '../model';
 import type { ViewAction, ViewCue, ViewInput, ViewModel } from '../types';
 import { Arms } from './arms';
 import { ClipPlayer, Frame, type Clip, type ClipCtx, type ClipEvent } from './clip';
+import { FINGERS, type FingerPose } from './fingers';
 import { arReload, pistolReload, shotgunLoadIn, shotgunLoadOut, shotgunPump, shotgunShell, sniperCycle, sniperReload, SLIDE_LOCK } from './clips-guns';
-import { cookClip, drawClip, extraGoals, holsterClip, meleeClip, restClip, throwClip } from './clips-extra';
+import { drawClip, extraGoals, holsterClip, restClip } from './clips-extra';
+import { cookClip, grenadeGoals, throwClip } from './clips-grenade';
+import { meleeClip, meleeGoals } from './clips-melee';
 import { harpoonReload } from './clips-harpoon';
 import { REVOLVER_CYCLE, revolverAction, revolverReload } from './clips-revolver';
 import { ViewFx } from './fx';
-import { blendGoals, blendMatrices, goal, holdQuat } from './goals';
+import { blendMatrices, followPath, goal, goalMatrix } from './goals';
 import { ViewLighting } from './lighting';
 import { Motion } from './motion';
 import { buildGunRig, type GunRig } from './rig';
@@ -26,6 +29,10 @@ export function createViewModel(kit: Kit): ViewModel {
 }
 
 const FADE = 0.12;
+/** Seconds the trigger finger takes to relax after a shot. */
+const TRIGGER_RESET = 0.14;
+/** Where a tool handle's axis sits in the left hand's frame once the fingers close on it. */
+const HANDLE_IN_FIST = new THREE.Vector3(-0.001, 0, -0.0075);
 
 /** Which reload and cycling animations each gun uses. */
 const RELOAD: Record<WeaponId, 'rifle' | 'pistol' | 'pump' | 'bolt' | 'revolver' | 'harpoon'> = {
@@ -71,6 +78,7 @@ class FirstPersonView implements ViewModel {
   private sprintCue = false;
   private adsCue = false;
   private fade = 0;
+  private fadeTime = FADE;
   private readonly fadeGunPos = new THREE.Vector3();
   private readonly fadeGunRot = new THREE.Vector3();
   private readonly fadeLeft = new THREE.Matrix4();
@@ -89,13 +97,14 @@ class FirstPersonView implements ViewModel {
     this.melee = createRiggedModel('mallet', kit, 'first');
     this.grenade = createRiggedModel('grenade', kit, 'first');
     this.arms.left.hand.add(this.melee.model.root, this.grenade.model.root);
-    this.grenade.model.root.position.set(-0.004, 0.034, -0.004);
+    this.melee.model.root.position.copy(HANDLE_IN_FIST);
+    this.grenade.model.root.position.set(0.0165, 0.016, -0.002);
     this.shell = new THREE.Mesh(this.fx.shellGeometry, surfaceMaterial(kit.materials));
-    this.shell.position.set(-0.012, 0.05, -0.03);
-    this.shell.quaternion.setFromEuler(new THREE.Euler(-0.4, 0, 0));
+    this.shell.position.set(0.042, 0.028, 0.0005);
+    this.shell.quaternion.setFromEuler(new THREE.Euler(Math.PI / 2, 0, 0));
     this.arms.left.hand.add(this.shell);
     this.pinRest = this.grenade.parts.get('pin')?.position.clone() ?? new THREE.Vector3();
-    this.extra = extraGoals(this.scene);
+    this.extra = { ...extraGoals(this.scene), ...meleeGoals(this.scene), ...grenadeGoals(this.scene) };
     this.ctx = { id: 'ar', tuning: null!, view: this.scene, goals: {}, flags: { empty: false } };
     this.setCharacter('rivet');
     this.equip('ar');
@@ -110,6 +119,7 @@ class FirstPersonView implements ViewModel {
     if (this.melee.model.id === id) return;
     this.melee.model.root.removeFromParent();
     this.melee = createRiggedModel(id, this.kit, 'first');
+    this.melee.model.root.position.copy(HANDLE_IN_FIST);
     this.arms.left.hand.add(this.melee.model.root);
   }
 
@@ -136,13 +146,20 @@ class FirstPersonView implements ViewModel {
     this.motion.setTuning(rig.tuning);
     this.ctx.id = id;
     this.ctx.tuning = rig.tuning;
-    this.ctx.goals = { ...rig.goals, ...this.extra, ring: goal(this.grenade.nodes.get('ring')!, [0.004, -0.028, 0.03], holdQuat([-1, 0.25, 0], [0.2, 0.3, -1])) };
+    this.ctx.goals = { ...rig.goals, ...this.extra, ring: this.ringSeat() };
+  }
+
+  /** Where the pin's ring rests on the bomb, in the bomb's own frame: the pin is animated against it. */
+  private ringSeat() {
+    const at = this.pinRest.clone().add(this.grenade.nodes.get('ring')!.position);
+    return goal(this.grenade.model.root, [at.x, at.y, at.z], new THREE.Quaternion());
   }
 
   act(action: ViewAction) {
     const g = this.gun;
     switch (action.type) {
       case 'fire': {
+        this.triggerPull = 1;
         this.motion.kick(this.lastAds);
         this.fx.fire(g.rigged.model.muzzle, g.flash);
         if (g.casing && g.rigged.model.ejectPort) this.fx.eject(g.casing, g.rigged.model.ejectPort);
@@ -189,8 +206,10 @@ class FirstPersonView implements ViewModel {
         if (RELOAD[g.id] === 'pump') return this.play(shotgunPump(action.duration, true));
         if (RELOAD[g.id] === 'bolt') return this.play(sniperCycle(action.duration));
         return;
-      case 'melee':
-        return this.play(meleeClip(MELEES[this.melee.model.id as MeleeId].cooldown * 0.75));
+      case 'melee': {
+        const melee = MELEES[this.melee.model.id as MeleeId];
+        return this.play(meleeClip(melee.id, melee.cooldown * 0.75, melee.windup));
+      }
       case 'grenadeCook':
         return this.play(cookClip());
       case 'grenadeThrow':
@@ -210,6 +229,7 @@ class FirstPersonView implements ViewModel {
 
   private play(clip: Clip) {
     this.fade = 1;
+    this.fadeTime = clip.fade ?? FADE;
     this.fadeGunPos.copy(this.lastGunPos);
     this.fadeGunRot.copy(this.lastGunRot);
     this.fadeLeft.copy(this.leftMat);
@@ -259,7 +279,7 @@ class FirstPersonView implements ViewModel {
     this.player.clip?.sample(this.player.u, f, this.ctx);
     this.slideKick = Math.min(1, this.slideKick + dt / 0.1);
     this.cylinderKick = Math.min(1, this.cylinderKick + dt / REVOLVER_CYCLE);
-    this.fade = Math.max(0, this.fade - dt / FADE);
+    this.fade = Math.max(0, this.fade - dt / this.fadeTime);
     const k = smooth01(1 - this.fade);
 
     const ads = smooth01(input.ads * (1 - f.busy));
@@ -272,7 +292,7 @@ class FirstPersonView implements ViewModel {
     this.sprintCue = sprinting;
 
     this.poseGun(ads, k);
-    this.poseHands(k);
+    this.poseHands(k, dt);
     this.fx.update(dt);
     this.camera.updateMatrixWorld();
   }
@@ -343,10 +363,21 @@ class FirstPersonView implements ViewModel {
     return SLIDE_LOCK * (t < 0.25 ? t / 0.25 : 1 - smooth01((t - 0.25) / 0.75));
   }
 
-  private poseHands(k: number) {
+  private triggerPull = 0;
+  private readonly firingFingers: FingerPose = { ...FINGERS.trigger };
+
+  private poseHands(k: number, dt: number) {
     const f = this.frame;
     const g = this.ctx.goals;
-    const left = f.left[0] ? blendGoals(f.left[0], f.left[1], f.left[2], this.tmpM) : blendGoals(g.leftRest!, null, 0, this.tmpM);
+    const grip = this.gun.tuning.fingers;
+    // The index finger squeezes on each shot and lets go just after.
+    this.triggerPull = Math.max(0, this.triggerPull - dt / TRIGGER_RESET);
+    Object.assign(this.firingFingers, grip.right);
+    this.firingFingers.index += (FINGERS.squeeze.index - FINGERS.trigger.index) * this.triggerPull;
+    const held = f.show.mallet ? FINGERS.handle : f.show.grenade ? FINGERS.ball : f.show.shell ? FINGERS.pinch : grip.left;
+    const onGrip = !f.right || (f.right.from === g.rightRest && f.right.to === g.rightRest);
+    this.arms.setFingers(f.rightFingers ?? this.firingFingers, f.leftFingers ?? held, dt, onGrip);
+    const left = f.left ? followPath(f.left, this.tmpM) : goalMatrix(g.leftRest!, this.tmpM);
     if (this.fade > 0) blendMatrices(this.fadeLeft, left, k, this.leftMat);
     else this.leftMat.copy(left);
     this.leftMat.decompose(this.arms.left.hand.position, this.arms.left.hand.quaternion, this.tmpV);
@@ -361,7 +392,7 @@ class FirstPersonView implements ViewModel {
     }
     this.shell.visible = f.show.shell;
     this.arms.left.hand.updateMatrixWorld(true);
-    const right = f.right[0] ? blendGoals(f.right[0], f.right[1], f.right[2], this.tmpM) : blendGoals(g.rightRest!, null, 0, this.tmpM);
+    const right = f.right ? followPath(f.right, this.tmpM) : goalMatrix(g.rightRest!, this.tmpM);
     if (this.fade > 0) blendMatrices(this.fadeRight, right, k, this.rightMat);
     else this.rightMat.copy(right);
     this.tmpV.copy(this.motion.pos).multiplyScalar(0.4);

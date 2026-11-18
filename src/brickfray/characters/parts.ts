@@ -19,6 +19,13 @@ const LOOKS: Record<Exclude<Look, 'glass'>, [number, number, number, number]> = 
   tint: [0.4, 0, 0.12, 1]
 };
 
+/** `grip` wraps a pistol grip, `cup` holds a handguard from below; the rest are free hands. */
+export type HandShape = 'grip' | 'cup' | 'fist' | 'open' | 'relaxed' | 'point';
+export interface Hands {
+  L: HandShape;
+  R: HandShape;
+}
+
 export interface PartOptions {
   at?: V3;
   rot?: V3;
@@ -55,13 +62,23 @@ const sc = new THREE.Vector3();
 export class PartSet {
   readonly pieces: Piece[] = [];
   readonly detail: 0 | 1 | 2;
+  /** Showroom build: seen close up, so rounder shapes and the extra parts behind `if (b.hero)`. */
+  readonly hero: boolean;
+  /** Hand shapes to build; a showroom stance picks them. */
+  readonly hands: Hands;
 
-  constructor(readonly profile: QualityProfile) {
-    this.detail = profile.detail;
+  constructor(
+    readonly profile: QualityProfile,
+    options: { hero?: boolean; hands?: Hands } = {}
+  ) {
+    this.hero = options.hero ?? false;
+    this.detail = this.hero ? 2 : profile.detail;
+    this.hands = options.hands ?? { L: 'cup', R: 'grip' };
   }
 
   /** Segment count for the current tier. */
   seg(low: number, medium: number, high: number) {
+    if (this.hero) return Math.round(high * 1.7);
     return this.detail === 0 ? low : this.detail === 1 ? medium : high;
   }
 

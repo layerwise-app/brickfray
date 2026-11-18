@@ -6,6 +6,7 @@ import { Pose } from './pose';
 import { ANKLE_H, BALL, BONE, PELVIS_Y, SHIN, THIGH, type V3 } from './skeleton';
 import { emptyFidget, fidgetAt, type Style } from './style';
 import type { AnimState } from './types';
+import { poseStance, type Stance } from './stance';
 import { poseUpper, type UpperInput } from './upper';
 
 const IDLE: { pos: V3; heading: number }[] = [
@@ -75,6 +76,8 @@ export class Animator {
   private move = new THREE.Vector3();
   private lean = new THREE.Vector3();
   support: THREE.Matrix4 | null = null;
+  /** A held showroom pose; replaces the gameplay animation while set. */
+  stance: Stance | null = null;
 
   constructor(
     rest: V3[],
@@ -103,6 +106,11 @@ export class Animator {
   update(rawDt: number, s: AnimState) {
     const dt = clamp(rawDt, 0, 0.1);
     this.time += dt;
+    if (this.stance) {
+      poseStance(this.pose, this.stance, this.time, this.support);
+      if (dt > 0) for (const d of this.dangles) d.update(dt, this.pose, this.move.set(0, 0, 0));
+      return;
+    }
     const st = this.style;
     this.vx = damp(this.vx, s.localVelocity.x, 10, dt);
     this.vz = damp(this.vz, s.localVelocity.z, 10, dt);

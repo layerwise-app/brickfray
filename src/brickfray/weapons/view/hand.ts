@@ -7,122 +7,173 @@ export type Slot = 'sleeve' | 'trim' | 'glove' | 'pad' | 'seam';
 
 export interface ArmPiece {
   geometry: THREE.BufferGeometry;
+  /** Placement in the frame of the joint the piece rides on. */
   matrix: THREE.Matrix4;
   slot: Slot;
   surface: Surface;
+  /** Index into HAND_JOINTS; 0 (the hand itself) when omitted. */
+  joint?: number;
 }
 
 /**
  * Hand frame: origin on the axis of whatever the hand holds, +Y along that
  * axis (pinky → index), back of the hand toward +X, fingers wrapping around
  * through -Z, thumb through +Z. Right hand; the left one is mirrored.
+ *
+ * Finger and thumb segments live in joint frames: the joint at the origin,
+ * the segment running down -Z, its pad toward -X, so bending is a turn about +Y.
  */
 export const WRIST = new THREE.Vector3(0.024, -0.014, 0.064);
 
-const Y = new THREE.Vector3(0, 1, 0);
-const tmpZ = new THREE.Vector3();
-const tmpX = new THREE.Vector3();
-const tmpY = new THREE.Vector3();
-
-/** A rounded block from a to b, its width along the hand's Y. */
-function bone(out: ArmPiece[], a: THREE.Vector3, b: THREE.Vector3, width: number, thick: number, bevel: number, slot: Slot, extend = 0.3) {
-  tmpZ.subVectors(b, a);
-  const len = tmpZ.length() + thick * extend;
-  tmpZ.normalize();
-  tmpX.crossVectors(Y, tmpZ);
-  if (tmpX.lengthSq() < 1e-6) tmpX.set(1, 0, 0);
-  tmpX.normalize();
-  tmpY.crossVectors(tmpZ, tmpX).normalize();
-  const m = new THREE.Matrix4().makeBasis(tmpX, tmpY, tmpZ);
-  m.setPosition(new THREE.Vector3().addVectors(a, b).multiplyScalar(0.5));
-  out.push({ geometry: box(thick, width, len, bevel), matrix: m, slot, surface: 'satin' });
+export interface HandJoint {
+  parent: number;
+  /** Offset from the parent joint, right hand. */
+  pos: THREE.Vector3;
 }
 
-function polar(r: number, deg: number, y: number) {
-  const a = (deg * Math.PI) / 180;
-  return new THREE.Vector3(Math.cos(a) * r, y, Math.sin(a) * r);
+/** Joint of a finger (0 index … 3 pinky) segment (0 knuckle, 1 middle, 2 tip). */
+export const fingerJoint = (finger: number, segment: number) => 1 + finger * 3 + segment;
+/** First of the thumb's three joints (base, knuckle, tip). */
+export const THUMB_JOINT = 13;
+
+interface Digit {
+  base: readonly [number, number, number];
+  /** Segment lengths, joint to joint (the last to the centre of the rounded tip). */
+  len: readonly [number, number, number];
+  /** Half thickness at each joint and at the tip. */
+  r: readonly [number, number, number, number];
+  width: readonly [number, number, number];
 }
 
-/** Gloved hand pieces in the hand frame. `trigger` straightens the index finger onto a trigger. */
-export function handPieces(detail: 0 | 1 | 2, trigger: boolean): ArmPiece[] {
-  const out: ArmPiece[] = [];
-  const bevel = detail === 0 ? 0 : detail === 1 ? 0.004 : 0.0055;
-  const fb = detail === 0 ? 0 : detail === 1 ? 0.0035 : 0.0048;
-  // Palm, wrapping the right-rear of the held object, and the back-of-hand pad.
-  const palm = new THREE.Matrix4().compose(new THREE.Vector3(0.029, -0.002, 0.02), new THREE.Quaternion().setFromEuler(new THREE.Euler(0, -0.16, 0)), new THREE.Vector3(1, 1, 1));
-  out.push({ geometry: box(0.023, 0.08, 0.07, bevel * 1.6), matrix: palm, slot: 'glove', surface: 'satin' });
-  if (detail >= 1) {
-    const pad = new THREE.Matrix4().compose(new THREE.Vector3(0.0415, 0.003, 0.006), new THREE.Quaternion().setFromEuler(new THREE.Euler(0, -0.16, 0)), new THREE.Vector3(1, 1, 1));
-    out.push({ geometry: box(0.006, 0.066, 0.034, 0.0022), matrix: pad, slot: 'pad', surface: 'rubber' });
+const FINGERS: readonly Digit[] = [
+  { base: [0.0272, 0.0288, -0.021], len: [0.036, 0.0235, 0.0185], r: [0.0097, 0.009, 0.0083, 0.0072], width: [0.0186, 0.0178, 0.0168] },
+  { base: [0.0275, 0.0094, -0.0245], len: [0.039, 0.0265, 0.0195], r: [0.01, 0.0092, 0.0085, 0.0074], width: [0.0194, 0.0185, 0.0174] },
+  { base: [0.0272, -0.0102, -0.0215], len: [0.036, 0.0245, 0.0185], r: [0.0097, 0.009, 0.0083, 0.0072], width: [0.0186, 0.0178, 0.0168] },
+  { base: [0.0262, -0.0286, -0.0155], len: [0.0285, 0.0185, 0.0165], r: [0.0088, 0.0081, 0.0075, 0.0066], width: [0.0166, 0.0158, 0.015] }
+];
+const THUMB: Digit = { base: [0.0235, 0.0235, 0.043], len: [0.035, 0.0265, 0.02], r: [0.0126, 0.0106, 0.0095, 0.0082], width: [0.026, 0.021, 0.0195] };
+
+export const HAND_JOINTS: readonly HandJoint[] = (() => {
+  const joints: HandJoint[] = [{ parent: -1, pos: new THREE.Vector3() }];
+  for (const d of [...FINGERS, THUMB]) {
+    const first = joints.length;
+    joints.push({ parent: 0, pos: new THREE.Vector3(...d.base) });
+    joints.push({ parent: first, pos: new THREE.Vector3(0, 0, -d.len[0]) });
+    joints.push({ parent: first + 1, pos: new THREE.Vector3(0, 0, -d.len[1]) });
   }
-  // Fingers: index, middle, ring, pinky (or one block for the three outer fingers on low).
-  const fingers = [
-    { y: 0.028, r: 0.034, joints: [-34, -104, -152, -192], w: 0.0185 },
-    { y: 0.008, r: 0.035, joints: [-32, -104, -154, -196], w: 0.0195 },
-    { y: -0.012, r: 0.034, joints: [-30, -100, -150, -190], w: 0.0185 },
-    { y: -0.03, r: 0.031, joints: [-28, -94, -140, -176], w: 0.016 }
-  ];
-  const list = detail === 0 ? [fingers[0]!, { y: -0.011, r: 0.034, joints: [-30, -100, -150, -190], w: 0.056 }] : fingers;
-  list.forEach((f, i) => {
-    let pts = f.joints.map((deg) => polar(f.r, deg, f.y));
-    if (i === 0 && trigger) {
-      pts = [polar(f.r, -34, f.y), new THREE.Vector3(0.019, f.y + 0.006, -0.064), new THREE.Vector3(0.006, f.y + 0.002, -0.084), new THREE.Vector3(0.0, f.y - 0.012, -0.092)];
+  return joints;
+})();
+
+const ARC = [0, 0.25, 0.5, 0.75, 1].map((t) => t * Math.PI);
+const inside = new THREE.Vector3();
+const ea = new THREE.Vector3();
+const eb = new THREE.Vector3();
+const en = new THREE.Vector3();
+
+/**
+ * One finger segment: a bevelled block from its joint down -Z whose two ends
+ * are rounded about the joints, so neighbours overlap at any bend.
+ */
+function phalanx(len: number, rA: number, rB: number, width: number, bevel: number): THREE.BufferGeometry {
+  const ring = (inset: number, y: number) => {
+    const a = rA - inset;
+    const b = rB - inset;
+    return [
+      ...ARC.map((t) => new THREE.Vector3(Math.cos(t) * a, y, Math.sin(t) * a)),
+      ...ARC.map((t) => new THREE.Vector3(-Math.cos(t) * b, y, -len - Math.sin(t) * b))
+    ];
+  };
+  const h = width / 2;
+  const rings = [ring(bevel, -h), ring(0, -h + bevel), ring(0, h - bevel), ring(bevel, h)];
+  const faces: THREE.Vector3[][] = [rings[0]!, rings[3]!];
+  const n = rings[0]!.length;
+  for (let k = 0; k < 3; k++) {
+    for (let i = 0; i < n; i++) {
+      const j = (i + 1) % n;
+      faces.push([rings[k]![i]!, rings[k]![j]!, rings[k + 1]![j]!, rings[k + 1]![i]!]);
     }
-    for (let k = 0; k < 3; k++) {
-      const thick = k === 0 ? 0.019 : k === 1 ? 0.017 : 0.0155;
-      bone(out, pts[k]!, pts[k + 1]!, f.w * (k === 2 ? 0.94 : 1), thick, fb, 'glove');
+  }
+  inside.set(0, 0, -len / 2);
+  const positions: number[] = [];
+  const normals: number[] = [];
+  for (const face of faces) {
+    en.crossVectors(ea.subVectors(face[1]!, face[0]!), eb.subVectors(face[2]!, face[0]!)).normalize();
+    const flip = en.dot(ea.subVectors(face[0]!, inside)) < 0;
+    if (flip) en.negate();
+    for (let i = 1; i < face.length - 1; i++) {
+      for (const p of flip ? [face[0]!, face[i + 1]!, face[i]!] : [face[0]!, face[i]!, face[i + 1]!]) {
+        positions.push(p.x, p.y, p.z);
+        normals.push(en.x, en.y, en.z);
+      }
     }
-    if (detail >= 2) {
-      const knuckle = new THREE.Matrix4().makeTranslation(pts[0]!.x + 0.006, pts[0]!.y, pts[0]!.z - 0.002);
-      out.push({ geometry: box(0.012, f.w * 0.8, 0.014, 0.003), matrix: knuckle, slot: 'pad', surface: 'rubber' });
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  g.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
+  return g;
+}
+
+const at = (x: number, y: number, z: number, ry = 0) => new THREE.Matrix4().makeRotationY(ry).setPosition(x, y, z);
+
+function digit(out: ArmPiece[], d: Digit, first: number, fingers: boolean) {
+  for (let k = 0; k < 3; k++) {
+    const len = d.len[k]!;
+    const w = d.width[k]!;
+    out.push({ geometry: phalanx(len, d.r[k]!, d.r[k + 1]!, w, 0.0034), matrix: new THREE.Matrix4(), slot: 'glove', surface: 'satin', joint: first + k });
+    if (k < 2 && (fingers || k === 1)) {
+      // Armour plate on the back of the segment, clear of both joints.
+      const r = (d.r[k]! + d.r[k + 1]!) / 2;
+      out.push({ geometry: box(0.0036, w * 0.7, len * 0.5, 0.0013), matrix: at(r + 0.0006, 0, -len * 0.52), slot: 'pad', surface: 'rubber', joint: first + k });
     }
+  }
+}
+
+/** Gloved hand: palm, cuff, four fingers and a thumb, every segment on its own joint. */
+export function handPieces(): ArmPiece[] {
+  const out: ArmPiece[] = [];
+  const glove = (geometry: THREE.BufferGeometry, matrix: THREE.Matrix4) => out.push({ geometry, matrix, slot: 'glove', surface: 'satin' });
+  const pad = (geometry: THREE.BufferGeometry, matrix: THREE.Matrix4) => out.push({ geometry, matrix, slot: 'pad', surface: 'rubber' });
+  // Palm slab from the heel to the knuckle line, the pinky edge a touch shorter.
+  glove(box(0.0235, 0.058, 0.078, 0.0075), at(0.0282, 0.0095, 0.0175));
+  glove(box(0.0225, 0.03, 0.07, 0.0075), at(0.0274, -0.024, 0.0205));
+  // Heel of the hand and the pad under the knuckles: the hollow between them takes the held object.
+  glove(box(0.013, 0.036, 0.036, 0.0055), at(0.0205, -0.019, 0.0385));
+  glove(box(0.009, 0.07, 0.013, 0.004), at(0.0185, 0, -0.0185));
+  pad(box(0.006, 0.058, 0.036, 0.0022), at(0.0412, 0.002, 0.02));
+  FINGERS.forEach((f, i) => {
+    digit(out, f, fingerJoint(i, 0), true);
+    pad(box(0.0075, f.width[0] * 0.82, 0.0155, 0.003), at(f.base[0] + 0.0092, f.base[1], f.base[2] + 0.0035));
   });
-  // Thumb: thick base over the back of the grip, then forward along the far side.
-  const t0 = new THREE.Vector3(0.016, 0.022, 0.05);
-  const t1 = new THREE.Vector3(-0.008, 0.042, 0.034);
-  const t2 = new THREE.Vector3(-0.022, 0.049, 0.008);
-  const t3 = new THREE.Vector3(-0.024, 0.047, -0.016);
-  bone(out, t0, t1, 0.026, 0.024, bevel, 'glove', 0.5);
-  bone(out, t1, t2, 0.02, 0.019, fb, 'glove');
-  bone(out, t2, t3, 0.018, 0.017, fb, 'glove');
+  digit(out, THUMB, THUMB_JOINT, false);
   // Gauntlet cuff around the wrist, aimed back along the forearm.
   const dir = WRIST.clone().sub(new THREE.Vector3(0.03, -0.002, 0.018)).normalize();
   const cuff = new THREE.Matrix4().compose(WRIST.clone().addScaledVector(dir, -0.008), new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), dir), new THREE.Vector3(1, 1, 1));
-  const segs = detail === 0 ? 8 : detail === 1 ? 12 : 16;
-  out.push({ geometry: tube(0.036, 0.044, segs, detail >= 1 ? 0.004 : 0, 0.039), matrix: cuff, slot: 'glove', surface: 'satin' });
-  if (detail >= 1) out.push({ geometry: tube(0.0395, 0.009, segs, 0.002), matrix: cuff.clone().multiply(new THREE.Matrix4().makeTranslation(0, 0, 0.018)), slot: 'trim', surface: 'plastic' });
+  glove(tube(0.036, 0.044, 16, 0.004, 0.039), cuff);
+  out.push({ geometry: tube(0.0395, 0.009, 16, 0.002), matrix: cuff.clone().multiply(new THREE.Matrix4().makeTranslation(0, 0, 0.018)), slot: 'trim', surface: 'plastic' });
   return out;
 }
 
 /** Upper arm along +Y from the shoulder; length in meters. */
-export function upperArmPieces(detail: 0 | 1 | 2, length: number): ArmPiece[] {
-  const segs = detail === 0 ? 8 : detail === 1 ? 12 : 16;
+export function upperArmPieces(length: number): ArmPiece[] {
   const up = new THREE.Matrix4().makeRotationX(-Math.PI / 2);
-  return [
-    { geometry: latheZ([[0, 0], [0.054, 0], [0.05, length * 0.6], [0.047, length], [0, length + 0.02]], segs), matrix: up, slot: 'sleeve', surface: 'satin' }
-  ];
+  return [{ geometry: latheZ([[0, 0], [0.054, 0], [0.05, length * 0.6], [0.047, length], [0, length + 0.02]], 16), matrix: up, slot: 'sleeve', surface: 'satin' }];
 }
 
 /**
  * Forearm along +Y from the elbow to the wrist: sleeve to mid-forearm with a
  * rolled trim band, then the glove's gauntlet down to the wrist.
  */
-export function forearmPieces(detail: 0 | 1 | 2, length: number): ArmPiece[] {
-  const segs = detail === 0 ? 8 : detail === 1 ? 12 : 18;
+export function forearmPieces(length: number): ArmPiece[] {
+  const segs = 18;
   const up = new THREE.Matrix4().makeRotationX(-Math.PI / 2);
-  const at = (y: number) => up.clone().premultiply(new THREE.Matrix4().makeTranslation(0, y, 0));
+  const ring = (y: number) => up.clone().premultiply(new THREE.Matrix4().makeTranslation(0, y, 0));
   const cut = length * 0.5;
-  const out: ArmPiece[] = [
+  return [
     { geometry: latheZ([[0, -0.035], [0.037, -0.03], [0.042, 0.0], [0.04, cut * 0.6], [0.0375, cut + 0.004], [0, cut + 0.004]], segs), matrix: up, slot: 'sleeve', surface: 'satin' },
     { geometry: latheZ([[0, cut - 0.01], [0.032, cut - 0.01], [0.031, length * 0.8], [0.029, length], [0, length]], segs), matrix: up, slot: 'glove', surface: 'satin' },
-    { geometry: tube(0.041, 0.02, segs, detail >= 1 ? 0.006 : 0, 0.039), matrix: at(cut), slot: 'trim', surface: 'plastic' }
+    { geometry: tube(0.041, 0.02, segs, 0.006, 0.039), matrix: ring(cut), slot: 'trim', surface: 'plastic' },
+    { geometry: tube(0.0328, 0.012, segs, 0.003), matrix: ring(cut + 0.03), slot: 'pad', surface: 'rubber' },
+    { geometry: tube(0.0425, 0.004, segs, 0.0015), matrix: ring(cut * 0.45), slot: 'seam', surface: 'dark' },
+    { geometry: tube(0.0318, 0.003, segs), matrix: ring(length * 0.78), slot: 'seam', surface: 'dark' }
   ];
-  if (detail >= 1) {
-    out.push({ geometry: tube(0.0328, 0.012, segs, 0.003), matrix: at(cut + 0.03), slot: 'pad', surface: 'rubber' });
-  }
-  if (detail >= 2) {
-    out.push({ geometry: tube(0.0425, 0.004, segs, 0.0015), matrix: at(cut * 0.45), slot: 'seam', surface: 'dark' });
-    out.push({ geometry: tube(0.0318, 0.003, segs), matrix: at(length * 0.78), slot: 'seam', surface: 'dark' });
-  }
-  return out;
 }

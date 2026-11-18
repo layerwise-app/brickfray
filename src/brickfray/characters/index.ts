@@ -4,7 +4,7 @@ import { disposePieceMaterials } from './material';
 import { clearShapeCache } from './shapes';
 import { DESIGNS } from './designs';
 import { meleeProp } from './melee';
-import { PartSet, type BakedCharacter } from './parts';
+import { PartSet, type BakedCharacter, type Hands } from './parts';
 import { Rig } from './rig';
 import { ROSTER } from './roster';
 import { restModelPositions, restOffsets } from './skeleton';
@@ -15,17 +15,19 @@ export type { AnimState, BotKind, CharacterId, CharacterInfo, CharacterRig, Shat
 export { CHARACTER_IDS, ROSTER } from './roster';
 export { BOT_KINDS } from './designs';
 export { idleState } from './labState';
+export { STANCES } from './stances';
+export type { Stance } from './stance';
 
 const cache = new Map<string, BakedCharacter>();
 
 /** Builds a rigged, animated character; geometry is shared per (id, quality). */
-export function createCharacter(id: CharacterId | BotKind, kit: Kit): CharacterRig {
+export function createCharacter(id: CharacterId | BotKind, kit: Kit, hero?: { hands: Hands }): CharacterRig {
   const design = DESIGNS[id];
   const rest = restOffsets(design.rest);
-  const key = `${id}:${kit.profile.level}`;
+  const key = hero ? `${id}:hero:${hero.hands.L}:${hero.hands.R}` : `${id}:${kit.profile.level}`;
   let baked = cache.get(key);
   if (!baked) {
-    const parts = new PartSet(kit.profile);
+    const parts = new PartSet(kit.profile, hero ? { hero: true, hands: hero.hands } : {});
     design.build(parts);
     meleeProp(parts, LOADOUTS[id].melee, !(id in ROSTER));
     baked = parts.bake(restModelPositions(rest));

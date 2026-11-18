@@ -68,7 +68,12 @@ export class Game {
     // After the first frame so the menu paints first.
     requestAnimationFrame(() =>
       setTimeout(() => {
-        if (!this.disposed) this.app.set({ portraits: renderPortraits(this.kit, this.renderer, IDLE, this.showroom.scene.environment) });
+        if (this.disposed) return;
+        void renderPortraits(this.showroom.display.kit, this.renderer, IDLE, this.showroom.display.environment, (id, url) => {
+          if (this.disposed) return false;
+          this.app.set({ portraits: { ...this.app.state.portraits, [id]: url } });
+          return true;
+        });
       })
     );
     this.input = new Input(canvas, settings.input);
@@ -172,10 +177,11 @@ export class Game {
     this.showroom.dispose();
     this.showroom = new Showroom(this.kit, this.renderer, this.settings.character);
     if (this.match && this.client?.settings) {
-      const weapon = this.match.me.arms.weapon;
-      this.match.dispose();
+      const old = this.match;
+      old.dispose();
       this.match = this.createMatch(this.client.settings);
-      this.view.equip(weapon);
+      this.match.adopt(old);
+      this.view.equip(old.me.arms.weapon);
     }
     this.resize();
   }

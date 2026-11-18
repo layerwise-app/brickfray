@@ -1,12 +1,11 @@
 import * as THREE from 'three';
 import { CRANE_HINGE } from '../models/cannon';
-import { bump, hand, track, type Clip, type ClipEvent, type Keys } from './clip';
+import { hand, track, type Clip, type Keys } from './clip';
+import { carry, clip, jolt, viewGoal, viewOf, Z, type Events } from './clips-kit';
+import { fingers } from './fingers';
 import { goal, gripQuat, type Goal, type V3 } from './goals';
-import { env, smooth01 } from './springs';
+import { env, seg, smooth01 } from './springs';
 import { TUNING } from './tuning';
-
-const Z = [0, 0, 0, 0, 0, 0];
-type Events = (readonly [number, ClipEvent])[];
 
 /** Crane swing when the cylinder is out (radians, positive = out to the left). */
 const OPEN = 1.38;
@@ -33,10 +32,12 @@ function fromView(pose: readonly number[], crane: boolean) {
   return (v: V3): [number, number, number] => new THREE.Vector3(...v).applyQuaternion(q).toArray();
 }
 
-/** Fresh rounds held low-left out of view, then lined up behind the open cylinder; empties dropping out of view. */
-const ROUNDS_LOW = [...fromView(GUN_LOAD, false)([-0.3, -0.39, 0.18]), 0, 0.4, 0];
-const ROUNDS_NEAR = [0, 0, 0.05, 0, 0, 0];
-const ROUNDS_FALLEN = [...fromView(GUN_UP, false)([-0.05, -0.45, 0.08]), 1.4, 0.5, 0];
+/** Moon clip offsets from its chambers: kicked out by the rod, lined up behind the cylinder, starting in. */
+const KICKED = [0, -0.005, 0.045, 0.1, 0, 0];
+const NEAR = [0, 0, 0.05, 0, 0, 0];
+const STARTED = [0, 0, 0.036, 0, 0, 0];
+const DIP = [0.004, -0.01, 0.006, -0.03, -0.02, 0.04];
+const OVER = [0.004, -0.006, 0.004, -0.025, -0.01, 0.04];
 
 const out: number[] = [];
 
@@ -92,59 +93,89 @@ export function revolverAction(part: string, t: number, q: THREE.Quaternion): TH
   return q.identity();
 }
 
+/** Offset of the moon clip riding the crane swung out by `a`, moved `r` from its chambers. */
+function onCrane(a: number, r: readonly number[]) {
+  const base = crane(a, 0);
+  return [base[0]! + r[0]!, base[1]! + r[1]!, r[2]!, r[3]!, r[4]!, a + r[5]!];
+}
+
 /**
- * Hand Cannon reload: the cylinder swings out, the muzzle tips up while the
- * ejector rod dumps the moon-clipped empties, the left hand brings a fresh clip
- * up by its gold speedloader knob and seats it, then pushes the cylinder home.
+ * Hand Cannon reload: the cylinder is pushed out, the muzzle tips up while the
+ * ejector rod kicks the moon-clipped empties free, the left hand brings a fresh
+ * clip up by its gold knob and seats it, then flicks the cylinder home.
  */
 export function revolverReload(_empty: boolean, duration: number): Clip {
-  const gun: Keys = [[0, Z], [0.11, GUN_OPEN], [0.2, GUN_OPEN], [0.27, GUN_UP], [0.4, GUN_UP], [0.49, GUN_LOAD], [0.69, GUN_LOAD], [0.75, GUN_OPEN], [0.83, GUN_CLOSE], [1, Z]];
-  const swing: Keys = [[0.11, [0]], [0.18, [OPEN]], [0.77, [OPEN]], [0.805, [0]]];
-  const rod: Keys = [[0.29, [0]], [0.33, [STROKE]], [0.36, [STROKE]], [0.4, [0]]];
-  const rounds: Keys = [
-    [0.29, Z],
-    [0.33, [0, 0, STROKE, 0, 0, 0]],
-    [0.355, [0, -0.005, 0.04, 0.1, 0, 0]],
-    [0.43, ROUNDS_FALLEN],
-    [0.4301, ROUNDS_LOW],
-    [0.47, ROUNDS_LOW],
-    [0.6, ROUNDS_NEAR],
-    [0.625, ROUNDS_NEAR],
-    [0.66, Z]
+  const gun: Keys = [
+    [0, Z],
+    [0.06, DIP],
+    [0.24, GUN_OPEN],
+    [0.38, [-0.08, 0.07, -0.05, 0.25, 0.4, -0.66]],
+    [0.56, GUN_UP],
+    [0.74, [-0.022, 0.06, -0.028, 0.86, 0.42, -0.55]],
+    [0.98, GUN_LOAD],
+    [1.26, [-0.054, 0.057, -0.062, 0.35, 0.42, -0.54]],
+    [1.44, GUN_LOAD],
+    [1.6, GUN_OPEN],
+    [1.74, GUN_CLOSE],
+    [1.96, OVER],
+    [2.06, Z],
+    [2.1, Z]
   ];
-  const events: Events = [[0.02, 'cloth'], [0.15, 'boltBack'], [0.32, 'magOut'], [0.44, 'cloth'], [0.655, 'magIn'], [0.8, 'boltForward'], [0.92, 'cloth']];
-  const r: number[] = [];
-  return {
-    name: 'revolverReload',
-    duration,
-    events,
-    sample(u, f, c) {
-      const g = c.goals;
-      f.gun(track(u, gun));
-      f.gun([0, 0.006, 0.004, -0.04, 0, 0], bump(u, 0.33, 0.02));
-      f.gun([0, 0.008, -0.004, 0.05, 0, 0], bump(u, 0.66, 0.02));
-      f.gun([0.006, 0, 0, 0, 0, -0.12], bump(u, 0.805, 0.018));
-      const a = track(u, swing)[0]!;
-      f.part('cylinder', crane(a, 0));
-      f.part('crane', crane(a, 0));
-      f.part('ejector', crane(a, track(u, rod)[0]!));
-      track(u, rounds, r);
-      const base = crane(a, 0);
-      f.part('speedloader', [base[0]! + r[0]!, base[1]! + r[1]!, r[2]!, r[3]!, r[4]!, a + r[5]!]);
-      f.left = hand(u, [
-        [0, g.leftRest!],
-        [0.1, g.cylinder!],
-        [0.2, g.cylinder!],
-        [0.27, g.rod!],
-        [0.37, g.rod!],
-        [0.43, g.low!],
-        [0.47, g.loader!],
-        [0.67, g.loader!],
-        [0.74, g.cylinder!],
-        [0.79, g.cylinder!],
-        [0.92, g.leftRest!]
-      ]);
-      f.busy = env(u, 0, 0.07, 0.92, 1);
+  const swing: Keys = [[0.25, [0]], [0.37, [OPEN]], [1.6, [OPEN]], [1.665, [0]]];
+  const rod: Keys = [[0.58, [0]], [0.625, [STROKE]], [0.68, [STROKE]], [0.76, [0]]];
+  const rounds: Keys = [[0.58, Z], [0.625, [0, 0, STROKE, 0, 0, 0]], [0.68, KICKED], [1.24, NEAR], [1.3, STARTED], [1.36, Z]];
+  const events: Events = [[0.04, 'cloth'], [0.27, 'boltBack'], [0.62, 'magOut'], [0.92, 'cloth'], [1.35, 'magIn'], [1.66, 'boltForward'], [1.9, 'cloth']];
+  let path: Keys | null = null;
+  let fetch: Goal | null = null;
+  return clip('revolverReload', duration, 2.1, events, (t, f, c) => {
+    const g = c.goals;
+    const seat = g.speedloaderSeat!;
+    const hold = g.loader!.node;
+    if (!path) {
+      const kicked = viewOf(c, GUN_UP, seat, hold, onCrane(OPEN, KICKED));
+      const near = viewOf(c, GUN_LOAD, seat, hold, onCrane(OPEN, NEAR));
+      const pouch = [-0.2, -0.42, -0.3, near[3]! + 0.3, near[4]!, near[5]! - 0.2];
+      path = [
+        [0.625, viewOf(c, GUN_UP, seat, hold, onCrane(OPEN, [0, 0, STROKE, 0, 0, 0]))],
+        [0.68, kicked],
+        [0.78, [kicked[0]!, kicked[1]! - 0.2, kicked[2]! + 0.03, kicked[3]! + 0.6, kicked[4]!, kicked[5]! + 0.3]],
+        [0.88, [kicked[0]!, kicked[1]! - 0.6, kicked[2]! + 0.05, kicked[3]! + 1.4, kicked[4]!, kicked[5]! + 0.6]],
+        [0.8801, pouch],
+        [0.98, pouch],
+        [1.12, [-0.06, -0.24, -0.4, near[3]! + 0.12, near[4]!, near[5]! - 0.08]],
+        [1.24, near],
+        [1.3, viewOf(c, GUN_LOAD, seat, hold, onCrane(OPEN, STARTED))]
+      ];
+      fetch = viewGoal(c, pouch, g.loader!);
     }
-  };
+    f.gun(track(t, gun));
+    f.gun([0.005, 0, 0, 0, 0.02, -0.07], jolt(t - 0.27));
+    f.gun([0, 0.006, 0.004, -0.05, 0, 0], jolt(t - 0.61));
+    f.gun([0, 0.008, -0.004, 0.05, 0, 0], jolt(t - 1.345));
+    f.gun([0.006, 0, 0, 0, 0, -0.12], jolt(t - 1.655));
+    const a = track(t, swing)[0]!;
+    f.part('cylinder', crane(a, 0));
+    f.part('crane', crane(a, 0));
+    f.part('ejector', crane(a, track(t, rod)[0]!));
+    carry(f, c, 'speedloader', seat, hold, onCrane(a, track(t, rounds)), track(t, path), seg(t, 0.64, 0.7) * (1 - seg(t, 1.14, 1.26)));
+    f.left = hand(t, [
+      [0, g.leftRest!],
+      [0.04, g.leftRest!],
+      [0.24, g.cylinder!],
+      [0.38, g.cylinder!],
+      [0.56, g.rod!],
+      [0.7, g.rod!],
+      [0.92, fetch!],
+      [0.94, fetch!],
+      [0.9401, g.loader!],
+      [1.42, g.loader!],
+      [1.58, g.cylinder!],
+      [1.66, g.cylinder!],
+      [1.92, g.leftRest!]
+    ]);
+    if (t > 0.04 && t < 1.92) {
+      f.leftFingers = fingers(t, [[0.04, 'wrap'], [0.16, 'open'], [0.26, 'support'], [0.4, 'support'], [0.56, 'flat'], [0.7, 'flat'], [0.9, 'pinch'], [1.38, 'pinch'], [1.5, 'open'], [1.6, 'support'], [1.68, 'flat'], [1.92, 'wrap']]);
+    }
+    f.busy = env(t, 0, 0.14, 1.9, 2.08);
+  });
 }

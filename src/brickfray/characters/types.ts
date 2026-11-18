@@ -1,5 +1,6 @@
 import type * as THREE from 'three';
 import type { WeaponId } from '../weapons/defs';
+import type { Stance } from './stance';
 
 export type CharacterId = 'rivet' | 'vega' | 'clack' | 'coral' | 'moss' | 'nova';
 export type BotKind = 'grunt' | 'rusher' | 'sniper' | 'boss';
@@ -54,6 +55,8 @@ export interface CharacterRig {
   readonly rightHand: THREE.Object3D;
   /** Holds the weapon model; the rig IKs the left hand to its `supportGrip` node when present. */
   setWeapon(model: THREE.Object3D | null, supportGrip: THREE.Object3D | null): void;
+  /** Hold a showroom pose instead of the gameplay animation; null returns to it. */
+  setStance(stance: Stance | null): void;
   /** Team or player tint shown on an armband/visor stripe; null clears it. */
   setTint(color: THREE.ColorRepresentation | null): void;
   /** Brief white hit flash. */

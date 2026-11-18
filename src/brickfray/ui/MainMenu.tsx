@@ -38,10 +38,11 @@ export function MainMenu({ openSettings }: { openSettings: () => void }) {
 
   return (
     <div className='absolute inset-0 flex flex-col p-5 sm:p-8'>
-      <div className='pointer-events-none absolute inset-0 bg-gradient-to-l from-[#0b1222]/70 via-transparent to-transparent' />
-      <header className='relative flex items-start justify-between gap-4'>
-        <h1 className='bf-logo select-none'>BRICKFRAY</h1>
-        <div className='flex gap-3'>
+      <div className='pointer-events-none absolute inset-y-0 right-0 hidden w-2/5 bg-gradient-to-l from-[#0b1222]/70 to-transparent lg:block' />
+      <div className='pointer-events-none absolute inset-x-0 bottom-0 h-[600px] max-h-full bg-gradient-to-t from-[#0b1222] via-[#0b1222]/75 to-transparent lg:hidden' />
+      <header className='relative flex items-start justify-between gap-1.5 sm:gap-4'>
+        <h1 className='bf-logo select-none max-[480px]:!text-[7.6vw]'>BRICKFRAY</h1>
+        <div className='flex shrink-0 gap-1.5 sm:gap-3'>
           <LanguageButton />
           <button className='bf-btn bf-btn-ghost bf-icon-btn' onClick={() => void document.documentElement.requestFullscreen?.()} aria-label={t('fullscreen')}>
             <FullscreenIcon size={22} />
@@ -52,7 +53,7 @@ export function MainMenu({ openSettings }: { openSettings: () => void }) {
         </div>
       </header>
 
-      <div className='relative mt-auto flex flex-col-reverse items-stretch gap-6 lg:flex-row lg:items-end lg:justify-between'>
+      <div className='relative mt-auto flex flex-col items-stretch gap-5 lg:flex-row lg:items-end lg:justify-between lg:gap-6'>
         <section className='flex flex-col gap-3'>
           <div className='bf-fade-in' key={character}>
             <div className='text-sm font-semibold uppercase tracking-[0.2em] drop-shadow-[0_1px_2px_rgba(0,0,0,.7)]' style={{ color: info.primary }}>
@@ -70,19 +71,19 @@ export function MainMenu({ openSettings }: { openSettings: () => void }) {
                   key={id}
                   onClick={() => pick(id)}
                   aria-pressed={selected}
-                  className='group flex w-[4.5rem] flex-col items-center gap-1 transition-transform hover:-translate-y-0.5'
+                  className='group flex w-12 flex-col items-center gap-1 transition-transform hover:-translate-y-0.5 sm:w-[4.5rem]'
                 >
                   <span
-                    className='relative block h-16 w-16 overflow-hidden rounded-2xl'
+                    className='relative block h-12 w-12 overflow-hidden rounded-xl sm:h-16 sm:w-16 sm:rounded-2xl'
                     style={{
                       background: `linear-gradient(160deg, ${ROSTER[id].primary} 0 55%, ${ROSTER[id].secondary} 55% 100%)`,
                       boxShadow: selected ? '0 0 0 3px #fff, 0 6px 0 rgba(0,0,0,.35)' : '0 5px 0 rgba(0,0,0,.35)'
                     }}
                   >
-                    {app.portraits && <img src={app.portraits[id]} alt='' draggable={false} className='absolute inset-0 h-full w-full object-cover' />}
+                    {app.portraits[id] && <img src={app.portraits[id]} alt='' draggable={false} className='absolute inset-0 h-full w-full object-cover' />}
                   </span>
                   <span
-                    className={`max-w-full truncate text-xs font-semibold drop-shadow-[0_1px_2px_rgba(0,0,0,.8)] ${selected ? 'text-white' : 'text-white/75 group-hover:text-white'}`}
+                    className={`max-w-full truncate text-[11px] font-semibold sm:text-xs drop-shadow-[0_1px_2px_rgba(0,0,0,.8)] ${selected ? 'text-white' : 'text-white/75 group-hover:text-white'}`}
                   >
                     {ROSTER[id].name}
                   </span>
@@ -93,7 +94,7 @@ export function MainMenu({ openSettings }: { openSettings: () => void }) {
           <input className='bf-input w-64' placeholder={t('namePlaceholder')} value={name} maxLength={16} onChange={(e) => rename(e.target.value)} />
         </section>
 
-        <nav className='flex w-full flex-col gap-4 lg:w-[340px]'>
+        <nav className='grid w-full grid-cols-2 gap-3 lg:flex lg:w-[340px] lg:flex-col lg:gap-4'>
           <BigButton primary icon={<PlayIcon size={30} />} label={t('play')} caption={t('playCaption')} onClick={() => begin(() => game.quickMatch())} disabled={!!app.busy} />
           <BigButton icon={<BotIcon size={28} />} label={t('solo')} caption={t('soloCaption')} onClick={() => begin(() => game.playSolo())} disabled={!!app.busy} />
           <BigButton icon={<UsersIcon size={28} />} label={t('rooms')} caption={t('roomsCaption')} onClick={() =>
@@ -133,11 +134,15 @@ function Loadout({ character }: { character: CharacterId }) {
 
 function BigButton(props: { primary?: boolean; icon: React.ReactNode; label: string; caption: string; onClick: () => void; disabled?: boolean }) {
   return (
-    <button className={`bf-btn ${props.primary ? 'bf-btn-primary' : 'bf-btn-blue'} !h-auto !justify-start !gap-4 !px-5 !py-4 text-left`} onClick={props.onClick} disabled={props.disabled}>
-      <span className='grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-black/15'>{props.icon}</span>
-      <span className='flex flex-col'>
-        <span className={`bf-display leading-none ${props.primary ? 'text-4xl' : 'text-3xl'}`}>{props.label}</span>
-        <span className='mt-1 text-sm font-medium opacity-75'>{props.caption}</span>
+    <button
+      className={`bf-btn ${props.primary ? 'bf-btn-primary col-span-2' : 'bf-btn-blue'} !h-auto min-w-0 !justify-start !gap-3 !px-3.5 !py-3 text-left lg:!gap-4 lg:!px-5 lg:!py-4`}
+      onClick={props.onClick}
+      disabled={props.disabled}
+    >
+      <span className='grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-black/15 lg:h-12 lg:w-12'>{props.icon}</span>
+      <span className='flex min-w-0 flex-col'>
+        <span className={`bf-display leading-none ${props.primary ? 'text-3xl lg:text-4xl' : 'text-2xl lg:text-3xl'}`}>{props.label}</span>
+        <span className='mt-1 text-xs font-medium leading-tight opacity-75 lg:text-sm'>{props.caption}</span>
       </span>
     </button>
   );

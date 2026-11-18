@@ -1,6 +1,7 @@
 import { audibleLength, loudness, peakOf } from './analysis';
 import { CATEGORIES, DEFAULT_VARIANTS } from './catalog';
 import { SONGS, renderMusic } from './music';
+import { SAMPLES } from './samples';
 import { SOUNDS, SOUND_IDS } from './sounds';
 import { hashString, mulberry32, whiteNoise } from './synth';
 import type { MusicTrack, SoundId } from './types';
@@ -76,8 +77,58 @@ function normalize(src: Float32Array<ArrayBuffer>, sr: number, target: number): 
   return { out, raw };
 }
 
-/** Renders every variant of one sound in a single offline pass, one slot per variant. */
+/** Trims, fades and loudness-normalizes one variant into a mono buffer. */
+function finish(full: Float32Array<ArrayBuffer>, sampleRate: number, target: number): { buffer: AudioBuffer; raw: number } {
+  const fade = Math.round(0.008 * sampleRate);
+  const clip = full.slice(0, Math.max(Math.min(full.length, audibleLength(full) + fade), 64));
+  for (let i = 0; i < fade && i < clip.length; i++) clip[clip.length - 1 - i]! *= i / fade;
+  const n = normalize(clip, sampleRate, target);
+  const buffer = new AudioBuffer({ numberOfChannels: 1, length: clip.length, sampleRate });
+  buffer.copyToChannel(n.out, 0);
+  return { buffer, raw: n.raw };
+}
+
+/** Samples below this are lead-in silence (encoder padding, room tone before the transient). */
+const LEAD_IN = 0.004;
+
+/** Fetches and decodes one recording per variant, mixed to mono with lead-in silence removed. */
+async function loadSamples(files: readonly string[], sampleRate: number, target: number): Promise<RenderedSound> {
+  const decoder = new OfflineAudioContext(1, 1, sampleRate);
+  const done = await Promise.all(
+    files.map(async (file) => {
+      const response = await fetch(`${import.meta.env.BASE_URL}audio/${file}`);
+      if (!response.ok) throw new Error(`audio/${file}: HTTP ${response.status}`);
+      const decoded = await decoder.decodeAudioData(await response.arrayBuffer());
+      const mono = new Float32Array(decoded.length);
+      for (let ch = 0; ch < decoded.numberOfChannels; ch++) {
+        const data = decoded.getChannelData(ch);
+        for (let i = 0; i < mono.length; i++) mono[i]! += data[i]! / decoded.numberOfChannels;
+      }
+      const peak = peakOf(mono);
+      let start = 0;
+      while (start < mono.length && Math.abs(mono[start]!) < peak * LEAD_IN) start++;
+      return finish(mono.slice(Math.max(0, start - 16)), sampleRate, target);
+    })
+  );
+  return { buffers: done.map((d) => d.buffer), raw: done.map((d) => d.raw), target };
+}
+
+/** One sound's variants: recordings when the sample map has them, the synthesized recipe otherwise. */
 export async function renderSound(id: SoundId, sampleRate: number): Promise<RenderedSound> {
+  const spec = SOUNDS[id];
+  const files = SAMPLES[id];
+  if (files?.length) {
+    try {
+      return await loadSamples(files, sampleRate, spec.loudness ?? CATEGORIES[spec.category].loudness);
+    } catch (error) {
+      console.error(`Sound ${id} falls back to its synthesized recipe`, error);
+    }
+  }
+  return synthesize(id, sampleRate);
+}
+
+/** Renders every variant of one sound in a single offline pass, one slot per variant. */
+async function synthesize(id: SoundId, sampleRate: number): Promise<RenderedSound> {
   const spec = SOUNDS[id];
   const variants = spec.variants ?? DEFAULT_VARIANTS;
   const slot = spec.duration + GAP;
@@ -95,18 +146,12 @@ export async function renderSound(id: SoundId, sampleRate: number): Promise<Rend
   }
   const rendered = (await ctx.startRendering()).getChannelData(0);
   const target = spec.loudness ?? CATEGORIES[spec.category].loudness;
-  const fade = Math.round(0.008 * sampleRate);
   const raw: number[] = [];
   const buffers = Array.from({ length: variants }, (_, v) => {
     const start = Math.round(v * slot * sampleRate);
-    const full = rendered.subarray(start, start + Math.round(spec.duration * sampleRate));
-    const clip = full.slice(0, Math.max(Math.min(full.length, audibleLength(full) + fade), 64));
-    for (let i = 0; i < fade && i < clip.length; i++) clip[clip.length - 1 - i]! *= i / fade;
-    const n = normalize(clip, sampleRate, target);
-    raw.push(n.raw);
-    const buffer = new AudioBuffer({ numberOfChannels: 1, length: clip.length, sampleRate });
-    buffer.copyToChannel(n.out, 0);
-    return buffer;
+    const done = finish(rendered.subarray(start, start + Math.round(spec.duration * sampleRate)), sampleRate, target);
+    raw.push(done.raw);
+    return done.buffer;
   });
   return { buffers, raw, target };
 }

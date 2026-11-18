@@ -115,6 +115,20 @@ export class Predictor {
     this.smoothing.z *= k;
   }
 
+  /** Continue where another predictor left off: same body, same unacknowledged commands. */
+  adopt(from: Predictor) {
+    const p = this.player;
+    const q = from.player;
+    copyMoveState(q.move, p.move);
+    p.arms = copyArms(q.arms, createArms());
+    p.yaw = q.yaw;
+    p.pitch = q.pitch;
+    p.alive = q.alive;
+    p.health = q.health;
+    p.life = q.life;
+    this.pending = [...from.pending];
+  }
+
   /** Respawn or first spawn: take the host's state as is. */
   reset(self: SelfState) {
     copyMoveState(self.move, this.player.move);

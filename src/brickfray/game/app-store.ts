@@ -17,11 +17,12 @@ export interface AppState {
   lobbies: PublicLobby[] | null;
   audioReady: boolean;
   /** Character picker images (data URLs), rendered shortly after start. */
-  portraits: Record<CharacterId, string> | null;
+  /** Picker head shots, filled in as each one is rendered. */
+  portraits: Partial<Record<CharacterId, string>>;
 }
 
 export class AppStore {
-  state: AppState = { screen: 'menu', busy: null, lobby: null, isHost: false, paused: false, error: null, lobbies: null, audioReady: false, portraits: null };
+  state: AppState = { screen: 'menu', busy: null, lobby: null, isHost: false, paused: false, error: null, lobbies: null, audioReady: false, portraits: {} };
   private listeners = new Set<() => void>();
 
   subscribe = (fn: () => void) => {

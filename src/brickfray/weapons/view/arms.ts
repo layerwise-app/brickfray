@@ -2,7 +2,10 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import type { CharacterInfo } from '../../characters/types';
 import type { Kit } from '../../engine/kit';
+import { useLod } from '../shapes';
 import { paint, surfaceMaterial } from '../surface';
+import { FINGERS, mixFingers, type FingerPose } from './fingers';
+import { createHandBones, poseFingers } from './fingers-rig';
 import { forearmPieces, handPieces, upperArmPieces, WRIST, type ArmPiece, type Slot } from './hand';
 
 export const UPPER = 0.34;
@@ -10,21 +13,33 @@ export const FOREARM = 0.31;
 
 const SLOTS: Slot[] = ['sleeve', 'trim', 'glove', 'pad', 'seam'];
 const MIRROR = new THREE.Matrix4().makeScale(-1, 1, 1);
+/** Seconds for a finger shape to settle, so grips never pop when a clip starts or ends. */
+const FINGER_LAG = 0.07;
 
 /** Right/left: shoulder, elbow-pole hint, wrist offset in the hand frame. */
 interface Side {
   upper: THREE.Bone;
   fore: THREE.Bone;
   hand: THREE.Bone;
+  /** The hand and its finger joints, in HAND_JOINTS order. */
+  joints: THREE.Bone[];
+  fingers: FingerPose;
+  /** Shoulder, at its furthest forward. */
   shoulder: THREE.Vector3;
+  /** The shoulder stays this far behind the wrist in depth, so the forearm arrives from behind the hand, not from under it… */
+  trail: number;
+  /** …but never further back than this. */
+  back: number;
   pole: THREE.Vector3;
   wrist: THREE.Vector3;
 }
 
 /**
- * Both first-person arms as one rigidly skinned mesh (six bones, one draw
- * call). Hands are placed directly; elbows come from two-bone IK toward
- * fixed shoulders below and behind the camera.
+ * Both first-person arms as one rigidly skinned mesh (one draw call): upper
+ * arm, forearm, hand and fifteen finger joints a side. Hands are placed
+ * directly; elbows come from two-bone IK toward shoulders below and
+ * behind the camera. Built at full detail on every quality tier: they sit
+ * right at the camera.
  */
 export class Arms {
   readonly root = new THREE.Group();
@@ -32,12 +47,14 @@ export class Arms {
   readonly right: Side;
   readonly left: Side;
   private readonly slots: Uint8Array;
+  private settled = false;
+  private trigger = 0;
 
   constructor(kit: Kit) {
-    const detail = kit.profile.detail;
-    const bones = Array.from({ length: 6 }, () => new THREE.Bone());
+    useLod(null);
     const geos: THREE.BufferGeometry[] = [];
     const slotIds: number[] = [];
+    const bones: THREE.Bone[] = [];
     const add = (pieces: ArmPiece[], boneIndex: number, mirror: boolean) => {
       for (const p of pieces) {
         const g = p.geometry.clone();
@@ -48,7 +65,7 @@ export class Arms {
         const skinIndex = new Uint16Array(n * 4).fill(0);
         const skinWeight = new Float32Array(n * 4).fill(0);
         for (let i = 0; i < n; i++) {
-          skinIndex[i * 4] = boneIndex;
+          skinIndex[i * 4] = boneIndex + (p.joint ?? 0);
           skinWeight[i * 4] = 1;
           slotIds.push(SLOTS.indexOf(p.slot));
         }
@@ -57,21 +74,31 @@ export class Arms {
         geos.push(g);
       }
     };
-    for (const [offset, mirror] of [[0, false], [3, true]] as const) {
-      add(upperArmPieces(detail, UPPER), offset, mirror);
-      add(forearmPieces(detail, FOREARM), offset + 1, mirror);
-      add(handPieces(detail, !mirror), offset + 2, mirror);
-    }
+    const side = (mirror: boolean, shoulder: THREE.Vector3, trail: number, back: number, pole: THREE.Vector3): Side => {
+      const upper = new THREE.Bone();
+      const fore = new THREE.Bone();
+      const joints = createHandBones(mirror);
+      const first = bones.length;
+      bones.push(upper, fore, ...joints);
+      add(upperArmPieces(UPPER), first, mirror);
+      add(forearmPieces(FOREARM), first + 1, mirror);
+      add(handPieces(), first + 2, mirror);
+      this.root.add(upper, fore, joints[0]!);
+      joints[0]!.name = mirror ? 'hand:left' : 'hand:right';
+      fore.name = mirror ? 'forearm:left' : 'forearm:right';
+      const fingers = { ...FINGERS.relaxed };
+      poseFingers(joints, fingers, mirror);
+      return { upper, fore, hand: joints[0]!, joints, fingers, shoulder, trail, back, pole, wrist: WRIST.clone().setX(mirror ? -WRIST.x : WRIST.x) };
+    };
+    this.right = side(false, new THREE.Vector3(0.2, -0.2, -0.05), 0.535, 0.24, new THREE.Vector3(0.9, -1, 0.15));
+    this.left = side(true, new THREE.Vector3(-0.16, -0.33, -0.2), 0.46, 0.15, new THREE.Vector3(-1.4, -1.3, 0.1));
     const geometry = mergeGeometries(geos)!;
     for (const g of geos) g.dispose();
     this.slots = Uint8Array.from(slotIds);
     this.mesh = new THREE.SkinnedMesh(geometry, surfaceMaterial(kit.materials));
     this.mesh.frustumCulled = false;
-    this.root.add(this.mesh, ...bones);
-    const skeleton = new THREE.Skeleton(bones, bones.map(() => new THREE.Matrix4()));
-    this.mesh.bind(skeleton, new THREE.Matrix4());
-    this.right = { upper: bones[0]!, fore: bones[1]!, hand: bones[2]!, shoulder: new THREE.Vector3(0.17, -0.33, -0.02), pole: new THREE.Vector3(0.9, -1, 0.15), wrist: WRIST.clone() };
-    this.left = { upper: bones[3]!, fore: bones[4]!, hand: bones[5]!, shoulder: new THREE.Vector3(-0.25, -0.34, -0.06), pole: new THREE.Vector3(-1.1, -1.6, 0.1), wrist: WRIST.clone().setX(-WRIST.x) };
+    this.root.add(this.mesh);
+    this.mesh.bind(new THREE.Skeleton(bones, bones.map(() => new THREE.Matrix4())), new THREE.Matrix4());
   }
 
   setColors(info: CharacterInfo) {
@@ -85,6 +112,20 @@ export class Arms {
       color.setXYZ(i, c.r, c.g, c.b);
     }
     color.needsUpdate = true;
+  }
+
+  /**
+   * Ease each hand's fingers toward a shape; `dt` 0 snaps. `onTrigger` says the right
+   * hand is on a pistol grip, so its index hooks around the trigger.
+   */
+  setFingers(right: FingerPose, left: FingerPose, dt: number, onTrigger = false) {
+    const k = this.settled && dt > 0 ? 1 - Math.exp(-dt / FINGER_LAG) : 1;
+    this.settled = true;
+    this.trigger += ((onTrigger ? 1 : 0) - this.trigger) * k;
+    mixFingers(this.right.fingers, right, k, this.right.fingers);
+    mixFingers(this.left.fingers, left, k, this.left.fingers);
+    poseFingers(this.right.joints, this.right.fingers, false, this.trigger);
+    poseFingers(this.left.joints, this.left.fingers, true);
   }
 
   /** Place each hand (pose in the arms' space) and bend the arms to reach it. */
@@ -108,7 +149,7 @@ const basis = new THREE.Matrix4();
 function solve(side: Side, hand: THREE.Matrix4, shift: THREE.Vector3) {
   hand.decompose(side.hand.position, side.hand.quaternion, side.hand.scale);
   wrist.copy(side.wrist).applyMatrix4(hand);
-  shoulder.copy(side.shoulder).add(shift);
+  shoulder.copy(side.shoulder).setZ(Math.min(side.back, Math.max(side.shoulder.z, wrist.z + side.trail))).add(shift);
   dir.subVectors(wrist, shoulder);
   let dist = dir.length();
   dir.divideScalar(dist);

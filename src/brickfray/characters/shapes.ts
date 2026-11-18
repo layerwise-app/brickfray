@@ -137,3 +137,158 @@ export function section(r: number, wide: number, tall: number, w: number, h: num
     return normalizeGeometry(g);
   });
 }
+
+export interface LoftRing {
+  y: number;
+  /** Half width (x) and half depth toward the front (-z); `back` is the half depth toward +z when it differs. */
+  rx: number;
+  rz: number;
+  back?: number;
+  cx?: number;
+  cz?: number;
+  /** Superellipse exponent of the cross-section: 2 is an ellipse, higher is boxier. */
+  e?: number;
+}
+
+export interface LoftEnds {
+  /** Dome heights closing each end; 0 is a flat cap with a hard edge. */
+  bottom?: number;
+  top?: number;
+  /** Rings stay as given; otherwise `steps` smooth rings are added between each pair. */
+  steps?: number;
+  /** Rings in each dome; by default it follows `radial`. */
+  domes?: number;
+}
+
+type Ring = Required<LoftRing>;
+const RING_KEYS = ['y', 'rx', 'rz', 'back', 'cx', 'cz', 'e'] as const;
+
+function fullRing(r: LoftRing): Ring {
+  return { y: r.y, rx: r.rx, rz: r.rz, back: r.back ?? r.rz, cx: r.cx ?? 0, cz: r.cz ?? 0, e: r.e ?? 2 };
+}
+
+function ringBetween(rings: Ring[], i: number, t: number): Ring {
+  const p0 = rings[Math.max(0, i - 1)]!;
+  const p1 = rings[i]!;
+  const p2 = rings[Math.min(rings.length - 1, i + 1)]!;
+  const p3 = rings[Math.min(rings.length - 1, i + 2)]!;
+  const out = { ...p1 };
+  const t2 = t * t;
+  const t3 = t2 * t;
+  for (const key of RING_KEYS) {
+    const v = 0.5 * (2 * p1[key] + (p2[key] - p0[key]) * t + (2 * p0[key] - 5 * p1[key] + 4 * p2[key] - p3[key]) * t2 + (3 * p1[key] - p0[key] - 3 * p2[key] + p3[key]) * t3);
+    const lo = Math.min(p1[key], p2[key]);
+    const hi = Math.max(p1[key], p2[key]);
+    out[key] = key === 'y' ? p1.y + (p2.y - p1.y) * t : Math.min(hi + (hi - lo) * 0.15, Math.max(lo - (hi - lo) * 0.15, v));
+  }
+  return out;
+}
+
+/** The smoothed cross-section of a loft at height y (clamped to its ends). */
+export function loftRingAt(rings: LoftRing[], y: number): Required<LoftRing> {
+  const full = rings.map(fullRing);
+  if (y <= full[0]!.y) return full[0]!;
+  for (let i = 0; i < full.length - 1; i++) {
+    const a = full[i]!;
+    const b = full[i + 1]!;
+    if (y <= b.y) return ringBetween(full, i, (y - a.y) / Math.max(1e-9, b.y - a.y));
+  }
+  return full[full.length - 1]!;
+}
+
+/** Front (-z) surface of a loft at (x, y): where to seat a part on a curved face or chest. */
+export function loftFrontZ(rings: LoftRing[], x: number, y: number) {
+  const r = loftRingAt(rings, y);
+  const u = Math.min(1, Math.abs(x - r.cx) / r.rx);
+  return r.cz - r.rz * Math.pow(1 - Math.pow(u, r.e), 1 / r.e);
+}
+
+/**
+ * Smooth-skinned solid through superellipse cross-sections stacked along Y
+ * (rings in rising y): torsos, limbs with muscle volume, heads, fingers, soles.
+ */
+export function loft(rings: LoftRing[], radial: number, ends: LoftEnds = {}) {
+  const steps = Math.max(1, ends.steps ?? 1);
+  const bottom = ends.bottom ?? 0;
+  const top = ends.top ?? 0;
+  const domeRings = ends.domes ?? Math.max(1, Math.round(radial / 6));
+  return cached(k('loft', JSON.stringify(rings), radial, steps, bottom, top, domeRings), () => {
+    const keys = rings.map(fullRing);
+    const body: Ring[] = [];
+    for (let i = 0; i < keys.length - 1; i++) for (let s = 0; s < steps; s++) body.push(ringBetween(keys, i, s / steps));
+    body.push(keys[keys.length - 1]!);
+    const dome = (from: Ring, h: number, sign: number) => {
+      const out: Ring[] = [];
+      for (let j = 1; j <= domeRings; j++) {
+        const a = (j / (domeRings + 1)) * (Math.PI / 2);
+        out.push({ ...from, y: from.y + sign * h * Math.sin(a), rx: from.rx * Math.cos(a), rz: from.rz * Math.cos(a), back: from.back * Math.cos(a) });
+      }
+      return out;
+    };
+    const first = body[0]!;
+    const last = body[body.length - 1]!;
+    const stack = [...(bottom > 0 ? dome(first, bottom, -1).reverse() : []), ...body, ...(top > 0 ? dome(last, top, 1) : [])];
+    const grid = stack.map((r) => {
+      const p = 2 / r.e;
+      const ring: THREE.Vector3[] = [];
+      for (let j = 0; j < radial; j++) {
+        const a = (j / radial) * Math.PI * 2;
+        const c = Math.cos(a);
+        const s = Math.sin(a);
+        ring.push(new THREE.Vector3(r.cx + r.rx * Math.sign(c) * Math.pow(Math.abs(c), p), r.y, r.cz + (s < 0 ? r.rz : r.back) * Math.sign(s) * Math.pow(Math.abs(s), p)));
+      }
+      return ring;
+    });
+    const low = new THREE.Vector3(first.cx, first.y - bottom, first.cz);
+    const high = new THREE.Vector3(last.cx, last.y + top, last.cz);
+    // Normals from the grid itself, so shading does not follow the triangle diagonals.
+    const tu = new THREE.Vector3();
+    const tv = new THREE.Vector3();
+    const normals = grid.map((ring, i) =>
+      ring.map((_, j) => {
+        tu.subVectors(ring[(j + 1) % radial]!, ring[(j + radial - 1) % radial]!);
+        const below = i > 0 ? grid[i - 1]![j]! : bottom > 0 ? low : ring[j]!;
+        const above = i < grid.length - 1 ? grid[i + 1]![j]! : top > 0 ? high : ring[j]!;
+        return new THREE.Vector3().crossVectors(tv.subVectors(above, below), tu).normalize();
+      })
+    );
+    const pos: number[] = [];
+    const nrm: number[] = [];
+    const up = new THREE.Vector3(0, 1, 0);
+    const down = new THREE.Vector3(0, -1, 0);
+    const vertex = (p: THREE.Vector3, n: THREE.Vector3) => {
+      pos.push(p.x, p.y, p.z);
+      nrm.push(n.x, n.y, n.z);
+    };
+    for (let i = 0; i < grid.length - 1; i++) {
+      for (let j = 0; j < radial; j++) {
+        const j1 = (j + 1) % radial;
+        const a = grid[i]!;
+        const b = grid[i + 1]!;
+        const na = normals[i]!;
+        const nb = normals[i + 1]!;
+        vertex(a[j]!, na[j]!);
+        vertex(b[j]!, nb[j]!);
+        vertex(a[j1]!, na[j1]!);
+        vertex(a[j1]!, na[j1]!);
+        vertex(b[j]!, nb[j]!);
+        vertex(b[j1]!, nb[j1]!);
+      }
+    }
+    const cap = (i: number, center: THREE.Vector3, n: THREE.Vector3, smooth: boolean, top: boolean) => {
+      const ring = grid[i]!;
+      for (let j = 0; j < radial; j++) {
+        const j1 = (j + 1) % radial;
+        const order = top ? [ring[j]!, center, ring[j1]!] : [ring[j]!, ring[j1]!, center];
+        const ns = top ? [normals[i]![j]!, n, normals[i]![j1]!] : [normals[i]![j]!, normals[i]![j1]!, n];
+        order.forEach((v, q) => vertex(v, smooth && v !== center ? ns[q]! : n));
+      }
+    };
+    cap(0, low, down, bottom > 0, false);
+    cap(grid.length - 1, high, up, top > 0, true);
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    g.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3));
+    return g;
+  });
+}

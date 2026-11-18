@@ -29,6 +29,13 @@ export class MatchEvents {
 
   constructor(private readonly mv: MatchView) {}
 
+  adopt(from: MatchEvents) {
+    this.feed = from.feed;
+    this.chat = from.chat;
+    this.bannerUntil = from.bannerUntil;
+    this.clock = from.clock;
+  }
+
   private name(id: number) {
     return this.mv.session.roster.get(id)?.name ?? '?';
   }

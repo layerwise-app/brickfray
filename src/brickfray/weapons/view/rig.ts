@@ -71,12 +71,13 @@ export function buildGunRig(id: WeaponId, kit: Kit): GunRig {
     low: goal(root, [-0.02, -0.38, 0.1], L([-0.5, -1, 0], [0, 0.3, -1]))
   };
   if (rigged.nodes.has('magHold')) {
-    goals.mag = SIDEARMS.has(id) ? goal(node('magHold'), [-0.004, -0.012, 0.004], L([-0.4, -1, 0], [0, 0.25, -1])) : goal(node('magHold'), [-0.004, 0, -0.004], L([-1, -0.15, -0.5], [0, 1, 0.25]));
+    goals.mag = SIDEARMS.has(id) ? goal(node('magHold'), [-0.006, 0.02, 0.002], L([-1, 0, 0.2], [0, 0.15, 1])) : goal(node('magHold'), [-0.004, 0, -0.004], L([-1, -0.15, -0.5], [0, 1, 0.25]));
   }
   if (rigged.nodes.has('charge')) {
-    const q = L([0, 1, 0.35], [1, 0, 0]);
-    goals.charge = goal(node('charge'), [0.0, 0.026, 0.012], q);
-    goals.chargeBack = goal(anchor('charge', [0, 0, 0.068]), [0.0, 0.026, 0.012], q);
+    // Reaching in from the left, palm down, fingers hooked over the handle's left wing.
+    const q = L([-0.5, 1, 0], [0.15, 0.1, 1]);
+    goals.charge = goal(node('charge'), [-0.028, 0.012, 0], q);
+    goals.chargeBack = goal(anchor('charge', [0, 0, 0.068]), [-0.028, 0.012, 0], q);
   }
   if (rigged.nodes.has('boltKnob')) goals.bolt = goal(node('boltKnob'), [0.012, 0.012, 0], gripQuat([0.4, 1, 0], [0, 0, 1], 1));
   if (rigged.nodes.has('slideRear')) {
@@ -85,17 +86,24 @@ export function buildGunRig(id: WeaponId, kit: Kit): GunRig {
     goals.slideBack = goal(anchor('slideRear', [0, 0, 0.036]), [-0.018, 0.012, 0.004], q);
   }
   if (rigged.nodes.has('port')) {
-    const q = L([-0.25, -1, 0], [0, 0, -1]);
-    goals.port = goal(node('port'), [0.004, -0.03, 0.012], q);
-    goals.portNear = goal(node('port'), [-0.01, -0.075, 0.03], q);
-    goals.shellLow = goal(node('port'), [-0.04, -0.3, 0.08], q);
+    // From below, palm toward the camera side, index along the tube: the shell at the fingertips leads into the port.
+    const q = L([1, 0, 0], [0, 0.15, -1]);
+    goals.port = goal(node('port'), [-0.012, -0.05, 0.055], q);
+    goals.portNear = goal(node('port'), [-0.016, -0.105, 0.085], q);
+    goals.portIn = goal(node('port'), [-0.012, -0.032, 0.02], q);
   }
   if (rigged.nodes.has('spearHold')) {
-    const q = L([-0.2, -1, 0], [0, 0, 1]);
-    goals.spear = goal(node('spearHold'), [-0.004, -0.02, 0], q);
-    goals.spearHead = goal(node('spearHead'), [-0.004, -0.02, 0], q);
+    // Underhand on the shaft, wrist below and to the left, index toward the tip.
+    const q = L([0.7, -0.7, 0], [0, 0, -1]);
+    goals.spear = goal(node('spearHold'), [-0.008, 0.008, 0], q);
+    goals.spearHead = goal(node('spearHead'), [-0.008, 0.008, 0], q);
   }
   if (rigged.nodes.has('cylHold')) Object.assign(goals, revolverGoals(node));
+  // Where each hand-carried part sits when seated, so clips can hand it over to the hand in view space.
+  for (const name of ['magazine', 'spear', 'speedloader']) {
+    const seat = rest.get(name);
+    if (seat) goals[`${name}Seat`] = goal(root, [seat.pos.x, seat.pos.y, seat.pos.z], seat.quat);
+  }
   const sight = node('sight').position.clone();
   return { id, rigged, tuning, rest, goals, sight, flash: FLASH[id], casing: CASING[id] };
 }

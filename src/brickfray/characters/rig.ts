@@ -4,6 +4,7 @@ import { Animator } from './animator';
 import { patchCharacterMaterial, pieceMaterial, type CharacterMaterial } from './material';
 import type { BakedCharacter } from './parts';
 import { BONE, createBones, type V3 } from './skeleton';
+import type { Stance } from './stance';
 import type { Style } from './style';
 import type { AnimState, BotKind, CharacterId, CharacterRig, ShatterPiece } from './types';
 import { SOCKET_R } from './upper';
@@ -86,6 +87,10 @@ export class Rig implements CharacterRig {
     this.weapon = model;
     this.supportGrip = model ? supportGrip : null;
     if (model) this.rightHand.add(model);
+  }
+
+  setStance(stance: Stance | null) {
+    this.animator.stance = stance;
   }
 
   setTint(color: THREE.ColorRepresentation | null) {
