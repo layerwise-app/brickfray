@@ -1,7 +1,8 @@
 import type { BotKind, CharacterId } from '../characters/types';
 import type { GameEvent, MatchSettings, MatchState } from '../sim/types';
+import type { UpgradeId } from '../sim/upgrades';
 
-export const PROTOCOL_VERSION = 1;
+export const PROTOCOL_VERSION = 3;
 
 export interface LobbyPlayer {
   id: number;
@@ -48,7 +49,8 @@ export type ClientMessage =
   | { t: 'probe' }
   | { t: 'ping'; c: number; rtt: number }
   | { t: 'chat'; text: string }
-  | { t: 'character'; character: CharacterId };
+  | { t: 'character'; character: CharacterId }
+  | { t: 'upgrade'; id: UpgradeId };
 
 export type HostMessage =
   | { t: 'welcome'; id: number; lobby: LobbyState }

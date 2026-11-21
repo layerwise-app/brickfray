@@ -28,10 +28,12 @@ export interface MoveState {
   jumpLatch: boolean;
   /** Downward speed at the last landing (for camera dip and sounds), consumed by the caller. */
   landed: number;
+  /** The player's own speed multiplier (solo upgrades), on top of the weapon's. */
+  pace: number;
 }
 
 export function createMoveState(x = 0, y = 0, z = 0): MoveState {
-  return { x, y, z, vx: 0, vy: 0, vz: 0, grounded: false, crouch: 0, slide: 0, sprinting: false, jumpLatch: false, landed: 0 };
+  return { x, y, z, vx: 0, vy: 0, vz: 0, grounded: false, crouch: 0, slide: 0, sprinting: false, jumpLatch: false, landed: 0, pace: 1 };
 }
 
 export function copyMoveState(from: MoveState, to: MoveState): MoveState {
@@ -139,7 +141,7 @@ export function stepMove(world: CollisionWorld, s: MoveState, input: MoveInput, 
 
   let maxSpeed = s.sprinting ? MOVE.sprint : s.crouch > 0.5 ? MOVE.crouch : MOVE.walk;
   if (input.ads && !s.sprinting) maxSpeed *= MOVE.adsScale;
-  maxSpeed *= speedScale;
+  maxSpeed *= speedScale * s.pace;
 
   if (s.grounded) {
     const friction = s.slide > 0 ? MOVE.slideFriction : MOVE.friction;

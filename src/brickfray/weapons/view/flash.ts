@@ -116,6 +116,8 @@ export class MuzzleFlash {
     this.solid = cardMesh(new THREE.MeshBasicMaterial(base), 11);
     this.root.add(this.glow, this.solid);
     this.root.visible = false;
+    // In the scene before the first shot, so a match's warm-up frame compiles and draws it.
+    scene.add(this.root);
     const puffMap = this.texture.clone();
     puffMap.repeat.set(1 / CELLS, 1);
     puffMap.offset.set(Cell.Puff / CELLS, 0);

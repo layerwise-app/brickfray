@@ -19,6 +19,8 @@ const MAX_FAILURES = 3;
 const HEADROOM = 0.7;
 /** A GPU busy for less than this share of the refresh is not why frames miss: fewer pixels wouldn't help. */
 const GPU_IDLE = 0.5;
+/** A GPU busy for more than this share of the refresh counts as missing: the next busy moment will. */
+const GPU_FULL = 0.9;
 
 /** The tier's own ratio first, then each lower step down to the floor (0.7). */
 export function scaleLadder(base: number): number[] {
@@ -88,11 +90,16 @@ export class ResolutionScaler {
     this.clean = 0;
   }
 
+  /** Lower ratios can't keep frames on the refresh: none is left, or the GPU isn't what makes them late. */
+  exhausted(refresh: number, cost: FrameCost) {
+    return this.step === this.ladder.length - 1 || (cost.gpu !== null && cost.gpu < refresh * GPU_IDLE);
+  }
+
   /**
-   * One delivered frame: `interval` ms since the previous one (0 after a break), `refresh` the display's interval
-   * (0 while unknown). Returns true when the ratio changed.
+   * One delivered frame: `interval` ms since the previous one (0 after a break), `refresh` the interval frames are
+   * due at (0 while unknown). `mayRise` false holds the ratio from stepping up. Returns true when the ratio changed.
    */
-  frame(interval: number, refresh: number, cost: FrameCost): boolean {
+  frame(interval: number, refresh: number, cost: FrameCost, mayRise = true): boolean {
     if (interval <= 0 || refresh <= 0) {
       this.reset();
       return false;
@@ -109,13 +116,16 @@ export class ResolutionScaler {
     const windowMs = this.windowMs;
     this.window = [];
     this.windowMs = 0;
-    if (missed > MISS_RATE) {
+    if (missed > MISS_RATE || (cost.gpu !== null && cost.gpu > refresh * GPU_FULL)) {
       this.clean = 0;
       this.badWindows++;
       if ((this.badWindows < 2 && missed <= HEAVY_MISS) || this.step === this.ladder.length - 1) return false;
       if (cost.gpu !== null && cost.gpu < refresh * GPU_IDLE) return false;
       if (this.clock - this.reachedAt[this.step]! < FAIL_WITHIN_MS) this.failures[this.step]!++;
-      return this.go(this.step + 1);
+      // Straight to the step the measured GPU cost predicts fits, so a heavy scene doesn't judder through every step.
+      let next = this.step + 1;
+      while (cost.gpu !== null && next < this.ladder.length - 1 && cost.gpu * (this.ladder[next]! / this.ratio) ** 2 > refresh * HEADROOM) next++;
+      return this.go(next);
     }
     this.badWindows = 0;
     if (missed > CLEAN_RATE) {
@@ -124,7 +134,7 @@ export class ResolutionScaler {
     }
     this.clean += windowMs;
     const up = this.step - 1;
-    if (up < 0 || this.failures[up]! >= MAX_FAILURES) return false;
+    if (!mayRise || up < 0 || this.failures[up]! >= MAX_FAILURES) return false;
     const timed = cost.gpu !== null;
     if (this.clean < UP_DELAY_MS * 4 ** this.failures[up]! * (timed ? 1 : 2)) return false;
     if (timed) {

@@ -8,6 +8,7 @@ import { cycleClip, loadsShells, reloadClip } from '../weapons/view/clips-guns';
 import type { MapId, Surface } from '../world/types';
 import { BulletSounds, DebrisSounds, SURFACES, type Ears, type Vec3 } from './bullet-sounds';
 import { gearOf } from './gear';
+import { Heartbeat } from './heartbeat';
 import { reloadLayers, type ReloadLayer } from './reload-layers';
 import { GROUND, RemoteSounds } from './remote-sounds';
 import { pickSpot } from './scenery';
@@ -49,6 +50,9 @@ const OWN_STEP = { level: 0.85, ducked: 0.65, near: 15, hold: 0.8 };
  */
 const HURT = { volume: 0.8, ducked: 0.3, quiet: 0.25, gap: 0.15 };
 
+/** A headshot kill rings the headshot ping this many seconds in front of the kill sound, which stays the same. */
+const HEADSHOT_LEAD = 0.07;
+
 /** View actions that end a reload before its layers have played. */
 const INTERRUPTS: ReadonlySet<ViewAction['type']> = new Set(['cancelReload', 'switch', 'melee', 'grenadeCook', 'grenadeThrow']);
 /** Reload layers are handed to the engine this long before they are due, with the rest as a delay: sample-exact timing. */
@@ -58,7 +62,6 @@ const LAYER_LEAD = 0.05;
 const FALL = 0.48;
 /** Auto fire drops at most one audible case per this many seconds. */
 const CASE_GAP = 0.11;
-const LOW_HEALTH = 30;
 const OCCLUSION_TTL = 0.22;
 /**
  * Rays from the ear to points around a source, [up, sideways] in metres, with their share of the occlusion: the
@@ -126,7 +129,6 @@ export class MatchAudio implements Ears {
   /** The running reload's layers, `at` on this clock. */
   private layers: ReloadLayer[] = [];
   private lastCase = -1;
-  private beat = 0;
   private wasSliding = false;
   private phase: MatchPhase | null = null;
   private counted = 0;
@@ -134,6 +136,7 @@ export class MatchAudio implements Ears {
   private lastHit = -Infinity;
   private lastHurt = -Infinity;
   private nextSpot = 4 + Math.random() * 6;
+  private readonly heart: Heartbeat;
   private surface: Surface = 'plastic';
   private readonly occluded = new Map<number, { until: number; at: number; value: number }>();
 
@@ -147,6 +150,7 @@ export class MatchAudio implements Ears {
     this.bullets = new BulletSounds(audio, this);
     this.debris = new DebrisSounds(audio, this);
     this.remotes = new RemoteSounds(audio, this);
+    this.heart = new Heartbeat(audio);
   }
 
   /**
@@ -191,6 +195,12 @@ export class MatchAudio implements Ears {
     if (burst && this.clock - this.lastHurt < HURT.gap) return;
     this.lastHurt = this.clock;
     this.audio.play('hurt', { volume: burst ? HURT.ducked : HURT.volume, priority: 8 });
+  }
+
+  /** The local player killed someone: always the same kill sound, a headshot's ping just in front of it. */
+  kill(headshot: boolean): void {
+    if (headshot) this.audio.play('headshotMarker', { priority: 9 });
+    this.audio.play('killConfirm', { priority: 9, delay: headshot ? HEADSHOT_LEAD : 0 });
   }
 
   /** A grenade striking the ground at `speed` m/s: a soft touch is quiet and dull, a hard throw loud and bright. */
@@ -289,7 +299,7 @@ export class MatchAudio implements Ears {
     }
     if (state.sliding && !this.wasSliding && state.alive) this.movement('slide', state.surface, null, 0.7, 4);
     this.wasSliding = state.sliding;
-    this.heartbeat(dt, state);
+    this.heart.frame(dt, state.alive, state.health);
     this.scenery(dt);
   }
 
@@ -310,19 +320,6 @@ export class MatchAudio implements Ears {
     const [volume, rate] = LANDING[this.surface];
     if (this.surface === 'water') this.audio.play('impact:water', { volume, rate, priority: 1 });
     else this.audio.play(p.id, { volume: p.volume * volume, rate: p.rate * rate, priority: 2 });
-  }
-
-  /** Faster and louder as health runs out. */
-  private heartbeat(dt: number, state: MatchAudioState): void {
-    if (!state.alive || state.health >= LOW_HEALTH) {
-      this.beat = 0;
-      return;
-    }
-    const danger = 1 - state.health / LOW_HEALTH;
-    this.beat -= dt;
-    if (this.beat > 0) return;
-    this.beat = 1 - 0.4 * danger;
-    this.audio.play('heartbeat', { volume: 0.55 + 0.4 * danger, priority: 7 });
   }
 
   private scenery(dt: number): void {

@@ -19,6 +19,7 @@ import { Route as SignUpRouteImport } from './routes/sign-up'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as SignInOtpRouteImport } from './routes/sign-in_.otp'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
+import { Route as ApiBoardAvatarIdRouteImport } from './routes/api/board/avatar.$id'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -70,6 +71,11 @@ const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   path: '/api/auth/$',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiBoardAvatarIdRoute = ApiBoardAvatarIdRouteImport.update({
+  id: '/api/board/avatar/$id',
+  path: '/api/board/avatar/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -82,6 +88,7 @@ export interface FileRoutesByFullPath {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/sign-in/otp': typeof SignInOtpRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/board/avatar/$id': typeof ApiBoardAvatarIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -94,6 +101,7 @@ export interface FileRoutesByTo {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/sign-in/otp': typeof SignInOtpRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/board/avatar/$id': typeof ApiBoardAvatarIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -107,6 +115,7 @@ export interface FileRoutesById {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/sign-in_/otp': typeof SignInOtpRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/board/avatar/$id': typeof ApiBoardAvatarIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -121,6 +130,7 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/sign-in/otp'
     | '/api/auth/$'
+    | '/api/board/avatar/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -133,6 +143,7 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/sign-in/otp'
     | '/api/auth/$'
+    | '/api/board/avatar/$id'
   id:
     | '__root__'
     | '/'
@@ -145,6 +156,7 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/sign-in_/otp'
     | '/api/auth/$'
+    | '/api/board/avatar/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -158,6 +170,7 @@ export interface RootRouteChildren {
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   SignInOtpRoute: typeof SignInOtpRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
+  ApiBoardAvatarIdRoute: typeof ApiBoardAvatarIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -232,6 +245,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAuthSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/board/avatar/$id': {
+      id: '/api/board/avatar/$id'
+      path: '/api/board/avatar/$id'
+      fullPath: '/api/board/avatar/$id'
+      preLoaderRoute: typeof ApiBoardAvatarIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -246,6 +266,7 @@ const rootRouteChildren: RootRouteChildren = {
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   SignInOtpRoute: SignInOtpRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
+  ApiBoardAvatarIdRoute: ApiBoardAvatarIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

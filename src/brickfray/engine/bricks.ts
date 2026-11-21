@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { partGeometry, partKey, PITCH, PLATE, type PartSpec } from './geometry';
 import type { Finish, Materials } from './materials';
 import type { QualityProfile } from './quality';
-import { SceneryBatch } from './shadow-caster';
+import { mergeChunks, SceneryChunk } from './scenery-chunks';
 
 interface Placement {
   key: string;
@@ -68,8 +68,27 @@ const tmpP = new THREE.Vector3();
 const UP = new THREE.Vector3(0, 1, 0);
 
 /**
- * Collects every scenery part of a map, then bakes them into one BatchedMesh
- * per finish: a whole city draws in a handful of calls with per-part culling.
+ * Every part as one batched mesh that is never drawn: ray hits read a part's colour from it (match-view's
+ * sceneryAt), while the merged chunks draw the same parts.
+ */
+function partsProxy(list: readonly Placement[], geometries: Map<string, THREE.BufferGeometry>, material: THREE.Material) {
+  let vertices = 0;
+  for (const g of geometries.values()) vertices += g.getAttribute('position').count;
+  const proxy = new THREE.BatchedMesh(list.length, vertices, vertices * 2, material);
+  const ids = new Map<string, number>();
+  for (const [key, g] of geometries) ids.set(key, proxy.addGeometry(g));
+  for (const p of list) {
+    const id = proxy.addInstance(ids.get(p.key)!);
+    proxy.setMatrixAt(id, p.matrix);
+    proxy.setColorAt(id, p.color);
+  }
+  proxy.visible = false;
+  return proxy;
+}
+
+/**
+ * Collects every scenery part of a map, then bakes them per finish into merged chunk meshes (one draw per
+ * CHUNK_CELL square, culled whole) plus an undrawn proxy that answers ray hits.
  */
 export class BrickBuilder {
   private placements: Placement[] = [];
@@ -115,7 +134,8 @@ export class BrickBuilder {
     this.placements.push({ key, geometry, matrix, color: new THREE.Color(options.color), finish: options.finish ?? 'plastic' });
   }
 
-  build(): THREE.Group {
+  /** `origins` stores each part's origin on its vertices, for chunks that fade parts by distance (world/lod.ts). */
+  build(options: { origins?: boolean } = {}): THREE.Group {
     const group = new THREE.Group();
     group.name = 'scenery';
     const byFinish = new Map<Finish, Placement[]>();
@@ -129,22 +149,20 @@ export class BrickBuilder {
       for (const p of list) if (!geometries.has(p.key)) geometries.set(p.key, p.geometry());
       // Every tier: the geometries are cached and shared, and one batch cannot mix marked and unmarked ones after a quality change.
       for (const g of geometries.values()) markBevels(g);
-      let vertices = 0;
-      for (const g of geometries.values()) vertices += g.getAttribute('position').count;
-      const mesh = new SceneryBatch(list.length, vertices, vertices * 2, this.materials.batch[finish]);
-      mesh.name = `scenery:${finish}`;
-      const ids = new Map<string, number>();
-      for (const [key, g] of geometries) ids.set(key, mesh.addGeometry(g));
-      for (const p of list) {
-        const id = mesh.addInstance(ids.get(p.key)!);
-        mesh.setMatrixAt(id, p.matrix);
-        mesh.setColorAt(id, p.color);
+      const material = this.materials.batch[finish];
+      const proxy = partsProxy(list, geometries, material);
+      proxy.name = `scenery:${finish}`;
+      group.add(proxy);
+      const parts = list.map((p) => ({ geometry: geometries.get(p.key)!, matrix: p.matrix, color: p.color }));
+      const chunks = mergeChunks(parts, { edges: !!material.userData.bevelEdges, origins: !!options.origins });
+      for (const geometry of chunks) {
+        const mesh = new SceneryChunk(geometry, material);
+        mesh.name = `scenery:${finish}`;
+        mesh.castShadow = this.profile.shadows && finish !== 'glass' && finish !== 'glow';
+        mesh.receiveShadow = this.profile.shadows && finish !== 'glow';
+        if (finish === 'glass') mesh.renderOrder = 2;
+        group.add(mesh);
       }
-      const shadows = this.profile.shadows && finish !== 'glass' && finish !== 'glow';
-      mesh.castShadow = shadows;
-      mesh.receiveShadow = this.profile.shadows && finish !== 'glow';
-      if (finish === 'glass') mesh.renderOrder = 2;
-      group.add(mesh);
     }
     this.placements = [];
     return group;

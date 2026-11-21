@@ -5,6 +5,7 @@ import { TEAM_COLORS } from '../../game/remotes';
 import { useGame, useHud } from '../App';
 import { useT } from '../i18n';
 import { BotIcon, CrownIcon, DoorIcon } from '../icons';
+import { UpgradeList } from './UpgradeList';
 
 function Swatch({ row }: { row: ScoreRow }) {
   const info = ROSTER[row.character as CharacterId];
@@ -86,7 +87,44 @@ export function Scoreboard() {
         ) : (
           <Table rows={hud.rows} />
         )}
+        {mode === 'solo' && (
+          <div className='mt-4 border-t border-white/10 pt-3'>
+            <div className='mb-2 text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--bf-muted)]'>{t('upgrade.list')}</div>
+            <UpgradeList levels={hud.upgrades} />
+          </div>
+        )}
       </div>
+    </div>
+  );
+}
+
+/** The end of a solo run: how far it went, what it scored, and the upgrades it was built from. */
+function RunSummary() {
+  const hud = useHud();
+  const { t } = useT();
+  const me = hud.rows.find((r) => r.me);
+  return (
+    <div className='bf-panel bf-studs flex w-full flex-col gap-5 p-6'>
+      <div className='grid grid-cols-3 gap-3'>
+        <Stat label={t('run.wave')} value={Math.max(1, hud.wave)} accent />
+        <Stat label={t('score')} value={me?.score ?? 0} />
+        <Stat label={t('run.kills')} value={me?.kills ?? 0} />
+      </div>
+      <div>
+        <div className='mb-2 text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--bf-muted)]'>
+          {t('run.upgrades')} · {hud.upgradesTaken.length}
+        </div>
+        <UpgradeList levels={hud.upgrades} order={hud.upgradesTaken} />
+      </div>
+    </div>
+  );
+}
+
+function Stat({ label, value, accent }: { label: string; value: number; accent?: boolean }) {
+  return (
+    <div className='flex flex-col items-center rounded-[14px] bg-white/[.07] py-3' style={{ boxShadow: PLATE }}>
+      <span className={`bf-display text-5xl leading-none tabular-nums ${accent ? 'text-[var(--bf-yellow)]' : ''}`}>{value}</span>
+      <span className='mt-1.5 text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--bf-muted)]'>{label}</span>
     </div>
   );
 }
@@ -123,9 +161,13 @@ export function Results() {
             {t('reachedWave', { n: Math.max(1, hud.wave) })} · {t(`difficulty.${hud.settings.difficulty}`)}
           </div>
         )}
-        <div className='bf-panel bf-studs w-full p-5'>
-          <Table rows={hud.rows} />
-        </div>
+        {mode === 'solo' ? (
+          <RunSummary />
+        ) : (
+          <div className='bf-panel bf-studs w-full p-5'>
+            <Table rows={hud.rows} />
+          </div>
+        )}
         <div className='flex items-center gap-4'>
           {mode !== 'solo' && <span className='font-semibold text-white/75'>{t('backToLobby', { n: Math.ceil(hud.phaseLeft) })}</span>}
           {mode === 'solo' && (

@@ -1,6 +1,8 @@
 import type { MapId } from '../world/types';
 import { mulberry32 } from './synth';
 
+/** Maps that play another map's bed: the jungle temple's leaves in the wind are the fortress countryside's. */
+const BED_FILE: Partial<Record<MapId, MapId>> = { temple: 'fortress' };
 /** The bed files are levelled to about -22 LUFS; this puts them near -38, about 10 LU under the player's own footstep. */
 const BED_GAIN = 0.16;
 const FADE_IN = 2.5;
@@ -85,9 +87,10 @@ export class Ambience {
 
   private async load(map: MapId): Promise<void> {
     let bed: AudioBuffer;
+    const file = BED_FILE[map] ?? map;
     try {
-      const response = await fetch(`${import.meta.env.BASE_URL}audio/ambience/bed-${map}.mp3`);
-      if (!response.ok) throw new Error(`audio/ambience/bed-${map}.mp3: HTTP ${response.status}`);
+      const response = await fetch(`${import.meta.env.BASE_URL}audio/ambience/bed-${file}.mp3`);
+      if (!response.ok) throw new Error(`audio/ambience/bed-${file}.mp3: HTTP ${response.status}`);
       bed = await this.ctx.decodeAudioData(await response.arrayBuffer());
     } catch (error) {
       console.error(`Ambience ${map} falls back to generated wind`, error);

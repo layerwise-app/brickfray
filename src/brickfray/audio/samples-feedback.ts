@@ -6,7 +6,8 @@ export const FEEDBACK_SAMPLES: SampleMap = {
   headshotMarker: ['ui/headshot-1.mp3', 'ui/headshot-2.mp3', 'ui/headshot-3.mp3', 'ui/headshot-4.mp3'],
   killConfirm: ['ui/kill-1.mp3', 'ui/kill-2.mp3', 'ui/kill-3.mp3'],
   respawn: ['ui/respawn-1.mp3', 'ui/respawn-2.mp3', 'ui/respawn-3.mp3'],
-  heartbeat: ['ui/heartbeat-1.mp3', 'ui/heartbeat-2.mp3', 'ui/heartbeat-3.mp3'],
+  // The lub of six recorded beats, then the dub of each in the same order (heartbeat.ts pairs them).
+  heartbeat: [1, 2, 3, 4, 5, 6].map((n) => `ui/heartbeat-lub-${n}.mp3`).concat([1, 2, 3, 4, 5, 6].map((n) => `ui/heartbeat-dub-${n}.mp3`)),
   uiClick: ['ui/ui-click-1.mp3', 'ui/ui-click-2.mp3', 'ui/ui-click-3.mp3'],
   uiHover: ['ui/ui-hover-1.mp3', 'ui/ui-hover-2.mp3', 'ui/ui-hover-3.mp3'],
   uiBack: ['ui/ui-back-1.mp3', 'ui/ui-back-2.mp3', 'ui/ui-back-3.mp3'],

@@ -126,6 +126,16 @@ describe('MatchAudio', () => {
     expect(ids().length - slow).toBeGreaterThan(slow + 1);
   });
 
+  it('plays the same kill sound for every kill, with the headshot ping just in front of a headshot kill', () => {
+    const { sound, played } = setup();
+    sound.kill(false);
+    sound.kill(true);
+    expect(played.map((p) => p.id)).toEqual(['killConfirm', 'headshotMarker', 'killConfirm']);
+    expect(played[0]!.options?.delay).toBe(0);
+    expect(played[1]!.options?.delay ?? 0).toBe(0);
+    expect(played[2]!.options?.delay).toBeGreaterThan(0.04);
+  });
+
   it('plays a hard grenade bounce louder and brighter than a soft one, over the ground it hits', () => {
     const { sound, played } = setup();
     sound.bounce({ x: 3, y: 0.1, z: 0 }, 1);

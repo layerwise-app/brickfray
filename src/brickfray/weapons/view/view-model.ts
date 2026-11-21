@@ -23,11 +23,12 @@ import { ViewLighting } from './lighting';
 import { Motion } from './motion';
 import { Parts } from './parts';
 import { ViewPose } from './pose';
-import { buildGunRig, type GunRig } from './rig';
+import { GunRack } from './rack';
+import type { GunRig } from './rig';
 import { smooth01 } from './springs';
 
-export function createViewModel(kit: Kit): ViewModel {
-  return new FirstPersonView(kit);
+export function createViewModel(kit: Kit, character: CharacterId = 'rivet'): ViewModel {
+  return new FirstPersonView(kit, character);
 }
 
 /** Seconds a clip takes over from the one it cuts in on, unless it names its own. */
@@ -52,7 +53,7 @@ class FirstPersonView implements ViewModel {
   private readonly lighting: ViewLighting;
   private readonly arms: Arms;
   private readonly fx: ViewFx;
-  private readonly guns = new Map<WeaponId, GunRig>();
+  private readonly rack: GunRack;
   private gun!: GunRig;
   private readonly motion = new Motion();
   get stepPhase() {
@@ -80,7 +81,10 @@ class FirstPersonView implements ViewModel {
   private readonly pose: ViewPose;
   private readonly tmpV = new THREE.Vector3();
 
-  constructor(private readonly kit: Kit) {
+  constructor(
+    private readonly kit: Kit,
+    character: CharacterId
+  ) {
     this.camera.updateMatrixWorld();
     this.lighting = new ViewLighting(this.scene, kit);
     this.arms = new Arms(kit);
@@ -91,13 +95,16 @@ class FirstPersonView implements ViewModel {
     this.extra = { ...extraGoals(this.scene), ...meleeGoals(this.scene), ...grenadeGoals(this.scene), ring: this.held.ringSeat(), ringHook: this.held.ringHook() };
     this.ctx = { id: 'ar', tuning: null!, view: this.scene, goals: {}, flags: { empty: false }, ads: 0 };
     this.pose = new ViewPose(this.arms, this.held, this.carry, this.motion, this.parts, this.action, this.camera);
-    this.setCharacter('rivet');
-    this.equip('ar');
+    this.rack = new GunRack(kit, this.scene);
+    this.setCharacter(character);
+    this.equip(LOADOUTS[character].primary);
   }
 
   setCharacter(id: CharacterId) {
+    const loadout = LOADOUTS[id];
     this.arms.setColors(ROSTER[id]);
-    this.held.setMelee(LOADOUTS[id].melee);
+    this.held.setMelee(loadout.melee);
+    this.rack.stock(loadout, this.gun);
   }
 
   equip(id: WeaponId) {
@@ -115,14 +122,8 @@ class FirstPersonView implements ViewModel {
   }
 
   private setGun(id: WeaponId) {
-    if (this.gun) this.gun.rigged.model.root.removeFromParent();
-    let rig = this.guns.get(id);
-    if (!rig) {
-      rig = buildGunRig(id, this.kit);
-      this.guns.set(id, rig);
-    }
+    const rig = this.rack.swap(this.gun, id);
     this.gun = rig;
-    this.scene.add(rig.rigged.model.root);
     this.motion.setTuning(rig.tuning);
     this.ctx.id = id;
     this.ctx.tuning = rig.tuning;
@@ -340,7 +341,7 @@ class FirstPersonView implements ViewModel {
     this.fx.dispose();
     this.drops.clear();
     this.arms.mesh.geometry.dispose();
-    for (const rig of this.guns.values()) rig.rigged.model.dispose();
+    this.rack.dispose();
     this.scene.clear();
   }
 }

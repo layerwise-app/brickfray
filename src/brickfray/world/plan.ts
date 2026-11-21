@@ -1,12 +1,13 @@
 import * as THREE from 'three';
 import { BrickBuilder, type PlaceOptions } from '../engine/bricks';
+import { SceneryChunk } from '../engine/scenery-chunks';
 import { buildGround, type GroundTile } from '../engine/ground';
 import type { Kit } from '../engine/kit';
 import type { Finish } from '../engine/materials';
 import type { Atmosphere } from '../engine/renderer';
 import { Anim } from './anim';
 import { contactShadows } from './contact-shadows';
-import { detailLod, type LodMode } from './lod';
+import { DetailFades, type LodMode } from './lod';
 import { buildNav } from './nav';
 import { Siding } from './siding';
 import { aimSpawns } from './spawn-aim';
@@ -124,21 +125,22 @@ export class Drawer {
     this.scope = null;
   }
 
-  /** Bake every collected part into batched meshes (major ones cast shadows). */
-  bake() {
+  /** Bake every collected part into merged chunk meshes (major ones cast shadows); `fades` owns the fade materials. */
+  bake(): { group: THREE.Group; fades: DetailFades } {
     const group = this.b.build();
-    const range = this.detail === 2 ? 46 : 34;
+    const fades = new DetailFades(this.detail === 2 ? 46 : 34);
     const add = (built: THREE.Group, mode?: LodMode) => {
       for (const child of [...built.children]) {
         child.castShadow = false;
         group.add(child);
-        if (mode) group.add(...detailLod(child as THREE.BatchedMesh, range, mode));
+        if (mode && child instanceof SceneryChunk) group.add(...fades.apply(child, mode));
       }
     };
     add(this.minor.build());
-    add(this.fine.build(), 'near');
-    add(this.far.build(), 'far');
-    return group;
+    add(this.fine.build({ origins: true }), 'near');
+    add(this.far.build({ origins: true }), 'far');
+    group.add(fades.tracker);
+    return { group, fades };
   }
 
   uid(prefix: string) {
@@ -230,11 +232,7 @@ export function defineMap(spec: MapSpec): MapDefinition {
       root.name = `map:${spec.id}`;
       const ground = buildGround(d.ground, kit.profile);
       root.add(ground);
-      const scenery = d.bake();
-      for (const child of scenery.children) {
-        const mesh = child as THREE.BatchedMesh;
-        if (mesh.name !== 'scenery:glass') mesh.sortObjects = false;
-      }
+      const { group: scenery, fades } = d.bake();
       root.add(scenery);
       const siding = d.siding.build(kit);
       if (siding) root.add(siding);
@@ -251,10 +249,10 @@ export function defineMap(spec: MapSpec): MapDefinition {
           siding?.geometry.dispose();
           (siding?.material as THREE.Material | undefined)?.dispose();
           for (const child of scenery.children) {
-            const mesh = child as THREE.BatchedMesh;
-            mesh.dispose();
-            if ((mesh.material as THREE.Material).userData.lodClone) (mesh.material as THREE.Material).dispose();
+            if (child instanceof THREE.BatchedMesh) child.dispose();
+            else if (child instanceof SceneryChunk) child.geometry.dispose();
           }
+          fades.dispose();
           anim.dispose();
           contact?.geometry.dispose();
           (contact?.material as THREE.Material | undefined)?.dispose();

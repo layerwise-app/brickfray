@@ -50,19 +50,30 @@ export class AutoResolution {
     this.scaler.setBase(base);
   }
 
-  /**
-   * Once per match frame, before drawing: steps the ratio on missed refreshes (a new device pixel ratio restarts the
-   * ladder) and sizes the canvas. False means leave this frame undrawn while the GPU catches up before a shrink.
-   */
-  prepare(base: number, width: number, height: number): boolean {
+  /** A match frame, drawn or left undrawn by pacing: the menu's frames take the stretch off, these keep it. */
+  mark() {
+    this.renderedFrame = this.timer.frame;
+  }
+
+  /** Lower ratios can't keep frames on time any more (or the player turned automatic resolution off). */
+  exhausted(due: number) {
     const t = this.timer;
-    const continuous = t.frame === this.renderedFrame + 1;
-    this.renderedFrame = t.frame;
+    return !this.enabled || this.scaler.exhausted(due, { cpu: t.cpuMs, gpu: t.gpuMs });
+  }
+
+  /**
+   * Once per drawn match frame, before drawing: steps the ratio on frames that miss `due` (the refresh, or every
+   * second one when paced; a new device pixel ratio restarts the ladder) and sizes the canvas. `interval` is 0 when
+   * the frame does not follow the game loop's previous one. False means leave this frame undrawn while the GPU
+   * catches up before a shrink.
+   */
+  prepare(base: number, width: number, height: number, interval: number, due: number, mayRise: boolean): boolean {
+    const t = this.timer;
     if (this.enabled && this.scaler.ladder[0] !== base) {
       t.remeasure();
       this.scaler.setBase(base);
     } else if (this.enabled) {
-      this.scaler.frame(continuous ? t.interval : 0, t.refresh, { cpu: t.cpuMs, gpu: t.gpuMs });
+      this.scaler.frame(interval, due, { cpu: t.cpuMs, gpu: t.gpuMs }, mayRise);
     }
     const want = this.ratio(base);
     const canvas = this.renderer.getPixelRatio();

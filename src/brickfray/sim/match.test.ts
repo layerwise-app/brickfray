@@ -134,8 +134,12 @@ describe('Match', () => {
         match.tick(TICK);
       }
       expect(match.state.phase).toBe('intermission');
-      for (let t = 0; t < 10 && match.state.phase === 'intermission'; t += TICK) match.tick(TICK);
-      for (let t = 0; t < 1; t += TICK) match.tick(TICK);
+      // The next wave waits for the upgrade pick, then comes after a short break.
+      const offer = match.sim.drain().events.find((e) => e.type === 'upgradeOffer');
+      for (let t = 0; t < 10; t += TICK) match.tick(TICK);
+      expect(match.state).toMatchObject({ phase: 'intermission', wave });
+      expect(offer?.type === 'upgradeOffer' && match.pickUpgrade(human.id, offer.options[1]!)).toBe(true);
+      for (let t = 0; t < 6; t += TICK) match.tick(TICK);
       expect(match.state).toMatchObject({ phase: 'playing', wave: wave + 1 });
     }
   });

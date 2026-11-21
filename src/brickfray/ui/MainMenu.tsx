@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { ROSTER, CHARACTER_IDS } from '../characters/roster';
 import type { CharacterId } from '../characters/types';
 import { refreshPortraits } from '../game/portraits';
@@ -10,6 +10,9 @@ import { MELEES, WEAPONS } from '../weapons/defs';
 import { LOADOUTS } from '../weapons/loadouts';
 import { BotIcon, FullscreenIcon, GearIcon, GlobeIcon, PlayIcon, UsersIcon, WeaponIcon } from './icons';
 import { RoomsPanel } from './RoomsPanel';
+import { TrophyIcon } from './board/icons';
+import { queueRename } from '../../lib/board/client/rename';
+import { flushMatches } from '../../lib/board/client/sync';
 import './menu.css';
 import './menu-wide.css';
 import './menu-landscape.css';
@@ -18,6 +21,8 @@ import './menu-stacked.css';
 /** A drag that starts on one of these is theirs; anywhere else on the menu it turns the figure. */
 const CONTROLS = 'button, input, a, select, textarea, label, nav, [data-cover], .bf-panel';
 
+const BoardPanel = lazy(() => import('./board/BoardPanel'));
+
 export function MainMenu({ openSettings }: { openSettings: () => void }) {
   const game = useGame();
   const app = useApp();
@@ -25,6 +30,7 @@ export function MainMenu({ openSettings }: { openSettings: () => void }) {
   const [character, setCharacter] = useState<CharacterId>(game.settings.character);
   const [name, setName] = useState(game.settings.name);
   const [rooms, setRooms] = useState(false);
+  const [board, setBoard] = useState(false);
   const [turning, setTurning] = useState(false);
   const info = ROSTER[character];
   const root = useRef<HTMLDivElement>(null);
@@ -68,6 +74,12 @@ export function MainMenu({ openSettings }: { openSettings: () => void }) {
     };
   }, []);
 
+  // Matches an earlier visit could not upload (offline, rate limit) go up once the menu has settled.
+  useEffect(() => {
+    const timer = setTimeout(() => void flushMatches(game.settings.name), 5000);
+    return () => clearTimeout(timer);
+  }, [game]);
+
   const begin = async (action: () => Promise<void>) => {
     // The audio context must start inside the click; the sound bank keeps rendering in the background.
     void game.unlockAudio();
@@ -85,11 +97,12 @@ export function MainMenu({ openSettings }: { openSettings: () => void }) {
     const clean = value.replace(/\s+/g, ' ').slice(0, 16);
     setName(clean);
     game.applySettings({ ...game.settings, name: clean.trim() });
+    queueRename(clean.trim());
   };
 
   const grab = (e: React.PointerEvent<HTMLDivElement>) => {
     const target = e.target as Element;
-    if (rooms || drag.current || e.button !== 0 || target.closest(CONTROLS)) return;
+    if (rooms || board || drag.current || e.button !== 0 || target.closest(CONTROLS)) return;
     if (sheet.current!.contains(target) && getComputedStyle(root.current!).getPropertyValue('--bf-stage').trim() === 'stacked') return;
     drag.current = { pointer: e.pointerId, x: e.clientX, at: e.timeStamp };
     e.currentTarget.setPointerCapture(e.pointerId);
@@ -112,7 +125,7 @@ export function MainMenu({ openSettings }: { openSettings: () => void }) {
 
   return (
     <div ref={root} className='bf-menu' data-turning={turning} onPointerDown={grab} onPointerMove={turn} onPointerUp={drop} onPointerCancel={drop}>
-      <header className='bf-menu-header'>
+      <header className='bf-menu-header' inert={board}>
         <h1 ref={logo} className='bf-logo bf-menu-logo'>
           BRICKFRAY
         </h1>
@@ -121,13 +134,23 @@ export function MainMenu({ openSettings }: { openSettings: () => void }) {
           <button className='bf-btn bf-btn-ghost bf-icon-btn' onClick={() => void document.documentElement.requestFullscreen?.()} aria-label={t('fullscreen')}>
             <FullscreenIcon size={22} />
           </button>
+          <button
+            className='bf-btn bf-btn-ghost bf-icon-btn'
+            onClick={() => {
+              game.audio.play('uiClick');
+              setBoard(true);
+            }}
+            aria-label={t('board.title')}
+          >
+            <TrophyIcon size={22} />
+          </button>
           <button className='bf-btn bf-btn-ghost bf-icon-btn' onClick={openSettings} aria-label={t('settings')}>
             <GearIcon size={24} />
           </button>
         </div>
       </header>
 
-      <div ref={sheet} className='bf-menu-sheet'>
+      <div ref={sheet} className='bf-menu-sheet' inert={board}>
         <section className='bf-menu-info'>
           <div className='bf-menu-swap' key={character}>
             <div data-cover className='bf-menu-title'>
@@ -172,6 +195,17 @@ export function MainMenu({ openSettings }: { openSettings: () => void }) {
           />
         </nav>
       </div>
+      {board && (
+        <Suspense fallback={null}>
+          <BoardPanel
+            onClose={() => {
+              game.audio.play('uiBack');
+              setBoard(false);
+            }}
+            onName={setName}
+          />
+        </Suspense>
+      )}
       {rooms && (
         <RoomsPanel
           onClose={() => {

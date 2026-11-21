@@ -10,6 +10,7 @@ import { HostSession, type HostKind } from '../net/host-session';
 import { joinPrivate, joinPublic, listPublicLobbies, pickQuickMatch, releaseClientPeer } from '../net/matchmaking';
 import { normalizeCode } from '../net/peer';
 import type { MatchSettings } from '../sim/types';
+import type { UpgradeId } from '../sim/upgrades';
 import { createViewModel } from '../weapons';
 import type { ViewCue, ViewModel } from '../weapons/types';
 import type { MapId } from '../world/types';
@@ -20,6 +21,9 @@ import { MatchView } from './match-view';
 import { MAP_IDS, saveSettings, type Settings } from './settings';
 import { IDLE, Showroom } from './showroom';
 import { renderPortraits } from './portraits';
+import type { MatchReport } from '../../lib/board/contract';
+import { recordMatch } from '../../lib/board/client/sync';
+import { MatchTally } from '../../lib/board/client/tally';
 
 
 function sessionToken() {
@@ -49,6 +53,8 @@ export class Game {
   private host: HostSession | null = null;
   private client: ClientSession | null = null;
   private match: MatchView | null = null;
+  /** The local player's side of the current match, for the leaderboard. */
+  private tally: MatchTally | null = null;
   private raf = 0;
   private last = performance.now();
   private disposed = false;
@@ -64,9 +70,9 @@ export class Game {
     this.audio = createAudioEngine();
     this.cues = new CueSounds(this.audio);
     this.audio.setMix(settings.mix);
-    this.view = createViewModel(this.kit);
-    this.view.setCharacter(settings.character);
+    this.view = createViewModel(this.kit, settings.character);
     this.view.onCue = (cue) => this.cue(cue);
+    this.renderer.prepareView(this.view.scene, this.view.camera);
     this.showroom = new Showroom(this.kit, this.renderer, settings.character);
     // After the first frame so the menu paints first.
     requestAnimationFrame(() =>
@@ -175,9 +181,9 @@ export class Game {
     this.renderer.setQuality(this.settings.quality);
     this.kit = { profile: this.renderer.profile, materials: this.renderer.materials };
     this.view.dispose();
-    this.view = createViewModel(this.kit);
-    this.view.setCharacter(this.settings.character);
+    this.view = createViewModel(this.kit, this.settings.character);
     this.view.onCue = (cue) => this.cue(cue);
+    this.renderer.prepareView(this.view.scene, this.view.camera);
     this.showroom.dispose();
     this.showroom = new Showroom(this.kit, this.renderer, this.settings.character);
     if (this.match && this.client?.settings) {
@@ -270,7 +276,10 @@ export class Game {
         else this.app.set({ lobby });
       },
       start: (settings) => this.enterMatch(settings),
-      events: (events) => this.match?.events.handle(events),
+      events: (events) => {
+        this.tally?.events(events, client.you);
+        this.match?.events.handle(events);
+      },
       snapshot: (s) => this.match?.receive(s),
       roster: () => this.match?.remotes.syncRoster(client.roster),
       lobbyReturn: () => this.exitMatch('lobby'),
@@ -286,6 +295,8 @@ export class Game {
 
   private enterMatch(settings: MatchSettings) {
     this.app.set({ busy: 'loading' });
+    this.report(this.tally?.leave(this.hud.state));
+    this.tally = new MatchTally(settings, this.settings.character);
     this.match?.dispose();
     this.hud.reset();
     this.hud.set({ settings });
@@ -301,6 +312,8 @@ export class Game {
   }
 
   private exitMatch(to: 'menu' | 'lobby') {
+    this.report(this.tally?.leave(this.hud.state));
+    this.tally = null;
     this.match?.dispose();
     this.match = null;
     this.showroom.enter();
@@ -346,6 +359,11 @@ export class Game {
     saveSettings(this.settings);
   }
 
+  /** Solo: the upgrade card chosen after a cleared wave. */
+  pickUpgrade(id: UpgradeId) {
+    this.client?.pickUpgrade(id);
+  }
+
   chat(text: string) {
     this.client?.chat(text);
   }
@@ -377,6 +395,11 @@ export class Game {
     this.app.set({ error });
   }
 
+  /** Keeps a finished match in this browser's history and sends it to the leaderboard. */
+  private report(report: MatchReport | null | undefined) {
+    if (report) recordMatch(report, this.settings.name);
+  }
+
   private loop = () => {
     if (this.disposed) return;
     this.raf = requestAnimationFrame(this.loop);
@@ -389,6 +412,7 @@ export class Game {
       // Zero time: apply snapshots and place the camera, but nothing moves.
       match.frame(0, this.input.read(0, 1), true);
       this.renderer.render(match.scene, match.fp.camera, match.me.alive && !match.scoped ? this.view.scene : null, this.view.camera);
+      this.report(this.tally?.frame(0, this.hud.state, true));
     } else if (match) {
       if (this.hud.state.phase === 'ended' && this.input.locked) this.input.unlock();
       const paused = this.app.state.paused;
@@ -397,6 +421,7 @@ export class Game {
       if (input.scoreboard !== this.hud.state.scoreboard) this.hud.set({ scoreboard: input.scoreboard });
       match.frame(dt, input, paused || !this.input.active);
       this.renderer.render(match.scene, match.fp.camera, match.me.alive && !match.scoped ? this.view.scene : null, this.view.camera);
+      this.report(this.tally?.frame(dt, this.hud.state, false));
     } else {
       this.showroom.update(dt);
       this.showroom.render();

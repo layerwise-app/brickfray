@@ -32,7 +32,7 @@ export class FrameTimer {
   cpuMs = 0;
   /** GPU time per frame, ms; null without GPU timer queries. */
   gpuMs: number | null = null;
-  /** Interval from the previous frame, ms; 0 for the first frame after a break. */
+  /** Interval from the previous drawn frame, ms; 0 for the first frame after a break. */
   interval = 0;
   /** Display refresh interval, ms; 0 until measured. */
   refresh = 0;
@@ -45,6 +45,10 @@ export class FrameTimer {
   private query: WebGLQuery | null = null;
   private started = 0;
   private last = 0;
+  /** Start of this frame and of the last frame that drew. */
+  private now = 0;
+  private lastDrawn = 0;
+  private skipped = false;
   private windowStart = 0;
   private frames = 0;
   private cpu = 0;
@@ -76,29 +80,50 @@ export class FrameTimer {
     this.frame++;
     const t = frameTime();
     this.started = performance.now();
+    this.skipped = false;
     const gap = this.last ? t - this.last : 0;
-    this.last = t;
-    this.interval = gap > 0 && gap < BREAK_MS ? gap : 0;
-    if (this.interval) this.pace(t, this.interval);
-    else this.paceTimes.length = this.paceGaps.length = 0;
+    this.last = this.now = t;
+    if (gap > 0 && gap < BREAK_MS) this.measure(gap);
+    else this.lastDrawn = 0;
+    const drawn = this.lastDrawn ? t - this.lastDrawn : 0;
+    this.interval = drawn > 0 && drawn < BREAK_MS ? drawn : 0;
+    if (!this.interval) this.paceTimes.length = this.paceGaps.length = 0;
     if (!this.windowStart) this.windowStart = this.started;
     if (!this.ext || this.pending.length >= MAX_PENDING) return;
     this.query = this.gl.createQuery();
     this.gl.beginQuery(this.ext.TIME_ELAPSED_EXT, this.query);
   }
 
+  /** Ms since the start of the last frame that drew (0 when there was none). */
+  get sinceDrawn() {
+    return this.lastDrawn ? this.now - this.lastDrawn : 0;
+  }
+
+  /** This frame is left undrawn (paced to every second refresh): it counts toward neither pacing nor cost. */
+  skip() {
+    this.skipped = true;
+    if (!this.query) return;
+    this.gl.endQuery(this.ext!.TIME_ELAPSED_EXT);
+    this.gl.deleteQuery(this.query);
+    this.query = null;
+  }
+
   end() {
     this.onEnd?.();
     const now = performance.now();
-    this.cpu += now - this.started;
-    this.frames++;
+    if (!this.skipped) {
+      if (this.interval) this.pace(this.now, this.interval);
+      this.lastDrawn = this.now;
+      this.cpu += now - this.started;
+      this.frames++;
+    }
     if (this.query) {
       this.gl.endQuery(this.ext!.TIME_ELAPSED_EXT);
       this.pending.push(this.query);
       this.query = null;
     }
     this.collect();
-    if (now - this.windowStart < COST_WINDOW_MS) return;
+    if (now - this.windowStart < COST_WINDOW_MS || !this.frames) return;
     this.cpuMs = this.cpu / this.frames;
     if (this.gpuFrames) this.gpuMs = this.gpu / this.gpuFrames;
     const span = this.paceGaps.reduce((a, b) => a + b, 0);
@@ -108,6 +133,7 @@ export class FrameTimer {
     this.frames = this.cpu = this.gpu = this.gpuFrames = 0;
   }
 
+  /** Drawn frames over the last PACE_WINDOW_MS: what the player sees. */
   private pace(t: number, gap: number) {
     this.paceTimes.push(t);
     this.paceGaps.push(gap);
@@ -117,6 +143,10 @@ export class FrameTimer {
       this.paceTimes.splice(0, drop);
       this.paceGaps.splice(0, drop);
     }
+  }
+
+  /** The display's refresh, from every animation frame (drawn or not). */
+  private measure(gap: number) {
     this.sample.push(gap);
     this.sampleMs += gap;
     if (this.refresh) {

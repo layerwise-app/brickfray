@@ -2,6 +2,7 @@ import type { BotKind, CharacterId } from '../characters/types';
 import type { MeleeId, WeaponId } from '../weapons/defs';
 import type { MapId } from '../world/types';
 import type { MoveState } from './movement';
+import type { UpgradeId, UpgradeLevels } from './upgrades';
 
 export const BUTTON = {
   fire: 1,
@@ -55,6 +56,15 @@ export interface ArmsState {
   meleeCooldown: number;
   meleeTime: number;
   grenades: number;
+  /** A full load of grenades; below it they come back one at a time. */
+  grenadeMax: number;
+  /** Seconds to get one grenade back (per player: upgrades can shorten it). */
+  grenadeRefill: number;
+  /** Seconds until the next grenade arrives; 0 while the load is full. */
+  grenadeTimer: number;
+  /** Solo upgrades: magazine size and reload time multipliers (1 = as the gun's def). */
+  magScale: number;
+  reloadScale: number;
   /** Cooking time while the grenade button is held (-1 = none). */
   cook: number;
   /** Seconds left in the throw motion (blocks firing). */
@@ -97,6 +107,14 @@ export interface PlayerState {
   scale: number;
 }
 
+/** The host's record of a player: the shared state plus what only the host's rules read. */
+export interface HostPlayer extends PlayerState {
+  /** Solo upgrade levels taken so far (all zero elsewhere). */
+  upgrades: UpgradeLevels;
+  /** Soaks damage before health until it is used up. */
+  armor: number;
+}
+
 export const DIFFICULTIES = ['easy', 'normal', 'hard'] as const;
 export type Difficulty = (typeof DIFFICULTIES)[number];
 
@@ -122,6 +140,10 @@ export interface MatchState {
 
 export type HitKind = 'body' | 'head';
 
+/** Deaths the world deals rather than a player: falling below the map's kill height (its water). */
+export type HazardId = 'water';
+export type KillCause = WeaponId | MeleeId | 'grenade' | HazardId;
+
 /** Shot result shared with every client so they can draw tracers and impacts. */
 export interface ShotTrace {
   shooter: number;
@@ -131,7 +153,8 @@ export interface ShotTrace {
 }
 
 export type GameEvent =
-  | { type: 'kill'; killer: number; victim: number; weapon: WeaponId | MeleeId | 'grenade'; headshot: boolean; assister: number | null }
+  /** `respawnAt`: host time the victim comes back, null when it won't (solo, match over). */
+  | { type: 'kill'; killer: number; victim: number; weapon: KillCause; headshot: boolean; assister: number | null; respawnAt: number | null }
   | { type: 'damage'; attacker: number; victim: number; amount: number; kind: HitKind; from: [number, number, number]; fatal: boolean }
   | { type: 'explosion'; position: [number, number, number]; owner: number }
   | { type: 'spawn'; player: number }
@@ -139,5 +162,8 @@ export type GameEvent =
   | { type: 'melee'; player: number; hit: boolean; wall?: { surface: string; at: [number, number, number] } }
   | { type: 'chat'; player: number; text: string }
   | { type: 'wave'; wave: number }
+  /** Solo, after a cleared wave: the cards `player` picks one from, with the levels they hold now. */
+  | { type: 'upgradeOffer'; player: number; wave: number; options: UpgradeId[]; levels: UpgradeLevels }
+  | { type: 'upgrade'; player: number; id: UpgradeId; level: number; auto: boolean }
   | { type: 'join'; player: number; name: string }
   | { type: 'leave'; player: number; name: string };

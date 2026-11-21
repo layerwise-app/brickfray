@@ -125,18 +125,20 @@ export class Anim {
     const tmp = new THREE.Matrix4();
     const q = new THREE.Quaternion();
     const one = new THREE.Vector3(1, 1, 1);
+    const at = new THREE.Vector3();
+    const stretch = new THREE.Vector3(1, 1, 1);
     return [
       (_dt: number, t: number) => {
         this.jets.forEach((j, i) => {
           const h = j.height * (0.92 + Math.sin(t * 2.4 + i) * 0.08);
-          tmp.compose(new THREE.Vector3(...j.pos), q, new THREE.Vector3(1, h, 1));
+          tmp.compose(at.set(...j.pos), q, stretch.setY(h));
           columns.setMatrixAt(i, tmp);
           for (let k = 0; k < drops; k++) {
             const a = (k / drops) * Math.PI * 2;
             const life = (t * 0.55 + k * 0.618) % 1;
             const r = j.spread * life;
             const y = j.pos[1] + h * 0.9 + (4 * life - 4 * life * life) * 0.5 - life * life * h * 0.85;
-            tmp.compose(new THREE.Vector3(j.pos[0] + Math.cos(a) * r, y, j.pos[2] + Math.sin(a) * r), q, one);
+            tmp.compose(at.set(j.pos[0] + Math.cos(a) * r, y, j.pos[2] + Math.sin(a) * r), q, one);
             dropMesh.setMatrixAt(i * drops + k, tmp);
           }
         });

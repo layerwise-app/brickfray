@@ -1,105 +1,9 @@
 import { WEAPON_IDS, type WeaponId } from '../weapons/defs';
 import type { Grenade } from '../sim/grenades';
 import type { MoveState } from '../sim/movement';
-import type { ArmsState, Command, PlayerState, ShotTrace } from '../sim/types';
-
-/** Growable little-endian binary writer. */
-export class Writer {
-  private view: DataView;
-  private bytes: Uint8Array;
-  offset = 0;
-
-  constructor(size = 512) {
-    this.bytes = new Uint8Array(size);
-    this.view = new DataView(this.bytes.buffer);
-  }
-
-  private ensure(n: number) {
-    if (this.offset + n <= this.bytes.length) return;
-    const next = new Uint8Array(Math.max(this.bytes.length * 2, this.offset + n));
-    next.set(this.bytes);
-    this.bytes = next;
-    this.view = new DataView(next.buffer);
-  }
-  u8(v: number) {
-    this.ensure(1);
-    this.view.setUint8(this.offset++, Math.max(0, Math.min(255, Math.round(v))));
-  }
-  i8(v: number) {
-    this.ensure(1);
-    this.view.setInt8(this.offset++, Math.max(-128, Math.min(127, Math.round(v))));
-  }
-  u16(v: number) {
-    this.ensure(2);
-    this.view.setUint16(this.offset, Math.max(0, Math.min(65535, Math.round(v))), true);
-    this.offset += 2;
-  }
-  i16(v: number) {
-    this.ensure(2);
-    this.view.setInt16(this.offset, Math.max(-32768, Math.min(32767, Math.round(v))), true);
-    this.offset += 2;
-  }
-  u32(v: number) {
-    this.ensure(4);
-    this.view.setUint32(this.offset, v >>> 0, true);
-    this.offset += 4;
-  }
-  f32(v: number) {
-    this.ensure(4);
-    this.view.setFloat32(this.offset, v, true);
-    this.offset += 4;
-  }
-  f64(v: number) {
-    this.ensure(8);
-    this.view.setFloat64(this.offset, v, true);
-    this.offset += 8;
-  }
-  finish(): ArrayBuffer {
-    return this.bytes.slice(0, this.offset).buffer;
-  }
-}
-
-export class Reader {
-  private view: DataView;
-  offset = 0;
-  constructor(buffer: ArrayBuffer) {
-    this.view = new DataView(buffer);
-  }
-  get done() {
-    return this.offset >= this.view.byteLength;
-  }
-  u8() {
-    return this.view.getUint8(this.offset++);
-  }
-  i8() {
-    return this.view.getInt8(this.offset++);
-  }
-  u16() {
-    const v = this.view.getUint16(this.offset, true);
-    this.offset += 2;
-    return v;
-  }
-  i16() {
-    const v = this.view.getInt16(this.offset, true);
-    this.offset += 2;
-    return v;
-  }
-  u32() {
-    const v = this.view.getUint32(this.offset, true);
-    this.offset += 4;
-    return v;
-  }
-  f32() {
-    const v = this.view.getFloat32(this.offset, true);
-    this.offset += 4;
-    return v;
-  }
-  f64() {
-    const v = this.view.getFloat64(this.offset, true);
-    this.offset += 8;
-    return v;
-  }
-}
+import type { ArmsState, Command, HostPlayer, PlayerState, ShotTrace } from '../sim/types';
+import { noUpgrades, UPGRADE_IDS, upgradeStats, type UpgradeLevels } from '../sim/upgrades';
+import { Reader, Writer } from './bytes';
 
 export const PACKET = { input: 1, snapshot: 2 } as const;
 
@@ -163,6 +67,9 @@ export interface SelfState {
   health: number;
   alive: boolean;
   life: number;
+  maxHealth: number;
+  armor: number;
+  upgrades: UpgradeLevels;
 }
 
 export interface Snapshot {
@@ -170,13 +77,13 @@ export interface Snapshot {
   ack: number;
   self: SelfState | null;
   players: RemoteSnapshotPlayer[];
-  grenades: { id: number; x: number; y: number; z: number; bounces: number; fuse: number }[];
+  grenades: { id: number; owner: number; x: number; y: number; z: number; bounces: number; fuse: number }[];
   traces: ShotTrace[];
 }
 
 const SURFACES = ['none', 'body', 'plastic', 'metal', 'wood', 'glass', 'foliage', 'water', 'stone'];
 
-function writeSelf(w: Writer, p: PlayerState) {
+function writeSelf(w: Writer, p: HostPlayer) {
   const m = p.move;
   const a = p.arms;
   w.f32(m.x);
@@ -202,6 +109,9 @@ function writeSelf(w: Writer, p: PlayerState) {
   w.f32(a.meleeCooldown);
   w.f32(a.meleeTime);
   w.u8(a.grenades);
+  w.u8(a.grenadeMax);
+  w.f32(a.grenadeRefill);
+  w.f32(a.grenadeTimer);
   w.f32(a.cook);
   w.f32(a.throwTime);
   w.f32(a.ads);
@@ -210,6 +120,9 @@ function writeSelf(w: Writer, p: PlayerState) {
   w.u16(a.shots & 0xffff);
   w.u16(Math.ceil(p.health));
   w.u8(p.life);
+  w.u16(p.maxHealth);
+  w.u16(Math.ceil(p.armor));
+  for (const id of UPGRADE_IDS) w.u8(p.upgrades[id]);
 }
 
 function readSelf(r: Reader): SelfState {
@@ -242,18 +155,33 @@ function readSelf(r: Reader): SelfState {
     meleeCooldown: r.f32(),
     meleeTime: r.f32(),
     grenades: r.u8(),
+    grenadeMax: r.u8(),
+    grenadeRefill: r.f32(),
+    grenadeTimer: r.f32(),
     cook: r.f32(),
     throwTime: r.f32(),
     ads: r.f32(),
     queuedFire: r.f32(),
     prevButtons: r.u16(),
-    shots: r.u16()
+    shots: r.u16(),
+    magScale: 1,
+    reloadScale: 1
   };
   const health = r.u16();
-  return { move, arms, health, alive: (flags & 8) !== 0, life: r.u8() };
+  const life = r.u8();
+  const maxHealth = r.u16();
+  const armor = r.u16();
+  const upgrades = noUpgrades();
+  for (const id of UPGRADE_IDS) upgrades[id] = r.u8();
+  // The modifiers come from the levels, so prediction runs on the very numbers the host does.
+  const stats = upgradeStats(upgrades);
+  arms.magScale = stats.magScale;
+  arms.reloadScale = stats.reloadScale;
+  move.pace = stats.pace;
+  return { move, arms, health, alive: (flags & 8) !== 0, life, maxHealth, armor, upgrades };
 }
 
-export function encodeSnapshot(time: number, ack: number, self: PlayerState | null, players: Iterable<PlayerState>, grenades: readonly Grenade[], traces: readonly ShotTrace[]): ArrayBuffer {
+export function encodeSnapshot(time: number, ack: number, self: HostPlayer | null, players: Iterable<PlayerState>, grenades: readonly Grenade[], traces: readonly ShotTrace[]): ArrayBuffer {
   const w = new Writer(1024);
   w.u8(PACKET.snapshot);
   w.f64(time);
@@ -287,6 +215,7 @@ export function encodeSnapshot(time: number, ack: number, self: PlayerState | nu
   w.u8(grenades.length);
   for (const g of grenades) {
     w.u16(g.id);
+    w.u16(g.owner);
     w.f32(g.x);
     w.f32(g.y);
     w.f32(g.z);
@@ -349,7 +278,7 @@ export function decodeSnapshot(r: Reader): Snapshot {
   }
   const grenades: Snapshot['grenades'] = [];
   const g = r.u8();
-  for (let i = 0; i < g; i++) grenades.push({ id: r.u16(), x: r.f32(), y: r.f32(), z: r.f32(), bounces: r.u8(), fuse: r.u8() / 50 });
+  for (let i = 0; i < g; i++) grenades.push({ id: r.u16(), owner: r.u16(), x: r.f32(), y: r.f32(), z: r.f32(), bounces: r.u8(), fuse: r.u8() / 50 });
   const traces: ShotTrace[] = [];
   const t = r.u8();
   for (let i = 0; i < t; i++) {

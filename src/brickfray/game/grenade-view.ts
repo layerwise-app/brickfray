@@ -21,8 +21,8 @@ export interface LiveGrenade {
   left: number;
   /** Seconds since it was first drawn. */
   age: number;
-  /** Who threw it, when someone stood at the spot it appeared (snapshots don't carry the owner). */
-  thrower: number | null;
+  /** Who threw it. */
+  thrower: number;
   own: boolean;
 }
 
@@ -32,8 +32,6 @@ const WORLD_SCALE = 2.4;
 const GROW = 0.2;
 /** The fuse bulb on top of the cap, in model units. */
 const BULB = new THREE.Vector3(0, 0.058, 0);
-/** A grenade that first shows within this of a player's eye was thrown by that player. */
-const THROWER_REACH = 2.6;
 /** Ball radius in the simulation: the surface is this far from the centre at a bounce. */
 const BALL = 0.09;
 const SPIN = 14;
@@ -66,18 +64,36 @@ export class GrenadeView {
   /** The local player as of the newest snapshot. */
   self: { alive: boolean; x: number; y: number; z: number } | null = null;
   private models = new Map<number, Entry>();
-  private origins = new Map<number, { thrower: number | null; own: boolean }>();
   private readonly fx = new GrenadeFx();
+  /** Hidden in the scene from the start, so the first grenade thrown in a match is not drawn for the first time mid-match. */
+  private spare: WeaponModel | null = null;
+  /** Never shown: a grenade flying, landing and lying still, drawn only by the match's warm-up frame. */
+  private readonly primer = new GrenadeFx();
   private lastTime: number | null = null;
   private world: CollisionWorld | null | undefined;
 
   constructor(
     private readonly kit: Kit,
+    /** The local player's id: their own grenades warn differently. */
+    private readonly you: number,
     private readonly bounce: (at: Vec3, speed: number) => void
   ) {
     this.group.name = 'grenades';
     this.group.userData.view = this;
     this.group.add(this.fx.group);
+    this.spare = this.build();
+    this.spare.root.visible = false;
+    this.group.add(this.spare.root);
+    const at = new THREE.Vector3();
+    for (let i = 0; i < 2; i++) {
+      this.primer.begin(0.05);
+      this.primer.grenade(0, at.set(0, 1 + i, 0), at, 2, true, true);
+      this.primer.grenade(1, at.set(1, 0, 0), at, 1, false, false);
+    }
+    this.primer.land(0, at, new THREE.Vector3(0, 1, 0), 1);
+    this.primer.end();
+    this.primer.group.visible = false;
+    this.group.add(this.primer.group);
   }
 
   update(snapshots: readonly Snapshot[], renderTime: number) {
@@ -101,7 +117,6 @@ export class GrenadeView {
     const eye = me?.alive ? { x: me.move.x, y: me.move.y + eyeHeight(me.move), z: me.move.z } : null;
     // The match keeps its effects (which hold the collision world) in a scene group of this name, beside this one.
     this.world ??= (this.group.parent?.children.find((o) => o.name === 'effects')?.userData.effects as Effects | undefined)?.world;
-    this.learnThrowers(snapshots);
     this.fx.begin(dt);
     this.live.length = 0;
     const seen = new Set<number>();
@@ -113,7 +128,7 @@ export class GrenadeView {
         if (!current) continue;
         const n = b?.grenades.find((x) => x.id === g.id) ?? g;
         seen.add(g.id);
-        const entry = this.models.get(g.id) ?? this.add(g.id);
+        const entry = this.models.get(g.id) ?? this.add(g.id, g.owner);
         const root = entry.model.root;
         root.position.set(g.x + (n.x - g.x) * k, g.y + (n.y - g.y) * k, g.z + (n.z - g.z) * k);
         const moving = Math.hypot(n.x - g.x, n.y - g.y, n.z - g.z) > 0.01;
@@ -149,54 +164,43 @@ export class GrenadeView {
     this.fx.end();
     for (const [id, entry] of this.models) {
       if (seen.has(id)) continue;
-      this.group.remove(entry.model.root);
-      entry.model.dispose();
       this.models.delete(id);
+      if (this.spare) entry.model.dispose();
+      else {
+        entry.model.root.visible = false;
+        this.spare = entry.model;
+      }
     }
-    for (const id of this.origins.keys()) if (!this.models.has(id) && !latest?.grenades.some((g) => g.id === id)) this.origins.delete(id);
   }
 
-  private add(id: number): Entry {
+  private build(): WeaponModel {
     const rigged = createRiggedModel('grenade', this.kit, 'third');
     // The pin came out during the cook.
     const pin = rigged.parts.get('pin');
     if (pin) pin.visible = false;
-    const model = rigged.model;
-    model.root.matrixAutoUpdate = false;
+    rigged.model.root.matrixAutoUpdate = false;
+    return rigged.model;
+  }
+
+  private add(id: number, owner: number): Entry {
+    const model = this.spare ?? this.build();
+    this.spare = null;
+    model.root.visible = true;
     this.group.add(model.root);
-    const origin = this.origins.get(id);
     const rest = new THREE.Quaternion().setFromEuler(euler.set((Math.random() - 0.5) * 0.6, Math.random() * Math.PI * 2, (Math.random() - 0.5) * 0.6));
-    const live: LiveGrenade = { id, drawn: new THREE.Vector3(), now: new THREE.Vector3(), left: 0, age: 0, thrower: origin?.thrower ?? null, own: origin?.own ?? false };
+    const live: LiveGrenade = { id, drawn: new THREE.Vector3(), now: new THREE.Vector3(), left: 0, age: 0, thrower: owner, own: owner === this.you };
     const entry: Entry = { model, bounces: 0, spin: Math.random() * 6, settle: 0, rest, landed: false, sight: { at: -Infinity, clear: false }, live };
     this.models.set(id, entry);
     return entry;
   }
 
-  /** The player standing where a grenade first shows threw it; it is ours when that player stands where we do. */
-  private learnThrowers(snapshots: readonly Snapshot[]) {
-    for (const s of snapshots) {
-      for (const g of s.grenades) {
-        if (this.origins.has(g.id)) continue;
-        let best: Snapshot['players'][number] | null = null;
-        let bestD = THROWER_REACH;
-        for (const p of s.players) {
-          const d = Math.hypot(p.x - g.x, p.y + 1.5 - g.y, p.z - g.z);
-          if (p.alive && d < bestD) {
-            best = p;
-            bestD = d;
-          }
-        }
-        const me = s.self?.move;
-        const own = !!best && !!me && Math.abs(best.x - me.x) + Math.abs(best.y - me.y) + Math.abs(best.z - me.z) < 0.01;
-        this.origins.set(g.id, { thrower: best?.id ?? null, own });
-      }
-    }
-  }
-
   dispose() {
     for (const entry of this.models.values()) entry.model.dispose();
     this.models.clear();
+    this.spare?.dispose();
+    this.spare = null;
     this.fx.dispose();
+    this.primer.dispose();
     this.group.clear();
     this.live.length = 0;
   }

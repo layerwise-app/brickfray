@@ -6,7 +6,7 @@ import { useApp, useGame } from './App';
 import { useT } from './i18n';
 import { CopyIcon, CrownIcon, DoorIcon, PlayIcon } from './icons';
 
-const MAPS = ['plaza', 'fortress', 'docks'] as const;
+const MAPS = ['plaza', 'fortress', 'docks', 'temple'] as const;
 const MINUTES = [5, 10, 15];
 
 export function Lobby() {
@@ -61,7 +61,7 @@ export function Lobby() {
               </Field>
             )}
             <Field label={t('map')}>
-              <div className='grid grid-cols-3 gap-3'>
+              <div className='grid grid-cols-2 gap-3 sm:grid-cols-4'>
                 {MAPS.map((map) => (
                   <button
                     key={map}

@@ -114,7 +114,7 @@ export class GrenadeAlerts {
       const fx = forward.x / fl;
       const fz = forward.z / fl;
       for (const g of grenades) {
-        if (g.own ? g.age < OWN_QUIET : g.thrower !== null && myTeam !== -1 && teamOf(g.thrower) === myTeam) continue;
+        if (g.own ? g.age < OWN_QUIET : myTeam !== -1 && teamOf(g.thrower) === myTeam) continue;
         const d = Math.hypot(g.now.x - self.x, g.now.y - (self.y + BODY), g.now.z - self.z);
         if (d > REACH) continue;
         const alert = this.alert(g.id, g.own ? 'own' : 'enemy');

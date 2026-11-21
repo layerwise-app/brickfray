@@ -1,21 +1,22 @@
 import { GRENADE, WEAPONS, type WeaponId } from '../weapons/defs';
 import { LOADOUTS } from '../weapons/loadouts';
-import type { Waypoint } from '../world/types';
-import { MOVE, PLAYER, TICK } from './constants';
+import { BotNav, nearestWaypoint, type NavState } from './bot-nav';
+import { BotRoam, HEADWAY, type RoamState, type Spot } from './bot-roam';
+import { PLAYER, TICK } from './constants';
 import type { HostSim } from './host';
 import { BUTTON, type Command, type PlayerState } from './types';
 
-interface Brain {
+export { findPath } from './bot-nav';
+
+interface Brain extends NavState, RoamState {
   seq: number;
   target: number;
   seenFor: number;
   lostFor: number;
-  lastSeen: [number, number, number] | null;
-  path: number[];
-  goal: number;
-  repath: number;
+  /** Where the bot last made headway out of a fight, and the host time it did. */
+  anchor: Spot;
+  anchorAt: number;
   think: number;
-  strafe: number;
   strafeTime: number;
   aimYaw: number;
   aimPitch: number;
@@ -24,20 +25,19 @@ interface Brain {
   stuck: number;
   lastPos: [number, number];
   crouchTime: number;
+  /** Seconds left of stepping aside round whatever the bot walked into (a post, a crate corner). */
+  sidestep: number;
   grenadeCooldown: number;
   /** Seconds left to stay clear of a grenade the bot just threw. */
   clearing: number;
   fireHeld: boolean;
   slot: number;
-  /** Waypoint links this bot got stuck on ("a>b" → host time until which it routes around them). */
-  avoid: Map<string, number>;
-  /** Seconds spent heading for each waypoint without arriving; a node that never comes is blocked. */
-  heading: Map<number, number>;
-  /** Waypoints given up on → host time until which the bot routes around them. */
-  blocked: Map<number, number>;
-  /** Host time until which the bot follows the graph instead of walking straight at its goal. */
-  graphOnly: number;
+  /** A fixed skill instead of the director's (a scripted stand-in for a player in tests). */
+  skill: number | null;
 }
+
+/** Out of a fight, a bot that has not got `HEADWAY` from where it stood for this many seconds goes on patrol. */
+const IDLE = 2;
 
 const PROFILE = {
   grunt: { reaction: 0.42, turn: 4.2, error: 0.08, range: 34, keep: 14 },
@@ -64,20 +64,32 @@ export class BotDirector {
   private brains = new Map<number, Brain>();
   /** 0 = easy … 1 = sharp; solo raises it each wave. */
   skill = 0.4;
+  private readonly nav: BotNav;
+  private readonly roam: BotRoam;
+  /** Bot choices are drawn from the match's seed, so a seeded match plays out the same every time. */
+  private seed: number;
 
-  constructor(private readonly host: HostSim) {}
+  constructor(private readonly host: HostSim) {
+    this.nav = new BotNav(host);
+    this.roam = new BotRoam(host, () => this.random());
+    this.seed = Math.floor(host.random() * 4294967296);
+  }
 
-  add(player: PlayerState) {
+  add(player: PlayerState, skill: number | null = null) {
     this.brains.set(player.id, {
+      skill,
       seq: 0,
       target: 0,
       seenFor: 0,
       lostFor: 99,
       lastSeen: null,
+      patrol: null,
+      patrolUntil: 0,
+      anchor: [player.move.x, player.move.y, player.move.z],
+      anchorAt: this.host.time,
       path: [],
-      goal: -1,
       repath: 0,
-      think: Math.random() * 0.2,
+      think: this.random() * 0.2,
       strafe: 1,
       strafeTime: 0,
       aimYaw: player.yaw,
@@ -87,6 +99,7 @@ export class BotDirector {
       stuck: 0,
       lastPos: [player.move.x, player.move.z],
       crouchTime: 0,
+      sidestep: 0,
       grenadeCooldown: 6,
       clearing: 0,
       avoid: new Map(),
@@ -121,19 +134,35 @@ export class BotDirector {
     const prof = fill ? { ...base, ...ENGAGE[LOADOUTS[bot.character].primary] } : base;
     b.seq++;
     const cmd: Command = { seq: b.seq, forward: 0, right: 0, yaw: b.aimYaw, pitch: b.aimPitch, buttons: 0, slot: b.slot, viewTime: host.time, life: bot.life };
+    const m = bot.move;
     if (!bot.alive) {
+      // It comes back somewhere else with nothing in sight: what it was after died with it.
       b.path = [];
       b.target = 0;
+      b.seenFor = 0;
+      b.lostFor = 99;
+      b.lastSeen = null;
+      b.patrol = null;
+      b.anchor = [m.x, m.y, m.z];
+      b.anchorAt = host.time;
       return cmd;
     }
     const eye = host.eye(bot);
     b.think -= TICK;
     if (b.think <= 0) {
-      b.think = 0.15 + Math.random() * 0.1;
+      b.think = 0.15 + this.random() * 0.1;
       this.perceive(bot, b, eye, prof.range);
     }
     const target = b.target ? host.players.get(b.target) : undefined;
     const visible = !!target && target.alive && b.lostFor === 0;
+    if (visible || Math.hypot(m.x - b.anchor[0], m.y - b.anchor[1], m.z - b.anchor[2]) > HEADWAY) {
+      b.anchor = [m.x, m.y, m.z];
+      b.anchorAt = host.time;
+    } else if (host.time - b.anchorAt > IDLE) {
+      // Whatever it was walking to can't be reached or held nobody: go somewhere else.
+      this.roam.patrol(bot, b);
+      b.anchorAt = host.time;
+    }
 
     let goal: [number, number, number] | null = null;
     if (visible && target) {
@@ -145,13 +174,14 @@ export class BotDirector {
       const dist = Math.hypot(dx, dz);
       const wantYaw = Math.atan2(-dx, -dz) + b.errYaw;
       const wantPitch = Math.atan2(dy, dist) + b.errPitch;
-      const turn = prof.turn * (0.6 + this.skill * 0.8) * TICK;
+      const skill = b.skill ?? this.skill;
+      const turn = prof.turn * (0.6 + skill * 0.8) * TICK;
       b.aimYaw += clamp(wrap(wantYaw - b.aimYaw), -turn, turn);
       b.aimPitch += clamp(wantPitch - b.aimPitch, -turn, turn);
-      b.errYaw *= 0.985 - this.skill * 0.02;
-      b.errPitch *= 0.985 - this.skill * 0.02;
+      b.errYaw *= 0.985 - skill * 0.02;
+      b.errPitch *= 0.985 - skill * 0.02;
       const offAim = Math.abs(wrap(wantYaw - b.errYaw - b.aimYaw)) + Math.abs(wantPitch - b.errPitch - b.aimPitch);
-      const ready = b.seenFor > prof.reaction * (1.3 - this.skill * 0.6);
+      const ready = b.seenFor > prof.reaction * (1.3 - skill * 0.6);
       const def = WEAPONS[bot.arms.weapon];
       if (ready && offAim < 0.12 + 1.5 / Math.max(4, dist) * 0.1 && bot.arms.ammo[bot.arms.weapon] > 0) {
         if (def.mode === 'auto') cmd.buttons |= BUTTON.fire;
@@ -163,14 +193,14 @@ export class BotDirector {
       // Keep a preferred distance and strafe.
       b.strafeTime -= TICK;
       if (b.strafeTime <= 0) {
-        b.strafe = Math.random() < 0.5 ? -1 : 1;
-        b.strafeTime = 0.5 + Math.random() * 1.1;
-        if (bot.bot !== 'rusher' && Math.random() < 0.15) b.crouchTime = 0.8;
+        b.strafe = this.random() < 0.5 ? -1 : 1;
+        b.strafeTime = 0.5 + this.random() * 1.1;
+        if (bot.bot !== 'rusher' && this.random() < 0.15) b.crouchTime = 0.8;
       }
       cmd.right = b.strafe * (bot.bot === 'sniper' ? 0.3 : 0.85);
       cmd.forward = dist > prof.keep + 3 ? 1 : dist < prof.keep - 3 ? -0.7 : 0;
       b.grenadeCooldown -= TICK;
-      if ((bot.bot === 'boss' || bot.bot === 'grunt') && b.grenadeCooldown <= 0 && dist > GRENADE.radius + 4 && dist < 22 && bot.arms.grenades > 0 && Math.random() < 0.01) {
+      if ((bot.bot === 'boss' || bot.bot === 'grunt') && b.grenadeCooldown <= 0 && dist > GRENADE.radius + 4 && dist < 22 && bot.arms.grenades > 0 && this.random() < 0.01) {
         b.grenadeCooldown = 9;
         b.clearing = GRENADE.fuse + 0.6;
         cmd.buttons |= BUTTON.grenade;
@@ -182,7 +212,7 @@ export class BotDirector {
       b.seenFor = 0;
       b.fireHeld = false;
       if (bot.arms.ammo[bot.arms.weapon] < WEAPONS[bot.arms.weapon].mag * 0.5) cmd.buttons |= BUTTON.reload;
-      goal = b.lastSeen ?? this.nearestEnemy(bot);
+      goal = this.roam.goal(bot, b, () => this.nearestEnemy(bot));
     }
     b.clearing = Math.max(0, b.clearing - TICK);
     if (bot.arms.ammo[bot.arms.weapon] === 0) cmd.buttons |= BUTTON.reload;
@@ -192,7 +222,7 @@ export class BotDirector {
     }
 
     // Walk the waypoint graph toward the goal.
-    const steer = this.navigate(bot, b, goal);
+    const steer = this.nav.navigate(bot, b, goal);
     if (steer && !(visible && cmd.forward <= 0)) {
       const moveYaw = Math.atan2(-steer[0], -steer[1]);
       const rel = wrap(moveYaw - b.aimYaw);
@@ -204,99 +234,47 @@ export class BotDirector {
       } else {
         b.aimYaw += clamp(wrap(moveYaw - b.aimYaw), -5 * TICK, 5 * TICK);
         b.aimPitch *= 0.9;
-        cmd.forward = 1;
-        cmd.right = 0;
+        cmd.forward = b.sidestep > 0 ? -0.4 : 1;
+        cmd.right = b.sidestep > 0 ? b.strafe : 0;
         if (bot.bot === 'rusher') cmd.buttons |= BUTTON.sprint;
       }
     }
-    // Unstick: jump when not making progress.
+    b.sidestep = Math.max(0, b.sidestep - TICK);
+    // Unstick: duck under a low beam, else jump, when not making progress.
     const moved = Math.hypot(bot.move.x - b.lastPos[0], bot.move.z - b.lastPos[1]);
     b.lastPos = [bot.move.x, bot.move.z];
     b.stuck = Math.abs(cmd.forward) + Math.abs(cmd.right) > 0.3 && moved < 0.01 ? b.stuck + TICK : 0;
     if (b.stuck > 0.25) {
-      cmd.buttons |= BUTTON.jump;
+      if (this.nav.ducks(bot, b.aimYaw, cmd.forward, cmd.right)) {
+        b.crouchTime = 1.5;
+        cmd.buttons |= BUTTON.crouch;
+      } else cmd.buttons |= BUTTON.jump;
       if (b.stuck > 1.2) {
         const wps = host.layout.waypoints;
         if (b.path.length && wps.length) {
           const here = nearestWaypoint(wps, bot.move.x, bot.move.y, bot.move.z);
           const next = b.path[0] === here && b.path.length > 1 ? b.path[1]! : b.path[0]!;
           b.avoid.set(`${here}>${next}`, host.time + 12);
+          // Nearest but not stood on: it may be the far side of the very thing the bot is pressed against.
+          const w = wps[here]!.position;
+          if (Math.hypot(w[0] - bot.move.x, w[2] - bot.move.z) > 0.9) b.blocked.set(here, host.time + 12);
         }
         b.graphOnly = host.time + 3;
         b.path = [];
         b.strafe *= -1;
+        b.sidestep = 0.6;
         b.stuck = 0;
       }
     }
     cmd.yaw = b.aimYaw;
     cmd.pitch = clamp(b.aimPitch, -1.2, 1.2);
-    this.keepOnGround(bot, b, cmd);
+    this.nav.keepOnGround(bot, b, cmd);
     return cmd;
   }
 
-  /**
-   * Strafing, corner-cutting and hugging an edge would walk bots off bridges and piers into the kill zone:
-   * stop short of a drop ahead, and veer away from one beside the path.
-   */
-  private keepOnGround(bot: PlayerState, b: Brain, cmd: Command) {
-    if (!cmd.forward && !cmd.right) return;
-    const s = Math.sin(cmd.yaw);
-    const c = Math.cos(cmd.yaw);
-    let dx = -s * cmd.forward + c * cmd.right;
-    let dz = -c * cmd.forward - s * cmd.right;
-    const speed = Math.hypot(dx, dz);
-    dx /= speed;
-    dz /= speed;
-    const m = bot.move;
-    // The unstick jump clears a parapet: look past it before leaping.
-    const leap = (cmd.buttons & BUTTON.jump) !== 0 && [1.4, 2.3, 3.2].some((d) => this.deadly(m.x + dx * d, m.y, m.z + dz * d, 1.8));
-    if (leap) {
-      cmd.buttons &= ~BUTTON.jump;
-      b.graphOnly = this.host.time + 3;
-    }
-    const pace = (cmd.buttons & BUTTON.sprint ? MOVE.sprint : MOVE.walk) * (bot.bot === 'rusher' ? 1.15 : 1);
-    // Sliding along a wall, the body goes where the wall lets it, not where the command points.
-    const drift = Math.hypot(m.vx, m.vz);
-    const sliding = m.grounded && drift > 1 && this.overshoots(m.x, m.y, m.z, m.vx / drift, m.vz / drift, Math.max(pace, drift));
-    if (leap || sliding || this.overshoots(m.x, m.y, m.z, dx, dz, pace)) {
-      cmd.forward = 0;
-      cmd.right = 0;
-      b.strafe *= -1;
-      b.path = [];
-      return;
-    }
-    // Right of the heading is (-dz, dx).
-    const side = (sign: number) => this.deadly(m.x + dx * 0.6 - dz * 0.55 * sign, m.y, m.z + dz * 0.6 + dx * 0.55 * sign) || this.deadly(m.x - dz * 0.45 * sign, m.y, m.z + dx * 0.45 * sign);
-    const left = side(-1);
-    const right = side(1);
-    if (left === right) return;
-    const away = left ? 1 : -1;
-    const vx = dx - dz * 0.9 * away;
-    const vz = dz + dx * 0.9 * away;
-    const k = speed / Math.hypot(vx, vz);
-    cmd.forward = (-s * vx - c * vz) * k;
-    cmd.right = (c * vx - s * vz) * k;
-  }
-
-  /** A drop ahead that kills, or one whose fall carries the body past the ledge below it into one. */
-  private overshoots(x: number, y: number, z: number, dx: number, dz: number, pace: number) {
-    const floor = this.floor(x + dx * 0.8, y, z + dz * 0.8);
-    if (floor < this.host.layout.killY + 0.4) return true;
-    const fall = y - floor;
-    if (fall < 1.2) return false;
-    const reach = 1.2 + pace * Math.sqrt((2 * fall) / MOVE.gravity);
-    for (let d = 1.4; d < reach + 0.6; d += 0.6) if (this.deadly(x + dx * d, y, z + dz * d)) return true;
-    return false;
-  }
-
-  private deadly(x: number, y: number, z: number, lift = 0.6) {
-    return this.floor(x, y, z, lift) < this.host.layout.killY + 0.4;
-  }
-
-  private floor(x: number, y: number, z: number, lift = 0.6) {
-    const top = y + lift;
-    const hit = this.host.world.raycast(x, top, z, 0, -1, 0, 5.4 + lift, false);
-    return hit ? top - hit.t : -Infinity;
+  private random() {
+    this.seed = (Math.imul(this.seed, 1664525) + 1013904223) >>> 0;
+    return this.seed / 4294967296;
   }
 
   private aimPoint(target: PlayerState): [number, number, number] {
@@ -327,12 +305,13 @@ export class BotDirector {
       if (best.id !== b.target) {
         b.target = best.id;
         b.seenFor = 0;
-        const miss = (1 - this.skill) * 0.25 + 0.03;
-        b.errYaw = (Math.random() - 0.5) * miss * 2;
-        b.errPitch = (Math.random() - 0.5) * miss;
+        const miss = (1 - (b.skill ?? this.skill)) * 0.25 + 0.03;
+        b.errYaw = (this.random() - 0.5) * miss * 2;
+        b.errPitch = (this.random() - 0.5) * miss;
       }
       b.lostFor = 0;
       b.lastSeen = [best.move.x, best.move.y, best.move.z];
+      this.roam.saw(b.lastSeen);
     } else if (b.target) {
       b.lostFor += 0.2;
       if (b.lostFor > 4) {
@@ -342,8 +321,8 @@ export class BotDirector {
     }
   }
 
-  private nearestEnemy(bot: PlayerState): [number, number, number] | null {
-    let best: [number, number, number] | null = null;
+  private nearestEnemy(bot: PlayerState): Spot | null {
+    let best: Spot | null = null;
     let bestD = Infinity;
     for (const p of this.host.players.values()) {
       if (!p.alive || !this.host.hostile(bot, p)) continue;
@@ -355,101 +334,6 @@ export class BotDirector {
     }
     return best;
   }
-
-  /** Direction (x, z) to walk, following waypoints when the goal isn't straight ahead. */
-  private navigate(bot: PlayerState, b: Brain, goal: readonly [number, number, number] | null): [number, number] | null {
-    if (!goal) return null;
-    const [gx, gy, gz] = goal;
-    const wps = this.host.layout.waypoints;
-    const m = bot.move;
-    const direct = Math.hypot(gx - m.x, gz - m.z);
-    // A goal on another floor (a balcony overhead) needs the graph even when it's close in plan.
-    const sameLevel = Math.abs(gy - m.y) < 1.2;
-    if (direct < 1 && sameLevel) return null;
-    if (wps.length === 0 || (sameLevel && direct < 10 && this.host.time > b.graphOnly && this.host.world.clearLine(m.x, m.y + 0.6, m.z, gx, m.y + 0.6, gz))) {
-      return direct < 1e-3 ? null : [(gx - m.x) / direct, (gz - m.z) / direct];
-    }
-    b.repath -= TICK;
-    if (b.path.length === 0 || b.repath <= 0) {
-      b.repath = 1.5;
-      const now = this.host.time;
-      b.path = findPath(wps, nearestWaypoint(wps, m.x, m.y, m.z), nearestWaypoint(wps, gx, gy, gz), (from, to) => (b.avoid.get(`${from}>${to}`) ?? 0) > now || (b.blocked.get(to) ?? 0) > now);
-    }
-    while (b.path.length) {
-      const w = wps[b.path[0]!]!.position;
-      const d = Math.hypot(w[0] - m.x, w[2] - m.z);
-      if (d < 0.9 && Math.abs(w[1] - m.y) < 1.2) {
-        b.heading.delete(b.path.shift()!);
-        continue;
-      }
-      if (d < 1e-3) break;
-      // Neighbouring waypoints are a second or two apart; bouncing off the way to one for this long means it can't be reached from here.
-      const spent = (b.heading.get(b.path[0]!) ?? 0) + TICK;
-      if (spent > 3.5) {
-        b.blocked.set(b.path[0]!, this.host.time + 20);
-        b.heading.delete(b.path[0]!);
-        b.path = [];
-        b.repath = 0;
-        break;
-      }
-      b.heading.set(b.path[0]!, spent);
-      return [(w[0] - m.x) / d, (w[2] - m.z) / d];
-    }
-    return direct < 1e-3 ? null : [(gx - m.x) / direct, (gz - m.z) / direct];
-  }
-}
-
-function nearestWaypoint(wps: readonly Waypoint[], x: number, y: number, z: number) {
-  let best = 0;
-  let bestD = Infinity;
-  wps.forEach((w, i) => {
-    const d = Math.hypot(w.position[0] - x, (w.position[1] - y) * 2, w.position[2] - z);
-    if (d < bestD) {
-      bestD = d;
-      best = i;
-    }
-  });
-  return best;
-}
-
-/** A* over the waypoint graph; returns node indices excluding the start. */
-export function findPath(wps: readonly Waypoint[], start: number, goal: number, avoid: (from: number, to: number) => boolean = () => false): number[] {
-  if (start === goal) return [goal];
-  const dist = (a: number, b: number) => {
-    const p = wps[a]!.position;
-    const q = wps[b]!.position;
-    return Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]);
-  };
-  const g = new Map<number, number>([[start, 0]]);
-  const from = new Map<number, number>();
-  const open = new Set([start]);
-  while (open.size) {
-    let current = -1;
-    let bestF = Infinity;
-    for (const n of open) {
-      const f = g.get(n)! + dist(n, goal);
-      if (f < bestF) {
-        bestF = f;
-        current = n;
-      }
-    }
-    if (current === goal) {
-      const path = [goal];
-      while (from.has(path[0]!) && from.get(path[0]!) !== start) path.unshift(from.get(path[0]!)!);
-      return path;
-    }
-    open.delete(current);
-    for (const next of wps[current]!.links) {
-      if (avoid(current, next)) continue;
-      const cost = g.get(current)! + dist(current, next);
-      if (cost < (g.get(next) ?? Infinity)) {
-        g.set(next, cost);
-        from.set(next, current);
-        open.add(next);
-      }
-    }
-  }
-  return [];
 }
 
 const wrap = (a: number) => Math.atan2(Math.sin(a), Math.cos(a));

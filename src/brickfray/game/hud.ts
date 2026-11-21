@@ -1,6 +1,8 @@
 import type { BotKind, CharacterId } from '../characters/types';
-import type { MatchPhase, MatchSettings } from '../sim/types';
-import type { MeleeId, WeaponId } from '../weapons/defs';
+import { GRENADE_REFILL } from '../sim/constants';
+import type { KillCause, MatchPhase, MatchSettings } from '../sim/types';
+import { noUpgrades, type UpgradeId, type UpgradeLevels } from '../sim/upgrades';
+import { GRENADE, type WeaponId } from '../weapons/defs';
 
 export interface FeedEntry {
   key: number;
@@ -8,7 +10,7 @@ export interface FeedEntry {
   killerTeam: number;
   victim: string;
   victimTeam: number;
-  weapon: WeaponId | MeleeId | 'grenade';
+  weapon: KillCause;
   headshot: boolean;
   mine: boolean;
   victimIsMe: boolean;
@@ -29,6 +31,15 @@ export interface ScoreRow {
   bot: boolean;
 }
 
+/** Solo: the upgrade cards dealt after a cleared wave; `picked` holds the choice while the cards leave. */
+export interface UpgradeOffer {
+  key: number;
+  wave: number;
+  options: UpgradeId[];
+  levels: UpgradeLevels;
+  picked: UpgradeId | null;
+}
+
 export interface HudState {
   settings: MatchSettings | null;
   phase: MatchPhase | 'loading';
@@ -39,15 +50,24 @@ export interface HudState {
   alive: boolean;
   weapon: WeaponId;
   ammo: number;
+  /** A full magazine of the weapon in hand (upgrades enlarge it). */
+  mag: number;
   reload: number;
   grenades: number;
+  grenadeMax: number;
+  /** Seconds until the next grenade comes back (0 = full), out of `grenadeRefill`. */
+  grenadeTimer: number;
+  grenadeRefill: number;
   scoped: boolean;
   /** Aiming down sights: the gun's own sight replaces the crosshair. */
   aiming: boolean;
   feed: FeedEntry[];
   /** Big center callout (e.g. "Wave 3") — an i18n key plus values. */
   banner: { key: number; text: string; sub?: string } | null;
-  death: { killer: string; weapon: FeedEntry['weapon']; respawnAt: number } | null;
+  /** `respawnAt` is host time (null: no respawn); `killer` is empty for a death of one's own doing or the world's. */
+  death: { killer: string; weapon: FeedEntry['weapon']; respawnAt: number | null } | null;
+  /** Seconds until the local player comes back; -1 while alive or when there is no respawn. */
+  respawnLeft: number;
   scoreboard: boolean;
   rows: ScoreRow[];
   teamScore: [number, number];
@@ -60,6 +80,11 @@ export interface HudState {
   frameMs: number;
   stats: { calls: number; triangles: number } | null;
   hint: 'ctrl' | null;
+  armor: number;
+  offer: UpgradeOffer | null;
+  /** Solo upgrade levels held, and each pick in the order taken (the run summary lists them). */
+  upgrades: UpgradeLevels;
+  upgradesTaken: UpgradeId[];
 }
 
 export type HudPulse =
@@ -77,13 +102,18 @@ export function initialHud(): HudState {
     alive: false,
     weapon: 'ar',
     ammo: 30,
+    mag: 30,
     reload: -1,
-    grenades: 2,
+    grenades: GRENADE.perLife,
+    grenadeMax: GRENADE.perLife,
+    grenadeTimer: 0,
+    grenadeRefill: GRENADE_REFILL,
     scoped: false,
     aiming: false,
     feed: [],
     banner: null,
     death: null,
+    respawnLeft: -1,
     scoreboard: false,
     rows: [],
     teamScore: [0, 0],
@@ -95,7 +125,11 @@ export function initialHud(): HudState {
     fps: 0,
     frameMs: 0,
     stats: null,
-    hint: null
+    hint: null,
+    armor: 0,
+    offer: null,
+    upgrades: noUpgrades(),
+    upgradesTaken: []
   };
 }
 

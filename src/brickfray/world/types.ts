@@ -2,7 +2,7 @@ import type * as THREE from 'three';
 import type { Atmosphere } from '../engine/renderer';
 import type { Kit } from '../engine/kit';
 
-export type MapId = 'plaza' | 'fortress' | 'docks';
+export type MapId = 'plaza' | 'fortress' | 'docks' | 'temple';
 export type Surface = 'plastic' | 'metal' | 'wood' | 'glass' | 'foliage' | 'water' | 'stone';
 
 /** Axis-aligned box in meters. Players collide with every box; bullets skip `bulletsPass`. */

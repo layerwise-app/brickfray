@@ -105,7 +105,8 @@ export const FEEDBACK_SOUNDS: Record<FeedbackIds, SoundSpec> = {
       );
     }
   },
-  heartbeat: { category: 'player', duration: 0.6, variants: 3, render: heartbeat },
+  // Under the mix: felt more than heard, well below the player's own steps.
+  heartbeat: { category: 'player', duration: 0.6, variants: 3, loudness: -31, render: heartbeat },
   respawn: { category: 'fx', duration: 2.3, variants: 3, render: respawn },
   uiHover: {
     category: 'ui',

@@ -1,0 +1,696 @@
+/* Leaderboard screen (BoardPanel): a fixed-size panel over the menu, three tabs, each a header block and one scrolling list. */
+.bf-board-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  /* Flex, not grid: the panel's percentage height must resolve against this box, not grow with its rows. */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  background: rgba(11, 18, 34, 0.65);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+.bf-board {
+  display: flex;
+  width: min(100%, 780px);
+  height: min(100%, 860px);
+  flex-direction: column;
+  gap: 14px;
+  padding: 22px 24px 18px;
+  outline: none;
+  user-select: none;
+}
+
+.bf-board-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.bf-btn.bf-board-back {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+}
+.bf-board-title {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  font-size: 30px;
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bf-board-chip {
+  display: flex;
+  max-width: 44%;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px 4px 4px;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.08);
+  font-weight: 600;
+  cursor: pointer;
+}
+.bf-board-chip:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+.bf-board-chip:focus-visible,
+.bf-board-pick:focus-visible,
+.bf-board-link:focus-visible,
+.bf-board-mine-bar:focus-visible,
+.bf-seg button:focus-visible {
+  outline: 3px solid #fff;
+  outline-offset: 2px;
+}
+.bf-board-tabs {
+  flex-shrink: 0;
+}
+.bf-board-tabs button {
+  padding: 0 10px;
+  white-space: nowrap;
+}
+
+/* One tab: fixed blocks above and below, the list between them takes what is left and scrolls. */
+.bf-board-tab {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 12px;
+}
+.bf-board-filters {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.bf-board-filter-row {
+  display: flex;
+  gap: 8px;
+}
+.bf-board-filter-row > .bf-seg {
+  flex: 1;
+}
+.bf-board-filters .bf-seg button {
+  min-width: 0;
+  padding: 0 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bf-board-list {
+  min-height: 0;
+  flex: 1;
+  margin-right: -6px;
+  padding-right: 6px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  transition: opacity 0.15s ease;
+}
+.bf-board-list[data-fetching='true'] {
+  opacity: 0.6;
+}
+.bf-board-list ol {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.bf-board-row {
+  display: grid;
+  width: 100%;
+  min-height: 56px;
+  grid-template-columns: 34px auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 14px 8px 8px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.05);
+  text-align: left;
+}
+.bf-board-match {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  padding-left: 10px;
+}
+.bf-board-row[data-mine] {
+  background: rgba(255, 205, 46, 0.14);
+  box-shadow: inset 0 0 0 2px rgba(255, 205, 46, 0.7);
+}
+.bf-board-rank {
+  font-size: 20px;
+  text-align: center;
+  color: var(--bf-muted);
+}
+.bf-board-row[data-top] .bf-board-rank {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border-radius: 10px;
+  color: #2a1a00;
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.35),
+    0 3px 0 rgba(0, 0, 0, 0.3);
+}
+.bf-board-row[data-top='1'] .bf-board-rank {
+  background: var(--bf-yellow);
+}
+.bf-board-row[data-top='2'] .bf-board-rank {
+  background: #cfd6e2;
+}
+.bf-board-row[data-top='3'] .bf-board-rank {
+  background: #e39a5b;
+}
+.bf-board-who {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+.bf-board-name {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+  font-weight: 600;
+}
+.bf-board-tag {
+  flex-shrink: 0;
+  padding: 1px 7px;
+  border-radius: 6px;
+  background: var(--bf-yellow);
+  color: #2a1a00;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.bf-board-stats {
+  overflow: hidden;
+  font-size: 13px;
+  line-height: 1.35;
+  color: var(--bf-muted);
+  font-variant-numeric: tabular-nums;
+}
+.bf-board-hs {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  vertical-align: -1px;
+}
+.bf-board-score {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.bf-board-score .bf-display {
+  font-size: 22px;
+  line-height: 1.05;
+}
+.bf-board-result {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--bf-muted);
+}
+.bf-board-result[data-result='win'] {
+  color: var(--bf-yellow);
+}
+.bf-board-result[data-result='wave'] {
+  color: #8fd3ff;
+}
+
+.bf-board-foot {
+  display: flex;
+  flex-shrink: 0;
+  flex-direction: column;
+  gap: 8px;
+}
+.bf-board-foot:empty {
+  display: none;
+}
+.bf-board-mine-bar {
+  cursor: pointer;
+}
+.bf-board-mine-bar:hover {
+  background: rgba(255, 205, 46, 0.2);
+}
+.bf-board-pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--bf-muted);
+}
+.bf-board-pager .bf-btn {
+  width: 40px;
+  height: 36px;
+}
+.bf-board-note {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 28px 12px;
+  text-align: center;
+  color: var(--bf-muted);
+}
+.bf-board-foot .bf-board-note {
+  padding: 4px;
+  font-size: 13px;
+}
+.bf-board-offline {
+  padding: 8px 12px 12px;
+  font-size: 13px;
+}
+.bf-board-wait {
+  animation: bf-board-pulse 1.2s ease-in-out infinite;
+}
+@keyframes bf-board-pulse {
+  50% {
+    opacity: 0.45;
+  }
+}
+
+/* Totals above the history list. */
+.bf-board-totals {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 6px;
+}
+.bf-board-totals div {
+  display: flex;
+  min-width: 0;
+  flex-direction: column-reverse;
+  justify-content: flex-end;
+  gap: 2px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.25);
+}
+.bf-board-totals dt {
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  hyphens: auto;
+  color: var(--bf-muted);
+}
+.bf-board-totals dd {
+  overflow: hidden;
+  font-size: 22px;
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Avatars: a portrait on its character's colors, clipped to a rounded tile, or an uploaded square. */
+.bf-av {
+  position: relative;
+  display: block;
+  width: var(--av);
+  height: var(--av);
+  flex-shrink: 0;
+  overflow: hidden;
+  border-radius: 28%;
+  background: #1c2a48;
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.3);
+}
+.bf-av img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.bf-av-hero::before {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 50% 42%, rgba(16, 22, 44, 0.08) 13%, rgba(8, 11, 26, 0.55) 100%);
+  content: '';
+}
+.bf-av-hero img {
+  top: auto;
+  height: auto;
+  object-fit: initial;
+}
+.bf-av-spin {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  border: 2.5px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: bf-spin 0.7s linear infinite;
+}
+
+/* Profile tab. */
+.bf-board-profile {
+  gap: 18px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+.bf-board-me {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.bf-board-label {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--bf-muted);
+}
+.bf-board-name-input {
+  width: 100%;
+  max-width: 340px;
+  font-weight: 600;
+}
+.bf-board-hint {
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--bf-muted);
+}
+.bf-board-error {
+  font-size: 14px;
+  font-weight: 600;
+  color: #ff8a80;
+}
+.bf-board-pictures {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.bf-board-pick {
+  display: grid;
+  width: 64px;
+  height: 64px;
+  place-items: center;
+  border-radius: 20px;
+  cursor: pointer;
+  transition: transform 0.12s ease;
+}
+.bf-board-pick:hover:not(:disabled) {
+  transform: translateY(-2px);
+}
+.bf-board-pick[aria-pressed='true'] {
+  box-shadow: 0 0 0 3px #fff;
+}
+.bf-board-pick-upload {
+  width: auto;
+  min-width: 64px;
+  grid-auto-flow: column;
+  gap: 8px;
+  padding: 0 14px 0 4px;
+  background: rgba(255, 255, 255, 0.08);
+  font-weight: 600;
+}
+.bf-board-pick-upload:not(:has(.bf-av)) {
+  padding-left: 14px;
+}
+.bf-board-account {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  border-radius: 16px;
+  background: rgba(0, 0, 0, 0.25);
+}
+.bf-board-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.bf-board-form .bf-input {
+  min-width: 200px;
+}
+.bf-board-code.bf-input {
+  width: 172px;
+  min-width: 0;
+  flex: none;
+  padding: 0 6px 0 calc(6px + 0.25em);
+  font-size: 24px;
+  letter-spacing: 0.25em;
+  text-align: center;
+}
+.bf-board-link {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--bf-yellow);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.bf-board-link:disabled {
+  opacity: 0.5;
+}
+.bf-board-signed {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+}
+
+/* The crop dialog sits over the whole panel. */
+.bf-board-crop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(11, 18, 34, 0.7);
+}
+.bf-board-crop-box {
+  display: flex;
+  width: min(100%, 340px);
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 20px;
+}
+.bf-board-crop-box .bf-btn {
+  padding: 0 14px;
+  white-space: nowrap;
+}
+.bf-board-crop-frame {
+  position: relative;
+  width: 240px;
+  height: 240px;
+  overflow: hidden;
+  border-radius: 28%;
+  box-shadow:
+    0 0 0 3px #fff,
+    0 8px 24px rgba(0, 0, 0, 0.45);
+  cursor: grab;
+  touch-action: none;
+}
+.bf-board-crop-frame:active {
+  cursor: grabbing;
+}
+.bf-board-crop-frame canvas {
+  width: 100%;
+  height: 100%;
+}
+
+/* Past 1440 × 900 the menu grows with the screen (menu-wide.css); the panel grows in steps to keep up with it. */
+@media (min-width: 1800px) and (min-height: 1040px) {
+  .bf-board,
+  .bf-board-crop-box {
+    zoom: 1.2;
+  }
+}
+@media (min-width: 2400px) and (min-height: 1400px) {
+  .bf-board,
+  .bf-board-crop-box {
+    zoom: 1.6;
+  }
+}
+
+/* Upright phones: the panel fills the screen and the rows close up. */
+@media (max-width: 599.98px) {
+  .bf-board-backdrop {
+    padding: max(8px, env(safe-area-inset-top)) 8px max(8px, env(safe-area-inset-bottom));
+  }
+  .bf-board {
+    height: 100%;
+    gap: 10px;
+    padding: 16px 14px 12px;
+  }
+  .bf-board-title {
+    font-size: 24px;
+  }
+  .bf-board-chip {
+    max-width: 40%;
+    padding-right: 10px;
+  }
+  .bf-board-row {
+    grid-template-columns: 28px auto minmax(0, 1fr) auto;
+    gap: 9px;
+    padding: 7px 10px 7px 6px;
+  }
+  .bf-board-match {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    padding-left: 8px;
+  }
+  .bf-board-row[data-top] .bf-board-rank {
+    width: 28px;
+    height: 28px;
+    font-size: 17px;
+  }
+  .bf-board-name {
+    font-size: 15px;
+  }
+  .bf-board-match .bf-board-name .truncate {
+    white-space: normal;
+  }
+  .bf-board-stats {
+    font-size: 12px;
+  }
+  .bf-board-score .bf-display {
+    font-size: 19px;
+  }
+  .bf-board-totals {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .bf-board-totals dd {
+    font-size: 19px;
+  }
+  .bf-board-filter-row {
+    flex-direction: column;
+  }
+  .bf-board-me {
+    gap: 12px;
+  }
+  /* Six portraits across, the upload button on its own row below them. */
+  .bf-board-pictures {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 6px;
+  }
+  .bf-board-pick {
+    width: auto;
+    height: auto;
+    aspect-ratio: 1;
+    border-radius: 16px;
+  }
+  .bf-board-pick .bf-av {
+    --av: 100% !important;
+  }
+  .bf-board-pick-upload {
+    grid-column: 1 / -1;
+    height: 44px;
+    aspect-ratio: auto;
+    justify-content: center;
+  }
+  .bf-board-pick-upload .bf-av {
+    --av: 36px !important;
+  }
+}
+
+/* A phone held sideways: little height, so the header, tabs and filters share rows and the list keeps the rest. */
+@media (orientation: landscape) and (max-height: 560px) {
+  .bf-board-backdrop {
+    padding: 6px max(12px, env(safe-area-inset-right)) 6px max(12px, env(safe-area-inset-left));
+  }
+  .bf-board {
+    width: min(100%, 820px);
+    height: 100%;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+    gap: 8px 12px;
+    padding: 10px 12px 8px;
+  }
+  .bf-board-head {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .bf-board-title,
+  .bf-board-chip span {
+    display: none;
+  }
+  .bf-board-chip {
+    padding: 2px;
+  }
+  .bf-board-tabs {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  .bf-board-tabs button {
+    height: 32px;
+  }
+  .bf-board-tab {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    gap: 8px;
+  }
+  /* Three groups on one row, each as wide as its labels need: no label is cut. Groups that still do not fit wrap. */
+  .bf-board-filters {
+    flex-flow: row wrap;
+    gap: 6px;
+  }
+  .bf-board-filters > .bf-seg,
+  .bf-board-filter-row > .bf-seg {
+    flex: 1 1 auto;
+  }
+  .bf-board-filter-row {
+    flex: 2 1 auto;
+    flex-flow: row wrap;
+    gap: 6px;
+  }
+  .bf-board-filters .bf-seg {
+    gap: 3px;
+    padding: 3px;
+  }
+  .bf-board-filters .bf-seg button {
+    flex: 1 0 auto;
+    height: 30px;
+    padding: 0 8px;
+    font-size: 13px;
+  }
+  .bf-board-row {
+    min-height: 46px;
+    padding-block: 5px;
+  }
+  .bf-board-foot {
+    flex-direction: row;
+    align-items: center;
+  }
+  .bf-board-foot > .bf-board-mine-bar {
+    flex: 1;
+  }
+  .bf-board-totals {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+  .bf-board-totals div {
+    padding: 5px 8px;
+  }
+  .bf-board-totals dd {
+    font-size: 17px;
+  }
+  .bf-board-crop-box {
+    width: min(100%, 520px);
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 10px 16px;
+  }
+  .bf-board-crop-frame {
+    width: 200px;
+    height: 200px;
+    grid-row: span 3;
+  }
+}

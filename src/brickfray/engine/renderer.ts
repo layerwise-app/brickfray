@@ -1,18 +1,18 @@
 import * as THREE from 'three';
-import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
-import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
-import { GTAOPass } from 'three/examples/jsm/postprocessing/GTAOPass.js';
-import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { QUALITY, type QualityLevel, type QualityProfile } from './quality';
 import { Materials } from './materials';
 import { FrameTimer } from './frame-timer';
+import { FramePacer } from './frame-pacer';
 import { AutoResolution } from './auto-resolution';
 import { installSmoothShadows } from './shadow-filter';
 import { PostAA } from './post-aa';
+import { CanvasAO } from './canvas-ao';
 import { buildClouds, CLOUD_DRIFT } from './clouds';
 import { createSky, DEFAULT_ATMOSPHERE, plainLights, type Atmosphere } from './atmosphere';
 
 export { DEFAULT_ATMOSPHERE, plainLights, type Atmosphere };
+
+type View = [THREE.Scene, THREE.Camera];
 
 export class GameRenderer {
   readonly renderer: THREE.WebGLRenderer;
@@ -24,14 +24,20 @@ export class GameRenderer {
   readonly sky: THREE.Mesh<THREE.SphereGeometry, THREE.ShaderMaterial>;
   private readonly clouds = new THREE.Group();
   private envTarget: THREE.WebGLRenderTarget | null = null;
-  private composer: EffectComposer | null = null;
-  private worldPass: RenderPass | null = null;
-  private viewPass: RenderPass | null = null;
-  private aoPass: GTAOPass | null = null;
+  private ao: CanvasAO | null = null;
   private postAA: PostAA | null = null;
   private width = 1;
   private height = 1;
   private readonly resolution: AutoResolution;
+  private readonly pacer = new FramePacer();
+  /** The timer's frame at the last match render: the next one follows it in the game loop. */
+  private loopFrame = -1;
+  /** Each scene drawn so far, with the view-model scene its programs were compiled with. */
+  private readonly warmed = new WeakMap<THREE.Scene, THREE.Scene | null>();
+  /** The view model last drawn: compiled with a new scene before the player spawns into it. */
+  private lastView: View | null = null;
+  private readonly shadowFocus = new THREE.Vector3();
+  private readonly bufferSize = new THREE.Vector2();
   atmosphere: Atmosphere = DEFAULT_ATMOSPHERE;
 
   constructor(
@@ -48,7 +54,7 @@ export class GameRenderer {
     this.renderer.info.autoReset = false;
     this.timer = new FrameTimer(this.renderer.getContext() as WebGL2RenderingContext);
     this.resolution = new AutoResolution(this.renderer, this.timer, this.pixelRatio);
-    // GTAO renders the scene a second time; shadows only need one update per frame.
+    // AO renders the scene a second time; shadows only need one update per frame.
     this.renderer.shadowMap.autoUpdate = false;
     this.materials = new Materials(this.profile);
 
@@ -139,6 +145,7 @@ export class GameRenderer {
     this.materials.dispose();
     this.materials = new Materials(this.profile);
     this.resolution.restart(this.pixelRatio);
+    this.pacer.restart();
     this.applyProfile();
     if (scene) this.applyAtmosphere(scene);
     return true;
@@ -163,9 +170,8 @@ export class GameRenderer {
       cam.updateProjectionMatrix();
       this.sun.shadow.radius = p.shadowRadius;
     }
-    this.composer?.dispose();
-    this.composer = null;
-    this.aoPass = null;
+    this.ao?.dispose();
+    this.ao = null;
     if (p.antialias) {
       this.postAA?.dispose();
       this.postAA = null;
@@ -192,7 +198,6 @@ export class GameRenderer {
     if (on === this.resolution.enabled) return;
     this.resolution.enabled = on;
     this.resolution.restart(this.pixelRatio);
-    this.composer?.setPixelRatio(this.drawRatio);
   }
 
   /** For the stats overlay: frames delivered against the display's rate, the longest gap, then what a frame costs. */
@@ -203,18 +208,24 @@ export class GameRenderer {
     return `${t.fps}${hz} fps · worst ${t.worstMs.toFixed(1)} ms · ${gpu}cpu ${t.cpuMs.toFixed(1)} ms · res ${+this.drawRatio.toFixed(2)}x`;
   }
 
-  /** `ratio` is what the canvas is drawn at now (the menu draws sharper than a match); post-processing keeps the match's. */
+  /** `ratio` is what the canvas is drawn at now (the menu draws sharper than a match). */
   resize(width: number, height: number, ratio?: number) {
     width = Math.max(1, width);
     height = Math.max(1, height);
-    if (width !== this.width || height !== this.height) this.timer.remeasure();
+    if (width !== this.width || height !== this.height) {
+      this.timer.remeasure();
+      this.pacer.restart();
+    }
     this.width = width;
     this.height = height;
     this.resolution.setBase(this.pixelRatio);
     // One call: setPixelRatio followed by setSize reallocates the canvas twice.
     this.renderer.setDrawingBufferSize(this.width, this.height, ratio ?? this.drawRatio);
-    this.composer?.setPixelRatio(this.drawRatio);
-    this.composer?.setSize(this.width, this.height);
+  }
+
+  /** The view model drawn over matches: compiled with each new match scene, before the player first spawns in it. */
+  prepareView(scene: THREE.Scene, camera: THREE.Camera) {
+    this.lastView = [scene, camera];
   }
 
   /** Keep the shadow frustum centered on the player, snapped to texels so edges don't crawl. */
@@ -222,7 +233,7 @@ export class GameRenderer {
     const dir = this.atmosphere.sunDirection;
     const cam = this.sun.shadow.camera;
     const texel = (cam.right - cam.left) / Math.max(1, this.profile.shadowMapSize);
-    const snapped = focus.clone();
+    const snapped = this.shadowFocus.copy(focus);
     snapped.x = Math.round(snapped.x / texel) * texel;
     snapped.z = Math.round(snapped.z / texel) * texel;
     this.sun.target.position.copy(snapped);
@@ -230,68 +241,95 @@ export class GameRenderer {
     this.sun.target.updateMatrixWorld();
   }
 
-  private ensureComposer(scene: THREE.Scene, camera: THREE.Camera, viewScene: THREE.Scene | null, viewCamera: THREE.Camera | null) {
-    if (!this.composer) {
-      const target = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: 4 });
-      this.composer = new EffectComposer(this.renderer, target);
-      this.worldPass = new RenderPass(scene, camera);
-      this.composer.addPass(this.worldPass);
-      this.aoPass = new GTAOPass(scene, camera, this.width, this.height);
-      this.aoPass.blendIntensity = 0.85;
-      this.aoPass.updateGtaoMaterial({ radius: 0.45, distanceExponent: 1.4, thickness: 1, scale: 1, samples: 12 });
-      this.aoPass.updatePdMaterial({ lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: 6, rings: 2, samples: 12 });
-      this.composer.addPass(this.aoPass);
-      this.viewPass = new RenderPass(scene, camera);
-      this.viewPass.clear = false;
-      this.viewPass.clearDepth = true;
-      this.composer.addPass(this.viewPass);
-      this.composer.addPass(new OutputPass());
-      this.composer.setPixelRatio(this.drawRatio);
-      this.composer.setSize(this.width, this.height);
-    }
-    this.worldPass!.scene = scene;
-    this.worldPass!.camera = camera;
-    this.aoPass!.scene = scene;
-    this.aoPass!.camera = camera;
-    this.viewPass!.enabled = !!viewScene && !!viewCamera;
-    if (viewScene && viewCamera) {
-      this.viewPass!.scene = viewScene;
-      this.viewPass!.camera = viewCamera;
-    }
-  }
-
   render(scene: THREE.Scene, camera: THREE.Camera, viewScene: THREE.Scene | null = null, viewCamera: THREE.Camera | null = null) {
+    const t = this.timer;
+    // The lab draws without the game loop's timer: never paced or rescaled.
+    const looped = t.frame === this.loopFrame + 1;
+    this.loopFrame = t.frame;
+    this.resolution.mark();
+    if (looped && !this.pacer.due(t.sinceDrawn, t.refresh)) return t.skip();
+    const interval = looped ? t.interval : 0;
+    this.pacer.frame(interval, t.refresh, { cpu: t.cpuMs, gpu: t.gpuMs }, this.resolution.exhausted(t.refresh));
     this.sky.position.copy((camera as THREE.PerspectiveCamera).position);
     this.clouds.position.copy(this.sky.position);
     this.clouds.rotation.y = (performance.now() / 1000) * CLOUD_DRIFT;
-    const before = this.drawRatio;
-    if (!this.resolution.prepare(this.pixelRatio, this.width, this.height)) return;
-    if (this.drawRatio !== before) this.composer?.setPixelRatio(this.drawRatio);
+    if (!this.resolution.prepare(this.pixelRatio, this.width, this.height, interval, t.refresh * this.pacer.divisor, this.pacer.divisor === 1)) return t.skip();
     this.renderer.info.reset();
     this.renderer.shadowMap.needsUpdate = this.profile.shadows;
     const scale = this.resolution.viewport(this.drawRatio);
-    if (this.profile.ambientOcclusion) {
-      this.ensureComposer(scene, camera, viewScene, viewCamera);
-      this.composer!.render();
-    } else {
+    const views: View[] = viewScene && viewCamera ? [[scene, camera], [viewScene, viewCamera]] : [[scene, camera]];
+    if (viewScene && viewCamera) this.lastView = [viewScene, viewCamera];
+    // A new scene, or the view model first drawn in it (its sky is prefiltered and every weapon compiled at once).
+    const known = this.warmed.get(scene);
+    const warm = known === undefined || (viewScene !== null && known !== viewScene);
+    const compiled = warm && !viewScene && this.lastView ? [...views, this.lastView] : views;
+    if (warm) this.warmed.set(scene, compiled[1]?.[0] ?? null);
+    const draw = (drawn: View[], compile: boolean) => {
       const post = this.profile.antialias ? null : (this.postAA ??= new PostAA());
+      if (compile) {
+        // Programs depend on the target drawn into, and the shadow map (drawn in the AO pass when there is one) is
+        // drawn with the lights compiling sets up: on a scene's first frame they are not set up yet.
+        post?.begin(this.renderer, scale);
+        for (const [s, c] of drawn) this.renderer.compile(s, c);
+      }
+      // Everything off the canvas first (shadow map, AO), so the canvas is drawn in one pass and its samples stay on tile.
+      if (this.profile.ambientOcclusion) {
+        const size = this.renderer.getDrawingBufferSize(this.bufferSize);
+        (this.ao ??= new CanvasAO(scene, camera)).draw(this.renderer, scene, camera, size.x * scale, size.y * scale);
+      }
       post?.begin(this.renderer, scale);
       this.renderer.autoClear = false;
       this.renderer.clear();
       this.renderer.render(scene, camera);
-      if (viewScene && viewCamera) {
+      if (this.profile.ambientOcclusion) this.ao!.composite(this.renderer);
+      for (const [s, c] of drawn.slice(1)) {
         this.renderer.clearDepth();
-        this.renderer.render(viewScene, viewCamera);
+        this.renderer.render(s, c);
       }
       post?.end(this.renderer);
-    }
+    };
+    if (warm) this.warm(compiled, () => draw(compiled, true), () => draw(views, false));
+    else draw(views, false);
     this.renderer.setViewport(0, 0, this.width, this.height);
     this.resolution.drawn();
   }
 
+  /**
+   * A scene's first frame. `prime` draws it once with hidden objects shown too (weapons not in hand, muzzle flash,
+   * casings, effect pools) and nothing culled, then `draw` paints the real frame over it, so nothing primed is seen.
+   * Compiling alone is not enough: a program first drawn mid-match stalls that frame for up to ~200 ms on
+   * ANGLE/Metal even when it was compiled long before.
+   */
+  private warm(views: View[], prime: () => void, draw: () => void) {
+    const undo: (() => void)[] = [];
+    for (const [scene] of views) {
+      scene.traverse((o) => {
+        if (o.frustumCulled) {
+          o.frustumCulled = false;
+          undo.push(() => (o.frustumCulled = true));
+        }
+        // Hidden batches are raycast stand-ins (scenery part colours), never drawn; a light shown would key every
+        // program to a light count the match never has.
+        if (!o.visible && !(o as THREE.BatchedMesh).isBatchedMesh && !(o as THREE.Light).isLight) {
+          o.visible = true;
+          undo.push(() => (o.visible = false));
+        }
+        const instances = o as THREE.InstancedMesh;
+        if (instances.isInstancedMesh && instances.count === 0 && instances.instanceMatrix.count > 0) {
+          instances.count = 1;
+          undo.push(() => (instances.count = 0));
+        }
+      });
+    }
+    prime();
+    for (const u of undo) u();
+    this.renderer.shadowMap.needsUpdate = this.profile.shadows;
+    draw();
+  }
+
   dispose() {
     this.resolution.dispose();
-    this.composer?.dispose();
+    this.ao?.dispose();
     this.postAA?.dispose();
     this.envTarget?.dispose();
     this.materials.dispose();

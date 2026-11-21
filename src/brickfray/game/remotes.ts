@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { createCharacter } from '../characters';
 import { Rig } from '../characters/rig';
-import type { AnimState, CharacterRig } from '../characters/types';
+import type { AnimState, BotKind, CharacterId, CharacterRig } from '../characters/types';
 import { FootStrikes } from '../audio/step-triggers';
 import type { Kit } from '../engine/kit';
 import type { RemoteSnapshotPlayer, Snapshot } from '../net/codec';
@@ -9,6 +9,7 @@ import type { RosterEntry } from '../net/protocol';
 import type { HitPose } from '../sim/hitboxes';
 import { createWeaponModel } from '../weapons';
 import type { WeaponId } from '../weapons/defs';
+import { LOADOUTS } from '../weapons/loadouts';
 import type { WeaponModel } from '../weapons/types';
 
 export const TEAM_COLORS = ['#2f7dff', '#ff7a1a'] as const;
@@ -53,6 +54,15 @@ const anim: AnimState = {
 
 const lerpAngle = (a: number, b: number, t: number) => a + Math.atan2(Math.sin(b - a), Math.cos(b - a)) * t;
 
+type Look = CharacterId | BotKind;
+
+/** A figure with both of its guns, in a remote's hands or hidden and waiting for one. */
+interface Figure {
+  rig: CharacterRig;
+  guns: Partial<Record<WeaponId, WeaponModel>>;
+  feet: FootStrikes;
+}
+
 /**
  * Other players, drawn 100 ms in the past between two snapshots (brief
  * extrapolation if packets are late), with their rigs animated from the
@@ -63,12 +73,36 @@ export class Remotes {
   readonly map = new Map<number, Remote>();
   onFire: ((remote: Remote) => void) | null = null;
   onStep: ((remote: Remote, loud: boolean) => void) | null = null;
+  /** Hidden figures ready for whoever joins next with that look. */
+  private readonly spare = new Map<Look, Figure[]>();
+  /**
+   * Never shown, drawn only by the match's warm-up frame: one broken-up figure per look (its pieces fly at a kill)
+   * and the plain kit finishes that a hand carries during a reload (shells, rounds, bolts).
+   */
+  private readonly unseen = new THREE.Group();
+  private readonly shattered = new Set<Look>();
+  private readonly stub = new THREE.BoxGeometry(0.01, 0.01, 0.01);
 
   constructor(
     private readonly kit: Kit,
     private self: number
   ) {
     this.group.name = 'remotes';
+    this.unseen.visible = false;
+    this.group.add(this.unseen);
+    for (const finish of ['plastic', 'metal'] as const) {
+      const mesh = new THREE.Mesh(this.stub, kit.materials.get('#ffffff', finish));
+      mesh.castShadow = kit.profile.shadows;
+      this.unseen.add(mesh);
+    }
+  }
+
+  /**
+   * Build hidden figures with both guns for looks that join later (solo waves), so the match's first frame, which
+   * draws hidden objects once, compiles and uploads them: a first draw mid-match stalls a frame for up to ~250 ms.
+   */
+  prepare(looks: readonly Look[]) {
+    for (const look of looks) if (!this.spare.get(look)?.length) this.release(this.build(look));
   }
 
   setSelf(id: number) {
@@ -82,11 +116,9 @@ export class Remotes {
       let r = this.map.get(id);
       if (!r || r.entry.character !== entry.character) {
         if (r) this.remove(id);
-        const rig = createCharacter(entry.character, this.kit);
+        const { rig, guns, feet } = this.spare.get(entry.character)?.pop() ?? this.build(entry.character);
         if (rig instanceof Rig) rig.animator.vary(id);
-        r = { entry, rig, guns: {}, weapon: null, state: null, alive: false, shots: 0, sinceShot: 9, sinceHurt: 9, hurtDir: { x: 0, z: 0 }, position: new THREE.Vector3(), yaw: 0, visible: false, knock: new THREE.Vector3(), feet: new FootStrikes(rig.root) };
-        rig.root.visible = false;
-        this.group.add(rig.root);
+        r = { entry, rig, guns, weapon: null, state: null, alive: false, shots: 0, sinceShot: 9, sinceHurt: 9, hurtDir: { x: 0, z: 0 }, position: new THREE.Vector3(), yaw: 0, visible: false, knock: new THREE.Vector3(), feet };
         this.map.set(id, r);
       }
       r.entry = entry;
@@ -95,13 +127,48 @@ export class Remotes {
     for (const id of [...this.map.keys()]) if (!roster.has(id)) this.remove(id);
   }
 
+  /** A remote leaves: its figure waits, hidden, for the next one with the same look (solo waves come and go). */
   remove(id: number) {
     const r = this.map.get(id);
     if (!r) return;
-    this.group.remove(r.rig.root);
-    r.rig.dispose();
-    for (const g of Object.values(r.guns)) g?.dispose();
     this.map.delete(id);
+    this.release(r);
+  }
+
+  /** A hidden figure with its loadout's guns stowed (hidden) on it; the first of each look also leaves its pieces. */
+  private build(look: Look): Figure {
+    const rig = createCharacter(look, this.kit);
+    const guns: Figure['guns'] = {};
+    const loadout = LOADOUTS[look];
+    for (const weapon of [loadout.primary, loadout.secondary]) {
+      const gun = (guns[weapon] ??= createWeaponModel(weapon, this.kit, 'third'));
+      gun.root.visible = false;
+      rig.root.add(gun.root);
+    }
+    if (!this.shattered.has(look)) {
+      this.shattered.add(look);
+      for (const piece of rig.shatter(new THREE.Vector3())) this.unseen.add(piece.mesh);
+      rig.reset();
+    }
+    rig.root.visible = false;
+    this.group.add(rig.root);
+    return { rig, guns, feet: new FootStrikes(rig.root) };
+  }
+
+  private release(figure: Figure) {
+    const { rig, guns } = figure;
+    rig.setWeapon(null, null);
+    for (const gun of Object.values(guns)) {
+      gun!.root.visible = false;
+      rig.root.add(gun!.root);
+    }
+    rig.reset();
+    rig.setTint(null);
+    rig.root.visible = false;
+    rig.root.userData.gun = undefined;
+    const spare = this.spare.get(rig.id) ?? [];
+    spare.push({ rig, guns, feet: figure.feet });
+    this.spare.set(rig.id, spare);
   }
 
   private equip(r: Remote, weapon: WeaponId) {
@@ -111,7 +178,14 @@ export class Remotes {
       gun = createWeaponModel(weapon, this.kit, 'third');
       r.guns[weapon] = gun;
     }
+    const held = r.weapon ? r.guns[r.weapon] : undefined;
     r.rig.setWeapon(gun.root, gun.supportGrip);
+    gun.root.visible = true;
+    // The gun put away stays on the figure, hidden, so it is never drawn for the first time mid-match.
+    if (held) {
+      held.root.visible = false;
+      r.rig.root.add(held.root);
+    }
     r.weapon = weapon;
     // Effects tell which gun fired (its flash and tracer) from the muzzle a shot starts at.
     r.rig.root.userData.gun = { weapon, muzzle: gun.muzzle };
@@ -226,5 +300,14 @@ export class Remotes {
 
   dispose() {
     for (const id of [...this.map.keys()]) this.remove(id);
+    for (const figures of this.spare.values()) {
+      for (const { rig, guns } of figures) {
+        rig.dispose();
+        for (const gun of Object.values(guns)) gun?.dispose();
+      }
+    }
+    this.spare.clear();
+    this.unseen.clear();
+    this.stub.dispose();
   }
 }

@@ -1,7 +1,7 @@
 import { GRENADE, MELEES, WEAPON_IDS, WEAPONS, type WeaponId } from '../weapons/defs';
 import { LOADOUTS, slotWeapon, type Loadout } from '../weapons/loadouts';
 import type { ViewAction } from '../weapons/types';
-import { MOVE } from './constants';
+import { GRENADE_REFILL, MOVE } from './constants';
 import { BUTTON, type ArmsState, type Command, type PlayerState } from './types';
 
 /** Side effects of a command; the host resolves hits, the client draws. Replays pass null. */
@@ -11,6 +11,20 @@ export interface ArmsHooks {
   grenade(player: PlayerState, cook: number, low: boolean, seq: number): void;
   view?(action: ViewAction): void;
   dryFire?(): void;
+}
+
+/** Rounds a full magazine of `weapon` holds at this upgrade scale; a bigger magazine adds at least a round. */
+export function scaledMag(weapon: WeaponId, scale: number) {
+  const base = WEAPONS[weapon].mag;
+  return scale === 1 ? base : Math.max(base + 1, Math.ceil(base * scale - 1e-9));
+}
+
+export function magSize(arms: ArmsState, weapon: WeaponId) {
+  return scaledMag(weapon, arms.magScale);
+}
+
+export function fillMagazines(arms: ArmsState) {
+  for (const id of WEAPON_IDS) arms.ammo[id] = magSize(arms, id);
 }
 
 /** Full magazines, holding `weapon` (the loadout's primary unless it is one of its guns). */
@@ -33,6 +47,11 @@ export function createArms(loadout: Loadout = LOADOUTS.grunt, weapon?: WeaponId)
     meleeCooldown: 0,
     meleeTime: -1,
     grenades: GRENADE.perLife,
+    grenadeMax: GRENADE.perLife,
+    grenadeRefill: GRENADE_REFILL,
+    grenadeTimer: 0,
+    magScale: 1,
+    reloadScale: 1,
     cook: -1,
     throwTime: 0,
     ads: 0,
@@ -122,14 +141,14 @@ function pelletDirections(player: PlayerState, seq: number): [number, number, nu
 
 function startReload(arms: ArmsState, hooks: ArmsHooks | null) {
   const def = WEAPONS[arms.weapon];
-  if (arms.reload > 0 || arms.ammo[arms.weapon] >= def.mag || arms.next) return;
+  if (arms.reload > 0 || arms.ammo[arms.weapon] >= magSize(arms, arms.weapon) || arms.next) return;
   arms.reloadEmpty = arms.ammo[arms.weapon] === 0;
   if (def.mode === 'pump') {
     arms.reload = LOAD_IN;
     arms.reloadTotal = LOAD_IN;
     hooks?.view?.({ type: 'reload', empty: arms.reloadEmpty, duration: LOAD_IN });
   } else {
-    arms.reload = arms.reloadEmpty ? def.reloadEmpty : def.reload;
+    arms.reload = (arms.reloadEmpty ? def.reloadEmpty : def.reload) * arms.reloadScale;
     arms.reloadTotal = arms.reload;
     hooks?.view?.({ type: 'reload', empty: arms.reloadEmpty, duration: arms.reload });
   }
@@ -139,6 +158,25 @@ function cancelReload(arms: ArmsState, hooks: ArmsHooks | null) {
   if (arms.reload <= 0) return;
   arms.reload = 0;
   hooks?.view?.({ type: 'cancelReload' });
+}
+
+/**
+ * Below a full load, grenades come back one at a time, `grenadeRefill` seconds each; the clock starts on the command
+ * that leaves a slot empty, so it reads the full duration right after a throw.
+ */
+export function refillGrenades(arms: ArmsState, dt: number) {
+  if (arms.grenades >= arms.grenadeMax) {
+    arms.grenadeTimer = 0;
+    return;
+  }
+  if (arms.grenadeTimer <= 0) {
+    arms.grenadeTimer = arms.grenadeRefill;
+    return;
+  }
+  arms.grenadeTimer -= dt;
+  if (arms.grenadeTimer > 1e-6) return;
+  arms.grenades++;
+  arms.grenadeTimer = arms.grenades < arms.grenadeMax ? arms.grenadeRefill : 0;
 }
 
 /** Advance one player's weapons by one command. Movement must already have run. */
@@ -211,6 +249,7 @@ export function stepArms(player: PlayerState, cmd: Command, dt: number, hooks: A
     arms.cook = 0;
     hooks?.view?.({ type: 'grenadeCook' });
   }
+  refillGrenades(arms, dt);
 
   const def = WEAPONS[arms.weapon];
   const busy = arms.switchTime > 0 || arms.meleeTime >= 0 || arms.cook >= 0 || arms.throwTime > 0;
@@ -219,18 +258,20 @@ export function stepArms(player: PlayerState, cmd: Command, dt: number, hooks: A
   if (arms.reload > 0) {
     arms.reload = Math.max(0, arms.reload - dt);
     if (arms.reload === 0) {
+      const mag = magSize(arms, arms.weapon);
       if (def.mode === 'pump') {
-        if (arms.reloadTotal !== LOAD_IN) arms.ammo[arms.weapon] = Math.min(def.mag, arms.ammo[arms.weapon] + 1);
-        if (arms.ammo[arms.weapon] < def.mag) {
-          arms.reload = def.reload;
-          arms.reloadTotal = def.reload;
-          hooks?.view?.({ type: 'reloadShell', index: arms.ammo[arms.weapon], duration: def.reload });
+        if (arms.reloadTotal !== LOAD_IN) arms.ammo[arms.weapon] = Math.min(mag, arms.ammo[arms.weapon] + 1);
+        if (arms.ammo[arms.weapon] < mag) {
+          // Upgrades never bring a shell down to the load-in time, which is how the two are told apart.
+          arms.reload = def.reload * arms.reloadScale;
+          arms.reloadTotal = arms.reload;
+          hooks?.view?.({ type: 'reloadShell', index: arms.ammo[arms.weapon], duration: arms.reload });
         } else {
           hooks?.view?.({ type: 'reloadEnd' });
           arms.cooldown = Math.max(arms.cooldown, arms.reloadEmpty ? RACK : 0.3);
         }
       } else {
-        arms.ammo[arms.weapon] = def.mag;
+        arms.ammo[arms.weapon] = mag;
       }
     }
   }

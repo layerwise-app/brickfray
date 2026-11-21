@@ -1,13 +1,18 @@
 import type { BotKind, CharacterId } from '../characters/types';
 import { CHARACTER_IDS } from '../characters/roster';
+import { fillMagazines } from './arms';
 import { BotDirector } from './bots';
 import { MATCH, PLAYER } from './constants';
 import { HostSim } from './host';
 import type { MapLayout } from '../world/types';
-import type { Difficulty, MatchSettings, MatchState, PlayerState } from './types';
+import type { Difficulty, HostPlayer, MatchSettings, MatchState } from './types';
+import { drawOffer, takeUpgrade, type UpgradeId } from './upgrades';
 
 const WARMUP = 4;
-const WAVE_BREAK = 7;
+/** Seconds from the upgrade pick (or a wave with nothing left to pick) to the next wave. */
+const WAVE_BREAK = 5;
+/** Seconds the upgrade cards wait before taking the first card for a player who doesn't choose. */
+export const PICK_TIME = 30;
 const RESULTS = 12;
 interface Ramp {
   /** [wave 1, added per wave, cap] */
@@ -15,27 +20,32 @@ interface Ramp {
   damage: [number, number, number];
   /** [base, added per wave] */
   count: [number, number];
-  /** [wave 1, cap] snapbots on the field at once. */
-  alive: [number, number];
+  /** [wave 1, added per wave, cap] snapbots on the field at once. */
+  alive: [number, number, number];
   /** Share of max health restored between waves. */
   heal: number;
 }
 
+// Wave 1 is as it always was; the climb after it is gentler so the upgrades taken between waves can keep up.
 const RAMP: Record<Difficulty, Ramp> = {
-  easy: { skill: [0.05, 0.05, 0.6], damage: [0.2, 0.025, 0.45], count: [2, 1.2], alive: [2, 6], heal: 1 },
-  normal: { skill: [0.18, 0.07, 0.9], damage: [0.3, 0.04, 0.65], count: [3, 1.6], alive: [3, 8], heal: 1 },
-  hard: { skill: [0.4, 0.07, 1], damage: [0.45, 0.05, 0.9], count: [4, 2.2], alive: [4, 10], heal: 0.5 }
+  easy: { skill: [0.05, 0.04, 0.6], damage: [0.2, 0.02, 0.45], count: [2, 1.2], alive: [2, 0.5, 6], heal: 1 },
+  normal: { skill: [0.18, 0.05, 0.9], damage: [0.3, 0.03, 0.65], count: [3, 1.6], alive: [3, 0.6, 8], heal: 1 },
+  hard: { skill: [0.4, 0.06, 1], damage: [0.45, 0.04, 0.9], count: [4, 2.2], alive: [4, 0.7, 10], heal: 0.5 }
 };
+
+/** From this wave on, aim and damage keep climbing past their caps, so even a fully upgraded run comes to an end. */
+const LATE = 10;
 
 /** How hard a solo wave is: bot aim, bot damage to the player, wave size and how many fight at once. */
 export function waveTuning(difficulty: Difficulty, wave: number) {
   const r = RAMP[difficulty];
   const step = wave - 1;
+  const late = Math.max(0, wave - LATE);
   return {
-    skill: Math.min(r.skill[2], r.skill[0] + r.skill[1] * step),
-    damage: Math.min(r.damage[2], r.damage[0] + r.damage[1] * step),
+    skill: Math.min(1, Math.min(r.skill[2], r.skill[0] + r.skill[1] * step) + 0.02 * late),
+    damage: Math.min(r.damage[2], r.damage[0] + r.damage[1] * step) * (1 + 0.05 * late),
     count: Math.floor(r.count[0] + r.count[1] * wave),
-    alive: Math.min(r.alive[1], r.alive[0] + step),
+    alive: Math.min(r.alive[2], r.alive[0] + Math.floor(r.alive[1] * step)),
     spawnEvery: Math.max(0.5, 1.4 - 0.08 * step),
     heal: r.heal
   };
@@ -52,8 +62,12 @@ export class Match {
   private waveQueue: BotKind[] = [];
   private waveSpawnTimer = 0;
   private wave = waveTuning('normal', 1);
+  /** Solo: the cards each player still has to pick from. */
+  private offers = new Map<number, UpgradeId[]>();
+  private readonly seed: number;
 
-  constructor(layout: MapLayout, readonly settings: MatchSettings, seed?: number) {
+  constructor(layout: MapLayout, readonly settings: MatchSettings, seed = Math.floor(Math.random() * 4294967296)) {
+    this.seed = seed >>> 0;
     this.sim = new HostSim(layout, settings, seed);
     this.bots = new BotDirector(this.sim);
     this.sim.onKill = (victim, killer) => this.onKill(victim, killer);
@@ -65,6 +79,7 @@ export class Match {
 
   start() {
     this.state = { phase: 'warmup', phaseEnds: this.time + WARMUP, teamScore: [0, 0], wave: 0, winner: null };
+    this.offers.clear();
     this.sim.damageEnabled = false;
     if (this.settings.mode !== 'solo') {
       for (let i = 0; i < this.settings.bots; i++) this.addBot();
@@ -72,7 +87,7 @@ export class Match {
     for (const p of this.sim.players.values()) this.sim.spawn(p);
   }
 
-  addHuman(name: string, character: CharacterId): PlayerState {
+  addHuman(name: string, character: CharacterId): HostPlayer {
     const p = this.sim.addPlayer(name, character, null, this.teamFor());
     if (this.settings.mode !== 'solo' && this.humans().length + this.botCount() > MATCH.maxPlayers) this.dropBot();
     if (this.state.phase === 'warmup' || this.state.phase === 'playing') this.sim.spawn(p);
@@ -80,6 +95,7 @@ export class Match {
   }
 
   remove(id: number) {
+    this.offers.delete(id);
     this.bots.remove(id);
     this.sim.removePlayer(id);
   }
@@ -118,7 +134,7 @@ export class Match {
     if (bot) this.remove(bot.id);
   }
 
-  private onKill(victim: PlayerState, killer: PlayerState | null) {
+  private onKill(victim: HostPlayer, killer: HostPlayer | null) {
     if (this.settings.mode === 'tdm' && killer && killer.team !== -1) this.state.teamScore[killer.team]++;
     if (this.settings.mode === 'solo') {
       if (victim.bot) {
@@ -151,7 +167,7 @@ export class Match {
       const [a, b] = this.state.teamScore;
       return a === b ? null : a > b ? 0 : 1;
     }
-    let best: PlayerState | null = null;
+    let best: HostPlayer | null = null;
     for (const p of this.sim.players.values()) if (!best || p.kills > best.kills) best = p;
     return best?.id ?? null;
   }
@@ -195,10 +211,44 @@ export class Match {
       }
     }
     if (s.phase === 'intermission' && this.time >= s.phaseEnds) {
-      s.phase = 'playing';
-      s.phaseEnds = 0;
-      this.startWave();
+      if (this.offers.size) {
+        for (const [id, options] of [...this.offers]) this.pickUpgrade(id, options[0]!, true);
+      } else {
+        s.phase = 'playing';
+        s.phaseEnds = 0;
+        this.startWave();
+      }
     }
+  }
+
+  /** The player takes one of the cards they were dealt; the next wave comes once everyone has. */
+  pickUpgrade(playerId: number, id: UpgradeId, auto = false): boolean {
+    const options = this.offers.get(playerId);
+    const player = this.sim.players.get(playerId);
+    if (!options || !player || !options.includes(id)) return false;
+    this.offers.delete(playerId);
+    takeUpgrade(player, id);
+    this.sim.events.push({ type: 'upgrade', player: playerId, id, level: player.upgrades[id], auto });
+    if (!this.offers.size && this.state.phase === 'intermission') this.state.phaseEnds = this.time + WAVE_BREAK;
+    return true;
+  }
+
+  /** Between waves: refill health (by difficulty), every magazine and the grenades, then deal each player three upgrade cards. */
+  private clearWave() {
+    const s = this.state;
+    s.phase = 'intermission';
+    for (const p of this.sim.players.values()) {
+      if (p.bot || !p.alive) continue;
+      p.health = Math.min(p.maxHealth, p.health + p.maxHealth * this.wave.heal);
+      fillMagazines(p.arms);
+      p.arms.grenades = p.arms.grenadeMax;
+      p.arms.grenadeTimer = 0;
+      const options = drawOffer(p.upgrades, this.seed + p.id * 7919, s.wave);
+      if (!options.length) continue;
+      this.offers.set(p.id, options);
+      this.sim.events.push({ type: 'upgradeOffer', player: p.id, wave: s.wave, options, levels: { ...p.upgrades } });
+    }
+    s.phaseEnds = this.time + (this.offers.size ? PICK_TIME : WAVE_BREAK);
   }
 
   private tickWaves(dt: number) {
@@ -210,14 +260,7 @@ export class Match {
       const bot = this.addBot(this.waveQueue.shift()!);
       this.sim.spawn(bot);
     }
-    if (!this.waveQueue.length && alive === 0 && this.botCount() === 0) {
-      this.state.phase = 'intermission';
-      this.state.phaseEnds = this.time + WAVE_BREAK;
-      for (const p of this.sim.players.values()) {
-        p.health = Math.min(p.maxHealth, p.health + p.maxHealth * this.wave.heal);
-        p.arms.grenades = Math.min(4, p.arms.grenades + 1);
-      }
-    }
+    if (!this.waveQueue.length && alive === 0 && this.botCount() === 0) this.clearWave();
   }
 
   get resultsOver() {

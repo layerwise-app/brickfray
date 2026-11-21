@@ -1,5 +1,6 @@
 import { K } from '../world/keep';
 import { ARCADE, TOWER } from '../world/plaza-parts';
+import { T } from '../world/temple-layout';
 import { WH } from '../world/warehouse';
 import type { MapId } from '../world/types';
 import { mulberry32 } from './synth';
@@ -36,6 +37,99 @@ const EAR = 1.6;
 const SPEED_OF_SOUND = 343;
 /** Image sources are traced this far; the diffuse tail carries on from there. */
 const EARLY_UNTIL = 0.11;
+
+/** A temple room's twin on the other half of the map (the layout turns half a turn about the centre). */
+function turned(r: RoomDef): RoomDef {
+  const swap = (s: Sides): Sides => [s[1], s[0], s[2], s[3], s[5], s[4]];
+  return { ...r, min: [-r.max[0], r.min[1], -r.max[2]], max: [-r.min[0], r.max[1], -r.min[2]], fade: swap(r.fade), walls: swap(r.walls) };
+}
+
+const SHRINE = T.shrine - 0.8;
+const VAULT = T.roofTop - 0.48;
+const TEMPLE_HALVES: RoomDef[] = [
+  {
+    min: [-20.8, -0.5, -17.6],
+    max: [-5.6, T.roofTop, -11.2],
+    fade: [OPEN, OPEN, 0, 0, OPEN, OPEN],
+    size: [15.2, T.roofTop, 6.4],
+    walls: [0.88, 0.88, 0.82, 0.9, 0.88, 0.88],
+    early: 7,
+    t60: 2,
+    tail: 2.6,
+    bright: [6000, 1600],
+    outdoor: 0.2,
+    bed: { gain: 0.3, cutoff: 1100 }
+  },
+  {
+    min: [-4.8, -0.5, -T.row],
+    max: [-2.4, VAULT, -T.shrine],
+    fade: [0, 0, 0, 0, OPEN, OPEN],
+    size: [2.4, VAULT, T.row - T.shrine],
+    walls: [0.9, 0.9, 0.85, 0.92, 0, 0],
+    early: 4,
+    t60: 1.3,
+    tail: 2.2,
+    bright: [7500, 2200],
+    outdoor: 0.45,
+    bed: { gain: 0.5, cutoff: 2500 }
+  },
+  {
+    min: [-1.6, -0.5, -17.6],
+    max: [7.2, T.roofTop, -11.2],
+    fade: [0, 0, 0, 0, OPEN, OPEN],
+    size: [8.8, T.roofTop, 6.4],
+    walls: [0.88, 0.88, 0.82, 0.9, 0.88, 0.88],
+    early: 6.5,
+    t60: 1.8,
+    tail: 2.4,
+    bright: [6500, 1700],
+    outdoor: 0.25,
+    bed: { gain: 0.35, cutoff: 1200 }
+  },
+  {
+    min: [8.8, -0.5, -17.6],
+    max: [17.6, T.high - T.slab, -11.2],
+    fade: [0, 0, 0, 0, OPEN, OPEN],
+    size: [8.8, T.high - T.slab, 6.4],
+    walls: [0.86, 0.86, 0.82, 0.88, 0.86, 0.86],
+    early: 6,
+    t60: 1.3,
+    tail: 2,
+    bright: [7000, 2000],
+    outdoor: 0.3,
+    bed: { gain: 0.35, cutoff: 1400 }
+  },
+  {
+    min: [-T.galleryOut + 0.8, -0.5, -T.row],
+    max: [-T.galleryIn, VAULT, T.row],
+    fade: [0, OPEN, 0, 0, OPEN, OPEN],
+    size: [T.galleryOut - 0.8 - T.galleryIn, VAULT, 2 * T.row],
+    walls: [0.92, 0.3, 0.85, 0.9, 0, 0],
+    early: 5,
+    t60: 1.1,
+    tail: 1.9,
+    bright: [7000, 2100],
+    outdoor: 0.6,
+    bed: { gain: 0.7, cutoff: 4500 }
+  }
+];
+
+const TEMPLE_ROOMS: RoomDef[] = [
+  {
+    min: [-SHRINE, -0.5, -SHRINE],
+    max: [SHRINE, T.high - T.slab, SHRINE],
+    fade: [OPEN, OPEN, 0, 0, OPEN, OPEN],
+    size: [2 * SHRINE, T.high - T.slab, 2 * SHRINE],
+    walls: [0.84, 0.84, 0.82, 0.9, 0.84, 0.84],
+    early: 6,
+    t60: 1.7,
+    tail: 2.4,
+    bright: [6500, 1800],
+    outdoor: 0.25,
+    bed: { gain: 0.3, cutoff: 1200 }
+  },
+  ...TEMPLE_HALVES.flatMap((r) => [r, turned(r)])
+];
 
 /**
  * Enclosed spaces with their own response, the first of each map the one a fresh mixer starts with. Each is a box of
@@ -102,7 +196,8 @@ export const ROOMS: Record<MapId, readonly RoomDef[]> = {
       outdoor: 0.65,
       bed: { gain: 0.7, cutoff: 5000 }
     }
-  ]
+  ],
+  temple: TEMPLE_ROOMS
 };
 
 /** The room the listener is most inside (-1: none) and how far: 0 at an opening, 1 past its fade. */

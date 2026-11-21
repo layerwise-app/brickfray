@@ -1,7 +1,9 @@
 import type { CharacterId } from '../characters/types';
 import type { Command, GameEvent, MatchSettings } from '../sim/types';
+import type { UpgradeId } from '../sim/upgrades';
 import type { Channel } from './channel';
-import { decodeSnapshot, encodeInput, PACKET, Reader, type Snapshot } from './codec';
+import { Reader } from './bytes';
+import { decodeSnapshot, encodeInput, PACKET, type Snapshot } from './codec';
 import { PROTOCOL_VERSION, type Board, type HostMessage, type LobbyState, type RosterEntry } from './protocol';
 
 export type CloseReason = 'hostLeft' | 'full' | 'version' | 'network';
@@ -155,6 +157,10 @@ export class ClientSession {
 
   setCharacter(character: CharacterId) {
     this.channel.sendReliable({ t: 'character', character });
+  }
+
+  pickUpgrade(id: UpgradeId) {
+    this.channel.sendReliable({ t: 'upgrade', id });
   }
 
   private fail(reason: CloseReason) {

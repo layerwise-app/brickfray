@@ -3,10 +3,11 @@ import { CollisionWorld } from '../sim/collision';
 import { DOCKS } from './map-docks';
 import { FORTRESS } from './map-fortress';
 import { PLAZA } from './map-plaza';
+import { TEMPLE } from './map-temple';
 import type { MapDefinition } from './types';
 import { validateLayout } from './validate';
 
-const maps: MapDefinition[] = [PLAZA, FORTRESS, DOCKS];
+const maps: MapDefinition[] = [PLAZA, FORTRESS, DOCKS, TEMPLE];
 
 describe.each(maps.map((m) => [m.id, m] as const))('%s layout', (_id, map) => {
   const layout = map.layout();

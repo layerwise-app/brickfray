@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { MatchAudio } from '../audio/match-audio';
+import { BOT_KINDS } from '../characters';
 import { OwnSteps } from '../audio/step-triggers';
 import type { AudioEngine, SoundId } from '../audio/types';
 import type { Kit } from '../engine/kit';
@@ -89,7 +90,7 @@ export class MatchView {
     this.scene.add(this.effects.root);
     this.remotes = new Remotes(kit, session.you);
     this.scene.add(this.remotes.group);
-    this.grenades = new GrenadeView(kit, (at, speed) => this.sound.bounce(at, speed));
+    this.grenades = new GrenadeView(kit, session.you, (at, speed) => this.sound.bounce(at, speed));
     this.scene.add(this.grenades.group);
     this.predictor = new Predictor(this.world, session.you, session.roster.get(session.you)?.character ?? 'rivet');
     this.events = new MatchEvents(this);
@@ -105,6 +106,7 @@ export class MatchView {
     };
     this.effects.onChipBounce = (p, speed) => this.sound.debris.bounce(p, speed);
     this.remotes.syncRoster(session.roster);
+    if (settings.mode === 'solo') this.remotes.prepare(BOT_KINDS);
   }
 
   play(id: SoundId, at?: THREE.Vector3 | [number, number, number] | null, volume = 1, priority = 5, occlusion = 0) {

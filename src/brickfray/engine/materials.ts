@@ -20,6 +20,8 @@ export class Materials {
       glow: this.make('glow', '#ffffff'),
       chrome: this.make('chrome', '#ffffff')
     };
+    // Scenery is merged into chunks that carry each part's colour on its vertices.
+    for (const m of Object.values(this.batch)) (m as THREE.MeshStandardMaterial).vertexColors = true;
     if (!profile.shadows) for (const f of ['plastic', 'rubber', 'metal', 'chrome'] as const) contactShade(this.batch[f], profile.detail === 0);
     if (profile.pbr && profile.bevel > 0) for (const f of ['plastic', 'rubber', 'metal', 'chrome'] as const) bevelAA(this.batch[f]);
   }
@@ -143,28 +145,8 @@ function contactShade(m: THREE.Material, courses: boolean) {
 const BEVEL_VERTEX = /* glsl */ `#include <defaultnormal_vertex>
 vBevelS = bevel;
 vBevelOn = step(0.5, bevel);
-vBevelA = vec3(0.0);
-vBevelB = vec3(0.0);
-if (bevel > 0.5) {
-  vec3 an = abs(objectNormal);
-  vec3 sn = sign(objectNormal);
-  vec3 eA = vec3(0.0, 0.0, sn.z);
-  vec3 eB = an.x >= an.y ? vec3(sn.x, 0.0, 0.0) : vec3(0.0, sn.y, 0.0);
-  if (an.x >= an.y && an.x >= an.z) {
-    eA = vec3(sn.x, 0.0, 0.0);
-    eB = an.y >= an.z ? vec3(0.0, sn.y, 0.0) : vec3(0.0, 0.0, sn.z);
-  } else if (an.y >= an.z) {
-    eA = vec3(0.0, sn.y, 0.0);
-    eB = an.x >= an.z ? vec3(sn.x, 0.0, 0.0) : vec3(0.0, 0.0, sn.z);
-  }
-  #ifdef USE_BATCHING
-  vec3 bmScale = vec3(dot(bm[0], bm[0]), dot(bm[1], bm[1]), dot(bm[2], bm[2]));
-  eA = bm * (eA / bmScale);
-  eB = bm * (eB / bmScale);
-  #endif
-  vBevelA = normalMatrix * eA;
-  vBevelB = normalMatrix * eB;
-}`;
+vBevelA = bevel > 0.5 ? normalMatrix * bevelA : vec3(0.0);
+vBevelB = bevel > 0.5 ? normalMatrix * bevelB : vec3(0.0);`;
 
 const BEVEL_FRAGMENT = /* glsl */ `#include <normal_fragment_begin>
 float bevelEnv = 1.0;
@@ -217,7 +199,7 @@ if (BEVEL_AMBIENT_BEGIN === THREE.ShaderChunk.lights_fragment_begin || BEVEL_AMB
 function bevelAA(m: THREE.Material) {
   m.onBeforeCompile = (shader) => {
     shader.vertexShader = shader.vertexShader
-      .replace('#include <common>', '#include <common>\nattribute float bevel;\nvarying float vBevelS;\nflat varying float vBevelOn;\nvarying vec3 vBevelA;\nvarying vec3 vBevelB;')
+      .replace('#include <common>', '#include <common>\nattribute float bevel;\nattribute vec3 bevelA;\nattribute vec3 bevelB;\nvarying float vBevelS;\nflat varying float vBevelOn;\nvarying vec3 vBevelA;\nvarying vec3 vBevelB;')
       .replace('#include <defaultnormal_vertex>', BEVEL_VERTEX);
     shader.fragmentShader = shader.fragmentShader
       .replace('#include <common>', '#include <common>\nvarying float vBevelS;\nflat varying float vBevelOn;\nvarying vec3 vBevelA;\nvarying vec3 vBevelB;')
@@ -226,4 +208,6 @@ function bevelAA(m: THREE.Material) {
       .replace('#include <lights_fragment_maps>', `${BEVEL_AMBIENT_MAPS}\n${BEVEL_ENV}`);
   };
   m.customProgramCacheKey = () => 'bevel-aa';
+  // Merged scenery stores the two faces each bevel rounds off (scenery-chunks.ts bevelFaces).
+  m.userData.bevelEdges = true;
 }

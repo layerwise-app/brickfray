@@ -1,9 +1,10 @@
 import { DOCKS } from './map-docks';
 import { FORTRESS } from './map-fortress';
 import { PLAZA } from './map-plaza';
+import { TEMPLE } from './map-temple';
 import type { MapDefinition, MapId } from './types';
 
-export const MAPS: Record<MapId, MapDefinition> = { plaza: PLAZA, fortress: FORTRESS, docks: DOCKS };
+export const MAPS: Record<MapId, MapDefinition> = { plaza: PLAZA, fortress: FORTRESS, docks: DOCKS, temple: TEMPLE };
 
 export type * from './types';
 export { validateLayout, type LayoutReport } from './validate';

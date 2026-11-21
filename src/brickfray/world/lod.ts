@@ -1,160 +1,165 @@
 import * as THREE from 'three';
+import { SceneryChunk } from '../engine/scenery-chunks';
 
 /** `near`: detail shown up close and dissolved with distance; `far`: its cheap stand-in, shown where the detail is gone. */
 export type LodMode = 'near' | 'far';
+
+/** How a chunk draws: its opaque parts, or the depth then blended pass of the parts inside the fade band. */
+type Role = 'plain' | 'depth' | 'blend';
 
 /** Metres over which a part dissolves. */
 const BAND = 6;
 /** Metres over which a stand-in fades in, just before its detail starts to dissolve. */
 const FAR_BAND = 4;
-/** Visibility is re-checked after the camera moves this far. */
-const RECHECK = 1.5;
+/** After glass (2), before smoke and sparks (3+). */
+const BLEND_ORDER = 2.5;
 
 /** Distances (from the camera) where a mode's fade runs from opaque to gone (`near`) or gone to opaque (`far`). */
 function fadeSpan(mode: LodMode, range: number) {
   return mode === 'near' ? { from: range - BAND, to: range } : { from: range - BAND - FAR_BAND, to: range - BAND };
 }
 
+/**
+ * Each vertex carries its part's origin (`lodOrigin`), so a whole part is in or out together. Plain draws the parts
+ * that are fully opaque at their distance, the twins the ones inside the band; the rest of the chunk's parts collapse
+ * behind the far plane.
+ */
 const VERTEX = /* glsl */ `#include <project_vertex>
-#ifdef USE_BATCHING
 {
-  vec3 lodAt = (modelMatrix * batchingMatrix * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
-  float lodT = clamp((distance(lodAt, cameraPosition) - uLodFrom) / (uLodTo - uLodFrom), 0.0, 1.0);
+  float lodD = distance((modelMatrix * vec4(lodOrigin, 1.0)).xyz, cameraPosition);
+  float lodT = clamp((lodD - uLodFrom) / (uLodTo - uLodFrom), 0.0, 1.0);
+  bool lodBand = lodD >= uLodFrom && lodD < uLodTo;
   #ifdef LOD_FAR
   vLodAlpha = lodT;
+  bool lodShown = LOD_PLAIN ? lodD >= uLodTo : lodBand;
   #else
   vLodAlpha = 1.0 - lodT;
+  bool lodShown = LOD_PLAIN ? lodD < uLodFrom : lodBand;
   #endif
-}
-#else
-vLodAlpha = 1.0;
-#endif`;
+  if (!lodShown) gl_Position = vec4(0.0, 0.0, 2.0, 1.0);
+}`;
 
 /**
- * In its band a part is alpha blended: only its nearest surface (laid down by a depth-only pass just before)
- * blends over what is behind it, so it fades without a screen pattern or seeing through itself. A stand-in
- * fades in over its detail first (it sits on or in front of it) and the detail dissolves after, so the two
- * never leave a gap between them.
+ * In its band a part is alpha blended: only its nearest surface (laid down by the depth twin just before) blends
+ * over what is behind it, so it fades without a screen pattern or seeing through itself. A stand-in fades in over its
+ * detail first (it sits on or in front of it) and the detail dissolves after, so the two never leave a gap.
  */
 const FRAGMENT = '#include <opaque_fragment>';
 const FRAGMENT_LOD = 'diffuseColor.a *= vLodAlpha;\n#include <opaque_fragment>';
-/** After glass (2), before smoke and sparks (3+). */
-const BLEND_ORDER = 2.5;
 
-function lodMaterial(base: THREE.Material, mode: LodMode, range: number, colorWrite: boolean) {
+function lodMaterial(base: THREE.Material, mode: LodMode, range: number, role: Role) {
   const m = base.clone();
   const span = fadeSpan(mode, range);
   const uniforms = { uLodFrom: { value: span.from }, uLodTo: { value: span.to } };
-  m.transparent = true;
-  m.colorWrite = colorWrite;
-  m.depthWrite = !colorWrite;
-  if (mode === 'far') {
-    // Fully faded in while its detail dissolves: faces the two share go to the detail.
-    m.polygonOffset = true;
-    m.polygonOffsetFactor = 1;
-    m.polygonOffsetUnits = 1;
+  if (role !== 'plain') {
+    m.transparent = true;
+    m.colorWrite = role === 'blend';
+    m.depthWrite = role === 'depth';
+    if (mode === 'far') {
+      // Fully faded in while its detail dissolves: faces the two share go to the detail.
+      m.polygonOffset = true;
+      m.polygonOffsetFactor = 1;
+      m.polygonOffsetUnits = 1;
+    }
   }
   m.onBeforeCompile = (shader, renderer) => {
     base.onBeforeCompile(shader, renderer);
     Object.assign(shader.uniforms, uniforms);
-    const pars = 'uniform float uLodFrom;\nuniform float uLodTo;\nflat varying float vLodAlpha;';
-    shader.vertexShader = shader.vertexShader
-      .replace('#include <common>', `#include <common>\n${mode === 'far' ? '#define LOD_FAR\n' : ''}${pars}`)
-      .replace('#include <project_vertex>', VERTEX);
-    shader.fragmentShader = shader.fragmentShader.replace('#include <common>', '#include <common>\nflat varying float vLodAlpha;').replace(FRAGMENT, FRAGMENT_LOD);
+    const defines = `${mode === 'far' ? '#define LOD_FAR\n' : ''}#define LOD_PLAIN ${role === 'plain'}\n`;
+    const pars = 'attribute vec3 lodOrigin;\nuniform float uLodFrom;\nuniform float uLodTo;\nflat varying float vLodAlpha;';
+    shader.vertexShader = shader.vertexShader.replace('#include <common>', `#include <common>\n${defines}${pars}`).replace('#include <project_vertex>', VERTEX);
+    shader.fragmentShader = shader.fragmentShader.replace('#include <common>', '#include <common>\nflat varying float vLodAlpha;');
+    if (role !== 'plain') shader.fragmentShader = shader.fragmentShader.replace(FRAGMENT, FRAGMENT_LOD);
   };
-  m.customProgramCacheKey = () => `${base.customProgramCacheKey()}|lod-${mode}`;
+  m.customProgramCacheKey = () => `${base.customProgramCacheKey()}|lod-${mode}-${role}`;
   m.userData.lodClone = true;
   m.userData.lodBase = base;
   return m;
 }
 
-/** three r170 BatchedMesh internals a twin shares with its source. */
-interface BatchInternals {
-  _instanceInfo: { visible: boolean; active: boolean; geometryIndex: number }[];
-  _geometryInfo: unknown[];
-  _geometryCount: number;
-  _geometryInitialized: boolean;
-  _maxInstanceCount: number;
-  _maxVertexCount: number;
-  _maxIndexCount: number;
-  _matricesTexture: THREE.DataTexture;
-  _indirectTexture: THREE.DataTexture;
-  _colorsTexture: THREE.DataTexture | null;
+/** Metres the per-chunk distance checks are padded by: they run a frame late and must never hide a part in range. */
+const MARGIN = 2;
+
+const eye = new THREE.Vector3();
+
+/** Farthest distance from `p` to the box. */
+function farthest(box: THREE.Box3, p: THREE.Vector3) {
+  const x = Math.max(Math.abs(p.x - box.min.x), Math.abs(p.x - box.max.x));
+  const y = Math.max(Math.abs(p.y - box.min.y), Math.abs(p.y - box.max.y));
+  const z = Math.max(Math.abs(p.z - box.min.z), Math.abs(p.z - box.max.z));
+  return Math.sqrt(x * x + y * y + z * z);
 }
 
-/** A second draw of a baked batch with another material: same buffers, matrices and colours, its own visibility. */
-function twin(mesh: THREE.BatchedMesh, material: THREE.Material) {
-  const src = mesh as unknown as BatchInternals;
-  const t = new THREE.BatchedMesh(src._maxInstanceCount, src._maxVertexCount, src._maxIndexCount, material);
-  const dst = t as unknown as BatchInternals;
-  dst._matricesTexture.dispose();
-  t.geometry = mesh.geometry;
-  dst._geometryInfo = src._geometryInfo;
-  dst._geometryCount = src._geometryCount;
-  dst._geometryInitialized = true;
-  dst._instanceInfo = src._instanceInfo.map((info) => ({ ...info }));
-  dst._matricesTexture = src._matricesTexture;
-  dst._colorsTexture = src._colorsTexture;
-  t.name = mesh.name;
-  t.position.copy(mesh.position);
-  t.quaternion.copy(mesh.quaternion);
-  t.scale.copy(mesh.scale);
-  t.receiveShadow = mesh.receiveShadow;
-  t.perObjectFrustumCulled = mesh.perObjectFrustumCulled;
-  t.sortObjects = mesh.sortObjects;
-  t.computeBoundingBox();
-  t.computeBoundingSphere();
-  t.dispose = () => {
-    dst._indirectTexture.dispose();
-    return t;
-  };
-  return t;
+interface Draw {
+  mesh: SceneryChunk;
+  role: Role;
+  mode: LodMode;
+  origins: THREE.Box3;
 }
 
 /**
- * Small detail instances of a batched mesh dissolve between `range - 6` and `range` metres from the camera
- * (`near`); their stand-ins fade in just before that (`far`). Instances inside their band draw from twin batches
- * (a depth pass, then a blended one); the rest stay in `mesh` with its plain material or are left out, so the
- * blending costs only what is fading. Returns the twins, for the caller to add.
+ * Small detail parts dissolve between `range - 6` and `range` metres from the camera (`near`); their stand-ins fade
+ * in just before that (`far`). Each merged chunk of them draws its opaque parts and, where the band crosses it, a
+ * depth then a blended twin; the shader decides per part, and a draw none of whose parts can show is hidden.
  */
-export function detailLod(mesh: THREE.BatchedMesh, range: number, mode: LodMode = 'near') {
-  const base = mesh.material as THREE.Material;
-  const twins = [twin(mesh, lodMaterial(base, mode, range, true))];
-  if (!base.transparent) twins.unshift(twin(mesh, lodMaterial(base, mode, range, false)));
-  // Same z and order: the depth twin, created first, draws right before its blend twin.
-  for (const t of twins) t.renderOrder = BLEND_ORDER;
-  const n = (mesh as unknown as BatchInternals)._instanceInfo.length;
-  const origins = new Float32Array(n * 3);
-  const m = new THREE.Matrix4();
-  for (let i = 0; i < n; i++) {
-    mesh.getMatrixAt(i, m);
-    origins.set([m.elements[12]!, m.elements[13]!, m.elements[14]!], i * 3);
+export class DetailFades {
+  /** Add to the scene: once a frame it hides the draws that cannot show for the next frame's camera. */
+  readonly tracker: THREE.Mesh;
+  private readonly materials = new Map<string, THREE.Material>();
+  private readonly draws: Draw[] = [];
+
+  constructor(private readonly range: number) {
+    const material = new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false, depthTest: false });
+    this.tracker = new THREE.Mesh(new THREE.BufferGeometry().setAttribute('position', new THREE.Float32BufferAttribute([], 3)), material);
+    this.tracker.frustumCulled = false;
+    this.tracker.raycast = () => {};
+    this.tracker.onBeforeRender = (_renderer, _scene, camera) => this.track(camera);
   }
-  // Between re-checks the camera moves under RECHECK, so a plain instance never reaches the band unseen.
-  const span = fadeSpan(mode, range);
-  const bandIn = span.from - RECHECK;
-  const bandOut = span.to + RECHECK;
-  const last = new THREE.Vector3(1e9, 0, 0);
-  const cam = new THREE.Vector3();
-  const recheck = (camera: THREE.Camera) => {
-    cam.setFromMatrixPosition(camera.matrixWorld);
-    if (cam.distanceToSquared(last) <= RECHECK * RECHECK) return;
-    last.copy(cam);
-    for (let i = 0; i < n; i++) {
-      const dist = Math.hypot(origins[i * 3]! - cam.x, origins[i * 3 + 1]! - cam.y, origins[i * 3 + 2]! - cam.z);
-      const inBand = dist >= bandIn && dist < bandOut;
-      const plain = mode === 'near' ? dist < bandIn : dist >= bandOut;
-      if (mesh.getVisibleAt(i) !== plain) mesh.setVisibleAt(i, plain);
-      for (const t of twins) if (t.getVisibleAt(i) !== inBand) t.setVisibleAt(i, inBand);
+
+  /** Turns a chunk built with origins into its plain draw; returns the twins, for the caller to add. */
+  apply(chunk: SceneryChunk, mode: LodMode): SceneryChunk[] {
+    const base = chunk.material;
+    const origins = chunk.geometry.userData.origins as THREE.Box3;
+    const roles: Role[] = base.transparent ? ['blend'] : ['depth', 'blend'];
+    const twins = roles.map((role) => {
+      const twin = new SceneryChunk(chunk.geometry, this.material(base, mode, role));
+      twin.name = chunk.name;
+      twin.receiveShadow = chunk.receiveShadow;
+      // Same z and order: the depth twin, made first, draws right before its blend twin.
+      twin.renderOrder = BLEND_ORDER;
+      twin.userData.noAO = true;
+      this.draws.push({ mesh: twin, role, mode, origins });
+      return twin;
+    });
+    chunk.material = this.material(base, mode, 'plain');
+    // The AO pass draws every part of a chunk: stand-ins would cover the detail up close.
+    chunk.userData.noAO = mode === 'far';
+    this.draws.push({ mesh: chunk, role: 'plain', mode, origins });
+    return twins;
+  }
+
+  dispose() {
+    for (const m of this.materials.values()) m.dispose();
+    this.materials.clear();
+    this.tracker.geometry.dispose();
+    (this.tracker.material as THREE.Material).dispose();
+  }
+
+  private track(camera: THREE.Camera) {
+    eye.setFromMatrixPosition(camera.matrixWorld);
+    for (const d of this.draws) {
+      const span = fadeSpan(d.mode, this.range);
+      const near = d.origins.distanceToPoint(eye);
+      const far = farthest(d.origins, eye);
+      if (d.role !== 'plain') d.mesh.visible = near < span.to + MARGIN && far >= span.from - MARGIN;
+      else d.mesh.visible = d.mode === 'near' ? near < span.from + MARGIN : far >= span.to - MARGIN;
     }
-  };
-  for (const target of [mesh, ...twins]) {
-    const before = target.onBeforeRender.bind(target);
-    target.onBeforeRender = (renderer, scene, camera, geometry, material, group) => {
-      recheck(camera);
-      before(renderer, scene, camera, geometry, material, group);
-    };
   }
-  return twins;
+
+  private material(base: THREE.Material, mode: LodMode, role: Role) {
+    const key = `${base.uuid}|${mode}|${role}`;
+    let m = this.materials.get(key);
+    if (!m) this.materials.set(key, (m = lodMaterial(base, mode, this.range, role)));
+    return m;
+  }
 }

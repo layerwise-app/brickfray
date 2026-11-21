@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import type { ShatterPiece } from '../characters/types';
 import { PLASTIC } from '../engine/palette';
 import type { GameEvent, ShotTrace } from '../sim/types';
+import { magSize } from '../sim/arms';
 import { WEAPONS } from '../weapons/defs';
 import type { FeedEntry, ScoreRow } from './hud';
 import type { MatchView } from './match-view';
@@ -34,6 +35,7 @@ export class MatchEvents {
     this.chat = from.chat;
     this.bannerUntil = from.bannerUntil;
     this.clock = from.clock;
+    this.offerUntil = from.offerUntil;
   }
 
   private name(id: number) {
@@ -116,12 +118,14 @@ export class MatchEvents {
           if (e.victim === me) {
             mv.deathCam = { at: mv.fp.camera.position.clone(), killer: e.killer, t: 0 };
             mv.play('death', null, 1, 9);
-            mv.hud.set({ death: { killer: e.killer === me ? '' : this.name(e.killer), weapon: e.weapon, respawnAt: mv.session.hostNow() + 3 } });
+            mv.hud.set({
+              death: { killer: e.killer === me ? '' : this.name(e.killer), weapon: e.weapon, respawnAt: e.respawnAt },
+              respawnLeft: e.respawnAt !== null ? Math.max(0, e.respawnAt - mv.session.hostNow()) : -1
+            });
           }
           if (e.killer === me && e.victim !== me) {
             mv.hud.pulse({ type: 'hit', kind: 'kill', amount: 0, at: null, headshot: e.headshot });
-            mv.play('killConfirm', null, 1, 9);
-            if (e.headshot) mv.play('headshotMarker', null, 1, 9);
+            mv.sound.kill(e.headshot);
           }
           this.feed.push({
             key: feedKey++,
@@ -166,11 +170,33 @@ export class MatchEvents {
           this.bannerUntil = this.clock + 3;
           mv.play('waveStart', null, 1, 8);
           break;
+        case 'upgradeOffer':
+          if (e.player === me) this.dealt(e);
+          break;
+        case 'upgrade':
+          if (e.player === me) this.upgraded(e);
+          break;
         case 'join':
         case 'leave':
           break;
       }
     }
+  }
+
+  private offerUntil = 0;
+  /** Solo: the upgrade cards after a cleared wave. */
+  private dealt(e: Extract<GameEvent, { type: 'upgradeOffer' }>) {
+    this.mv.hud.set({ offer: { key: feedKey++, wave: e.wave, options: e.options, levels: e.levels, picked: null } });
+    this.mv.play('respawn', null, 0.8, 8);
+  }
+
+  /** The pick landed: the cards hold the choice a moment, then leave. An idle player's card is picked with the same click. */
+  private upgraded(e: Extract<GameEvent, { type: 'upgrade' }>) {
+    const hud = this.mv.hud;
+    const offer = hud.state.offer;
+    hud.set({ offer: offer && { ...offer, picked: e.id }, upgrades: { ...hud.state.upgrades, [e.id]: e.level }, upgradesTaken: [...hud.state.upgradesTaken, e.id] });
+    this.offerUntil = this.clock + 0.9;
+    if (e.auto) this.mv.play('uiClick', null, 1, 8);
   }
 
   private pushFeed() {
@@ -189,6 +215,8 @@ export class MatchEvents {
       mv.hud.set({ chat: this.chat.map(({ at: _, ...c }) => c) });
     }
     if (mv.hud.state.banner && this.clock > this.bannerUntil) mv.hud.set({ banner: null });
+    if (mv.hud.state.offer?.picked && this.clock > this.offerUntil) mv.hud.set({ offer: null });
+    this.finalSeconds();
     this.hudTimer -= dt;
     if (this.hudTimer > 0) return;
     this.hudTimer = 1 / 15;
@@ -199,16 +227,24 @@ export class MatchEvents {
     const phase = match?.phase ?? 'warmup';
     mv.sound.setPhase(phase, match?.phaseEnds ? Math.max(0, match.phaseEnds - now) : 0);
     const info = mv.renderer.renderer.info.render;
+    const self = mv.session.snapshots.at(-1)?.self;
+    const weapon = p.arms.next ?? p.arms.weapon;
     mv.hud.set({
       phase,
       phaseLeft: match?.phaseEnds ? Math.max(0, match.phaseEnds - now) : 0,
       health: Math.ceil(p.health),
-      maxHealth: p.maxHealth,
+      maxHealth: self?.maxHealth ?? p.maxHealth,
+      armor: self?.armor ?? 0,
       alive: p.alive,
       weapon: p.arms.next ?? p.arms.weapon,
-      ammo: p.arms.ammo[p.arms.next ?? p.arms.weapon],
+      ammo: p.arms.ammo[weapon],
+      mag: magSize(p.arms, weapon),
       reload: p.arms.reload > 0 ? 1 - p.arms.reload / Math.max(1e-3, p.arms.reloadTotal) : -1,
       grenades: p.arms.grenades,
+      grenadeMax: p.arms.grenadeMax,
+      grenadeTimer: p.arms.grenadeTimer,
+      grenadeRefill: p.arms.grenadeRefill,
+      respawnLeft: mv.hud.state.death?.respawnAt != null ? Math.max(0, mv.hud.state.death.respawnAt - now) : -1,
       scoped: mv.scoped,
       aiming: p.arms.ads > 0.6,
       teamScore: match ? [match.teamScore[0], match.teamScore[1]] : [0, 0],
@@ -222,6 +258,18 @@ export class MatchEvents {
       stats: { calls: info.calls, triangles: info.triangles }
     });
     mv.hud.pulse({ type: 'spread', px: this.spreadPx() });
+  }
+
+  private counted = 0;
+  /** Timed modes: a countdown tick each second over the last ten, the last three rising like the warmup's. */
+  private finalSeconds() {
+    const match = this.mv.session.board?.match;
+    if (this.mv.settings.mode === 'solo' || match?.phase !== 'playing' || !match.phaseEnds) return;
+    const second = Math.ceil(match.phaseEnds - this.mv.session.hostNow());
+    if (second === this.counted || second < 1 || second > 10) return;
+    this.counted = second;
+    const last = Math.max(0, 3 - second);
+    this.mv.audio.play('countdown', { priority: 9, volume: second <= 3 ? 1 : 0.6, rate: 2 ** (last / 12), variant: last });
   }
 
   private spreadPx() {

@@ -6,7 +6,8 @@ import type { MatchSettings, ShotTrace } from '../sim/types';
 import { MAPS } from '../world';
 import type { Channel } from './channel';
 import { loopbackPair } from './channel';
-import { decodeInput, encodeSnapshot, PACKET, Reader } from './codec';
+import { Reader } from './bytes';
+import { decodeInput, encodeSnapshot, PACKET } from './codec';
 import { privatePeerId, publicPeerId, PUBLIC_SLOTS, randomCode, openPeer, wrapConnection } from './peer';
 import { PROTOCOL_VERSION, type Board, type ClientMessage, type HostMessage, type LobbyState, type RosterEntry } from './protocol';
 import { startTicker } from './ticker';
@@ -142,6 +143,10 @@ export class HostSession {
       case 'character':
         link.character = m.character;
         this.changed();
+        return;
+      case 'upgrade':
+        // Only one of the cards this player was dealt is accepted, which also validates the id.
+        if (link.playerId !== null) this.match?.pickUpgrade(link.playerId, m.id);
         return;
     }
   }

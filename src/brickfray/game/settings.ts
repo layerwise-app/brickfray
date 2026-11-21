@@ -5,7 +5,7 @@ import type { Difficulty, MatchSettings } from '../sim/types';
 import type { MapId } from '../world/types';
 import { DEFAULT_BINDINGS, type InputSettings } from './input';
 
-export const MAP_IDS: MapId[] = ['plaza', 'fortress', 'docks'];
+export const MAP_IDS: MapId[] = ['plaza', 'fortress', 'docks', 'temple'];
 
 export interface CrosshairSettings {
   color: string;

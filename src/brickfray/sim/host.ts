@@ -1,28 +1,28 @@
 import type { BotKind, CharacterId } from '../characters/types';
-import { GRENADE, MELEES, WEAPONS, type MeleeId, type WeaponId } from '../weapons/defs';
+import { GRENADE, WEAPONS } from '../weapons/defs';
 import { LOADOUTS } from '../weapons/loadouts';
 import type { MapLayout } from '../world/types';
-import { aimDirection, createArms, stepArms, type ArmsHooks } from './arms';
+import { aimDirection, createArms, fillMagazines, stepArms, type ArmsHooks } from './arms';
 import { CollisionWorld } from './collision';
 import { MAX_REWIND, PLAYER, TICK } from './constants';
 import { explosionDamage, stepGrenade, throwGrenade, type Grenade } from './grenades';
-import { damageAt, headCenterY, rayHitPlayer, type HitPose } from './hitboxes';
+import type { HitPose } from './hitboxes';
+import { resolveMelee, resolveShot } from './hits';
 import { createMoveState, eyeHeight, stepMove } from './movement';
 import { pickSpawn, type RecentDeath } from './spawns';
-import { BUTTON, type Command, type GameEvent, type HitKind, type MatchSettings, type PlayerState, type ShotTrace } from './types';
+import { BUTTON, type Command, type GameEvent, type HitKind, type HostPlayer, type KillCause, type MatchSettings, type PlayerState, type ShotTrace } from './types';
+import { applyLevels, noUpgrades, upgradeStats } from './upgrades';
 
 const HISTORY = 72;
-const REGEN_DELAY = 4.5;
-const REGEN_RATE = 22;
 
-interface PoseRecord extends HitPose {
+export interface PoseRecord extends HitPose {
   time: number;
   alive: boolean;
 }
 
 export interface DamageSource {
   attacker: number;
-  weapon: WeaponId | MeleeId | 'grenade';
+  weapon: KillCause;
   kind: HitKind;
   from: [number, number, number];
 }
@@ -30,13 +30,13 @@ export interface DamageSource {
 /** Authoritative world: commands in, state and events out. Runs on the host for every mode. */
 export class HostSim {
   readonly world: CollisionWorld;
-  readonly players = new Map<number, PlayerState>();
+  readonly players = new Map<number, HostPlayer>();
   readonly grenades: Grenade[] = [];
   events: GameEvent[] = [];
   traces: ShotTrace[] = [];
   time = 0;
   /** Rules hook: decides respawns, scoring and round flow (see match.ts). */
-  onKill: ((victim: PlayerState, killer: PlayerState | null) => void) | null = null;
+  onKill: ((victim: HostPlayer, killer: HostPlayer | null) => void) | null = null;
   damageEnabled = true;
   /** Bots hit humans for less; solo raises it wave by wave. */
   botDamage = 0.55;
@@ -62,11 +62,11 @@ export class HostSim {
     return this.seed / 4294967296;
   }
 
-  addPlayer(name: string, character: CharacterId | BotKind, bot: BotKind | null = null, team: 0 | 1 | -1 = -1): PlayerState {
+  addPlayer(name: string, character: CharacterId | BotKind, bot: BotKind | null = null, team: 0 | 1 | -1 = -1): HostPlayer {
     const id = this.nextId++;
     const scale = bot === 'boss' ? 1.6 : 1;
     const health = bot === 'boss' ? 900 : bot === 'rusher' ? 70 : bot ? 100 : PLAYER.health;
-    const player: PlayerState = {
+    const player: HostPlayer = {
       id,
       name,
       character,
@@ -89,7 +89,9 @@ export class HostSim {
       damagers: new Map(),
       lastSeq: 0,
       life: 0,
-      scale
+      scale,
+      upgrades: noUpgrades(),
+      armor: 0
     };
     this.players.set(id, player);
     this.history.set(id, []);
@@ -101,7 +103,7 @@ export class HostSim {
     this.history.delete(id);
   }
 
-  spawn(player: PlayerState, at?: { position: [number, number, number]; yaw: number }) {
+  spawn(player: HostPlayer, at?: { position: [number, number, number]; yaw: number }) {
     const spot = at ?? pickSpawn(this.world, this.layout.spawns, player, this.players.values(), this.deaths, this.time, () => this.random());
     player.move = createMoveState(...spot.position);
     player.move.grounded = true;
@@ -111,6 +113,9 @@ export class HostSim {
     const keep = player.arms;
     player.arms = createArms(LOADOUTS[player.character], keep.next ?? keep.weapon);
     player.arms.prevButtons = keep.prevButtons;
+    applyLevels(player);
+    fillMagazines(player.arms);
+    player.arms.grenades = player.arms.grenadeMax;
     player.health = player.maxHealth;
     player.alive = true;
     player.protectedUntil = this.time + (player.bot ? 0 : PLAYER.spawnProtection);
@@ -134,13 +139,13 @@ export class HostSim {
     const def = WEAPONS[p.arms.weapon];
     stepMove(this.world, p.move, cmdToMove(cmd), TICK, def.moveScale * (p.bot === 'rusher' ? 1.15 : 1));
     stepArms(p, cmd, TICK, this.hooks(cmd.viewTime));
-    if (p.move.y < this.layout.killY) this.damage(p, 1000, { attacker: p.id, weapon: 'grenade', kind: 'body', from: [p.move.x, p.move.y, p.move.z] });
+    if (p.move.y < this.layout.killY) this.damage(p, 1000, { attacker: p.id, weapon: 'water', kind: 'body', from: [p.move.x, p.move.y, p.move.z] });
   }
 
   private hooks(viewTime: number): ArmsHooks {
     return {
-      fire: (player, weapon, dirs) => this.resolveShot(player, weapon, dirs, viewTime),
-      melee: (player) => this.resolveMelee(player, viewTime),
+      fire: (player, weapon, dirs) => resolveShot(this, player, weapon, dirs, viewTime),
+      melee: (player) => resolveMelee(this, player, viewTime),
       grenade: (player, cook, low) => {
         const m = player.move;
         const eye: [number, number, number] = [m.x, m.y + eyeHeight(m) * player.scale, m.z];
@@ -175,98 +180,20 @@ export class HostSim {
     return list[0]!;
   }
 
-  private rewindTime(viewTime: number) {
+  rewindTime(viewTime: number) {
     return Math.max(this.time - MAX_REWIND, Math.min(this.time, viewTime));
   }
 
-  private resolveShot(shooter: PlayerState, weapon: WeaponId, dirs: [number, number, number][], viewTime: number) {
-    const def = WEAPONS[weapon];
-    const t = this.rewindTime(viewTime);
-    const origin = this.eye(shooter);
-    const trace: ShotTrace = { shooter: shooter.id, weapon, origin, ends: [] };
-    const totals = new Map<number, { amount: number; head: boolean }>();
-    const poses = new Map<number, PoseRecord>();
-    for (const p of this.players.values()) {
-      if (p.alive && p.id !== shooter.id) {
-        const pose = this.poseAt(p, t);
-        if (pose?.alive) poses.set(p.id, pose);
-      }
-    }
-    for (const d of dirs) {
-      const wall = this.world.raycast(origin[0], origin[1], origin[2], d[0], d[1], d[2], 260, true);
-      let maxT = wall?.t ?? 260;
-      let victim: PlayerState | null = null;
-      let kind: HitKind = 'body';
-      for (const [id, pose] of poses) {
-        const hit = rayHitPlayer(pose, origin[0], origin[1], origin[2], d[0], d[1], d[2], maxT);
-        if (hit) {
-          maxT = hit.t;
-          victim = this.players.get(id)!;
-          kind = hit.kind;
-        }
-      }
-      const point: [number, number, number] = [origin[0] + d[0] * maxT, origin[1] + d[1] * maxT, origin[2] + d[2] * maxT];
-      trace.ends.push({ point, surface: victim ? 'body' : (wall?.surface ?? 'none'), hitPlayer: victim?.id ?? 0, normal: victim ? [-d[0], -d[1], -d[2]] : (wall?.normal ?? [0, 1, 0]) });
-      if (victim && this.hostile(shooter, victim)) {
-        const full = kind === 'head' ? def.head : def.body;
-        const min = def.minDamage * (full / def.body);
-        const amount = damageAt(maxT, full, min, def.falloffStart, def.falloffEnd) * (shooter.bot && !victim.bot ? this.botDamage : 1);
-        const entry = totals.get(victim.id) ?? { amount: 0, head: false };
-        entry.amount += amount;
-        entry.head ||= kind === 'head';
-        totals.set(victim.id, entry);
-      }
-    }
-    this.traces.push(trace);
-    for (const [id, { amount, head }] of totals) {
-      const victim = this.players.get(id);
-      if (victim) this.damage(victim, Math.round(amount), { attacker: shooter.id, weapon, kind: head ? 'head' : 'body', from: origin });
-    }
-  }
-
-  private resolveMelee(attacker: PlayerState, viewTime: number) {
-    const t = this.rewindTime(viewTime);
-    const eye = this.eye(attacker);
-    const fwd = aimDirection(attacker.yaw, 0);
-    let best: PlayerState | null = null;
-    const melee = MELEES[LOADOUTS[attacker.character].melee];
-    let bestD = melee.range + 0.4;
-    for (const p of this.players.values()) {
-      if (!p.alive || !this.hostile(attacker, p)) continue;
-      const pose = this.poseAt(p, t);
-      if (!pose?.alive) continue;
-      const dx = pose.x - eye[0];
-      const dz = pose.z - eye[2];
-      const d = Math.hypot(dx, dz);
-      const dy = headCenterY(pose) - 0.5 - eye[1];
-      if (d > bestD || Math.abs(dy) > 1.4) continue;
-      const cos = (dx * fwd[0] + dz * fwd[2]) / Math.max(d, 1e-4);
-      if (d > 0.5 && cos < Math.cos(melee.arc)) continue;
-      best = p;
-      bestD = d;
-    }
-    if (!best) {
-      const aim = aimDirection(attacker.yaw, attacker.pitch);
-      const struck = this.world.raycast(eye[0], eye[1], eye[2], aim[0], aim[1], aim[2], melee.range, true);
-      const wall = struck && { surface: struck.surface, at: [eye[0] + aim[0] * struck.t, eye[1] + aim[1] * struck.t, eye[2] + aim[2] * struck.t] as [number, number, number] };
-      this.events.push({ type: 'melee', player: attacker.id, hit: false, ...(wall ? { wall } : {}) });
-      return;
-    }
-    this.events.push({ type: 'melee', player: attacker.id, hit: true });
-    const toVictim = Math.atan2(-(best.move.x - attacker.move.x), -(best.move.z - attacker.move.z));
-    const facing = Math.cos(best.yaw - toVictim);
-    // Victim facing away from the attacker: their forward points along attacker→victim.
-    const backstab = facing > 0.5;
-    this.damage(best, backstab ? melee.backstab : melee.damage, { attacker: attacker.id, weapon: melee.id, kind: 'body', from: eye });
-  }
-
-  damage(victim: PlayerState, amount: number, src: DamageSource) {
+  damage(victim: HostPlayer, amount: number, src: DamageSource) {
     if (!victim.alive || amount <= 0) return;
     const attacker = this.players.get(src.attacker) ?? null;
     const self = src.attacker === victim.id;
     if (!self && (!this.damageEnabled || this.time < victim.protectedUntil)) return;
     if (attacker && !self && !this.hostile(attacker, victim)) return;
-    victim.health -= amount;
+    if (attacker && !self && attacker.upgrades.damage) amount = Math.round(amount * upgradeStats(attacker.upgrades).damageScale);
+    const soaked = Math.min(victim.armor, amount);
+    victim.armor -= soaked;
+    victim.health -= amount - soaked;
     this.lastHurt.set(victim.id, this.time);
     if (!self) victim.damagers.set(src.attacker, (victim.damagers.get(src.attacker) ?? 0) + amount);
     const fatal = victim.health <= 0;
@@ -293,8 +220,10 @@ export class HostSim {
       killer.kills++;
       killer.score += src.kind === 'head' ? 150 : 100;
     }
-    this.events.push({ type: 'kill', killer: killer?.id ?? victim.id, victim: victim.id, weapon: src.weapon, headshot: src.kind === 'head', assister });
+    const kill = { type: 'kill' as const, killer: killer?.id ?? victim.id, victim: victim.id, weapon: src.weapon, headshot: src.kind === 'head', assister, respawnAt: null as number | null };
+    this.events.push(kill);
     this.onKill?.(victim, killer);
+    if (victim.respawnAt > this.time && Number.isFinite(victim.respawnAt)) kill.respawnAt = victim.respawnAt;
   }
 
   /** Grenades, regeneration and pose history; commands are applied as they arrive. */
@@ -308,8 +237,9 @@ export class HostSim {
       }
     }
     for (const p of this.players.values()) {
-      if (p.alive && p.health < p.maxHealth && this.time - (this.lastHurt.get(p.id) ?? -99) > REGEN_DELAY) {
-        p.health = Math.min(p.maxHealth, p.health + REGEN_RATE * dt * (p.maxHealth / 100));
+      if (p.alive && p.health < p.maxHealth) {
+        const { regenDelay, regenRate } = upgradeStats(p.upgrades);
+        if (this.time - (this.lastHurt.get(p.id) ?? -99) > regenDelay) p.health = Math.min(p.maxHealth, p.health + regenRate * dt * (p.maxHealth / 100));
       }
       const list = this.history.get(p.id)!;
       list.push({ time: this.time, alive: p.alive, x: p.move.x, y: p.move.y, z: p.move.z, crouch: p.move.crouch, scale: p.scale });

@@ -66,6 +66,38 @@ export interface FrameInput {
 
 const MOUSE_RADIANS = (0.022 * Math.PI) / 180;
 
+/** An on-screen choice (solo upgrade cards): while one is up, the captured mouse moves its pointer instead of the view. */
+export interface Picker {
+  move(dx: number, dy: number): void;
+  click(): void;
+  choose(index: number): void;
+  step(direction: number): void;
+}
+
+const PICK_KEYS: Record<string, number> = { Digit1: 0, Digit2: 1, Digit3: 2, Numpad1: 0, Numpad2: 1, Numpad3: 2 };
+
+/** Ctrl+W closes the tab in browsers everywhere but on Apple systems, where that is Cmd+W. */
+function ctrlClosesTab() {
+  const nav = navigator as Navigator & { userAgentData?: { platform?: string } };
+  return !/mac|iphone|ipad|ipod/i.test(nav.userAgentData?.platform || nav.platform || nav.userAgent);
+}
+
+const HINT_SEEN = 'brickfray.ctrlHintSeen';
+let hintSeenFallback = false;
+
+/** The Ctrl+W hint shows at most once per browser session. */
+function takeCtrlHint() {
+  try {
+    if (sessionStorage.getItem(HINT_SEEN)) return false;
+    sessionStorage.setItem(HINT_SEEN, '1');
+    return true;
+  } catch {
+    if (hintSeenFallback) return false;
+    hintSeenFallback = true;
+    return true;
+  }
+}
+
 /** Keyboard, pointer-locked mouse and gamepad, merged into per-frame intent. */
 export class Input {
   settings: InputSettings;
@@ -81,6 +113,7 @@ export class Input {
   onMenu: (() => void) | null = null;
   onChat: (() => void) | null = null;
   onCtrlHint: (() => void) | null = null;
+  private picker: Picker | null = null;
   enabled = false;
   private cleanup: (() => void)[] = [];
 
@@ -147,6 +180,13 @@ export class Input {
       return;
     }
     if (!this.active) return;
+    const pick = PICK_KEYS[e.code];
+    if (this.picker && pick !== undefined) {
+      e.preventDefault();
+      if (down && !e.repeat) this.picker.choose(pick);
+      if (!down) this.down.delete(e.code);
+      return;
+    }
     if (['Tab', 'Space', 'ArrowUp', 'ArrowDown', 'ControlLeft', 'Digit1', 'Digit2', 'Digit3', 'Digit4'].includes(e.code) || e.ctrlKey) e.preventDefault();
     if (down && this.matches('chat', e.code)) {
       // Otherwise this Enter's keypress lands in the chat box that just opened and submits it.
@@ -154,15 +194,28 @@ export class Input {
       this.onChat?.();
       return;
     }
-    if (down && (e.code === 'ControlLeft' || e.code === 'ControlRight') && !document.fullscreenElement) this.onCtrlHint?.();
+    if (down && (e.code === 'ControlLeft' || e.code === 'ControlRight') && !document.fullscreenElement && ctrlClosesTab() && takeCtrlHint()) this.onCtrlHint?.();
     if (down) {
       if (!this.down.has(e.code)) this.pressedOnce.add(e.code);
       this.down.add(e.code);
     } else this.down.delete(e.code);
   }
 
+  /** A held trigger or aim lets go when a choice comes up, so the gun stops with it. */
+  setPicker(picker: Picker | null) {
+    this.picker = picker;
+    this.down.delete('Mouse0');
+    this.down.delete('Mouse2');
+    this.dx = this.dy = 0;
+  }
+
   private mouse(e: MouseEvent, down: boolean) {
     if (!this.active) return;
+    if (this.picker && down) {
+      e.preventDefault();
+      if (e.button === 0) this.picker.click();
+      return;
+    }
     const code = `Mouse${e.button}`;
     if (down) {
       e.preventDefault();
@@ -176,6 +229,7 @@ export class Input {
     if (!this.active) return;
     // Ignore the occasional giant jump some browsers emit when lock engages.
     if (Math.abs(e.movementX) > 600 || Math.abs(e.movementY) > 600) return;
+    if (this.picker) return this.picker.move(e.movementX, e.movementY);
     this.dx += e.movementX;
     this.dy += e.movementY;
   }
@@ -251,6 +305,9 @@ export class Input {
         set(BUTTON.sprint, b(10) || (forward > 0.9 && b(10)));
         if (edge(3)) cycle = 1;
         if (edge(9)) this.onMenu?.();
+        if (this.picker && edge(14)) this.picker.step(-1);
+        if (this.picker && edge(15)) this.picker.step(1);
+        if (this.picker && edge(0)) this.picker.click();
         scoreboard ||= b(8);
       }
       this.padPrev = pad.buttons.map((x) => x.pressed);
