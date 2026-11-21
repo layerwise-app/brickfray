@@ -11,8 +11,8 @@ export interface Tuning {
   eye: number;
   sprint: V3;
   sprintRot: V3;
-  /** Recoil impulses: back (m/s), rise (rad/s), random roll and yaw (rad/s), sideways jitter (m/s); `adsBack` and `adsRise` are the shares of `back` and of the turns kept at full aim (0.75 and 0.45 when omitted). */
-  recoil: { back: number; rise: number; roll: number; yaw: number; side: number; up: number; adsBack?: number; adsRise?: number };
+  /** Recoil impulses: back (m/s), rise (rad/s), random roll and yaw (rad/s), sideways jitter (m/s); `adsBack` and `adsRise` are the shares of `back` and of the turns kept at full aim (0.75 and 0.45 when omitted); `adsEye` is the share of an aimed kick that turns the gun about the eye, taking the sight off the target (0 when omitted). */
+  recoil: { back: number; rise: number; roll: number; yaw: number; side: number; up: number; adsBack?: number; adsRise?: number; adsEye?: number };
   /** Recoil spring stiffness and damping ratio. */
   spring: [number, number];
   /** Right hand: palm-frame position relative to the `grip` node, and the way the back of the hand faces (straight out to the right when omitted). */
@@ -152,7 +152,7 @@ export const TUNING: Record<WeaponId, Tuning> = {
     eye: 0.583,
     sprint: [0.1, -0.27, -0.25],
     sprintRot: [0.36, 0.68, 0.38],
-    recoil: { back: 2.2, rise: 7.5, roll: 1.6, yaw: 1.0, side: 0.08, up: 0.14, adsBack: 0.4, adsRise: 0.7 },
+    recoil: { back: 2.2, rise: 7.5, roll: 1.6, yaw: 1.0, side: 0.08, up: 0.14, adsBack: 0.4, adsRise: 0.7, adsEye: 1 },
     spring: [420, 0.72],
     right: [0, 0.002, 0.012],
     left: { pos: [0.007, -0.014, -0.0012], back: [0.25, -0.97, 0], axis: [-0.45, 0, -1] },

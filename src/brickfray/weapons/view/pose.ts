@@ -39,23 +39,26 @@ export class ViewPose {
     this.motion.rest(rig.sight, ads, this.basePos, this.baseQuat);
     const root = rig.rigged.model.root;
     root.position.copy(this.basePos).add(this.carry.gunPos.apply(f.gunPos, dt)).add(this.motion.pos);
-    // An aimed shot's kick turns the gun about the eye (below), so the sights rise together and come back; the rest turns it about the sight.
+    // Shots leave from the screen center, so an aimed gun turns about its sight and the sight stays on the target. Only a
+    // gun that names `recoil.adsEye` (one shot, then a reload) lets its kick lift the whole sight picture about the eye.
     const kick = this.motion.kickRot;
-    this.tmpV.copy(this.carry.gunRot.apply(f.gunRot, dt)).add(this.motion.rot).addScaledVector(kick, -ads);
+    const eye = ads * (rig.tuning.recoil.adsEye ?? 0);
+    this.tmpV.copy(this.carry.gunRot.apply(f.gunRot, dt)).add(this.motion.rot).addScaledVector(kick, -eye);
     root.quaternion.copy(this.baseQuat).multiply(this.tmpQ.setFromEuler(this.tmpE.set(this.tmpV.x, this.tmpV.y, this.tmpV.z)));
 
     // Moving parts: clip offsets, or the action a shot sets off (slide kick, hammer and cylinder).
     this.parts.apply(rig, dt, f, this.action);
     root.updateMatrixWorld(true);
-    // Shots leave from the screen center, so an aimed sight must stay on it; sway, bob and the clip swing the gun around the dot.
     const dot = rig.rigged.model.sight;
     if (ads > 0 && dot) {
       dot.getWorldPosition(this.tmpV);
       root.position.x -= this.tmpV.x * ads;
       root.position.y -= this.tmpV.y * ads;
-      this.tmpQ.setFromEuler(this.tmpE.set(kick.x * ads, kick.y * ads, kick.z * ads));
-      root.position.applyQuaternion(this.tmpQ);
-      root.quaternion.premultiply(this.tmpQ);
+      if (eye > 0) {
+        this.tmpQ.setFromEuler(this.tmpE.set(kick.x * eye, kick.y * eye, kick.z * eye));
+        root.position.applyQuaternion(this.tmpQ);
+        root.quaternion.premultiply(this.tmpQ);
+      }
       root.updateMatrixWorld(true);
     }
     this.parts.settle(rig, dt, this.camera);
