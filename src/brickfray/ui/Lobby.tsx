@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { ROSTER } from '../characters/roster';
 import { DIFFICULTIES, type MatchSettings } from '../sim/types';
-import { MAP_PREVIEW } from './map-preview';
+import { mapPreview } from './map-preview';
 import { useApp, useGame } from './App';
 import { useT } from './i18n';
 import { CopyIcon, CrownIcon, DoorIcon, PlayIcon } from './icons';
@@ -68,7 +68,7 @@ export function Lobby() {
                     disabled={!host}
                     onClick={() => set({ map })}
                     className='group relative aspect-[4/3] overflow-hidden rounded-xl text-left transition-transform enabled:hover:-translate-y-0.5'
-                    style={{ background: MAP_PREVIEW[map], boxShadow: s.map === map ? '0 0 0 3px var(--bf-yellow), 0 5px 0 rgba(0,0,0,.35)' : '0 5px 0 rgba(0,0,0,.35)' }}
+                    style={{ background: mapPreview(map), boxShadow: s.map === map ? '0 0 0 3px var(--bf-yellow), 0 5px 0 rgba(0,0,0,.35)' : '0 5px 0 rgba(0,0,0,.35)' }}
                   >
                     <span className='bf-display absolute bottom-2 left-3 text-xl drop-shadow-[0_2px_0_rgba(0,0,0,.6)] sm:text-2xl'>{t(`map.${map}`)}</span>
                   </button>

@@ -126,7 +126,8 @@ export class BrickBuilder {
     for (const [finish, list] of byFinish) {
       const geometries = new Map<string, THREE.BufferGeometry>();
       for (const p of list) if (!geometries.has(p.key)) geometries.set(p.key, p.geometry());
-      if (this.profile.pbr) for (const g of geometries.values()) markBevels(g);
+      // Every tier: the geometries are cached and shared, and one batch cannot mix marked and unmarked ones after a quality change.
+      for (const g of geometries.values()) markBevels(g);
       let vertices = 0;
       for (const g of geometries.values()) vertices += g.getAttribute('position').count;
       const mesh = new THREE.BatchedMesh(list.length, vertices, vertices * 2, this.materials.batch[finish]);

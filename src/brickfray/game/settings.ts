@@ -1,8 +1,11 @@
 import type { AudioMix } from '../audio/types';
 import type { CharacterId } from '../characters/types';
 import type { QualityLevel } from '../engine/quality';
-import type { Difficulty } from '../sim/types';
+import type { Difficulty, MatchSettings } from '../sim/types';
+import type { MapId } from '../world/types';
 import { DEFAULT_BINDINGS, type InputSettings } from './input';
+
+export const MAP_IDS: MapId[] = ['plaza', 'fortress', 'docks'];
 
 export interface CrosshairSettings {
   color: string;
@@ -24,6 +27,9 @@ export interface Settings {
   showStats: boolean;
   /** Last solo difficulty picked. */
   difficulty: Difficulty;
+  /** Last map picked for a solo run, and the last room set up as host. */
+  soloMap: MapId;
+  room: Pick<MatchSettings, 'mode' | 'map' | 'minutes' | 'bots'>;
 }
 
 const KEY = 'brickfray.settings.v2';
@@ -54,7 +60,9 @@ export function defaultSettings(): Settings {
     crosshair: { color: '#ffffff', size: 1, gap: 1, dot: true },
     damageNumbers: false,
     showStats: false,
-    difficulty: 'normal'
+    difficulty: 'normal',
+    soloMap: 'plaza',
+    room: { mode: 'ffa', map: 'plaza', minutes: 10, bots: 5 }
   };
 }
 
@@ -69,7 +77,9 @@ export function loadSettings(): Settings {
       ...saved,
       input: { ...base.input, ...saved.input, bindings: { ...base.input.bindings, ...saved.input?.bindings } },
       mix: { ...base.mix, ...saved.mix },
-      crosshair: { ...base.crosshair, ...saved.crosshair }
+      crosshair: { ...base.crosshair, ...saved.crosshair },
+      soloMap: MAP_IDS.includes(saved.soloMap as MapId) ? saved.soloMap! : base.soloMap,
+      room: { ...base.room, ...saved.room, map: MAP_IDS.includes(saved.room?.map as MapId) ? saved.room!.map : base.room.map }
     };
   } catch {
     return base;

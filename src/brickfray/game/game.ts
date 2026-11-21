@@ -17,11 +17,10 @@ import { AppStore, type AppError } from './app-store';
 import { HudStore } from './hud';
 import { Input } from './input';
 import { MatchView } from './match-view';
-import { saveSettings, type Settings } from './settings';
+import { MAP_IDS, saveSettings, type Settings } from './settings';
 import { IDLE, Showroom } from './showroom';
 import { renderPortraits } from './portraits';
 
-const MAP_IDS: MapId[] = ['plaza', 'fortress', 'docks'];
 
 function sessionToken() {
   try {
@@ -181,6 +180,8 @@ export class Game {
     this.showroom = new Showroom(this.kit, this.renderer, this.settings.character);
     if (this.match && this.client?.settings) {
       const old = this.match;
+      // Cleared first: if the new view cannot be built, the pause menu must still be able to leave.
+      this.match = null;
       old.dispose();
       this.match = this.createMatch(this.client.settings);
       this.match.adopt(old);
@@ -195,7 +196,7 @@ export class Game {
 
   /** Opens the solo setup screen; the run begins on Start. */
   async playSolo() {
-    await this.hostGame('solo', this.baseSettings('solo', 'plaza'), false);
+    await this.hostGame('solo', this.baseSettings('solo', this.settings.soloMap), false);
   }
 
   async quickMatch() {
@@ -210,7 +211,7 @@ export class Game {
   }
 
   async createRoom(kind: Exclude<HostKind, 'solo'>) {
-    await this.hostGame(kind, this.baseSettings('ffa', 'plaza'), false);
+    await this.hostGame(kind, { ...this.baseSettings('ffa'), ...this.settings.room }, false);
   }
 
   async browse() {
@@ -335,11 +336,12 @@ export class Game {
   }
 
   setLobbySettings(settings: Partial<MatchSettings>) {
-    this.host?.setSettings(settings);
-    if (settings.difficulty) {
-      this.settings = { ...this.settings, difficulty: settings.difficulty };
-      saveSettings(this.settings);
-    }
+    if (!this.host) return;
+    this.host.setSettings(settings);
+    // What the host picks is the default next time, after a reload too.
+    const { mode, map, minutes, bots, difficulty } = { ...this.host.lobby.settings, ...settings };
+    this.settings = this.host.kind === 'solo' ? { ...this.settings, difficulty, soloMap: map } : { ...this.settings, room: { mode, map, minutes, bots } };
+    saveSettings(this.settings);
   }
 
   chat(text: string) {
@@ -362,7 +364,7 @@ export class Game {
     this.client = null;
     this.host?.close();
     this.host = null;
-    if (this.match) this.exitMatch('menu');
+    if (this.match || this.app.state.screen === 'match') this.exitMatch('menu');
     this.app.set({ screen: 'menu', lobby: null, isHost: false, busy: null, paused: false });
   }
 
