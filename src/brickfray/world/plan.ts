@@ -5,8 +5,10 @@ import type { Kit } from '../engine/kit';
 import type { Finish } from '../engine/materials';
 import type { Atmosphere } from '../engine/renderer';
 import { Anim } from './anim';
-import { detailLod } from './lod';
+import { contactShadows } from './contact-shadows';
+import { detailLod, type LodMode } from './lod';
 import { buildNav } from './nav';
+import { Siding } from './siding';
 import { aimSpawns } from './spawn-aim';
 import type { Collider, MapDefinition, MapId, MapLayout, MapVisual, SpawnPoint } from './types';
 import { Frame, Rng, type PlanCollider, type Vec3 } from './util';
@@ -57,7 +59,13 @@ export class Drawer {
   readonly b: BrickBuilder;
   /** Small parts and brick reliefs: drawn and shadowed, but never cast shadows. */
   private readonly minor: BrickBuilder;
+  /** Small parts that dissolve with distance (medium and high). */
+  private readonly fine: BrickBuilder;
+  /** Cheap stand-ins drawn only where the fine parts have dissolved. */
+  private readonly far: BrickBuilder;
+  private scope: 'lasting' | 'distant' | null = null;
   readonly ground: GroundTile[] = [];
+  readonly siding = new Siding();
   readonly anim: Anim;
   readonly rng: Rng;
   readonly detail: 0 | 1 | 2;
@@ -69,12 +77,16 @@ export class Drawer {
   constructor(readonly kit: Kit, seed: number) {
     this.b = new BrickBuilder(kit.profile, kit.materials);
     this.minor = new BrickBuilder(kit.profile, kit.materials);
+    this.fine = new BrickBuilder(kit.profile, kit.materials);
+    this.far = new BrickBuilder(kit.profile, kit.materials);
     const custom = this.b.custom.bind(this.b);
     const size = new THREE.Vector3();
     this.b.custom = (key, geometry, x, y, z, options) => {
       const g = geometry();
       if (!g.boundingBox) g.computeBoundingBox();
+      if (!g.boundingSphere) g.computeBoundingSphere();
       g.boundingBox!.getSize(size);
+      const stretch = options.scale ? Math.max(options.scale.x, options.scale.y, options.scale.z) : 1;
       if (options.scale) size.multiply(options.scale);
       const small = Math.min(size.x, size.y, size.z) < 0.15 || Math.max(size.x, size.y, size.z) < 0.9;
       const family = key.split(/[:#]/)[0]! + (family0(key) === 'face' || small ? '' : '*');
@@ -82,8 +94,11 @@ export class Drawer {
       entry.parts++;
       entry.tris += g.getAttribute('position').count / 3;
       this.stats.set(family, entry);
-      if (family0(key) === 'face' || small) this.minor.custom(key, geometry, x, y, z, options);
-      else custom(key, geometry, x, y, z, options);
+      if (this.scope === 'distant') this.far.custom(key, geometry, x, y, z, options);
+      else if (family0(key) === 'face' || small || this.scope === 'lasting') {
+        const fades = this.scope !== 'lasting' && this.detail > 0 && g.boundingSphere!.radius * stretch < FINE_RADIUS;
+        (fades ? this.fine : this.minor).custom(key, geometry, x, y, z, options);
+      } else custom(key, geometry, x, y, z, options);
     };
     this.anim = new Anim(kit);
     this.rng = new Rng(seed);
@@ -94,16 +109,35 @@ export class Drawer {
     return this.kit.profile;
   }
 
+  /** Parts drawn inside `fn` stay at every distance (small parts that carry a building's outline from afar). */
+  lasting(fn: () => void) {
+    this.scope = 'lasting';
+    fn();
+    this.scope = null;
+  }
+
+  /** Parts drawn inside `fn` stand in, beyond the fade range, for detail that dissolves there; nothing on low. */
+  distant(fn: () => void) {
+    if (this.detail === 0) return;
+    this.scope = 'distant';
+    fn();
+    this.scope = null;
+  }
+
   /** Bake every collected part into batched meshes (major ones cast shadows). */
   bake() {
     const group = this.b.build();
-    const minor = this.minor.build();
     const range = this.detail === 2 ? 46 : 34;
-    for (const child of [...minor.children]) {
-      child.castShadow = false;
-      if (this.detail > 0) detailLod(child as THREE.BatchedMesh, range);
-      group.add(child);
-    }
+    const add = (built: THREE.Group, mode?: LodMode) => {
+      for (const child of [...built.children]) {
+        child.castShadow = false;
+        group.add(child);
+        if (mode) group.add(detailLod(child as THREE.BatchedMesh, range, mode));
+      }
+    };
+    add(this.minor.build());
+    add(this.fine.build(), 'near');
+    add(this.far.build(), 'far');
     return group;
   }
 
@@ -121,6 +155,8 @@ export class Drawer {
 }
 
 const family0 = (key: string) => key.split(/[:#]/)[0]!;
+/** Bounding radius under which a small part dissolves with distance. */
+const FINE_RADIUS = 1.6;
 
 export let lastBuildStats: Record<string, { parts: number; tris: number }> = {};
 export let lastElementStats: Record<string, number> = {};
@@ -178,6 +214,7 @@ export function defineMap(spec: MapSpec): MapDefinition {
     build(kit: Kit): MapVisual {
       const plan = spec.plan();
       const d = new Drawer(kit, spec.seed);
+      d.anim.sky = { zenith: spec.atmosphere.zenith, horizon: spec.atmosphere.horizon };
       const byElement = new Map<string, number>();
       for (const item of plan.items) {
         const before = [...d.stats.values()].reduce((a, e) => a + e.tris, 0);
@@ -187,7 +224,7 @@ export function defineMap(spec: MapSpec): MapDefinition {
         byElement.set(sig, (byElement.get(sig) ?? 0) + after - before);
       }
       lastElementStats = Object.fromEntries([...byElement].sort((a, b) => b[1] - a[1]).slice(0, 25));
-      spec.backdrop?.(d);
+      d.lasting(() => spec.backdrop?.(d));
       lastBuildStats = Object.fromEntries([...d.stats].sort((a, b) => b[1].tris - a[1].tris));
       const root = new THREE.Group();
       root.name = `map:${spec.id}`;
@@ -196,19 +233,31 @@ export function defineMap(spec: MapSpec): MapDefinition {
       const scenery = d.bake();
       for (const child of scenery.children) {
         const mesh = child as THREE.BatchedMesh;
-        if (mesh.material !== kit.materials.batch.glass) mesh.sortObjects = false;
+        if (mesh.name !== 'scenery:glass') mesh.sortObjects = false;
       }
       root.add(scenery);
+      const siding = d.siding.build(kit);
+      if (siding) root.add(siding);
       const anim = d.anim.build();
       root.add(anim.root);
+      const contact = kit.profile.shadows ? null : contactShadows(collectColliders(plan), spec.atmosphere.sunDirection);
+      if (contact) root.add(contact);
       return {
         root,
         update: anim.update,
         dispose() {
           ground.geometry.dispose();
           (ground.material as THREE.Material).dispose();
-          for (const child of scenery.children) (child as THREE.BatchedMesh).dispose();
+          siding?.geometry.dispose();
+          (siding?.material as THREE.Material | undefined)?.dispose();
+          for (const child of scenery.children) {
+            const mesh = child as THREE.BatchedMesh;
+            mesh.dispose();
+            if ((mesh.material as THREE.Material).userData.lodClone) (mesh.material as THREE.Material).dispose();
+          }
           anim.dispose();
+          contact?.geometry.dispose();
+          (contact?.material as THREE.Material | undefined)?.dispose();
         }
       };
     }

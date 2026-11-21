@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { loadHeroAssets } from '../characters';
 import { Game } from '../game/game';
 import { loadSettings } from '../game/settings';
 import { Connecting, ErrorBanner } from './Connecting';
@@ -36,10 +37,19 @@ export default function App() {
 
   // eslint-disable-next-line react-hooks/exhaustive-deps -- the WebGL game is created once per mount
   useEffect(() => {
-    const instance = new Game(canvasRef.current!, tagsRef.current!, loadSettings());
-    setGame(instance);
-    (window as Window & { __game?: Game }).__game = instance;
-    return () => instance.dispose();
+    let instance: Game | null = null;
+    let unmounted = false;
+    // The showroom figure is built once, with its baked extras: they have to be there first.
+    void loadHeroAssets().then(() => {
+      if (unmounted) return;
+      instance = new Game(canvasRef.current!, tagsRef.current!, loadSettings());
+      setGame(instance);
+      (window as Window & { __game?: Game }).__game = instance;
+    });
+    return () => {
+      unmounted = true;
+      instance?.dispose();
+    };
   }, []);
 
   return (
@@ -48,8 +58,20 @@ export default function App() {
       <div ref={tagsRef} className='pointer-events-none absolute inset-0 overflow-hidden' />
       {game && (
         <GameContext.Provider value={game}>
-          <Screens openSettings={() => setSettingsOpen(true)} />
-          {settingsOpen && <SettingsPanel onClose={() => setSettingsOpen(false)} />}
+          <Screens
+            openSettings={() => {
+              game.audio.play('uiClick');
+              setSettingsOpen(true);
+            }}
+          />
+          {settingsOpen && (
+            <SettingsPanel
+              onClose={() => {
+                game.audio.play('uiBack');
+                setSettingsOpen(false);
+              }}
+            />
+          )}
         </GameContext.Provider>
       )}
     </div>

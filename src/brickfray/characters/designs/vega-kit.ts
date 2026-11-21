@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { limbBand } from '../body-limbs';
 import type { PartSet } from '../parts';
 import * as S from '../shapes';
 import type { V3 } from '../skeleton';
@@ -8,7 +9,7 @@ import { C } from './vega-hair';
 const HALF = Math.PI / 2;
 const { lerp, smoothstep } = THREE.MathUtils;
 /** The jacket's shape over the shared torso (body-torso.ts at bulk 0.92), on the chest and waist bones. */
-const CHEST = new Garment(
+export const CHEST = new Garment(
   [
     [-0.05, 0.288, 0.198],
     [0.05, 0.316, 0.208],
@@ -19,7 +20,7 @@ const CHEST = new Garment(
   ],
   3
 );
-const WAIST = new Garment(
+export const WAIST = new Garment(
   [
     [-0.036, 0.262, 0.186],
     [0.04, 0.256, 0.182],
@@ -29,12 +30,12 @@ const WAIST = new Garment(
 );
 const LIFT = 0.002;
 const CLOTH = 0.006;
-const ON = LIFT + CLOTH + 0.0004;
+export const ON = LIFT + CLOTH + 0.0004;
 const TOP = 0.26;
 const HEM = -0.036;
 const ZIP_X = -0.03;
-const L = 0.93;
-const THIGH = thigh(L);
+export const L = 0.93;
+export const THIGH = thigh(L);
 /** Raglan seam: from the armpit up to the collar. */
 const raglan = (y: number) => lerp(0.2, 0.05, smoothstep(y, 0.085, 0.25));
 const span = (y0: number, y1: number, f: (y: number) => [number, number]) => ({ y: [y0, y1] as [number, number], a: (t: number) => f(lerp(y0, y1, t)) });
@@ -104,8 +105,8 @@ export function jacket(b: PartSet) {
       C.white,
       { look: 'cloth' }
     );
-    b.add('chest', CHEST.panel({ y: [0.2, 0.245], a: [CHEST.front(0.22, sign * 0.105), CHEST.front(0.22, sign * 0.135)], lift: ON + 0.002, thick: 0.003, seg: [1, 3] }), C.tealDark, { look: 'cloth' });
-    b.cyl('chest', 0.0055, 0.0055, 0.003, C.steel, { ...CHEST.stud(0.212, CHEST.front(0.212, sign * 0.12), ON + 0.005), look: 'chrome', seg: 8 });
+    b.add('chest', CHEST.panel({ y: [0.2, 0.245], a: [CHEST.front(0.22, sign * 0.088), CHEST.front(0.22, sign * 0.116)], lift: ON + 0.002, thick: 0.003, seg: [2, 3] }), C.tealDark, { look: 'cloth' });
+    b.cyl('chest', 0.0055, 0.0055, 0.003, C.steel, { ...CHEST.stud(0.212, CHEST.front(0.212, sign * 0.102), ON + 0.005), look: 'chrome', seg: 8 });
   });
 }
 
@@ -135,23 +136,23 @@ export function sleeves(b: PartSet) {
   b.mirror((side, sign) => {
     const ua = `upperArm${side}` as const;
     const fa = `forearm${side}` as const;
-    b.cyl(ua, 0.057 * L, 0.0585 * L, 0.066, C.white, { at: [0, -0.04, 0], look: 'cloth', seg: round });
-    b.cyl(fa, 0.0425, 0.0412, 0.026, C.white, { at: [0, -0.168, 0], look: 'cloth', seg: round });
+    b.add(ua, limbBand(b, 'upperArm', L, -0.073, -0.007, 0.005), C.white, { look: 'cloth' });
+    b.add(fa, limbBand(b, 'forearm', L, -0.181, -0.155, 0.0035), C.white, { look: 'cloth' });
     if (!hi) return;
-    b.cyl(ua, 0.0595 * L, 0.0595 * L, 0.008, C.tealDark, { at: [0, -0.079, 0], look: 'cloth', seg: round });
+    b.add(ua, limbBand(b, 'upperArm', L, -0.083, -0.075, 0.006), C.tealDark, { look: 'cloth' });
     if (b.hero) {
       lump(b, fa, [0.07 * L, 0.1, 0.05], 12, C.tealDark, { at: [0, -0.03, 0.03 * L], look: 'cloth', e: 0.6 });
-      b.cyl(fa, 0.0438, 0.0434, 0.004, C.tealDark, { at: [0, -0.153, 0], look: 'cloth', seg: round });
+      b.add(fa, limbBand(b, 'forearm', L, -0.156, -0.151, 0.0045), C.tealDark, { look: 'cloth' });
     }
     if (sign > 0) return;
-    b.cyl(fa, 0.0445, 0.0435, 0.02, C.dark, { at: [0, -0.134, 0], look: 'rubber', seg: round });
+    b.add(fa, limbBand(b, 'forearm', L, -0.144, -0.124, 0.0035), C.dark, { look: 'rubber' });
     b.cyl(fa, 0.021, 0.021, 0.012, C.steel, { at: [-0.044, -0.134, 0], rot: [0, 0, HALF], look: 'chrome', seg: round });
     b.cyl(fa, 0.017, 0.017, 0.014, '#f7f4ea', { at: [-0.044, -0.134, 0], rot: [0, 0, HALF], look: 'gloss', seg: round });
     b.box(fa, [0.0162, 0.004, 0.022], '#d8342c', { at: [-0.044, -0.134, 0], rot: [0.6, 0, 0], look: 'gloss', bevel: 0 });
   });
 }
 
-/** Scarf: wraps around the neck, a knot with a short end at her left collarbone, and two tails on the swinging bone. */
+/** Scarf: wraps around the neck, with a knot and a short end at her left collarbone; its tails are in vega-trim.ts. */
 export function scarf(b: PartSet) {
   const hi = b.detail >= 2;
   const hero = b.hero;
@@ -160,11 +161,12 @@ export function scarf(b: PartSet) {
   const loop = (y: number, rx: number, rz: number, r: number, tilt: number, lean: number, from: number, to: number) => {
     const pts: V3[] = [];
     const n = 12;
-    for (let i = 0; i <= n; i++) {
+    const closed = to - from >= Math.PI * 2 - 1e-6;
+    for (let i = 0; i < (closed ? n : n + 1); i++) {
       const a = lerp(from, to, i / n);
       pts.push([Math.sin(a) * rx, y + Math.cos(a) * tilt + Math.sin(a) * lean, 0.004 - Math.cos(a) * rz]);
     }
-    return strand(pts, r, { flat: 0.78, side: [0, 1, 0], seg, radial });
+    return strand(pts, r, { flat: 0.78, side: [0, 1, 0], seg, radial, closed });
   };
   b.add('chest', loop(0.258, 0.088, 0.082, 0.034, -0.012, 0.004, Math.PI, Math.PI * 3), C.scarf, { look: 'cloth' });
   b.add('chest', loop(0.292, 0.078, 0.074, 0.028, 0.008, -0.008, Math.PI - 0.4, Math.PI * 3 - 0.1), C.scarfDark, { look: 'cloth' });
@@ -186,28 +188,6 @@ export function scarf(b: PartSet) {
   if (hi) b.box('chest', [0.076, 0.012, 0.014], C.scarfDark, { at: [-0.092, 0.104, -0.123], rot: [0.06, -0.3, 0.05], look: 'cloth', bevel: hero ? 0.003 : 0 });
   if (hero) for (let i = 0; i < 6; i++) b.cyl('chest', 0.0035, 0.002, 0.024, C.scarfDark, { at: [-0.123 + i * 0.012, 0.067, -0.11 - i * 0.003], rot: [0.05, 0, 0.1 - i * 0.03], look: 'cloth', seg: 5 });
 
-  // Two tails down the back: a long one that kicks out at the end and a shorter one beside it.
-  const tail = (points: V3[], half: number) => strand(points, (t) => half * (0.8 + 0.3 * t), { flat: 0.2, side: [1, 0, 0.15], seg: tier(b, 5, 6, 12), radial });
-  const long: V3[] = [
-    [0.01, 0.05, -0.035],
-    [0.016, 0.0, 0.014],
-    [0.034, -0.13, 0.034],
-    [0.03, -0.29, 0.03],
-    [0.06, -0.43, 0.062]
-  ];
-  b.add('dangleBack', tail(long, 0.043), C.scarf, { look: 'cloth' });
-  const short: V3[] = [
-    [-0.016, 0.05, -0.035],
-    [-0.03, 0.0, 0.012],
-    [-0.052, -0.11, 0.022],
-    [-0.064, -0.25, 0.034]
-  ];
-  if (hi) b.add('dangleBack', tail(short, 0.036), C.scarfDark, { look: 'cloth' });
-  for (const y of hi ? [-0.35, -0.385] : [-0.37]) {
-    const t = (y + 0.29) / -0.14;
-    b.box('dangleBack', [0.104, 0.014, 0.022], C.scarfDark, { at: [lerp(0.03, 0.06, t), y, lerp(0.03, 0.062, t)], rot: [-0.24, -0.15, -0.2], look: 'cloth', bevel: hero ? 0.004 : 0 });
-  }
-  if (hero) for (let i = 0; i < 8; i++) b.cyl('dangleBack', 0.004, 0.0022, 0.03, C.scarfDark, { at: [0.016 + i * 0.0125, -0.44 - Math.abs(i - 3.5) * 0.001, 0.07 + (i - 3.5) * 0.002], rot: [-0.25, 0, -0.2 + (i - 3.5) * 0.03], look: 'cloth', seg: 5 });
 }
 
 /** Binoculars on a neck strap. */
@@ -239,6 +219,8 @@ const BELT = new Garment(
   ],
   3.2
 );
+/** Belt angle of the pouch: on the right hip, clear of the gun hand at a low ready. */
+const POUCH = 1.45;
 
 /** Webbing belt with a clip buckle, pouches, a lumbar roll, the drop-leg pouch and the knife's empty sheath. */
 export function fieldKit(b: PartSet) {
@@ -248,13 +230,13 @@ export function fieldKit(b: PartSet) {
   const bevel = (v: number) => (hero ? v : 0);
   const r = 0.0755 * L;
   b.box('pelvis', [0.064, 0.052, 0.014], C.teal, { ...BELT.place(0.035, 0, 0.004), look: 'gloss', bevel: hi ? 0.005 : 0 });
-  b.box('pelvis', [0.066, 0.07, 0.05], C.teal, { ...BELT.place(0.022, BELT.front(0.022, 0.112), 0.024), look: 'cloth', bevel: hi ? 0.01 : 0 });
+  b.box('pelvis', [0.066, 0.07, 0.05], C.teal, { ...BELT.place(0.022, POUCH, 0.024), look: 'cloth', bevel: hi ? 0.01 : 0 });
   if (!hi) {
     b.box('thighL', [0.05, 0.11, 0.1], C.dark, { at: [-r - 0.012, -0.2, -0.004], look: 'rubber', bevel: 0 });
     return;
   }
-  b.box('pelvis', [0.07, 0.03, 0.054], C.tealDark, { ...BELT.place(0.046, BELT.front(0.046, 0.112), 0.025), look: 'cloth', bevel: bevel(0.008) });
-  b.cyl('pelvis', 0.006, 0.006, 0.004, C.steel, { ...BELT.stud(0.038, BELT.front(0.038, 0.112), 0.052), look: 'chrome', seg: 8 });
+  b.box('pelvis', [0.07, 0.03, 0.054], C.tealDark, { ...BELT.place(0.046, POUCH, 0.025), look: 'cloth', bevel: bevel(0.008) });
+  b.cyl('pelvis', 0.006, 0.006, 0.004, C.steel, { ...BELT.stud(0.038, POUCH, 0.052), look: 'chrome', seg: 8 });
   b.box('pelvis', [0.024, 0.036, 0.016], C.dark, { ...BELT.place(0.035, 0, 0.006), look: 'rubber', bevel: bevel(0.004) });
   // Lumbar roll: a sleeping mat strapped across the back of the belt.
   b.cyl('pelvis', 0.04, 0.04, 0.2, C.white, { at: [0, 0.03, 0.15], rot: [0, 0, HALF], look: 'cloth', seg: round });
@@ -272,26 +254,25 @@ export function fieldKit(b: PartSet) {
   lump(b, 'thighL', [0.05, 0.11, 0.1], tier(b, 6, 8, 16), C.dark, { at: [-r - 0.012, -0.2, -0.004], look: 'rubber', e: 0.35 });
   b.box('thighL', [0.03, 0.04, 0.104], C.slate, { at: [-r - 0.027, -0.162, -0.004], look: 'rubber', bevel: bevel(0.006) });
   b.box('thighL', [0.008, 0.02, 0.024], C.teal, { at: [-r - 0.043, -0.176, -0.004], look: 'gloss', bevel: bevel(0.003) });
-  for (const y of [-0.165, -0.235]) b.cyl('thighL', r + 0.004, r + 0.001, 0.02, C.dark, { at: [0, y, 0], look: 'rubber', seg: round });
+  for (const y of [-0.165, -0.235]) b.add('thighL', limbBand(b, 'thigh', L, y - 0.01, y + 0.01, 0.0035), C.dark, { look: 'rubber' });
   b.box('thighL', [0.008, 0.16, 0.03], C.dark, { at: [-r - 0.0, -0.075, -0.004], rot: [0, 0, 0.05], look: 'rubber', bevel: 0 });
   // Sheath for her knife on the right thigh.
   b.box('thighR', [0.022, 0.16, 0.046], C.dark, { at: [r + 0.008, -0.19, 0.006], rot: [0, 0, -0.04], look: 'rubber', bevel: bevel(0.006) });
   b.box('thighR', [0.026, 0.02, 0.05], C.teal, { at: [r + 0.011, -0.118, 0.006], rot: [0, 0, -0.04], look: 'gloss', bevel: bevel(0.004) });
-  for (const y of [-0.15, -0.23]) b.cyl('thighR', r + 0.003, r + 0.001, 0.016, C.dark, { at: [0, y, 0], look: 'rubber', seg: round });
+  for (const y of [-0.15, -0.23]) b.add('thighR', limbBand(b, 'thigh', L, y - 0.008, y + 0.008, 0.003), C.dark, { look: 'rubber' });
   if (hero) b.ball('thighR', 0.006, C.steel, { at: [r + 0.0205, -0.262, 0.006], look: 'chrome' });
 }
 
 /** Knee shells on padded straps and the bands at the top of her boots. */
 export function legKit(b: PartSet) {
   const soft = tier(b, 6, 8, 16);
-  const round = tier(b, 8, 10, 20);
   b.mirror((side, sign) => {
     const sh = `shin${side}` as const;
     lump(b, sh, [0.098, 0.112, 0.05], soft, C.dark, { at: [0, -0.012, -0.046], look: 'rubber', e: 0.5 });
     lump(b, sh, [0.076, 0.086, 0.034], soft, C.white, { at: [0, -0.008, -0.068], look: 'gloss', e: 0.6 });
-    b.cyl(sh, 0.0555, 0.0545, 0.02, C.dark, { at: [0, -0.066, 0.003], look: 'rubber', seg: round });
-    b.cyl(`thigh${side}`, 0.0625, 0.061, 0.02, C.dark, { at: [0, -0.37, 0], look: 'rubber', seg: round });
-    b.cyl(sh, 0.0458, 0.0448, 0.022, C.teal, { at: [0, -0.3, 0.001], look: 'cloth', seg: round });
+    b.add(sh, limbBand(b, 'shin', L, -0.076, -0.056, 0.0035), C.dark, { look: 'rubber' });
+    b.add(`thigh${side}`, limbBand(b, 'thigh', L, -0.38, -0.36, 0.0035), C.dark, { look: 'rubber' });
+    b.add(sh, limbBand(b, 'shin', L, -0.311, -0.289, 0.0033), C.teal, { look: 'cloth' });
     if (!b.hero) return;
     // Piping down the outside of the thigh.
     b.add(`thigh${side}`, THIGH.panel({ y: [-0.35, -0.03], a: [sign * (HALF - 0.04), sign * (HALF + 0.04)], lift: 0.0008, thick: 0.0014, seg: [1, 3] }), C.teal, { look: 'cloth' });

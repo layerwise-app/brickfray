@@ -310,7 +310,7 @@ export interface MeleeDef {
 export const MELEES: Record<MeleeId, MeleeDef> = {
   mallet: { id: 'mallet', name: 'Brick Mallet', damage: 55, backstab: 100, cooldown: 0.8, range: 2, arc: 0.6, windup: 0.12 },
   sword: { id: 'sword', name: 'Brick Blade', damage: 55, backstab: 100, cooldown: 0.9, range: 2.5, arc: 0.7, windup: 0.15 },
-  knife: { id: 'knife', name: 'Snap Knife', damage: 50, backstab: 100, cooldown: 0.6, range: 1.7, arc: 0.5, windup: 0.08 },
+  knife: { id: 'knife', name: 'Snap Knife', damage: 50, backstab: 100, cooldown: 0.6, range: 1.7, arc: 0.5, windup: 0.105 },
   anchor: { id: 'anchor', name: 'Anchor', damage: 60, backstab: 100, cooldown: 0.95, range: 2.1, arc: 0.7, windup: 0.16 },
   hatchet: { id: 'hatchet', name: 'Hatchet', damage: 55, backstab: 100, cooldown: 0.75, range: 1.9, arc: 0.6, windup: 0.11 },
   wrench: { id: 'wrench', name: 'Torque Wrench', damage: 55, backstab: 100, cooldown: 0.8, range: 2, arc: 0.6, windup: 0.12 }

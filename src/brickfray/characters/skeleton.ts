@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { TORSO_DEPTH } from './parts';
 
 export const BONES = [
   'pelvis',
@@ -26,7 +27,8 @@ export const BONES = [
   'mallet',
   'grenade',
   'dangleHead',
-  'dangleBack'
+  'dangleBack',
+  'dangleHip'
 ] as const;
 
 export type BoneName = (typeof BONES)[number];
@@ -60,7 +62,8 @@ export const PARENT: Record<BoneName, BoneName | null> = {
   mallet: 'handL',
   grenade: 'handL',
   dangleHead: 'head',
-  dangleBack: 'chest'
+  dangleBack: 'chest',
+  dangleHip: 'pelvis'
 };
 
 /** Limb lengths in meters; the animator's IK uses the same numbers. */
@@ -77,7 +80,7 @@ export const HIP_X = 0.095;
 export const PELVIS_Y = 0.98;
 
 /** Offsets from each bone's parent in the rest pose (feet at y=0, facing -Z, every rotation identity). */
-const REST: Record<BoneName, V3> = {
+const REST: Record<Exclude<BoneName, 'dangleBack'>, V3> = {
   pelvis: [0, PELVIS_Y, 0],
   spine: [0, 0.1, 0],
   chest: [0, 0.16, 0],
@@ -103,13 +106,15 @@ const REST: Record<BoneName, V3> = {
   mallet: [0.035, 0.045, -0.07],
   grenade: [0.035, 0.05, -0.07],
   dangleHead: [0, 0.2, 0.1],
-  dangleBack: [0, 0.18, 0.12]
+  dangleHip: [0, 0, 0]
 };
+/** Hangs off the back of the deepened torso. Read when a rig is built, not on load: parts.ts imports this module. */
+const backRest = (): V3 => [0, 0.18, 0.12 * TORSO_DEPTH];
 
 export type RestOverrides = Partial<Record<BoneName, V3>>;
 
 export function restOffsets(overrides: RestOverrides = {}): V3[] {
-  return BONES.map((name) => overrides[name] ?? REST[name]);
+  return BONES.map((name) => overrides[name] ?? (name === 'dangleBack' ? backRest() : REST[name]));
 }
 
 /** Rest positions in model space, used to bake bone-local parts into the bind pose. */

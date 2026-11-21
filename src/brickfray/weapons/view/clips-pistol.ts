@@ -1,10 +1,12 @@
 import { hand, track, type Clip, type Keys } from './clip';
 import { carry, clip, jolt, magSwap, viewGoal, viewOf, Z } from './clips-kit';
-import { fingers } from './fingers';
+import { fingers, FINGERS, type FingerPose } from './fingers';
 import type { Goal } from './goals';
 import { env, seg } from './springs';
 
 export const SLIDE_LOCK = 0.03;
+/** Clamped over the slide: four fingertips hooked on the far serrations, the thumb pressed on the near ones. */
+const CLAMP: FingerPose = { ...FINGERS.support, thumb: 0.7, oppose: 0.45, hook: 0.3, index: 0.74, middle: 0.76, ring: 0.8, pinky: 0.8, spread: 0 };
 const SLIDE_PULL = SLIDE_LOCK + 0.006;
 
 /** Muzzle up, butt of the grip turned in toward the left hand. */
@@ -15,9 +17,13 @@ const MEET = [-0.064, 0.134, -0.062, 0.52, 0.25, -0.78];
 /** Thumbing the release: a short flick that helps the empty mag out. */
 const FLICK = [-0.03, 0.11, -0.03, 0.42, 0.1, -0.35];
 const RECOVER = [-0.04, 0.085, -0.045, 0.34, 0.2, -0.55];
-/** Slide brought across to the left hand. */
-const RACK = [-0.03, 0.085, -0.11, 0.14, 0.4, -0.5];
-const RACKED = [-0.022, 0.08, -0.13, 0.1, 0.38, -0.46];
+/** Turning over after the seat, on the way to the rack. */
+const TURN = [-0.08, 0.12, -0.05, 0.45, 0.5, 0.25];
+/** Turned broadside across the chest, so the eye reads the slide in profile and the hand takes its rear from the top without hiding it. */
+const RACK = [-0.1, 0.1, -0.04, 0.3, 0.85, 1.05];
+/** Punched forward out of the hand that holds the slide, then drawn back as it lets go. */
+const RACKED = [-0.117, 0.107, -0.052, 0.32, 0.87, 1.07];
+const RACK_OUT = [-0.05, 0.05, -0.015, 0.15, 0.3, 0.2];
 const DIP = [0.004, -0.01, 0.006, -0.04, -0.02, 0.05];
 const OVER = [0.004, -0.006, 0.004, -0.03, -0.01, 0.04];
 
@@ -53,11 +59,11 @@ export function pistolReload(empty: boolean, duration: number): Clip {
       f.gun(track(t, gun));
       mag(t, f, c);
       f.left = hand(t, [[0, g.leftRest!], [0.05, g.leftRest!], [0.25, g.mag!], [1.07, g.mag!], [1.3, g.leftRest!]]);
-      if (t > 0.05 && t < 1.3) f.leftFingers = fingers(t, [[0.05, 'wrap'], [0.16, 'open'], [0.27, 'magazine'], [1.04, 'magazine'], [1.16, 'relaxed'], [1.3, 'wrap']]);
+      if (t > 0.05 && t < 1.3) f.leftFingers = fingers(t, [[0.05, c.tuning.fingers.left], [0.16, 'open'], [0.27, 'magazine'], [1.04, 'magazine'], [1.16, 'relaxed'], [1.3, c.tuning.fingers.left]]);
       f.busy = env(t, 0, 0.14, 1.2, 1.38);
     });
   }
-  const gun: Keys = [[0, Z], [0.06, DIP], [0.19, FLICK], [0.34, RECOVER], [0.52, PRESENT], [0.7, MEET], [0.9, WAIT], [1.12, RACK], [1.3, RACKED], [1.57, OVER], [1.67, Z], [1.7, Z]];
+  const gun: Keys = [[0, Z], [0.06, DIP], [0.19, FLICK], [0.34, RECOVER], [0.52, PRESENT], [0.7, MEET], [0.9, TURN], [1.12, RACK], [1.225, RACKED], [1.37, RACK_OUT], [1.57, OVER], [1.67, Z], [1.7, Z]];
   const local: Keys = [[0.14, Z], [0.2, [0, -0.03, 0.005]], [0.27, CLEAR], [0.64, UNDER], [0.72, MOUTH], [0.745, [0, -0.043, 0.007, 0.02, 0, 0]], [0.78, Z]];
   const slide: Keys = [[1.14, [0, 0, SLIDE_LOCK]], [1.21, [0, 0, SLIDE_PULL]], [1.24, [0, 0, SLIDE_PULL]], [1.265, Z]];
   let path: Keys | null = null;
@@ -98,10 +104,12 @@ export function pistolReload(empty: boolean, duration: number): Clip {
       [1.24, g.slide!],
       [1.2401, g.slideBack!],
       [1.31, g.slideBack!],
-      [1.58, g.leftRest!]
+      [1.45, g.leftOff!],
+      [1.6, g.leftRest!]
     ]);
     if (t > 0.05 && t < 1.58) {
-      f.leftFingers = fingers(t, [[0.05, 'wrap'], [0.2, 'relaxed'], [0.4, 'magazine'], [0.83, 'magazine'], [0.98, 'open'], [1.12, 'pinch'], [1.25, 'pinch'], [1.36, 'open'], [1.58, 'wrap']]);
+      const rest = c.tuning.fingers.left;
+      f.leftFingers = fingers(t, [[0.05, rest], [0.2, 'relaxed'], [0.4, 'magazine'], [0.83, 'magazine'], [0.98, 'relaxed'], [1.11, CLAMP], [1.25, CLAMP], [1.4, 'relaxed'], [1.58, rest]]);
     }
     f.busy = env(t, 0, 0.14, 1.5, 1.68);
   });

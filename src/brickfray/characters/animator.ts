@@ -1,44 +1,14 @@
 import * as THREE from 'three';
+import { RELOAD_FAMILY, reloadBody, throwLegs, type Carried, type MagazineState, type ReloadFamily } from './actions';
 import { Dangle } from './dangles';
-import { Gait, type FootPose } from './gait';
+import { AIR_FALL, AIR_PITCH, AIR_PUSH, AIR_TUCK, ballPivot, crouchFoot, crouchPose, Gait, IDLE, type FootPose } from './gait';
 import { clamp, damp, hprQuat, lerp, smooth, twoBoneIK } from './ik';
 import { Pose } from './pose';
-import { ANKLE_H, BALL, BONE, PELVIS_Y, SHIN, THIGH, type V3 } from './skeleton';
+import { BONE, PELVIS_Y, SHIN, THIGH, type V3 } from './skeleton';
 import { emptyFidget, fidgetAt, type Style } from './style';
 import type { AnimState } from './types';
-import { poseStance, type Stance } from './stance';
-import { poseUpper, type UpperInput } from './upper';
-
-const IDLE: { pos: V3; heading: number }[] = [
-  { pos: [-0.11, 0, -0.07], heading: -0.12 },
-  { pos: [0.12, 0, 0.1], heading: 0.42 }
-];
-const CROUCH: { pos: V3; heading: number; pitch: number }[] = [
-  { pos: [-0.13, 0, -0.2], heading: -0.08, pitch: 0 },
-  { pos: [0.15, 0, 0.2], heading: 0.35, pitch: -0.75 }
-];
-
-const AIR_TUCK: V3[] = [
-  [-0.1, 0.44, -0.14],
-  [0.1, 0.3, 0.16]
-];
-const AIR_FALL: V3[] = [
-  [-0.11, 0.2, -0.1],
-  [0.11, 0.16, 0.08]
-];
-const AIR_PUSH: V3[] = [
-  [-0.1, 0.14, 0.04],
-  [0.1, 0.11, 0.1]
-];
-
-/** Ankle position for a foot standing on its ball with the heel raised by `pitch` (≤ 0). */
-function ballPivot(pitch: number, heading: number, flat: THREE.Vector3) {
-  const along = -BALL * Math.cos(pitch) - ANKLE_H * Math.sin(pitch) + BALL;
-  flat.x += Math.sin(heading) * along;
-  flat.z -= Math.cos(heading) * along;
-  flat.y = -BALL * Math.sin(pitch) + ANKLE_H * Math.cos(pitch);
-  return flat;
-}
+import { poseStance, type Stance, type StanceLife } from './stance';
+import { carry, poseUpper, type UpperInput } from './upper';
 
 const v1 = new THREE.Vector3();
 const v2 = new THREE.Vector3();
@@ -48,7 +18,9 @@ const ql = new THREE.Quaternion();
 const knee = new THREE.Vector3();
 const reached = new THREE.Vector3();
 const X = new THREE.Vector3(1, 0, 0);
+const body = [0, 0, 0, 0, 0, 0];
 const feet: FootPose[] = [0, 1].map(() => ({ pos: new THREE.Vector3(), heading: 0, pitch: 0, toe: 0, planted: 1, stance: 0 }));
+const legs = { stride: 0, lift: 0, coil: 0, lunge: 0 };
 
 /** Procedural animation for one character: gait, jump/land, aim, hands on the gun, actions, fidgets, secondary motion. */
 export class Animator {
@@ -68,6 +40,11 @@ export class Animator {
   private landX = 0;
   private landV = 0;
   private idleTime = 0;
+  private ready = 0;
+  /** Throw progress as played: cooking arrives at its held wind-up pose at once, the animation winds up into it. */
+  private nade = -1;
+  /** Per-player variation (0 = none, deterministic for the lab): clock and gait offsets, breathing rate, aim drift. */
+  private seed = 0;
   private fidgetCount = 0;
   private fidgetStart = -1;
   private nextFidget = 4;
@@ -75,9 +52,19 @@ export class Animator {
   private dangles: Dangle[] = [];
   private move = new THREE.Vector3();
   private lean = new THREE.Vector3();
+  /** Points on the held gun relative to its grip; the rig sets them when it is given a weapon. */
   support: THREE.Matrix4 | null = null;
+  magHold: THREE.Matrix4 | null = null;
+  muzzle: THREE.Matrix4 | null = null;
+  private reload: { family: ReloadFamily; progress: number; blend: number } = { family: 'rifle', progress: 0, blend: 0 };
+  /** What the left hand holds after the last update, for the rig's props. */
+  readonly held: { item: Carried; magazine: MagazineState; grenade: number } = { item: 'none', magazine: 'seated', grenade: 0 };
   /** A held showroom pose; replaces the gameplay animation while set. */
   stance: Stance | null = null;
+  /** How fast a held stance is being turned about the vertical (radians per second), for its hanging parts: the showroom's turntable. */
+  spin = 0;
+  /** Gestures and weight shifts laid over a held stance (the showroom's idle). */
+  life: StanceLife | undefined;
 
   constructor(
     rest: V3[],
@@ -86,29 +73,47 @@ export class Animator {
     this.pose = new Pose(rest);
     if (style.dangleHead) this.dangles.push(new Dangle(BONE.dangleHead, BONE.head, style.dangleHead));
     if (style.dangleBack) this.dangles.push(new Dangle(BONE.dangleBack, BONE.chest, style.dangleBack));
+    if (style.dangleHip) this.dangles.push(new Dangle(BONE.dangleHip, BONE.pelvis, style.dangleHip));
+    this.reset();
+  }
+
+  /** Give this figure its own timing so a group of players never moves in lock-step. */
+  vary(seed: number) {
+    this.seed = 1 + (Math.abs(Math.sin(seed * 12.9898) * 43758.5453) % 1) * 6;
     this.reset();
   }
 
   reset() {
     this.pose.reset();
     this.gait.reset();
-    this.time = 0;
+    const u = this.seed ? (this.seed - 1) / 6 : 0;
+    this.gait.phase = (0.1 + u * 0.618 * 7) % 1;
+    this.time = u * 37;
     this.vx = this.vz = this.speed = this.crouch = this.sprint = this.ads = this.air = this.airTime = 0;
+    this.ready = 1;
+    this.nade = -1;
     this.wasGrounded = true;
     this.minVy = this.landX = this.landV = 0;
     this.idleTime = 0;
     this.fidgetCount = 0;
     this.fidgetStart = -1;
-    this.nextFidget = 4;
+    this.nextFidget = 4 + u * 6;
+    this.reload.blend = 0;
+    this.held.item = 'none';
+    this.held.magazine = 'seated';
+    this.held.grenade = 0;
     for (const d of this.dangles) d.reset();
   }
 
   update(rawDt: number, s: AnimState) {
     const dt = clamp(rawDt, 0, 0.1);
-    this.time += dt;
+    this.time += dt * (this.seed ? 0.88 + 0.04 * this.seed : 1);
     if (this.stance) {
-      poseStance(this.pose, this.stance, this.time, this.support);
-      if (dt > 0) for (const d of this.dangles) d.update(dt, this.pose, this.move.set(0, 0, 0));
+      poseStance(this.pose, this.stance, this.time, this.support, this.life);
+      this.held.item = 'none';
+      this.held.magazine = 'seated';
+      this.held.grenade = 0;
+      if (dt > 0) for (const d of this.dangles) d.update(dt, this.pose, this.move.set(0, 0, 0), this.spin);
       return;
     }
     const st = this.style;
@@ -118,6 +123,16 @@ export class Animator {
     this.crouch = damp(this.crouch, clamp(s.crouch, 0, 1), 9, dt);
     this.sprint = damp(this.sprint, s.sprint && this.speed > 3 ? 1 : 0, 6, dt);
     this.ads = damp(this.ads, s.ads, 18, dt);
+    // The gun comes up at once to fire and settles back to low ready a moment after the last shot.
+    const calm = s.sinceShot > 0.9 && s.ads < 0.1 ? 1 : 0;
+    this.ready = damp(this.ready, calm, calm > this.ready ? 2.6 : 24, dt);
+    if (s.reload >= 0) {
+      this.reload.family = RELOAD_FAMILY[s.weapon];
+      this.reload.progress = s.reload;
+    }
+    this.reload.blend = damp(this.reload.blend, s.reload >= 0 ? 1 : 0, 13, dt);
+    if (s.grenade < 0) this.nade = -1;
+    else this.nade = Math.min(s.grenade, Math.max(0, this.nade) + dt * (s.grenade > 0.25 ? 3 : 1.4));
     const moving = smooth(this.speed, 0.12, 0.8);
     const dir = Math.atan2(this.vx, this.vz);
     this.move.set(this.vx, 0, -this.vz);
@@ -132,16 +147,25 @@ export class Animator {
 
     // Feet: idle stance blended with the gait, then with air poses.
     const rising = smooth(s.verticalVelocity, -3, 1);
+    const planted = (1 - moving) * (1 - crouch);
+    throwLegs(this.nade, legs);
+    const lunge = legs.lunge * planted;
+    const stride = legs.stride * planted;
+    const coil = legs.coil * planted;
     const push = smooth(s.verticalVelocity, 0.5, 2.5) * (1 - smooth(this.airTime, 0.04, 0.18));
     for (let i = 0; i < 2; i++) {
       const f = feet[i]!;
       const g = this.gait.feet[i]!;
       const idle = IDLE[i]!;
-      const cr = CROUCH[i]!;
+      const cr = crouchFoot(i, st, crouchPose);
       const side = i === 0 ? -1 : 1;
       f.heading = lerp(idle.heading, cr.heading, crouch) + side * st.toeOut * 0.5;
-      const heelUp = cr.pitch * crouch - 0.45 * F.heel * (1 - moving);
-      ballPivot(heelUp, f.heading, f.pos.set(lerp(idle.pos[0] * st.stance, cr.pos[0], crouch), 0, lerp(idle.pos[2], cr.pos[2], crouch)));
+      // A left-handed throw steps out with the right foot and pushes off the left.
+      const heelUp = cr.pitch * crouch - 0.45 * F.heel * (1 - moving) - (i === 0 ? 0.6 * lunge : 0);
+      const reach = i === 1 ? 0.36 * stride : -0.03 * lunge;
+      if (i === 1) f.heading -= 0.3 * stride;
+      ballPivot(heelUp, f.heading, f.pos.set(lerp(idle.pos[0] * st.stance, cr.pos[0], crouch) - (i === 1 ? 0.03 * stride : 0), 0, lerp(idle.pos[2], cr.pos[2], crouch) - reach));
+      if (i === 1) f.pos.y += 0.07 * legs.lift * planted;
       f.pitch = heelUp;
       f.toe = -heelUp;
       f.pos.lerp(g.pos, moving);
@@ -157,7 +181,7 @@ export class Animator {
         v1.set(lerp(fall[0], tuck[0], rising), lerp(fall[1], tuck[1], rising), lerp(fall[2], tuck[2], rising));
         v1.lerp(v2.set(...pushed), push);
         f.pos.lerp(v1, this.air);
-        f.pitch = lerp(f.pitch, lerp(lerp(0.05, -0.35, rising), -0.9, push), this.air);
+        f.pitch = lerp(f.pitch, lerp(lerp(AIR_PITCH.fall[i]!, AIR_PITCH.tuck[i]!, rising), AIR_PITCH.push[i]!, push), this.air);
         f.heading = lerp(f.heading, side * 0.12, this.air);
         f.toe = lerp(f.toe, 0, this.air);
         f.planted = lerp(f.planted, 0, this.air);
@@ -169,15 +193,26 @@ export class Animator {
     const breath = Math.sin((this.time * Math.PI * 2) / 3.6);
     const shift = Math.sin(this.time * 0.55) * 0.016 * (1 - moving);
     const standY = PELVIS_Y - 0.008 - st.knees - P.drop * moving;
-    const baseY = lerp(standY, 0.45, crouch);
+    const kneelY = lerp(0.47 + 0.05 * clamp(st.bounce, 0, 1), 0.6, moving);
+    const baseY = lerp(standY, kneelY, crouch);
     const pp = pose.p[BONE.pelvis]!;
     pp.set(0.02 * (1 - moving) * (1 - crouch) + shift, baseY + this.gait.pelvis.y * moving + this.landX + F.pelvisY * (1 - moving) + 0.004 * breath * (1 - moving), 0);
     pp.x += this.gait.pelvis.x * moving;
-    pp.z += this.gait.pelvis.z * moving + 0.06 * crouch;
-    const idleHeading = -0.22 + 0.06 * crouch;
+    pp.z += this.gait.pelvis.z * moving + lerp(0.02, 0.06, moving) * crouch - 0.12 * lunge - 0.06 * stride + 0.05 * coil;
+    pp.x += 0.03 * lunge - 0.02 * coil;
+    pp.y -= 0.06 * lunge + 0.025 * stride;
+    // Reloading on the spot, the knees give and the weight rocks onto the side the hands work on.
+    const reloadW = this.reload.blend * (1 - moving) * (1 - crouch);
+    if (reloadW > 0.004) {
+      reloadBody(this.reload.family, this.reload.progress, body);
+      pp.y -= body[4]! * reloadW;
+      pp.x += body[5]! * reloadW;
+    } else body.fill(0);
+    const idleHeading = -0.22 - 0.06 * crouch + 0.3 * body[0]! * reloadW - 0.28 * coil + 0.22 * lunge;
     const heading = lerp(idleHeading, pelvisHeading, moving) + this.gait.yaw * moving;
     const roll = this.gait.roll * moving + shift * 1.5;
-    const pitch = -0.3 * crouch - (0.04 + 0.08 * P.run) * moving * (this.gait.backward ? -0.5 : 1) - 0.5 * this.landX;
+    const airPitch = this.air * lerp(0.06, -0.1, rising);
+    const pitch = -lerp(0.14, 0.3, moving) * crouch - (0.04 + 0.08 * P.run) * moving * (this.gait.backward ? -0.5 : 1) - 0.5 * this.landX + airPitch - 0.12 * lunge + 0.04 * coil;
     hprQuat(heading, pitch, roll, pose.q[BONE.pelvis]!);
     pose.solve(BONE.pelvis);
 
@@ -195,13 +230,14 @@ export class Animator {
       pose.solve(BONE.pelvis);
     }
 
-    // Legs: two-bone IK with knees following the feet, slightly out when crouched.
+    // Legs: two-bone IK with knees following the feet; kneeling, the lead knee points up and the rear one down.
+    const kneel = crouch * (1 - moving);
     for (let i = 0; i < 2; i++) {
       const f = feet[i]!;
       const side = i === 0 ? -1 : 1;
       const thigh = i === 0 ? BONE.thighL : BONE.thighR;
       pose.solve(thigh);
-      v1.set(Math.sin(f.heading) + side * (0.3 * crouch + 0.16), 0.15 * this.air, -Math.cos(f.heading));
+      v1.set(Math.sin(f.heading) + side * (0.16 + 0.14 * crouch * moving), 0.35 * this.air + (i === 0 ? 0.35 : -0.5) * kneel, -Math.cos(f.heading));
       twoBoneIK(pose.mp[thigh]!, f.pos, THIGH, SHIN, v1, true, qu, ql, knee, reached);
       pose.setModelRotation(thigh, qu);
       pose.setModelRotation(thigh + 1, ql);
@@ -230,9 +266,18 @@ export class Animator {
       landing: clamp(-this.landX * 3, 0, 1),
       style: st,
       fidget: F,
-      support: this.support
+      support: this.support,
+      magHold: this.magHold,
+      muzzle: this.muzzle,
+      reload: this.reload,
+      grenade: this.nade,
+      ready: this.ready,
+      seed: this.seed
     };
     poseUpper(pose, input);
+    this.held.item = carry.item;
+    this.held.magazine = carry.magazine;
+    this.held.grenade = carry.grenade;
     if (dt > 0) for (const d of this.dangles) d.update(dt, pose, this.move);
   }
 

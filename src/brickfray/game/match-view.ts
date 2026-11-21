@@ -1,4 +1,6 @@
 import * as THREE from 'three';
+import { MatchAudio } from '../audio/match-audio';
+import { OwnSteps } from '../audio/step-triggers';
 import type { AudioEngine, SoundId } from '../audio/types';
 import type { Kit } from '../engine/kit';
 import type { GameRenderer } from '../engine/renderer';
@@ -52,8 +54,9 @@ export class MatchView {
   private tmp2 = v3();
   private lastSnapshot: Snapshot | null = null;
   private pendingSnapshot: Snapshot | null = null;
-  private stepTimer = 0;
+  private readonly ownSteps = new OwnSteps();
   private wasGrounded = true;
+  readonly sound: MatchAudio;
   scoped = false;
   deathCam: { at: THREE.Vector3; killer: number; t: number } | null = null;
 
@@ -67,10 +70,16 @@ export class MatchView {
     readonly hud: HudStore,
     tagLayer: HTMLElement
   ) {
-    this.tags = new NameTags(tagLayer);
+    this.tags = new NameTags(tagLayer, (ax, ay, az, bx, by, bz) => this.world.clearLine(ax, ay, az, bx, by, bz));
     const def = MAPS[settings.map];
     this.layout = def.layout();
     this.world = new CollisionWorld(this.layout.colliders);
+    this.sound = new MatchAudio(
+      audio,
+      settings.map,
+      (ax, ay, az, bx, by, bz) => this.world.clearLine(ax, ay, az, bx, by, bz),
+      (x, y, z) => this.world.surfaceBelow(x, y, z)
+    );
     renderer.atmosphere = def.atmosphere;
     renderer.dress(this.scene);
     view.setAtmosphere(def.atmosphere);
@@ -80,7 +89,7 @@ export class MatchView {
     this.scene.add(this.effects.root);
     this.remotes = new Remotes(kit, session.you);
     this.scene.add(this.remotes.group);
-    this.grenades = new GrenadeView(kit, audio);
+    this.grenades = new GrenadeView(kit, (at, speed) => this.sound.bounce(at, speed));
     this.scene.add(this.grenades.group);
     this.predictor = new Predictor(this.world, session.you, session.roster.get(session.you)?.character ?? 'rivet');
     this.events = new MatchEvents(this);
@@ -88,23 +97,28 @@ export class MatchView {
       // Flash at the gun; the tracer and sound come with the shot trace.
       const muzzle = this.remotes.muzzleOf(r, v3());
       const dir = new THREE.Vector3(-Math.sin(r.yaw), 0, -Math.cos(r.yaw));
-      this.effects.muzzle(muzzle, dir, r.weapon === 'shotgun' || r.weapon === 'sniper');
+      this.effects.muzzle(muzzle, dir, r.weapon ?? false);
     };
     this.remotes.onStep = (r, loud) => {
       const surface = this.world.surfaceBelow(r.position.x, r.position.y, r.position.z);
-      this.play(`step:${surface}`, r.position, loud ? 1 : 0.7, 3);
+      this.sound.footstep(surface, r.entry.character, r.position, loud ? 1.2 : 0.9, 3, this.sound.occlusion(r.entry.id, r.position, 1), r.entry.id);
     };
-    this.effects.onChipBounce = (p) => this.play('brickClatter', p, 0.35, 1);
+    this.effects.onChipBounce = (p, speed) => this.sound.debris.bounce(p, speed);
     this.remotes.syncRoster(session.roster);
   }
 
-  play(id: SoundId, at?: THREE.Vector3 | [number, number, number] | null, volume = 1, priority = 5) {
+  play(id: SoundId, at?: THREE.Vector3 | [number, number, number] | null, volume = 1, priority = 5, occlusion = 0) {
     const position = at ? (Array.isArray(at) ? { x: at[0], y: at[1], z: at[2] } : { x: at.x, y: at.y, z: at.z }) : undefined;
-    this.audio.play(id, { position, volume, priority });
+    this.audio.play(id, { position, volume, priority, occlusion });
   }
 
   get me() {
     return this.predictor.player;
+  }
+
+  /** The view model's swing cue: the whoosh of the melee weapon in hand. */
+  swing() {
+    this.sound.swing(this.me.character);
   }
 
   /** Where the local muzzle appears on screen, placed in the world for tracers. */
@@ -119,9 +133,13 @@ export class MatchView {
 
   private hooks: ArmsHooks = {
     fire: (player, weapon, dirs) => this.localShot(weapon, dirs, player.arms.burst, player.arms.ads),
-    melee: () => this.play('cue:swing', null, 0.9, 6),
-    grenade: () => this.play('cue:throw', null, 0.9, 6),
-    view: (action) => this.view.act(action),
+    melee: () => undefined,
+    // The throw whoosh comes from the view model's throw cue, on the arm's swing.
+    grenade: () => undefined,
+    view: (action) => {
+      this.sound.action(action, this.me.arms.weapon);
+      this.view.act(action);
+    },
     dryFire: () => this.play('dryFire', null, 1, 7)
   };
 
@@ -131,7 +149,9 @@ export class MatchView {
     const oy = m.y + eyeHeight(m);
     const oz = m.z;
     const muzzle = this.muzzleWorld(v3());
+    this.effects.shotLight(muzzle, weapon === 'shotgun' || weapon === 'sniper');
     let predicted: 'body' | 'head' | null = null;
+    this.sound.bullets.volley();
     for (const d of dirs) {
       const wall = this.world.raycast(ox, oy, oz, d[0], d[1], d[2], 260, true);
       let maxT = wall?.t ?? 260;
@@ -148,6 +168,7 @@ export class MatchView {
       const end = new THREE.Vector3(ox + d[0] * maxT, oy + d[1] * maxT, oz + d[2] * maxT);
       const pellet = dirs.length > 1;
       this.effects.tracers.add(muzzle, end, {
+        weapon,
         streak: weapon === 'sniper' ? 14 : pellet ? 2.2 : 5,
         width: weapon === 'sniper' ? 0.06 : pellet ? 0.022 : 0.034,
         speed: weapon === 'sniper' ? 700 : 340,
@@ -158,8 +179,11 @@ export class MatchView {
         predicted = predicted === 'head' || hitRemote.head ? 'head' : 'body';
       } else if (wall) {
         const n = new THREE.Vector3(...wall.normal);
-        this.effects.impact(end, n, wall.surface, this.colorAt(end, n));
-        if (!pellet || Math.random() < 0.35) this.play(`impact:${wall.surface}`, end, pellet ? 0.5 : 0.8, 3);
+        const seen = this.sceneryAt(end, n);
+        // No collider is marked as glass: a window is known by the pane that was hit.
+        const surface = seen.glass ? 'glass' : wall.surface;
+        this.effects.impact(end, n, surface, seen.color);
+        this.sound.bullets.own(surface, end, maxT, weapon, pellet);
       }
     }
     if (predicted) this.play(predicted === 'head' ? 'impactHead' : 'impactBody', null, 0.7, 7);
@@ -169,22 +193,24 @@ export class MatchView {
   }
 
   private raycaster = new THREE.Raycaster();
-  /** Sample the scenery's own color under a hit, so chips match what was shot. */
-  private colorAt(point: THREE.Vector3, normal: THREE.Vector3): THREE.Color | undefined {
+  /** The scenery's own colour under a hit, so chips match what was shot, and whether it is a glass pane. */
+  private sceneryAt(point: THREE.Vector3, normal: THREE.Vector3): { color?: THREE.Color; glass: boolean } {
     try {
       this.raycaster.set(point.clone().addScaledVector(normal, 0.06), normal.clone().negate());
       this.raycaster.far = 0.15;
       const hit = this.raycaster.intersectObject(this.visual.root, true)[0] as (THREE.Intersection & { batchId?: number }) | undefined;
-      const mesh = hit?.object as THREE.BatchedMesh | undefined;
-      if (hit && mesh?.isBatchedMesh && hit.batchId !== undefined) {
+      if (!hit) return { glass: false };
+      const mesh = hit.object as THREE.BatchedMesh;
+      const material = mesh.material as THREE.MeshStandardMaterial;
+      const glass = (material.userData.lodBase ?? material) === this.kit.materials.batch.glass;
+      if (mesh.isBatchedMesh && hit.batchId !== undefined) {
         const color = new THREE.Color();
         mesh.getColorAt(hit.batchId, color);
-        return color;
+        return { color, glass };
       }
-      const material = (hit?.object as THREE.Mesh | undefined)?.material as THREE.MeshStandardMaterial | undefined;
-      return material?.color?.clone();
+      return { color: material.color?.clone(), glass };
     } catch {
-      return undefined;
+      return { glass: false };
     }
   }
 
@@ -218,9 +244,9 @@ export class MatchView {
     if (m.landed > 4) {
       this.fp.land(m.landed);
       this.view.act({ type: 'land', impact: Math.min(1, m.landed / 14) });
-      this.play('land', null, Math.min(1, m.landed / 12), 4);
+      this.sound.movement('land', this.world.surfaceBelow(m.x, m.y, m.z), null, Math.min(1, m.landed / 12), 4);
     }
-    if (this.wasGrounded && !m.grounded && m.vy > 3) this.play('jump', null, 0.6, 3);
+    if (this.wasGrounded && !m.grounded && m.vy > 3) this.sound.movement('jump', this.world.surfaceBelow(m.x, m.y, m.z), null, 0.6, 3);
     this.wasGrounded = m.grounded;
   }
 
@@ -306,10 +332,11 @@ export class MatchView {
 
     const renderTime = this.session.hostNow() - INTERP_DELAY;
     this.remotes.update(dt, this.session.snapshots, renderTime);
+    for (const r of this.remotes.map.values()) if (r.state) this.sound.remotes.update(r.entry.id, r.state, r.position);
     this.grenades.update(this.session.snapshots, renderTime);
     this.view.setHidden(!alive || this.scoped);
     this.view.orient(this.fp.camera.quaternion);
-    this.view.update(dt, { speed, sprint: m.sprinting, grounded: m.grounded, crouch: m.crouch, ads: p.arms.ads, look: { yaw: input.lookYaw, pitch: input.lookPitch }, time: performance.now() / 1000 });
+    this.view.update(dt, { speed, sprint: m.sprinting, grounded: m.grounded, crouch: m.crouch, sliding: m.slide > 0, ads: p.arms.ads, look: { yaw: input.lookYaw, pitch: input.lookPitch }, time: performance.now() / 1000 });
     this.effects.update(dt, this.fp.camera);
     this.tags.update(this.fp.camera, this.remotes, alive ? this.aimedRemote() : 0, this.myTeam, this.renderer.canvas.clientWidth, this.renderer.canvas.clientHeight);
     this.visual.update(dt, performance.now() / 1000);
@@ -317,6 +344,7 @@ export class MatchView {
     const cam = this.fp.camera;
     this.audio.setListener(cam.position, cam.getWorldDirection(this.tmp), cam.up);
     this.audio.setMuffle(alive && p.health < 30 ? 1 - p.health / 30 : 0);
+    this.sound.frame(dt, { alive, health: p.health, sliding: m.slide > 0, surface: this.world.surfaceBelow(m.x, m.y, m.z), listener: cam.position });
     this.events.frame(dt);
   }
 
@@ -384,17 +412,10 @@ export class MatchView {
 
   private footsteps(dt: number, speed: number) {
     const m = this.me.move;
-    if (!m.grounded || speed < 1 || !this.me.alive) {
-      this.stepTimer = 0.18;
-      return;
-    }
-    const interval = m.sprinting ? 0.29 : m.crouch > 0.5 ? 0.55 : 0.4;
-    this.stepTimer -= dt;
-    if (this.stepTimer <= 0) {
-      this.stepTimer = interval;
-      const surface = this.world.surfaceBelow(m.x, m.y, m.z);
-      this.play(`step:${surface}`, null, m.crouch > 0.5 ? 0.3 : m.sprinting ? 0.75 : 0.5, 2);
-    }
+    const walking = m.grounded && speed >= 1 && this.me.alive;
+    if (!this.ownSteps.update(dt, this.view.stepPhase, walking, m.sprinting, m.crouch > 0.5)) return;
+    const surface = this.world.surfaceBelow(m.x, m.y, m.z);
+    this.sound.footstep(surface, this.me.character, null, m.crouch > 0.5 ? 0.28 : m.sprinting ? 0.7 : 0.45, 2);
   }
 
   private placeDeathCam(dt: number) {
@@ -431,6 +452,7 @@ export class MatchView {
   }
 
   dispose() {
+    this.sound.dispose();
     this.tags.clear();
     this.remotes.dispose();
     this.effects.clear();

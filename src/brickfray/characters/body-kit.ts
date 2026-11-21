@@ -27,8 +27,9 @@ export interface BodyKit {
   b: PartSet;
   s: BodyStyle;
   omit: Set<BodyPart>;
-  /** Limb thickness and shoulder width multipliers. */
+  /** Arm thickness, leg thickness and shoulder width multipliers. */
   L: number;
+  legs: number;
   bulk: number;
   sleeve: string;
   shirtLook: Look;
@@ -46,6 +47,7 @@ export function bodyKit(b: PartSet, s: BodyStyle): BodyKit {
     s,
     omit: new Set(s.omit ?? []),
     L: s.limbs ?? 1,
+    legs: s.legs ?? s.limbs ?? 1,
     bulk: s.bulk ?? 1,
     sleeve: s.sleeve ?? s.shirt,
     shirtLook: s.shirtLook ?? 'cloth',

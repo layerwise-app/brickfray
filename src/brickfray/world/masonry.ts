@@ -26,6 +26,11 @@ export interface FaceSpec {
   variance: number;
   /** Course index of v = 0, so faces stacked on each other keep the bond. */
   firstCourse?: number;
+  /**
+   * Seamless flat bricks for the low tier, where hairline joints shimmer without antialiasing; the
+   * bond shows through color instead: odd courses use groups offset by `groups` (shaded by the caller).
+   */
+  flat?: boolean;
 }
 
 const GAP = 0.003;
@@ -62,6 +67,36 @@ function brick(m: Mesher, r: FaceRect, depth: number) {
   m.poly([f[3]!, f[2]!, V(u1, v1, 0), V(u0, v1, 0)], center);
 }
 
+function flatBrick(m: Mesher, r: FaceRect, depth: number) {
+  m.poly([V(r.u0, r.v0, depth), V(r.u1, r.v0, depth), V(r.u1, r.v1, depth), V(r.u0, r.v1, depth)], V((r.u0 + r.u1) / 2, (r.v0 + r.v1) / 2, -1));
+}
+
+/** Flat bricks of one color that touch along a course merge into one quad. */
+class FlatRun {
+  private r: FaceRect | null = null;
+  private group = 0;
+  constructor(
+    private readonly meshers: Mesher[],
+    private readonly depth: number
+  ) {}
+
+  add(r: FaceRect, group: number) {
+    const run = this.r;
+    if (run && group === this.group && Math.abs(r.u0 - run.u1) < 1e-4 && r.v0 === run.v0 && r.v1 === run.v1) {
+      run.u1 = r.u1;
+      return;
+    }
+    this.flush();
+    this.r = { ...r };
+    this.group = group;
+  }
+
+  flush() {
+    if (this.r) flatBrick(this.meshers[this.group]!, this.r, this.depth);
+    this.r = null;
+  }
+}
+
 /**
  * Running-bond brick fronts for one wall face, split into color groups.
  * Local frame: u = +x, v = +y, the face looks along +z from z = 0 to `depth`.
@@ -70,8 +105,9 @@ export function brickFace(spec: FaceSpec): (THREE.BufferGeometry | null)[] {
   const course = spec.course ?? BRICK;
   const lens = spec.lens ?? [4, 4, 6, 3, 8];
   const rng = new Rng(spec.seed);
-  const meshers = Array.from({ length: spec.groups }, () => new Mesher());
+  const meshers = Array.from({ length: spec.groups * (spec.flat ? 2 : 1) }, () => new Mesher());
   const L = spec.length / PITCH;
+  const run = new FlatRun(meshers, spec.depth);
   let prev = new Set<number>();
   const courses = Math.ceil(spec.height / course - 1e-3);
   for (let k = 0; k < courses; k++) {
@@ -92,10 +128,14 @@ export function brickFace(spec: FaceSpec): (THREE.BufferGeometry | null)[] {
       joints.add(Math.round(end));
       let rects: FaceRect[] = [{ u0: pos * PITCH, v0, u1: end * PITCH, v1 }];
       for (const hole of spec.openings ?? []) rects = subtract(rects, hole);
-      const group = spec.groups > 1 && rng.chance(spec.variance) ? 1 + Math.floor(rng.next() * (spec.groups - 1)) : 0;
-      for (const r of rects) if (r.u1 - r.u0 > 0.06 && r.v1 - r.v0 > 0.06) brick(meshers[group]!, r, spec.depth);
+      const group = (spec.groups > 1 && rng.chance(spec.variance) ? 1 + Math.floor(rng.next() * (spec.groups - 1)) : 0) + (spec.flat && odd ? spec.groups : 0);
+      for (const r of rects) {
+        if (spec.flat) run.add(r, group);
+        else if (r.u1 - r.u0 > 0.06 && r.v1 - r.v0 > 0.06) brick(meshers[group]!, r, spec.depth);
+      }
       pos = end;
     }
+    run.flush();
     prev = joints;
   }
   return meshers.map((m) => (m.pos.length ? m.build() : null));

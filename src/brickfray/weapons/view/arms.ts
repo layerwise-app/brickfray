@@ -6,12 +6,13 @@ import { useLod } from '../shapes';
 import { paint, surfaceMaterial } from '../surface';
 import { FINGERS, mixFingers, type FingerPose } from './fingers';
 import { createHandBones, poseFingers } from './fingers-rig';
+import { padColor } from './glove';
 import { forearmPieces, handPieces, upperArmPieces, WRIST, type ArmPiece, type Slot } from './hand';
 
 export const UPPER = 0.34;
 export const FOREARM = 0.31;
 
-const SLOTS: Slot[] = ['sleeve', 'trim', 'glove', 'pad', 'seam'];
+const SLOTS: Slot[] = ['sleeve', 'trim', 'glove', 'pad', 'seam', 'cuff'];
 const MIRROR = new THREE.Matrix4().makeScale(-1, 1, 1);
 /** Seconds for a finger shape to settle, so grips never pop when a clip starts or ends. */
 const FINGER_LAG = 0.07;
@@ -31,8 +32,15 @@ interface Side {
   /** …but never further back than this. */
   back: number;
   pole: THREE.Vector3;
+  /** Elbow hint and shoulder trail once the hand is up on the sight line: the elbow drops under the wrist instead of flaring out. */
+  aimPole: THREE.Vector3;
+  aimTrail: number;
   wrist: THREE.Vector3;
 }
+
+/** A wrist this close to the view axis (m, sideways) and this high (m, below the eye) counts as aimed; the arm eases over between the pairs. */
+const AIM_SIDE = [0.13, 0.05] as const;
+const AIM_HEIGHT = [-0.2, -0.11] as const;
 
 /**
  * Both first-person arms as one rigidly skinned mesh (one draw call): upper
@@ -74,7 +82,7 @@ export class Arms {
         geos.push(g);
       }
     };
-    const side = (mirror: boolean, shoulder: THREE.Vector3, trail: number, back: number, pole: THREE.Vector3): Side => {
+    const side = (mirror: boolean, shoulder: THREE.Vector3, trail: number, back: number, pole: THREE.Vector3, aimPole: THREE.Vector3, aimTrail: number): Side => {
       const upper = new THREE.Bone();
       const fore = new THREE.Bone();
       const joints = createHandBones(mirror);
@@ -88,10 +96,10 @@ export class Arms {
       fore.name = mirror ? 'forearm:left' : 'forearm:right';
       const fingers = { ...FINGERS.relaxed };
       poseFingers(joints, fingers, mirror);
-      return { upper, fore, hand: joints[0]!, joints, fingers, shoulder, trail, back, pole, wrist: WRIST.clone().setX(mirror ? -WRIST.x : WRIST.x) };
+      return { upper, fore, hand: joints[0]!, joints, fingers, shoulder, trail, back, pole, aimPole, aimTrail, wrist: WRIST.clone().setX(mirror ? -WRIST.x : WRIST.x) };
     };
-    this.right = side(false, new THREE.Vector3(0.2, -0.2, -0.05), 0.535, 0.24, new THREE.Vector3(0.9, -1, 0.15));
-    this.left = side(true, new THREE.Vector3(-0.16, -0.33, -0.2), 0.46, 0.15, new THREE.Vector3(-1.4, -1.3, 0.1));
+    this.right = side(false, new THREE.Vector3(0.2, -0.2, -0.05), 0.535, 0.24, new THREE.Vector3(0.9, -1, 0.15), new THREE.Vector3(0.7, -1.3, 0.1), 0.44);
+    this.left = side(true, new THREE.Vector3(-0.16, -0.33, -0.2), 0.46, 0.15, new THREE.Vector3(-0.95, -1.3, 0.1), new THREE.Vector3(-0.7, -1.3, 0.1), 0.44);
     const geometry = mergeGeometries(geos)!;
     for (const g of geos) g.dispose();
     this.slots = Uint8Array.from(slotIds);
@@ -105,7 +113,9 @@ export class Arms {
     const glove = new THREE.Color(info.glove);
     const sleeve = info.sleeve ?? info.primary;
     const trim = info.sleeve ? info.primary : info.secondary;
-    const palette = [new THREE.Color(sleeve), new THREE.Color(trim), glove, glove.clone().multiplyScalar(0.62), new THREE.Color(sleeve).multiplyScalar(0.55)];
+    // A character with its own sleeve colour wears it down to the wrist, so a bright glove (Rivet's yellow) is only the hand, not the whole forearm against a gun of the same paint.
+    const cuff = info.sleeve ? new THREE.Color(sleeve).multiplyScalar(0.85) : glove;
+    const palette = [new THREE.Color(sleeve), new THREE.Color(trim), glove, padColor(info), new THREE.Color(sleeve).multiplyScalar(0.55), cuff];
     const color = this.mesh.geometry.getAttribute('color') as THREE.BufferAttribute;
     for (let i = 0; i < this.slots.length; i++) {
       const c = palette[this.slots[i]!]!;
@@ -116,15 +126,18 @@ export class Arms {
 
   /**
    * Ease each hand's fingers toward a shape; `dt` 0 snaps. `onTrigger` says the right
-   * hand is on a pistol grip, so its index hooks around the trigger.
+   * hand is on a pistol grip, so its index hooks around the trigger; `squeeze` is the extra curl of a trigger pull.
    */
-  setFingers(right: FingerPose, left: FingerPose, dt: number, onTrigger = false) {
+  setFingers(right: FingerPose, left: FingerPose, dt: number, onTrigger = false, squeeze = 0) {
     const k = this.settled && dt > 0 ? 1 - Math.exp(-dt / FINGER_LAG) : 1;
     this.settled = true;
     this.trigger += ((onTrigger ? 1 : 0) - this.trigger) * k;
     mixFingers(this.right.fingers, right, k, this.right.fingers);
     mixFingers(this.left.fingers, left, k, this.left.fingers);
+    // The pull is laid over the settled grip unsmoothed, so it lands with the shot.
+    this.right.fingers.index += squeeze;
     poseFingers(this.right.joints, this.right.fingers, false, this.trigger);
+    this.right.fingers.index -= squeeze;
     poseFingers(this.left.joints, this.left.fingers, true);
   }
 
@@ -140,6 +153,7 @@ const shoulder = new THREE.Vector3();
 const elbow = new THREE.Vector3();
 const dir = new THREE.Vector3();
 const normal = new THREE.Vector3();
+const pole = new THREE.Vector3();
 const UP = new THREE.Vector3(0, 1, 0);
 const bx = new THREE.Vector3();
 const by = new THREE.Vector3();
@@ -149,7 +163,10 @@ const basis = new THREE.Matrix4();
 function solve(side: Side, hand: THREE.Matrix4, shift: THREE.Vector3) {
   hand.decompose(side.hand.position, side.hand.quaternion, side.hand.scale);
   wrist.copy(side.wrist).applyMatrix4(hand);
-  shoulder.copy(side.shoulder).setZ(Math.min(side.back, Math.max(side.shoulder.z, wrist.z + side.trail))).add(shift);
+  const aim = ramp(Math.abs(wrist.x), AIM_SIDE) * ramp(wrist.y, AIM_HEIGHT);
+  const trail = side.trail + (side.aimTrail - side.trail) * aim;
+  pole.copy(side.pole).lerp(side.aimPole, aim);
+  shoulder.copy(side.shoulder).setZ(Math.min(side.back, Math.max(side.shoulder.z, wrist.z + trail))).add(shift);
   dir.subVectors(wrist, shoulder);
   let dist = dir.length();
   dir.divideScalar(dist);
@@ -159,10 +176,16 @@ function solve(side: Side, hand: THREE.Matrix4, shift: THREE.Vector3) {
   const b = FOREARM * stretch;
   dist = Math.min(Math.max(dist, Math.abs(a - b) + 1e-4), a + b - 1e-4);
   const cosA = (a * a + dist * dist - b * b) / (2 * a * dist);
-  normal.copy(side.pole).addScaledVector(dir, -side.pole.dot(dir)).normalize();
+  normal.copy(pole).addScaledVector(dir, -pole.dot(dir)).normalize();
   elbow.copy(shoulder).addScaledVector(dir, a * cosA).addScaledVector(normal, a * Math.sqrt(Math.max(0, 1 - cosA * cosA)));
   place(side.upper, shoulder, elbow, UPPER);
   place(side.fore, elbow, wrist, FOREARM);
+}
+
+/** 0 at `range[0]`, 1 at `range[1]`, smoothstep between. */
+function ramp(v: number, range: readonly [number, number]) {
+  const t = Math.min(1, Math.max(0, (v - range[0]) / (range[1] - range[0])));
+  return t * t * (3 - 2 * t);
 }
 
 /** Bone at `from`, +Y toward `to`, its -Z side facing up so pads stay on top. */

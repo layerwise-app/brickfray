@@ -98,9 +98,8 @@ export class Pen {
   }
 
   /** Cylinder lying along local z, centered at (x, y, z). */
-  cylZ(x: number, y: number, z: number, r: number, len: number, color: string, finish?: Finish, edge = 0) {
+  cylZ(x: number, y: number, z: number, r: number, len: number, color: string, finish?: Finish, edge = 0, s = this.segsFor(r)) {
     const e = this.detail === 0 ? 0 : edge;
-    const s = this.segsFor(r);
     this.d.put(this.f, `cyl:${r3(r)}:${r3(len)}:${s}:${r3(e)}:c`, () => cylGeo(r, len, s, e, true), x, y, z - len / 2, { color, finish, tilt: ALONG_Z });
   }
 

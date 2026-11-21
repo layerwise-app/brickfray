@@ -27,6 +27,7 @@ export function patchCharacterMaterial(material: THREE.Material): CharacterMater
       .replace('#include <color_fragment>', '#include <color_fragment>\nif (vSurface.w > 0.5) diffuseColor.rgb = uTint;')
       .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = vSurface.x;')
       .replace('#include <metalnessmap_fragment>', '#include <metalnessmap_fragment>\nmetalnessFactor = vSurface.y;')
+      .replace('#include <lights_physical_fragment>', '#include <lights_physical_fragment>\n#ifdef USE_CLEARCOAT\nmaterial.clearcoat *= 1.0 - smoothstep( 0.4, 0.7, vSurface.x );\n#endif')
       .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance += diffuseColor.rgb * vSurface.z;');
   };
   material.customProgramCacheKey = () => 'bf-character';

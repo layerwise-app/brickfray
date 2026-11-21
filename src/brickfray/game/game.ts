@@ -1,4 +1,5 @@
 import { createAudioEngine } from '../audio';
+import { CueSounds } from '../audio/cue-sounds';
 import type { AudioEngine } from '../audio/types';
 import type { CharacterId } from '../characters/types';
 import type { Kit } from '../engine/kit';
@@ -10,7 +11,7 @@ import { joinPrivate, joinPublic, listPublicLobbies, pickQuickMatch, releaseClie
 import { normalizeCode } from '../net/peer';
 import type { MatchSettings } from '../sim/types';
 import { createViewModel } from '../weapons';
-import type { ViewModel } from '../weapons/types';
+import type { ViewCue, ViewModel } from '../weapons/types';
 import type { MapId } from '../world/types';
 import { AppStore, type AppError } from './app-store';
 import { HudStore } from './hud';
@@ -42,6 +43,7 @@ export class Game {
   readonly renderer: GameRenderer;
   readonly input: Input;
   readonly audio: AudioEngine;
+  private readonly cues: CueSounds;
   private kit: Kit;
   private view: ViewModel;
   private showroom: Showroom;
@@ -60,10 +62,11 @@ export class Game {
     this.renderer = new GameRenderer(canvas, settings.quality);
     this.kit = { profile: this.renderer.profile, materials: this.renderer.materials };
     this.audio = createAudioEngine();
+    this.cues = new CueSounds(this.audio);
     this.audio.setMix(settings.mix);
     this.view = createViewModel(this.kit);
     this.view.setCharacter(settings.character);
-    this.view.onCue = (cue) => this.audio.play(`cue:${cue}`, { volume: 0.8, priority: 6 });
+    this.view.onCue = (cue) => this.cue(cue);
     this.showroom = new Showroom(this.kit, this.renderer, settings.character);
     // After the first frame so the menu paints first.
     requestAnimationFrame(() =>
@@ -134,9 +137,9 @@ export class Game {
   private resize = () => {
     const w = this.canvas.clientWidth || window.innerWidth;
     const h = this.canvas.clientHeight || window.innerHeight;
-    this.renderer.resize(w, h);
-    this.view.resize(w, h);
     this.showroom.resize(w, h);
+    this.renderer.resize(w, h, this.match ? undefined : this.showroom.pixelRatio(w, h));
+    this.view.resize(w, h);
   };
 
   /** Must be called from a click: unlocks audio and enters the game view. */
@@ -173,7 +176,7 @@ export class Game {
     this.view.dispose();
     this.view = createViewModel(this.kit);
     this.view.setCharacter(this.settings.character);
-    this.view.onCue = (cue) => this.audio.play(`cue:${cue}`, { volume: 0.8, priority: 6 });
+    this.view.onCue = (cue) => this.cue(cue);
     this.showroom.dispose();
     this.showroom = new Showroom(this.kit, this.renderer, this.settings.character);
     if (this.match && this.client?.settings) {
@@ -230,7 +233,7 @@ export class Game {
   }
 
   private async hostGame(kind: HostKind, settings: MatchSettings, autoStart: boolean) {
-    this.leave();
+    this.reset();
     this.app.set({ screen: 'connecting', busy: 'host', error: null });
     try {
       const host = new HostSession(kind, this.settings.name || 'Player', settings);
@@ -245,7 +248,7 @@ export class Game {
   }
 
   private async joinWith(connect: () => Promise<import('../net/channel').Channel>) {
-    this.leave();
+    this.reset();
     this.app.set({ screen: 'connecting', busy: 'join', error: null });
     try {
       const channel = await connect();
@@ -284,7 +287,10 @@ export class Game {
     this.hud.reset();
     this.hud.set({ settings });
     this.match = this.createMatch(settings);
+    // The menu draws at its own pixel ratio; this puts the tier's back.
+    this.resize();
     this.audio.playMusic?.(null);
+    this.audio.setScene?.(settings.map);
     this.input.enabled = true;
     this.app.set({ screen: 'match', busy: null, paused: false });
     void this.input.lock();
@@ -298,6 +304,7 @@ export class Game {
     this.input.enabled = false;
     this.input.unlock();
     this.hud.reset();
+    this.audio.setScene?.(null);
     this.audio.playMusic?.('menu');
     this.app.set({ screen: to, paused: false });
     this.syncHalt();
@@ -341,6 +348,16 @@ export class Game {
 
   /** Leave whatever game we're in and return to the main menu. */
   leave() {
+    if (this.client || this.host || this.match) this.audio.play('uiBack');
+    this.reset();
+  }
+
+  private cue(cue: ViewCue) {
+    if (cue === 'swing') this.match?.swing();
+    else this.cues.play(cue, this.match?.me.arms.weapon ?? null);
+  }
+
+  private reset() {
     this.client?.dispose();
     this.client = null;
     this.host?.close();
@@ -351,7 +368,7 @@ export class Game {
 
   private fail(e: unknown) {
     const error: AppError = e === 'hostLeft' || e === 'full' || e === 'version' || e === 'notFound' || e === 'unsupported' ? e : 'network';
-    this.leave();
+    this.reset();
     releaseClientPeer();
     this.app.set({ error });
   }
@@ -378,7 +395,7 @@ export class Game {
       this.renderer.render(match.scene, match.fp.camera, match.me.alive && !match.scoped ? this.view.scene : null, this.view.camera);
     } else {
       this.showroom.update(dt);
-      this.renderer.render(this.showroom.scene, this.showroom.camera);
+      this.showroom.render();
     }
     this.renderer.timer.end();
   };
@@ -386,7 +403,7 @@ export class Game {
   dispose() {
     this.disposed = true;
     cancelAnimationFrame(this.raf);
-    this.leave();
+    this.reset();
     releaseClientPeer();
     document.removeEventListener('pointerlockchange', this.onLockChange);
     document.removeEventListener('visibilitychange', this.onVisibility);

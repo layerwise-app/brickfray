@@ -15,7 +15,7 @@ const GROUPS: readonly [string, (id: SoundId) => boolean][] = [
   ['Footsteps & movement', (id) => id.startsWith('step:') || ['jump', 'land', 'slide'].includes(id)],
   ['Impacts', (id) => id.startsWith('impact') || ['malletHit', 'malletMiss', 'grenadeBounce'].includes(id)],
   ['Feedback', (id) => ['hitmarker', 'headshotMarker', 'killConfirm', 'hurt', 'death', 'heartbeat', 'respawn'].includes(id)],
-  ['Debris & FX', (id) => ['shatter', 'brickClatter', 'casing', 'shell', 'whiz', 'explosion'].includes(id)],
+  ['Debris & FX', (id) => ['shatter', 'brickClatter', 'casing', 'shell', 'explosion', 'explosionFar'].includes(id) || id.startsWith('whiz') || id.startsWith('spot:')],
   ['UI & match', (id) => SOUNDS[id].category === 'ui' || SOUNDS[id].category === 'stinger']
 ];
 

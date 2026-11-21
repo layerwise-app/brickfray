@@ -1,6 +1,13 @@
 import * as THREE from 'three';
+import type { AoMask } from './ao-mask';
+import { noiseTexture } from './noise';
 
-export type SpriteShape = 'soft' | 'star' | 'ring' | 'spark';
+export type SpriteShape = 'soft' | 'star' | 'ring' | 'spark' | 'smoke' | 'fire' | 'flare' | 'tongue';
+/**
+ * Additive light, alpha-blended haze, or `billow`: premultiplied and sorted back to front, so fire can glow
+ * and cover at once and smoke hides what is behind it.
+ */
+export type SpriteMode = 'additive' | 'alpha' | 'billow';
 
 interface Sprite {
   slot: number;
@@ -17,91 +24,181 @@ interface Sprite {
   drag: number;
   gravity: number;
   shape: number;
+  delay: number;
+  seed: number;
+  depth: number;
 }
+
+const lin = (hex: string) => {
+  const c = new THREE.Color(hex);
+  return `vec3(${c.r.toFixed(4)}, ${c.g.toFixed(4)}, ${c.b.toFixed(4)})`;
+};
 
 const VERTEX = /* glsl */ `
 attribute vec4 aPosSize;
 attribute vec4 aColor;
-attribute vec2 aRotShape;
-uniform vec3 uRight;
-uniform vec3 uUp;
-varying vec2 vUv;
+attribute vec4 aMisc;
+varying vec2 vLocal;
+varying vec2 vScreen;
 varying vec4 vColor;
-varying float vShape;
+varying vec3 vMisc;
 void main() {
-  float c = cos(aRotShape.x), s = sin(aRotShape.x);
+  float c = cos(aMisc.x), s = sin(aMisc.x);
   vec2 q = vec2(position.x * c - position.y * s, position.x * s + position.y * c);
-  vec3 world = aPosSize.xyz + (uRight * q.x + uUp * q.y) * aPosSize.w;
-  vUv = uv;
+  vec4 center = viewMatrix * vec4(aPosSize.xyz, 1.0);
+  float dist = max(-center.z, 1e-3);
+  // Slide the sprite toward the camera (shrunk to keep its size on screen) so a big one doesn't slice into floors and walls.
+  float pull = min(aPosSize.w * 0.45, max(dist - 0.3, 0.0) * 0.5);
+  float k = (dist - pull) / dist;
+  vec4 view = vec4(center.xyz * k + vec3(q * aPosSize.w * k, 0.0), 1.0);
+  vLocal = position.xy * 2.0;
+  vScreen = q * 2.0;
   vColor = aColor;
-  vShape = aRotShape.y;
-  gl_Position = projectionMatrix * viewMatrix * vec4(world, 1.0);
+  vMisc = aMisc.yzw;
+  // Smoke thins out as it reaches the camera, so a blast next to the player doesn't wall off the screen.
+  if (aMisc.y > 3.5 && aMisc.y < 4.5) vColor.a *= mix(0.25, 1.0, smoothstep(0.3, 2.6, dist - aPosSize.w * 0.5));
+  gl_Position = projectionMatrix * view;
 }`;
+
 const FRAGMENT = /* glsl */ `
-uniform float uAdditive;
-varying vec2 vUv;
+uniform float uMode;
+uniform sampler2D uNoise;
+varying vec2 vLocal;
+varying vec2 vScreen;
 varying vec4 vColor;
-varying float vShape;
+varying vec3 vMisc;
 void main() {
-  vec2 d = vUv * 2.0 - 1.0;
+  float shape = vMisc.x;
+  float age = vMisc.y;
+  vec2 d = vLocal;
   float r = length(d);
+  vec3 col = vColor.rgb;
   float a;
-  if (vShape < 0.5) {
+  float cover = 1.0;
+  if (shape < 0.5) {
     a = smoothstep(1.0, 0.0, r);
     a *= a;
-  } else if (vShape < 1.5) {
+  } else if (shape < 1.5) {
     float ang = atan(d.y, d.x);
     float petals = 0.55 + 0.45 * cos(ang * 5.0);
     a = smoothstep(petals, 0.0, r) + smoothstep(0.35, 0.0, r);
-  } else if (vShape < 2.5) {
-    a = smoothstep(0.12, 0.0, abs(r - 0.8)) ;
-  } else {
+  } else if (shape < 2.5) {
+    a = smoothstep(0.12, 0.0, abs(r - 0.8));
+  } else if (shape < 3.5) {
     a = smoothstep(1.0, 0.0, abs(d.x)) * smoothstep(0.25, 0.0, abs(d.y));
+  } else if (shape > 5.5) {
+    if (shape < 6.5) {
+      // Muzzle star: four long thin spikes on the local axes, four short ones between, a hot core; crisp edges.
+      float ang = atan(d.y, d.x);
+      float c4 = abs(cos(ang * 2.0));
+      float reach = max(pow(c4, 14.0), 0.42 * pow(1.0 - c4, 8.0)) * 0.92 + 0.16;
+      // The spike pointing back along the barrel (local -x) stays short so it never crosses the shooter's face.
+      reach *= 1.0 - 0.72 * smoothstep(0.2, -0.6, cos(ang));
+      // The spikes across the barrel stay shorter too: over a face they read as a scratch.
+      reach *= 1.0 - 0.35 * pow(abs(sin(ang)), 10.0);
+      a = smoothstep(reach, reach * 0.72, r);
+      col = mix(col, vec3(1.0, 0.97, 0.9), smoothstep(0.34, 0.08, r));
+    } else {
+      // Flame tongue along local +x: wide and white at the muzzle end (-x), tapering to a point.
+      float u = d.x * 0.5 + 0.5;
+      float w = 0.34 * pow(max(1.0 - u, 0.0), 0.65) * smoothstep(0.0, 0.1, u) + 0.002;
+      a = smoothstep(w, w * 0.45, abs(d.y)) * smoothstep(1.0, 0.9, u);
+      col = mix(col, vec3(1.0, 0.96, 0.86), smoothstep(0.5, 0.05, u) * 0.85);
+    }
+  } else {
+    // Billows: a ragged soft silhouette from two scrolling noise layers; the noise turns with the sprite, the light doesn't.
+    vec2 nuv = d * 0.3 + vMisc.z * vec2(7.13, 3.71);
+    float n = texture2D(uNoise, nuv + vec2(0.0, age * 0.16)).r * 0.6 + texture2D(uNoise, nuv * 2.3 + vec2(age * 0.1, 0.37)).g * 0.4;
+    vec2 sd = vScreen;
+    float sr = length(sd);
+    float edge = sr + (n - 0.5) * 0.75;
+    if (shape < 4.5) {
+      a = smoothstep(1.0, 0.4, edge);
+      // As it ages it tears into holes where the noise is thin, and clears from the inside out.
+      float thin = smoothstep(0.2, 1.0, age) * 0.8;
+      float n2 = texture2D(uNoise, nuv * 1.7 + vec2(0.53, age * 0.05)).b;
+      a *= smoothstep(thin - 0.14, thin + 0.14, n2 * 0.7 + n * 0.3 + (1.0 - sr) * 0.12);
+      float body = sqrt(max(0.0, 1.0 - sr * sr));
+      // Sun-lit tops, a darker core where it is thick, a lighter thin rim.
+      float light = 0.64 + 0.55 * sd.y + 0.18 * body + (n - 0.5) * 0.7 + 0.22 * smoothstep(0.55, 0.95, sr) - 0.14 * body * smoothstep(0.2, -0.5, sd.y);
+      col *= clamp(light, 0.3, 1.45);
+      // Lit from below by the fire for its first moments.
+      float ember = (1.0 - smoothstep(0.0, 0.12, age)) * smoothstep(0.3, -0.9, sd.y);
+      col = mix(col, ${lin('#ff8a3a')}, ember * 0.4);
+    } else {
+      a = smoothstep(1.0, 0.55, edge);
+      float heat = clamp(1.2 - sr * 0.8 - age * 1.3 + (n - 0.5) * 1.1, 0.0, 1.0);
+      col = mix(${lin('#4b4541')}, ${lin('#b8340e')}, smoothstep(0.05, 0.3, heat));
+      col = mix(col, ${lin('#ff7518')}, smoothstep(0.22, 0.52, heat));
+      col = mix(col, ${lin('#ffc54a')}, smoothstep(0.48, 0.78, heat));
+      col = mix(col, ${lin('#fff5dc')}, smoothstep(0.8, 1.0, heat));
+      col *= vColor.rgb;
+      // Hot fire mostly adds light; cooling flame turns to soot that covers what is behind.
+      cover = mix(0.85, 0.4, heat);
+    }
   }
   a *= vColor.a;
   if (a < 0.004) discard;
-  gl_FragColor = uAdditive > 0.5 ? vec4(vColor.rgb * a, 1.0) : vec4(vColor.rgb, a);
+  if (uMode < 0.5) {
+    gl_FragColor = vec4(col * a, 1.0);
+    #include <colorspace_fragment>
+  } else if (uMode < 1.5) {
+    gl_FragColor = vec4(col, a);
+    #include <colorspace_fragment>
+  } else {
+    gl_FragColor = vec4(col, 1.0);
+    #include <colorspace_fragment>
+    gl_FragColor = vec4(gl_FragColor.rgb * a, a * cover);
+  }
 }`;
 
-const SHAPES: Record<SpriteShape, number> = { soft: 0, star: 1, ring: 2, spark: 3 };
+const SHAPES: Record<SpriteShape, number> = { soft: 0, star: 1, ring: 2, spark: 3, smoke: 4, fire: 5, flare: 6, tongue: 7 };
+const MODES: Record<SpriteMode, number> = { additive: 0, alpha: 1, billow: 2 };
+const eye = new THREE.Vector3();
+const ahead = new THREE.Vector3();
+const byDepth = (a: Sprite, b: Sprite) => b.depth - a.depth;
 
-/**
- * Camera-facing particles in one instanced draw: muzzle flashes, sparks and
- * fire (additive) or smoke and dust (alpha) depending on the pool.
- */
+/** Camera-facing particles in one instanced draw: flashes and sparks, haze, or fire and smoke billows. */
 export class SpritePool {
   readonly mesh: THREE.Mesh<THREE.InstancedBufferGeometry, THREE.ShaderMaterial>;
   private sprites: Sprite[] = [];
   private free: number[] = [];
   private posSize: THREE.InstancedBufferAttribute;
   private color: THREE.InstancedBufferAttribute;
-  private rotShape: THREE.InstancedBufferAttribute;
-  private material: THREE.ShaderMaterial;
+  private misc: THREE.InstancedBufferAttribute;
+  private readonly sorted: boolean;
+  /** Where thick smoke and fire are written for the ambient-occlusion pass (billows on tiers that have it). */
+  mask: AoMask | null = null;
 
-  constructor(additive: boolean, private readonly capacity = 256) {
+  constructor(mode: SpriteMode, private readonly capacity = 256) {
     const geometry = new THREE.InstancedBufferGeometry();
     const base = new THREE.PlaneGeometry(1, 1);
     geometry.index = base.index;
     geometry.setAttribute('position', base.getAttribute('position'));
-    geometry.setAttribute('uv', base.getAttribute('uv'));
     this.posSize = new THREE.InstancedBufferAttribute(new Float32Array(capacity * 4), 4);
     this.color = new THREE.InstancedBufferAttribute(new Float32Array(capacity * 4), 4);
-    this.rotShape = new THREE.InstancedBufferAttribute(new Float32Array(capacity * 2), 2);
+    this.misc = new THREE.InstancedBufferAttribute(new Float32Array(capacity * 4), 4);
     geometry.setAttribute('aPosSize', this.posSize);
     geometry.setAttribute('aColor', this.color);
-    geometry.setAttribute('aRotShape', this.rotShape);
-    this.material = new THREE.ShaderMaterial({
+    geometry.setAttribute('aMisc', this.misc);
+    this.sorted = mode === 'billow';
+    const material = new THREE.ShaderMaterial({
       vertexShader: VERTEX,
       fragmentShader: FRAGMENT,
-      uniforms: { uRight: { value: new THREE.Vector3(1, 0, 0) }, uUp: { value: new THREE.Vector3(0, 1, 0) }, uAdditive: { value: additive ? 1 : 0 } },
+      uniforms: { uMode: { value: MODES[mode] }, uNoise: { value: noiseTexture() } },
       transparent: true,
       depthWrite: false,
-      blending: additive ? THREE.AdditiveBlending : THREE.NormalBlending,
+      blending: mode === 'additive' ? THREE.AdditiveBlending : mode === 'alpha' ? THREE.NormalBlending : THREE.CustomBlending,
+      blendSrc: THREE.OneFactor,
+      blendDst: THREE.OneMinusSrcAlphaFactor,
       toneMapped: false
     });
-    this.mesh = new THREE.Mesh(geometry, this.material);
+    this.mesh = new THREE.Mesh(geometry, material);
     this.mesh.frustumCulled = false;
-    this.mesh.renderOrder = additive ? 6 : 4;
+    this.mesh.renderOrder = mode === 'additive' ? 6 : mode === 'billow' ? 3 : 4;
+    // A pass that swaps every material (the occlusion pass) can't place the instances: it would draw them all as
+    // one square at the origin, so it draws none.
+    this.mesh.onBeforeRender = (_r, scene, _c, g) => g.setDrawRange(0, scene.overrideMaterial ? 0 : Infinity);
     geometry.instanceCount = 0;
     for (let i = capacity - 1; i >= 0; i--) this.free.push(i);
   }
@@ -118,6 +215,10 @@ export class SpritePool {
     spin?: number;
     drag?: number;
     gravity?: number;
+    /** Fixed rotation in radians instead of a random one. */
+    rotation?: number;
+    /** Seconds before it appears. */
+    delay?: number;
   }) {
     let slot = this.free.pop();
     if (slot === undefined) slot = this.sprites.shift()!.slot;
@@ -127,7 +228,7 @@ export class SpritePool {
       v: options.velocity?.clone() ?? new THREE.Vector3(),
       size: options.size,
       grow: options.grow ?? 0,
-      rot: Math.random() * Math.PI * 2,
+      rot: options.rotation ?? Math.random() * Math.PI * 2,
       spin: options.spin ?? 0,
       color: new THREE.Color(options.color),
       alpha: options.alpha ?? 1,
@@ -135,17 +236,22 @@ export class SpritePool {
       maxLife: options.life,
       drag: options.drag ?? 0,
       gravity: options.gravity ?? 0,
-      shape: SHAPES[options.shape ?? 'soft']
+      shape: SHAPES[options.shape ?? 'soft'],
+      delay: options.delay ?? 0,
+      seed: Math.random(),
+      depth: 0
     });
   }
 
   update(dt: number, camera: THREE.Camera) {
-    const e = camera.matrixWorld.elements;
-    (this.material.uniforms.uRight!.value as THREE.Vector3).set(e[0]!, e[1]!, e[2]!);
-    (this.material.uniforms.uUp!.value as THREE.Vector3).set(e[4]!, e[5]!, e[6]!);
-    let n = 0;
+    camera.getWorldPosition(eye);
+    camera.getWorldDirection(ahead);
     for (let i = this.sprites.length - 1; i >= 0; i--) {
       const s = this.sprites[i]!;
+      if (s.delay > 0) {
+        s.delay -= dt;
+        continue;
+      }
       s.life -= dt;
       if (s.life <= 0) {
         this.free.push(s.slot);
@@ -157,17 +263,26 @@ export class SpritePool {
       s.p.addScaledVector(s.v, dt);
       s.size += s.grow * dt;
       s.rot += s.spin * dt;
-      const t = s.life / s.maxLife;
-      // Sprites are written densely (order doesn't matter for additive; smoke is soft enough).
+      s.depth = (s.p.x - eye.x) * ahead.x + (s.p.y - eye.y) * ahead.y + (s.p.z - eye.z) * ahead.z;
+    }
+    const list = this.sorted ? [...this.sprites].sort(byDepth) : this.sprites;
+    let n = 0;
+    this.mask?.begin(camera);
+    for (const s of list) {
+      if (s.delay > 0) continue;
+      const age = 1 - s.life / s.maxLife;
+      const alpha = s.alpha * envelope(s.shape, age);
+      this.mask?.add(s.p, s.size, alpha);
       this.posSize.setXYZW(n, s.p.x, s.p.y, s.p.z, s.size);
-      this.color.setXYZW(n, s.color.r, s.color.g, s.color.b, s.alpha * Math.min(1, t * 2.2));
-      this.rotShape.setXY(n, s.rot, s.shape);
+      this.color.setXYZW(n, s.color.r, s.color.g, s.color.b, alpha);
+      this.misc.setXYZW(n, s.rot, s.shape, age, s.seed);
       n++;
     }
     this.mesh.geometry.instanceCount = n;
+    this.mask?.end();
     this.posSize.needsUpdate = true;
     this.color.needsUpdate = true;
-    this.rotShape.needsUpdate = true;
+    this.misc.needsUpdate = true;
   }
 
   clear() {
@@ -175,4 +290,11 @@ export class SpritePool {
     this.sprites = [];
     this.mesh.geometry.instanceCount = 0;
   }
+}
+
+/** Opacity over a sprite's life: smoke swells in and thins away, fire burns down to soot, the rest fade at the end. */
+function envelope(shape: number, age: number) {
+  if (shape === SHAPES.smoke) return THREE.MathUtils.smoothstep(age, 0, 0.08) * (1 - THREE.MathUtils.smoothstep(age, 0.3, 1));
+  if (shape === SHAPES.fire) return THREE.MathUtils.smoothstep(age, 0, 0.04) * (1 - THREE.MathUtils.smoothstep(age, 0.55, 1));
+  return Math.min(1, (1 - age) * 2.2);
 }

@@ -90,22 +90,18 @@ export const BUILDING: Element<BuildingParams> = {
     const rng = new Rng(p.seed ?? Math.round(p.x0 * 3 + p.z0 * 7));
     const hs = holes(p, length);
     const main = p.wall[0]!;
-    const style = { colors: p.wall, variance: 0.18, lens: [4, 6, 3, 8] };
-    if (d.detail === 0) {
-      slab(d, [p.x0, 0, p.z0], [p.x1, p.height, p.z1], main);
-    } else {
-      const openings: Opening[] = hs.map((h) => ({ from: along(h.u0), to: along(h.u1), y0: h.y0, y1: h.y1 }));
-      const depth = masonryFaces(d, [p.x0, 0.48, p.z0], [p.x1, p.height, p.z1], style, [p.face], { [p.face]: openings.map((o) => ({ ...o, y0: Math.max(o.y0, 0.48) })) });
-      const inset = (side: Face) => (side === p.face ? depth : 0);
-      slab(d, [p.x0 + inset('w'), 0, p.z0 + inset('n')], [p.x1 - inset('e'), p.height, p.z1 - inset('s')], shade(main, -0.3));
-      let u = 0;
-      for (const h of [...hs.filter((x) => x.kind === 'door').sort((a, b) => a.u0 - b.u0), { u0: length, u1: length }]) {
-        if (h.u0 - u > 0.05) t.box((u + h.u0) / 2, 0, 0.02, h.u0 - u, 0.48, 0.08, shade(p.trim, -0.15), undefined, 0.02);
-        u = h.u1;
-      }
-      const floors = Math.floor((p.height - 0.6) / STOREY);
-      for (let k = 1; k < floors; k++) t.box(length / 2, k * STOREY - 0.08, 0.03, length, PLATE, 0.1, p.trim, undefined, 0.02);
+    const style = { colors: p.wall, variance: 0.26, lens: [4, 6, 3, 8] };
+    const openings: Opening[] = hs.map((h) => ({ from: along(h.u0), to: along(h.u1), y0: h.y0, y1: h.y1 }));
+    const depth = masonryFaces(d, [p.x0, 0.48, p.z0], [p.x1, p.height, p.z1], style, [p.face], { [p.face]: openings.map((o) => ({ ...o, y0: Math.max(o.y0, 0.48) })) });
+    const inset = (side: Face) => (side === p.face ? depth : 0);
+    slab(d, [p.x0 + inset('w'), 0, p.z0 + inset('n')], [p.x1 - inset('e'), p.height, p.z1 - inset('s')], shade(main, -0.3));
+    let u = 0;
+    for (const h of [...hs.filter((x) => x.kind === 'door').sort((a, b) => a.u0 - b.u0), { u0: length, u1: length }]) {
+      if (h.u0 - u > 0.05) t.box((u + h.u0) / 2, 0, 0.02, h.u0 - u, 0.48, 0.08, shade(p.trim, -0.15), undefined, 0.02);
+      u = h.u1;
     }
+    const floors = Math.floor((p.height - 0.6) / STOREY);
+    for (let k = 1; k < floors; k++) t.box(length / 2, k * STOREY - 0.08, 0.03, length, PLATE, 0.1, p.trim, undefined, 0.02);
     t.box(length / 2, p.height - 0.32, 0.08, length + 0.2, 0.32, 0.24, p.trim, undefined, 0.03);
     if (d.detail > 0) t.box(length / 2, p.height - 0.48, 0.04, length + 0.1, PLATE, 0.14, shade(p.trim, -0.1), undefined, 0.02);
     for (const h of hs) drawHole(t, d, p, h, rng);
@@ -120,23 +116,27 @@ function drawHole(t: Pen, d: Drawer, p: BuildingParams, h: Hole, rng: Rng) {
   const c = (h.u0 + h.u1) / 2;
   const frame = p.trim;
   if (d.detail === 0) {
-    t.box(c, h.y0, 0.01, w, hh, 0.04, h.kind === 'door' ? p.shop?.door ?? '#6e4a2f' : '#3c5a74', h.kind === 'door' ? undefined : 'glass', 0);
+    flatHole(t, p, h);
     return;
   }
-  t.box(c, h.y0, -0.16, w, hh, 0.04, '#26323d', undefined, 0);
+  d.distant(() => flatHole(t, p, h));
+  // The wall core stands just behind the brick fronts, so everything in an opening is layered in front of it.
   if (h.kind === 'door') {
     const door = p.shop?.door ?? '#6e4a2f';
-    t.box(c, h.y0, -0.06, w - 0.08, hh - 0.04, 0.06, door, undefined, 0.012);
-    t.box(c, h.y0 + hh * 0.5, -0.02, w - 0.4, hh * 0.38, 0.03, '#9fd2ea', 'glass', 0);
-    t.ball(c + w / 2 - 0.18, h.y0 + 1.05, 0.02, 0.04, '#c99a3e', undefined, 0, 1, 'chrome');
+    t.box(c, h.y0, -0.004, w - 0.08, hh - 0.04, 0.03, door, undefined, 0.008);
+    if (d.detail >= 2) for (const y of [0.18, 0.56]) t.frame(c, h.y0 + hh * y * 0.62, 0.012, w - 0.34, hh * 0.24, 0.035, 0.012, shade(door, 0.12));
+    t.box(c, h.y0 + hh * 0.5, 0.012, w - 0.4, hh * 0.38, 0.008, '#22303c', undefined, 0);
+    t.box(c, h.y0 + hh * 0.5, 0.018, w - 0.4, hh * 0.38, 0.004, GLASS, 'glass', 0);
+    t.ball(c + w / 2 - 0.18, h.y0 + 1.05, 0.03, 0.04, '#c99a3e', undefined, 0, 1, 'chrome');
     t.box(c, h.y0 - 0.16, 0.12, w + 0.3, PLATE, 0.36, shade(p.trim, -0.1), undefined, 0.01);
   } else {
-    t.box(c, h.y0, -0.08, w, hh, 0.03, '#a9d9ef', 'glass', 0);
+    windowInside(t, d, h, rng);
+    t.box(c, h.y0, 0.016, w, hh, 0.004, GLASS, 'glass', 0);
   }
   t.frame(c, h.y0, -0.02, w, hh, 0.08, 0.1, frame);
   if (h.kind !== 'door') {
-    t.box(c, h.y0, -0.06, 0.05, hh, 0.05, frame, undefined, 0);
-    if (h.kind === 'window' && d.detail >= 2) t.box(c, h.y0 + hh * 0.62, -0.06, w, 0.05, 0.05, frame, undefined, 0);
+    t.box(c, h.y0, 0.012, 0.05, hh, 0.03, frame, undefined, 0);
+    if (h.kind === 'window' && d.detail >= 2) t.box(c, h.y0 + hh * 0.62, 0.012, w, 0.05, 0.03, frame, undefined, 0);
     t.box(c, h.y0 - 0.1, 0.06, w + 0.24, 0.1, 0.18, shade(p.trim, -0.08), undefined, 0.015);
   }
   if (h.kind === 'window') {
@@ -145,17 +145,20 @@ function drawHole(t: Pen, d: Drawer, p: BuildingParams, h: Hole, rng: Rng) {
       t.box(c, h.y1 + 0.16, 0.02, w * 0.5, 0.1, 0.12, shade(p.trim, -0.05), undefined, 0.015);
     } else t.box(c, h.y1, 0.02, w + 0.2, 0.14, 0.1, shade(p.trim, -0.12), undefined, 0.015);
     if (p.shutters) {
+      const shutters = p.shutters;
       for (const s of [-1, 1]) {
         const sx = c + s * (w / 2 + 0.24);
-        t.box(sx, h.y0, 0.04, 0.4, hh, 0.05, p.shutters, undefined, 0);
-        if (d.detail >= 2) t.frame(sx, h.y0 + 0.06, 0.08, 0.34, hh - 0.12, 0.05, 0.04, shade(p.shutters, -0.12));
+        d.lasting(() => t.box(sx, h.y0, 0.04, 0.4, hh, 0.05, shutters, undefined, 0));
+        if (d.detail >= 2) t.frame(sx, h.y0 + 0.06, 0.08, 0.34, hh - 0.12, 0.05, 0.04, shade(shutters, -0.12));
       }
     }
     if (p.balcony && h.y0 > STOREY && h.y0 < STOREY * 2) {
       const y = h.y0 - 0.96;
-      t.box(c, y, 0.4, w + 1.0, 0.12, 0.8, p.trim, undefined, 0.02);
-      t.box(c, y - 0.16, 0.3, w + 0.6, 0.16, 0.5, shade(p.trim, -0.1), undefined, 0.02);
-      t.box(c, y + 1.0, 0.78, w + 1.0, 0.06, 0.06, '#2f363d', 'metal', 0);
+      d.lasting(() => {
+        t.box(c, y, 0.4, w + 1.0, 0.12, 0.8, p.trim, undefined, 0.02);
+        t.box(c, y - 0.16, 0.3, w + 0.6, 0.16, 0.5, shade(p.trim, -0.1), undefined, 0.02);
+        t.box(c, y + 1.0, 0.78, w + 1.0, 0.06, 0.06, '#2f363d', 'metal', 0);
+      });
       const bars = d.detail >= 2 ? 7 : 4;
       for (let k = 0; k <= bars; k++) t.box(h.u0 - 0.5 + (k * (w + 1.0)) / bars, y + 0.12, 0.78, 0.035, 0.88, 0.035, '#2f363d', 'metal', 0);
       for (const s of [-1, 1]) t.box(c + s * (w / 2 + 0.48), y + 0.12, 0.4, 0.035, 0.88, 0.76, '#2f363d', 'metal', 0);
@@ -163,6 +166,54 @@ function drawHole(t: Pen, d: Drawer, p: BuildingParams, h: Hole, rng: Rng) {
       t.box(c, h.y0 - 0.3, 0.18, w + 0.1, 0.22, 0.26, '#8a5f3a', undefined, 0.01);
       for (let k = 0; k < 4; k++) t.ball(c - w / 2 + 0.1 + k * ((w - 0.2) / 3), h.y0 - 0.02, 0.18, 0.1, rng.pick(['#c8231b', '#f6c624', '#f3a6c3', '#f2f2ee', '#c43a85']));
     }
+  }
+}
+
+/**
+ * An opaque room with a lit ceiling band, a frame, a mullion and a sill instead of see-through glass: the flat
+ * tier's opening, and the far stand-in on the others.
+ */
+function flatHole(t: Pen, p: BuildingParams, h: Hole) {
+  const w = h.u1 - h.u0;
+  const hh = h.y1 - h.y0;
+  const c = (h.u0 + h.u1) / 2;
+  if (h.kind === 'door') t.box(c, h.y0, 0.01, w - 0.06, hh - 0.03, 0.04, p.shop?.door ?? '#6e4a2f', undefined, 0);
+  else {
+    t.box(c, h.y0, 0.01, w, hh, 0.04, '#2c3c4a', undefined, 0);
+    t.box(c, h.y1 - hh * 0.22, 0.032, w, hh * 0.22, 0.004, '#4f6476', undefined, 0);
+    t.box(c, h.y0, 0.045, 0.05, hh, 0.02, p.trim, undefined, 0);
+    t.box(c, h.y0 - 0.08, 0.06, w + 0.2, 0.08, 0.14, shade(p.trim, -0.08), undefined, 0);
+  }
+  t.frame(c, h.y0, 0.03, w, hh, 0.08, 0.06, p.trim);
+}
+
+const GLASS = '#8fb9cf';
+const CURTAINS = ['#f3e6b8', '#c8231b', '#2f6a8a', '#e8b84a', '#f2f2ee', '#7a9a4a'] as const;
+
+/** A room seen through the glass: dark inside with a lit ceiling band, then drapes, a blind or shop goods. */
+function windowInside(t: Pen, d: Drawer, h: Hole, rng: Rng) {
+  const w = h.u1 - h.u0;
+  const hh = h.y1 - h.y0;
+  const c = (h.u0 + h.u1) / 2;
+  t.box(c, h.y0, -0.006, w, hh, 0.016, '#23303b', undefined, 0);
+  t.box(c, h.y1 - hh * 0.2, 0.0, w, hh * 0.2, 0.006, '#3b4f60', undefined, 0);
+  if (h.kind === 'shop') {
+    for (const y of [0.3, 0.78]) {
+      t.box(c, h.y0 + y, 0.002, w - 0.06, 0.03, 0.01, '#d8cfbf', undefined, 0);
+      for (let k = 0; k < 4; k++) t.box(c - w / 2 + 0.2 + k * ((w - 0.4) / 3), h.y0 + y + 0.03, 0.004, 0.16, rng.range(0.1, 0.24), 0.008, rng.pick(CURTAINS), undefined, 0);
+    }
+    return;
+  }
+  const look = rng.next();
+  const cloth = rng.pick(CURTAINS);
+  if (look < 0.55) {
+    const drape = w * rng.range(0.2, 0.3);
+    for (const s of [-1, 1]) t.box(c + s * (w - drape) / 2, h.y0 + 0.02, 0.006, drape, hh - 0.04, 0.006, cloth, undefined, 0);
+    if (d.detail >= 2) t.box(c, h.y1 - 0.16, 0.009, w, 0.14, 0.006, shade(cloth, -0.12), undefined, 0);
+  } else if (look < 0.85) {
+    const down = hh * rng.range(0.3, 0.65);
+    t.box(c, h.y1 - down, 0.006, w - 0.04, down, 0.006, '#e9e2d0', undefined, 0);
+    t.box(c, h.y1 - down - 0.03, 0.009, w - 0.04, 0.03, 0.008, '#b8ad96', undefined, 0);
   }
 }
 

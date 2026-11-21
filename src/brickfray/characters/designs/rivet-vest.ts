@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import type { PartSet } from '../parts';
-import { Garment, lump, tier } from './tailor';
+import { Garment, lump, tier, type Ring } from './tailor';
 
 export const C = {
   orange: '#f58a1f',
@@ -16,6 +16,7 @@ export const C = {
   stitch: '#d9b27c',
   khaki: '#7d6a4c',
   khakiDark: '#6a5940',
+  duck: '#5b4a34',
   hair: '#3b2a1e',
   steel: '#aeb5bc',
   dark: '#2a2e33',
@@ -25,26 +26,26 @@ export const C = {
 };
 
 const { lerp, smoothstep } = THREE.MathUtils;
-/** The vest's shape over the shared torso (body-torso.ts at bulk 1.12), on the chest and waist bones. */
-const CHEST = new Garment(
-  [
-    [-0.05, 0.346, 0.2],
-    [0.05, 0.384, 0.212],
-    [0.13, 0.417, 0.221],
-    [0.19, 0.44, 0.225],
-    [0.228, 0.35, 0.19],
-    [0.26, 0.2, 0.15]
-  ],
-  3
-);
-const WAIST = new Garment(
-  [
-    [-0.02, 0.306, 0.19],
-    [0.04, 0.312, 0.188],
-    [0.15, 0.336, 0.194]
-  ],
-  3
-);
+/**
+ * The vest's one profile over the shared torso (body-torso.ts at bulk 1.12), in chest-bone space from the hem up.
+ * It is cut at SEAM into a piece on the chest bone and one on the waist bone; Rivet's stance turns them as one (`waist: 1`).
+ */
+const PROFILE: Ring[] = [
+  [-0.18, 0.306, 0.19],
+  [-0.12, 0.313, 0.188],
+  [-0.075, 0.325, 0.19],
+  [-0.03, 0.344, 0.198],
+  [0.05, 0.384, 0.212],
+  [0.13, 0.417, 0.221],
+  [0.19, 0.44, 0.225],
+  [0.228, 0.35, 0.19],
+  [0.26, 0.2, 0.15]
+];
+/** Height of the chest bone above the waist bone (skeleton.ts). */
+const RISE = 0.16;
+const CHEST = new Garment(PROFILE, 3);
+const WAIST = new Garment(PROFILE.map(([y, w, d]): Ring => [y + RISE, w, d]), 3);
+const SEAM = -0.03;
 const LIFT = 0.002;
 const CLOTH = 0.007;
 const ON = LIFT + CLOTH + 0.0004;
@@ -70,20 +71,22 @@ export function vest(b: PartSet) {
 
   b.mirror((_, sign) => {
     const side = (lo: number, hiA: number): [number, number] => (sign > 0 ? [lo, hiA] : [-hiA, -lo]);
-    b.add('chest', CHEST.panel({ ...span(-0.05, TOP, (y) => side(CHEST.front(y, neckX(y)), armhole(y))), lift: LIFT, thick: CLOTH, seg: [na, ny] }), C.orange, { look: 'cloth' });
-    b.add('spine', WAIST.panel({ y: [HEM, 0.15], a: side(WAIST.front(0, ZIP), Math.PI / 2), lift: LIFT, thick: CLOTH, seg: [na, 1] }), C.orange, { look: 'cloth' });
+    b.add('chest', CHEST.panel({ ...span(SEAM, TOP, (y) => side(CHEST.front(y, neckX(y)), armhole(y))), lift: LIFT, thick: CLOTH, seg: [na, ny] }), C.orange, { look: 'cloth' });
+    b.add('spine', WAIST.panel({ ...span(HEM, SEAM + RISE, (y) => side(WAIST.front(y, ZIP), Math.PI / 2)), lift: LIFT, thick: CLOTH, seg: [na, 1] }), C.orange, { look: 'cloth' });
 
     // Tape up the front, over the shoulder and down the back.
     for (const back of [false, true]) {
       const at = (y: number, x: number) => (back ? CHEST.back(y, sign * x) : CHEST.front(y, sign * x));
       const strip = (half: number, lift: number, thick: number, color: string, look: 'cloth' | 'gloss') =>
-        b.add('chest', CHEST.panel({ ...span(BAND[1] - 0.004, TOP, (y) => [at(y, stripe(y) - half), at(y, stripe(y) + half)]), lift, thick, seg: [1, ny] }), color, { look });
+        b.add('chest', CHEST.panel({ ...span(BAND[1] - 0.004, TOP, (y) => [at(y, stripe(y) - half), at(y, stripe(y) + half)]), lift, thick, seg: [tier(b, 1, 2, 4), ny] }), color, { look });
       if (hi) strip(0.022, ON, trim, C.lime, 'cloth');
       strip(0.015, ON + trim, 0.0024, C.tape, 'gloss');
     }
   });
-  b.add('chest', CHEST.panel({ ...span(-0.05, TOP, (y) => [Math.PI - armhole(y), Math.PI + armhole(y)]), lift: LIFT, thick: CLOTH, seg: [na * 2, ny] }), C.orange, { look: 'cloth' });
-  b.add('spine', WAIST.panel({ y: [HEM, 0.15], a: [Math.PI / 2, Math.PI * 1.5], lift: LIFT, thick: CLOTH, seg: [na * 2, 1] }), C.orange, { look: 'cloth' });
+  b.add('chest', CHEST.panel({ ...span(SEAM, TOP, (y) => [Math.PI - armhole(y), Math.PI + armhole(y)]), lift: LIFT, thick: CLOTH, seg: [na * 2, ny] }), C.orange, { look: 'cloth' });
+  b.add('spine', WAIST.panel({ y: [HEM, SEAM + RISE], a: [Math.PI / 2, Math.PI * 1.5], lift: LIFT, thick: CLOTH, seg: [na * 2, 1] }), C.orange, { look: 'cloth' });
+  // In a match the waist still bends against the chest: a lining under the seam keeps the opening orange.
+  if (!b.hero) b.add('spine', WAIST.panel({ y: [SEAM + RISE - 0.01, SEAM + RISE + 0.035], a: [0, Math.PI * 2], lift: LIFT - 0.006, thick: 0.005, seg: [around, 1] }), C.orange, { look: 'cloth' });
 
   // Tape around the chest and the waist, split at the zip.
   const wrap = (bone: 'chest' | 'spine', g: Garment, y: [number, number], lift: number, thick: number, color: string, look: 'cloth' | 'gloss') => {
@@ -105,7 +108,7 @@ export function vest(b: PartSet) {
   chestKit(b);
   if (!b.hero) return;
   // Yoke seam and hanging loop on the back, side seams under the arms.
-  b.add('chest', CHEST.panel({ y: [0.158, 0.162], a: [Math.PI - 1.15, Math.PI + 1.15], lift: ON, thick: 0.0008, seg: [16, 1] }), C.hem, { look: 'cloth' });
+  b.add('chest', CHEST.panel({ y: [0.158, 0.162], a: [Math.PI - armhole(0.16) + 0.03, Math.PI + armhole(0.16) - 0.03], lift: ON, thick: 0.0008, seg: [16, 1] }), C.hem, { look: 'cloth' });
   b.box('chest', [0.03, 0.012, 0.004], C.hem, { ...CHEST.place(0.236, Math.PI, ON), look: 'cloth', bevel: 0.0015 });
   b.mirror((_, sign) => b.add('spine', WAIST.panel({ y: [HEM, 0.11], a: [sign * (Math.PI / 2 - 0.012), sign * (Math.PI / 2 + 0.012)], lift: ON, thick: 0.0008, seg: [1, 1] }), C.hem, { look: 'cloth' }));
 }
@@ -118,11 +121,15 @@ function zip(b: PartSet) {
     return;
   }
   b.mirror((_, sign) => {
-    b.add('chest', CHEST.panel({ y: [-0.05, 0.1], a: [CHEST.front(0, sign * 0.003), CHEST.front(0, sign * 0.016)], lift: ON, thick: 0.001, seg: [1, 1] }), C.dark, { look: 'cloth' });
-    b.add('spine', WAIST.panel({ y: [HEM, 0.15], a: [WAIST.front(0, sign * 0.003), WAIST.front(0, sign * 0.016)], lift: ON, thick: 0.001, seg: [1, 1] }), C.dark, { look: 'cloth' });
+    const tape = (g: Garment, y: number) => [g.front(y, sign * 0.003), g.front(y, sign * 0.016)] as [number, number];
+    b.add('chest', CHEST.panel({ ...span(SEAM, 0.1, (y) => tape(CHEST, y)), lift: ON, thick: 0.001, seg: [1, 4] }), C.dark, { look: 'cloth' });
+    b.add('spine', WAIST.panel({ ...span(HEM, SEAM + RISE, (y) => tape(WAIST, y)), lift: ON, thick: 0.001, seg: [1, 1] }), C.dark, { look: 'cloth' });
   });
-  for (let y = -0.046; y < 0.094; y += 0.0085) b.box('chest', [0.0075, 0.0045, 0.005], metal, { ...CHEST.place(y, 0, ON), look: 'metal', bevel: 0 });
-  for (let y = HEM + 0.004; y < 0.112; y += 0.0085) b.box('spine', [0.0075, 0.0045, 0.005], metal, { ...WAIST.place(y, 0, ON), look: 'metal', bevel: 0 });
+  // One run of teeth from the hem to the pull, each on the piece it sits on.
+  for (let y = HEM + 0.004; y < 0.094 + RISE; y += 0.0085) {
+    if (y < SEAM + RISE - 0.002) b.box('spine', [0.0075, 0.0045, 0.005], metal, { ...WAIST.place(y, 0, ON), look: 'metal', bevel: 0 });
+    else b.box('chest', [0.0075, 0.0045, 0.005], metal, { ...CHEST.place(y - RISE, 0, ON), look: 'metal', bevel: 0 });
+  }
   b.box('chest', [0.016, 0.02, 0.009], metal, { ...CHEST.place(0.1, 0, ON), look: 'metal', bevel: 0.003 });
   b.box('chest', [0.009, 0.03, 0.004], C.orange, { ...CHEST.place(0.079, 0, ON + 0.007, 0.25), look: 'rubber', bevel: 0.0015 });
 }
@@ -143,7 +150,7 @@ function chestKit(b: PartSet) {
   // Polo collar spread over the vest, and the shirt's placket.
   b.mirror((_, sign) => {
     const wing = (y: number): [number, number] => [CHEST.front(y, sign * (neckX(y) - 0.004)), CHEST.front(y, sign * (neckX(y) + lerp(0.003, 0.036, (y - 0.168) / (TOP - 0.168))))];
-    b.add('chest', CHEST.panel({ ...span(0.168, TOP, wing), lift: ON, thick: 0.004, seg: [1, 2] }), C.collar, { look: 'cloth' });
+    b.add('chest', CHEST.panel({ ...span(0.168, TOP, wing), lift: ON + 0.0034, thick: 0.004, seg: [tier(b, 1, 2, 3), tier(b, 2, 2, 4)] }), C.collar, { look: 'cloth' });
   });
   if (hero) for (const y of [0.15, 0.186]) b.cyl('chest', 0.0055, 0.0055, 0.004, '#c9d2dc', { at: [0, y, -0.107], rot: [Math.PI / 2, 0, 0], look: 'gloss', seg: 8 });
 

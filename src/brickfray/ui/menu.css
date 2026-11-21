@@ -1,0 +1,750 @@
+/*
+ * Main menu. The 3D stage shows through; the overlay tells it what it covers (MainMenu → coverStage) and the
+ * figure is framed in the space left. Two arrangements, named in --bf-stage for that report:
+ *   wide    — columns in the bottom corners, the figure on its stand between them
+ *   stacked — one sheet across the bottom, the figure on its stand above it
+ */
+.bf-menu {
+  --bf-stage: wide;
+  /* One pixel of the 1440 × 900 design; larger screens scale the whole overlay with it. */
+  --u: 1px;
+  --pad: calc(24 * var(--u));
+  --gap: calc(10 * var(--u));
+  --thumb: calc(46 * var(--u));
+  --card: calc(96 * var(--u));
+  --name: calc(50 * var(--u));
+  --nav: calc(264 * var(--u));
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  cursor: grab;
+  touch-action: pan-y;
+}
+.bf-menu[data-turning='true'] {
+  cursor: grabbing;
+}
+
+.bf-menu-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: calc(12 * var(--u));
+  padding: max(var(--pad), env(safe-area-inset-top)) max(var(--pad), env(safe-area-inset-right)) 0 max(var(--pad), env(safe-area-inset-left));
+}
+.bf-menu-logo {
+  user-select: none;
+  cursor: default;
+}
+.bf-menu-tools {
+  display: flex;
+  flex-shrink: 0;
+  gap: calc(12 * var(--u));
+}
+
+.bf-menu-sheet {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: calc(24 * var(--u));
+  margin-top: auto;
+  padding: 0 max(var(--pad), env(safe-area-inset-right)) max(var(--pad), env(safe-area-inset-bottom)) max(var(--pad), env(safe-area-inset-left));
+}
+.bf-menu-info {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--gap);
+}
+.bf-menu-swap {
+  animation: bf-menu-swap 0.28s ease both;
+}
+/* Opacity only: the stage reads these boxes' positions the moment they appear. */
+@keyframes bf-menu-swap {
+  from {
+    opacity: 0;
+  }
+}
+
+.bf-menu-title {
+  display: grid;
+  width: fit-content;
+  grid-template-areas: 'role' 'name' 'style';
+  cursor: default;
+  text-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.75),
+    0 0 14px rgba(6, 10, 22, 0.7);
+}
+.bf-menu-role {
+  grid-area: role;
+  font-size: calc(13 * var(--u));
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+.bf-menu-name {
+  grid-area: name;
+  font-size: var(--name);
+  line-height: 1;
+}
+.bf-menu-style {
+  grid-area: style;
+  margin-top: calc(4 * var(--u));
+  font-size: calc(14 * var(--u));
+  font-weight: 600;
+}
+
+.bf-menu-loadout {
+  display: flex;
+  width: fit-content;
+  gap: calc(6 * var(--u));
+  margin-top: var(--gap);
+  cursor: default;
+}
+.bf-menu-loadout li {
+  display: flex;
+  width: var(--card);
+  min-width: 0;
+  flex-direction: column;
+  gap: calc(4 * var(--u));
+  padding: calc(8 * var(--u)) calc(10 * var(--u));
+  border-radius: calc(12 * var(--u));
+  background: rgba(8, 12, 26, 0.62);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.09);
+}
+.bf-menu-slot {
+  font-size: calc(10 * var(--u));
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.6);
+}
+.bf-menu-arm {
+  width: auto;
+  height: calc(24 * var(--u));
+  align-self: flex-start;
+}
+.bf-menu-item {
+  overflow: hidden;
+  font-size: calc(12 * var(--u));
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bf-menu-picker {
+  display: flex;
+  width: fit-content;
+  gap: calc(4 * var(--u));
+}
+.bf-menu-pick {
+  display: flex;
+  width: calc(var(--thumb) + calc(8 * var(--u)));
+  min-width: 0;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(3 * var(--u));
+  cursor: pointer;
+}
+/* The tile lifts under the pointer; its name stays on the row's baseline. */
+.bf-menu-thumb {
+  position: relative;
+  display: block;
+  width: var(--thumb);
+  height: var(--thumb);
+  border-radius: 28%;
+  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.35);
+  transition: transform 0.12s ease;
+}
+.bf-menu-pick:hover .bf-menu-thumb {
+  transform: translateY(-2px);
+}
+/* The swatch darkens a little toward its edges so the face stands out. */
+.bf-menu-thumb::before {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(circle at 50% 42%, rgba(16, 22, 44, 0.08) 13%, rgba(8, 11, 26, 0.55) 100%);
+  content: '';
+}
+/* The portrait is taller than its tile: clipped to the tile's sides and rounded bottom, a crest or antenna rises past its top. */
+.bf-menu-thumb img {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: auto;
+  clip-path: inset(0 round 0 0 calc(var(--thumb) * 0.28) calc(var(--thumb) * 0.28));
+}
+.bf-menu-pick[aria-pressed='true'] .bf-menu-thumb {
+  box-shadow:
+    0 0 0 3px #fff,
+    0 6px 0 rgba(0, 0, 0, 0.35);
+}
+.bf-menu-pick:focus-visible {
+  outline: none;
+}
+.bf-menu-pick:focus-visible .bf-menu-thumb {
+  outline: 3px solid var(--bf-yellow);
+  outline-offset: 3px;
+}
+.bf-menu-pick-name {
+  max-width: 100%;
+  overflow: hidden;
+  font-size: calc(11 * var(--u));
+  font-weight: 600;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: rgba(255, 255, 255, 0.72);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+}
+.bf-menu-pick:hover .bf-menu-pick-name,
+.bf-menu-pick[aria-pressed='true'] .bf-menu-pick-name {
+  color: #fff;
+}
+
+/* The player's name: a field that reads as one on any backdrop. */
+.bf-menu-callsign {
+  display: flex;
+  width: min(100%, calc(260 * var(--u)));
+  height: calc(44 * var(--u));
+  align-items: center;
+  gap: calc(9 * var(--u));
+  padding: 0 calc(14 * var(--u));
+  border: 2px solid rgba(255, 255, 255, 0.34);
+  border-radius: calc(12 * var(--u));
+  background: rgba(8, 12, 26, 0.72);
+  color: rgba(255, 255, 255, 0.7);
+  cursor: text;
+  transition:
+    border-color 0.12s ease,
+    background 0.12s ease;
+}
+.bf-menu-callsign:hover {
+  border-color: rgba(255, 255, 255, 0.55);
+}
+.bf-menu-callsign:focus-within {
+  border-color: var(--bf-yellow);
+  background: rgba(8, 12, 26, 0.88);
+  color: var(--bf-yellow);
+}
+.bf-menu-callsign svg {
+  flex-shrink: 0;
+}
+.bf-menu-callsign input {
+  min-width: 0;
+  flex: 1;
+  border: 0;
+  outline: none;
+  background: none;
+  color: var(--bf-text);
+  font: inherit;
+  font-weight: 600;
+  user-select: text;
+  -webkit-user-select: text;
+}
+.bf-menu-callsign input::placeholder {
+  color: rgba(255, 255, 255, 0.5);
+  font-weight: 500;
+}
+
+.bf-menu-nav {
+  display: flex;
+  width: var(--nav);
+  flex-shrink: 0;
+  flex-direction: column;
+  gap: calc(14 * var(--u));
+}
+.bf-btn.bf-big-btn {
+  --icon: calc(44 * var(--u));
+  height: auto;
+  min-width: 0;
+  justify-content: flex-start;
+  gap: calc(14 * var(--u));
+  padding: calc(13 * var(--u)) calc(16 * var(--u));
+  text-align: left;
+}
+.bf-big-btn-icon {
+  display: grid;
+  width: var(--icon);
+  height: var(--icon);
+  flex-shrink: 0;
+  place-items: center;
+  border-radius: calc(12 * var(--u));
+  background: rgba(0, 0, 0, 0.15);
+}
+.bf-big-btn-text {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+.bf-big-btn-label {
+  font-size: calc(28 * var(--u));
+  line-height: 1;
+}
+.bf-big-btn-main .bf-big-btn-label {
+  font-size: calc(34 * var(--u));
+}
+.bf-big-btn-caption {
+  margin-top: calc(4 * var(--u));
+  overflow: hidden;
+  font-size: calc(13 * var(--u));
+  font-weight: 500;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: 0.78;
+}
+
+/* The narrowest wide screens: the left column folds to the width of three portraits so the stand has the room between the columns. */
+@media (min-width: 1024px) and (max-width: 1279.98px) and (min-height: 560.02px) {
+  .bf-menu {
+    --thumb: 56px;
+    --name: 44px;
+    --column: 204px;
+  }
+  .bf-menu-loadout {
+    width: var(--column);
+    flex-direction: column;
+    gap: 5px;
+  }
+  .bf-menu-loadout li {
+    display: grid;
+    width: auto;
+    grid-template-areas: 'arm slot' 'arm item';
+    grid-template-columns: 40px minmax(0, 1fr);
+    align-items: center;
+    gap: 1px 10px;
+    padding: 6px 10px;
+  }
+  .bf-menu-arm {
+    grid-area: arm;
+    width: 40px;
+    height: auto;
+    align-self: center;
+  }
+  .bf-menu-slot {
+    grid-area: slot;
+    font-size: 9px;
+    line-height: 1.2;
+  }
+  .bf-menu-item {
+    grid-area: item;
+    font-size: 13px;
+    line-height: 1.25;
+  }
+  .bf-menu-picker {
+    display: grid;
+    width: var(--column);
+    grid-template-columns: repeat(3, auto);
+    justify-content: space-between;
+    gap: 6px 0;
+  }
+  .bf-menu-callsign {
+    width: var(--column);
+  }
+}
+
+@media (min-width: 1280px) {
+  .bf-menu {
+    --pad: calc(32 * var(--u));
+    --gap: calc(12 * var(--u));
+    --thumb: calc(64 * var(--u));
+    --card: calc(112 * var(--u));
+    --name: calc(60 * var(--u));
+    --nav: calc(320 * var(--u));
+  }
+  .bf-menu-picker {
+    gap: calc(6 * var(--u));
+  }
+  .bf-menu-pick-name {
+    font-size: calc(12 * var(--u));
+  }
+  .bf-btn.bf-big-btn {
+    --icon: calc(48 * var(--u));
+    gap: calc(16 * var(--u));
+    padding: calc(16 * var(--u)) calc(20 * var(--u));
+  }
+  .bf-big-btn-label {
+    font-size: calc(30 * var(--u));
+  }
+  .bf-big-btn-main .bf-big-btn-label {
+    font-size: calc(36 * var(--u));
+  }
+  .bf-big-btn-caption {
+    font-size: calc(14 * var(--u));
+  }
+}
+/* Past 1440 × 900 the overlay grows with the screen, keeping the proportions it has there. */
+@media (min-width: 1440.02px) and (min-height: 900.02px) {
+  .bf-menu {
+    --u: clamp(1px, min(100vw / 1440, 100vh / 900), 2.4px);
+  }
+  .bf-menu-logo.bf-logo {
+    font-size: calc(104 * var(--u));
+  }
+  .bf-menu-tools {
+    gap: calc(12 * var(--u));
+  }
+  .bf-menu-tools .bf-btn {
+    height: calc(48 * var(--u));
+    gap: calc(10 * var(--u));
+    border-radius: calc(14 * var(--u));
+  }
+  .bf-menu-tools .bf-btn.\!px-3 {
+    padding-inline: calc(12 * var(--u)) !important;
+  }
+  .bf-menu-tools .bf-icon-btn {
+    width: calc(48 * var(--u));
+  }
+  .bf-menu-tools svg {
+    width: calc(22 * var(--u));
+    height: calc(22 * var(--u));
+  }
+  .bf-menu-tools .text-sm {
+    font-size: calc(14 * var(--u));
+    line-height: calc(20 * var(--u));
+  }
+  .bf-menu-callsign {
+    font-size: calc(16 * var(--u));
+  }
+  .bf-menu-callsign svg {
+    width: calc(18 * var(--u));
+    height: calc(18 * var(--u));
+  }
+  .bf-btn.bf-big-btn {
+    border-radius: calc(14 * var(--u));
+  }
+  .bf-big-btn-icon svg {
+    width: calc(28 * var(--u));
+    height: calc(28 * var(--u));
+  }
+  .bf-big-btn-main .bf-big-btn-icon svg {
+    width: calc(30 * var(--u));
+    height: calc(30 * var(--u));
+  }
+}
+
+/* Compact title and loadout: on a sideways phone, and in the stacked sheet. */
+@media (orientation: landscape) and (max-height: 560px), (max-width: 1023.98px) {
+  .bf-menu-title {
+    grid-template-areas: 'name role' 'name style';
+    grid-template-columns: auto minmax(0, 1fr);
+    column-gap: 10px;
+    align-items: center;
+  }
+  .bf-menu-role {
+    align-self: end;
+    font-size: 11px;
+    line-height: 1.2;
+  }
+  .bf-menu-style {
+    align-self: start;
+    margin-top: 1px;
+    font-size: 12px;
+    line-height: 1.2;
+  }
+  /* A slot name too long for its card (Primärwaffe, Arma secundaria) wraps at a hyphen; the item names stay level. */
+  .bf-menu-loadout li {
+    display: grid;
+    grid-template-areas: 'arm slot' 'item item';
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-rows: 1fr auto;
+    align-items: center;
+    gap: 2px 6px;
+    padding: 5px 8px;
+    border-radius: 10px;
+  }
+  .bf-menu-slot {
+    grid-area: slot;
+    font-size: 9px;
+    line-height: 1.2;
+    letter-spacing: 0.08em;
+    -webkit-hyphens: auto;
+    hyphens: auto;
+    hyphenate-limit-chars: 8 4 4;
+    overflow-wrap: break-word;
+  }
+  .bf-menu-arm {
+    grid-area: arm;
+    width: 26px;
+    height: auto;
+  }
+  .bf-menu-item {
+    grid-area: item;
+    font-size: 11px;
+    line-height: 1.25;
+  }
+}
+
+/* Short and wide (a phone held sideways): the same columns, everything closed up so the figure keeps the full height. */
+@media (orientation: landscape) and (max-height: 560px) {
+  .bf-menu {
+    --pad: 12px;
+    --gap: 6px;
+    --thumb: 40px;
+    --card: 104px;
+    --name: 30px;
+    --nav: 204px;
+  }
+  .bf-menu-picker {
+    gap: 2px;
+  }
+  .bf-menu-pick {
+    width: calc(var(--thumb) + 14px);
+  }
+  .bf-menu-pick-name {
+    font-size: 12px;
+  }
+  .bf-menu-loadout li {
+    padding: 5px 7px;
+  }
+  .bf-menu-slot {
+    font-size: 10px;
+    letter-spacing: 0.04em;
+  }
+  .bf-menu-logo.bf-logo {
+    font-size: clamp(30px, 9.5vh, 46px);
+  }
+  /* The backdrop's builds stand behind the title at this size: a soft shade under it keeps the small type on calm ground. */
+  .bf-menu-title {
+    position: relative;
+    isolation: isolate;
+  }
+  .bf-menu-title::before {
+    position: absolute;
+    z-index: -1;
+    inset: -18px -40px -14px -24px;
+    background: radial-gradient(closest-side, rgba(6, 9, 22, 0.72), rgba(6, 9, 22, 0.4) 62%, rgba(6, 9, 22, 0));
+    content: '';
+    pointer-events: none;
+  }
+  .bf-menu-tools {
+    gap: 6px;
+  }
+  .bf-menu-tools .bf-btn {
+    height: 38px;
+  }
+  .bf-menu-tools .bf-icon-btn {
+    width: 38px;
+  }
+  .bf-menu-sheet {
+    gap: 12px;
+  }
+  .bf-menu-callsign {
+    width: min(100%, 220px);
+    height: 34px;
+    font-size: 14px;
+  }
+  .bf-menu-nav {
+    gap: 9px;
+  }
+  .bf-btn.bf-big-btn {
+    --icon: 32px;
+    gap: 10px;
+    padding: 7px 10px;
+  }
+  .bf-big-btn-icon {
+    border-radius: 9px;
+  }
+  .bf-big-btn-icon svg {
+    width: 22px;
+    height: 22px;
+  }
+  .bf-big-btn-label {
+    font-size: 21px;
+  }
+  .bf-big-btn-main .bf-big-btn-label {
+    font-size: 25px;
+  }
+  .bf-big-btn-caption {
+    margin-top: 2px;
+    font-size: 11px;
+  }
+}
+
+/* Stacked: everything narrower than the wide columns need, unless it is a sideways phone. */
+@media (max-width: 1023.98px) and (orientation: portrait), (max-width: 1023.98px) and (min-height: 560.02px), (max-width: 599.98px) {
+  .bf-menu {
+    --bf-stage: stacked;
+    --pad: 16px;
+    --gap: 10px;
+    --thumb: 46px;
+    --name: 36px;
+  }
+  .bf-menu-logo.bf-logo {
+    font-size: clamp(28px, 7.6vw, 64px);
+  }
+  .bf-menu-tools {
+    gap: 6px;
+  }
+  .bf-menu-tools .bf-btn {
+    height: 42px;
+  }
+  .bf-menu-tools .bf-icon-btn {
+    width: 42px;
+  }
+  .bf-menu-sheet {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+    padding-top: 14px;
+    border-radius: 22px 22px 0 0;
+    background: linear-gradient(180deg, #131c33 0, #0d1528 64px, #0b1222 100%);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.12),
+      0 -14px 34px rgba(3, 6, 14, 0.5);
+    cursor: default;
+  }
+  .bf-menu-title {
+    text-shadow: none;
+  }
+  .bf-menu-loadout {
+    width: 100%;
+  }
+  .bf-menu-loadout li {
+    width: auto;
+    flex: 1 1 0;
+    background: rgba(255, 255, 255, 0.06);
+  }
+  .bf-menu-picker {
+    width: 100%;
+    justify-content: space-between;
+    gap: 2px;
+  }
+  .bf-menu-pick {
+    flex: 1 1 0;
+    width: auto;
+  }
+  .bf-menu-callsign {
+    width: 100%;
+    height: 40px;
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.24);
+  }
+  .bf-menu-nav {
+    display: grid;
+    width: 100%;
+    grid-template-columns: 1fr 1fr;
+    gap: 9px;
+  }
+  .bf-big-btn-main {
+    grid-column: span 2;
+  }
+  .bf-btn.bf-big-btn {
+    --icon: 36px;
+    gap: 10px;
+    padding: 9px 12px;
+  }
+  .bf-big-btn-icon {
+    border-radius: 10px;
+  }
+  .bf-big-btn-icon svg {
+    width: 24px;
+    height: 24px;
+  }
+  .bf-big-btn-label {
+    font-size: 23px;
+  }
+  .bf-big-btn-main .bf-big-btn-label {
+    font-size: 28px;
+  }
+  .bf-big-btn-caption {
+    margin-top: 2px;
+    font-size: 12px;
+  }
+}
+
+/* A stacked sheet with room for two columns (a tablet upright): kit on the left, buttons on the right. */
+@media (min-width: 640px) and (max-width: 1023.98px) and (orientation: portrait), (min-width: 640px) and (max-width: 1023.98px) and (min-height: 560.02px) {
+  .bf-menu {
+    --pad: 24px;
+    --thumb: 52px;
+    --name: 44px;
+  }
+  .bf-menu-sheet {
+    flex-direction: row;
+    align-items: flex-end;
+    gap: 24px;
+    padding-top: 20px;
+  }
+  .bf-menu-info {
+    flex: 1 1 0;
+  }
+  .bf-menu-nav {
+    display: flex;
+    width: 250px;
+  }
+}
+
+/* An upright phone: the header slims and the sheet closes up so the figure gets more of the height. */
+@media (max-width: 639.98px) and (orientation: portrait) {
+  .bf-menu {
+    --pad: 14px;
+    --gap: 8px;
+    --thumb: 44px;
+  }
+  .bf-menu-tools .bf-btn {
+    height: 38px;
+  }
+  .bf-menu-tools .bf-icon-btn {
+    width: 38px;
+  }
+  .bf-menu-sheet {
+    gap: 9px;
+    padding-top: 12px;
+  }
+  .bf-menu-callsign {
+    height: 38px;
+  }
+  .bf-menu-nav {
+    gap: 8px;
+  }
+  .bf-btn.bf-big-btn {
+    padding: 6px 12px;
+  }
+  .bf-big-btn-main .bf-big-btn-label {
+    font-size: 26px;
+  }
+}
+
+/* A short upright phone: the sheet gives height back to the figure. */
+@media (max-width: 599.98px) and (max-height: 740px) {
+  .bf-menu {
+    --pad: 12px;
+    --gap: 7px;
+    --thumb: 42px;
+    --name: 32px;
+  }
+  .bf-menu-tools .bf-btn {
+    height: 38px;
+  }
+  .bf-menu-tools .bf-icon-btn {
+    width: 38px;
+  }
+  .bf-menu-sheet {
+    gap: 9px;
+    padding-top: 10px;
+    border-radius: 18px 18px 0 0;
+  }
+  .bf-menu-callsign {
+    height: 36px;
+  }
+  .bf-menu-nav {
+    gap: 7px;
+  }
+  .bf-btn.bf-big-btn {
+    --icon: 32px;
+    padding: 6px 10px;
+  }
+  .bf-big-btn-label {
+    font-size: 21px;
+  }
+  .bf-big-btn-main .bf-big-btn-label {
+    font-size: 24px;
+  }
+  .bf-big-btn-caption {
+    font-size: 11px;
+  }
+}

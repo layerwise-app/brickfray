@@ -33,10 +33,10 @@ const VISOR = new Loft(
 );
 const REACH = 1.72;
 const smooth = THREE.MathUtils.smoothstep;
-/** Top edge of the lower visor: the eye slit's sill, rising into a nasal bar at the middle. */
-const sill = (a: number) => 0.066 + 0.04 * (1 - smooth(a, 0.03, 0.15));
 /** Bottom edge of the brow plate: a stern V over the eyes that closes the slit toward the temples. */
 const brow = (a: number) => 0.093 - 0.009 * (1 - smooth(a, 0, 0.55)) - 0.027 * smooth(a, 0.85, 1.3);
+/** Top edge of the lower visor: the eye slit's sill, rising into a nasal bar that tucks just under the brow plate. */
+const sill = (a: number) => Math.min(0.066 + 0.04 * (1 - smooth(a, 0.03, 0.15)), brow(a) + 0.004);
 
 /** One half of a visor plate between two edges that vary with the angle, mirrored into a whole. */
 function visorPlate(lower: (a: number) => number, upper: (a: number) => number, cols: number, rows: number, lift = 0, thick = 0.008) {
@@ -52,19 +52,19 @@ function visorPlate(lower: (a: number) => number, upper: (a: number) => number, 
     },
     { thick, back: false, inward: true, butt: [true, false] }
   );
-  return symmetric(half, (y) => VISOR.keelAt(y) > 0.004);
+  return symmetric(half);
 }
 
 /** Armet: egg skull with a comb, a prowed visor with two eye slits and breaths, pivot bolts, gold brow. */
 export function helm(b: PartSet) {
   const q = tier(b);
   const cols = pick(b, 12, 18, 32);
-  const half = pick(b, 5, 8, 14);
+  const half = pick(b, 5, 8, 24);
   const stud = pick(b, 5, 5, 8);
-  b.add('head', SKULL.mesh({ cols, rows: q === 3 ? 3 : 1, thick: 0.014, back: false }), STEEL, { look: 'metal' });
+  b.add('head', SKULL.mesh({ cols, rows: q === 3 ? 4 : 1, thick: 0.014, back: false }), STEEL, { look: 'metal' });
   b.add('head', visorPlate((a) => sill(a) - 0.014, (a) => brow(a) + 0.016, half, 2, -0.009, 0), SHADOW, { look: 'rubber' });
-  b.add('head', visorPlate(() => -0.036, sill, half, pick(b, 2, 3, 6)), STEEL, { look: 'metal' });
-  b.add('head', visorPlate(brow, () => 0.156, half, pick(b, 1, 2, 4)), STEEL, { look: 'metal' });
+  b.add('head', visorPlate(() => -0.036, sill, half, pick(b, 2, 3, 14)), STEEL, { look: 'metal' });
+  b.add('head', visorPlate(brow, () => 0.156, half, pick(b, 1, 2, 6)), STEEL, { look: 'metal' });
 
   // Pivot bolts.
   b.mirror((_, sign) => {
@@ -114,8 +114,8 @@ const TUFT: V3[] = [
 /** Plume on the swinging head bone: a gold socket and layered locks sweeping up and back. */
 export function plume(b: PartSet) {
   const q = tier(b);
-  const seg = pick(b, 6, 10, 20);
-  const radial = pick(b, 5, 7, 12);
+  const seg = pick(b, 6, 9, 20);
+  const radial = pick(b, 5, 6, 12);
   const lock = (points: V3[], wide: number, deep: number, color: string, o: { at?: V3; rot?: V3; scale?: V3 } = {}) => {
     const g = sweep(
       points,

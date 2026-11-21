@@ -19,6 +19,8 @@ export class Pose {
   readonly s: number[] = BONES.map(() => 1);
   readonly mq: THREE.Quaternion[] = BONES.map(() => new THREE.Quaternion());
   readonly mp: THREE.Vector3[] = BONES.map(() => new THREE.Vector3());
+  /** Where each hand's wrist sits off its bone (see `wristOffset`); the forearm ends there. */
+  readonly wrist = { L: new THREE.Vector3(), R: new THREE.Vector3() };
 
   constructor(readonly rest: V3[]) {
     this.p = rest.map((o) => new THREE.Vector3(o[0], o[1], o[2]));

@@ -7,12 +7,14 @@ import { join, Loft, pick, placed, tier, type Spot } from './plate-forms';
 
 export const SUIT = '#f26b5b';
 export const SEAM = '#c9493c';
+/** Doubled canvas on the chafing points: elbows, knees, the calf lacing. */
+export const PATCH = '#a83a30';
 export const BRASS = '#c99a3e';
 export const BRONZE = '#a87a2c';
 export const COPPER = '#b8733a';
 export const RUBBER = '#3a3f47';
 export const LEAD = '#7a828b';
-const ROPE = '#dccba0';
+export const ROPE = '#dccba0';
 const SHELL = '#ece5d2';
 
 /** Brass and copper are mirror-polished in the showroom; under a match's open sky that finish turns green, so they go satin. */
@@ -25,21 +27,26 @@ const LAID: V3 = [Math.PI / 2, 0, 0];
 /** The suit's chest: everything strapped to it is cut from, or seated on, this loft. */
 export const TORSO = new Loft([
   { y: -0.072, w: 0, f: 0 },
-  { y: -0.064, w: 0.14, f: 0.086, e: 0.78 },
-  { y: -0.05, w: 0.167, f: 0.107, b: 0.104, e: 0.78 },
-  { y: 0.04, w: 0.19, f: 0.116, b: 0.108, e: 0.75 },
+  { y: -0.064, w: 0.15, f: 0.094, e: 0.78 },
+  { y: -0.05, w: 0.18, f: 0.114, b: 0.111, e: 0.78 },
+  { y: 0.04, w: 0.194, f: 0.118, b: 0.11, e: 0.75 },
   { y: 0.12, w: 0.214, f: 0.122, b: 0.114, e: 0.72 },
   { y: 0.19, w: 0.216, f: 0.116, b: 0.114, e: 0.72 },
   { y: 0.235, w: 0.18, f: 0.1, b: 0.1, e: 0.78 },
   { y: 0.27, w: 0.105, f: 0.078, b: 0.08, e: 0.9 },
   { y: 0.285, w: 0, f: 0 }
 ]);
-const WAIST = new Loft([
+/** The suit below the jacket's hem, bunched in folds over the belt. */
+export const WAIST = new Loft([
   { y: -0.1, w: 0, f: 0 },
-  { y: -0.085, w: 0.15, f: 0.094, e: 0.78 },
-  { y: 0.02, w: 0.158, f: 0.1, e: 0.78 },
-  { y: 0.11, w: 0.158, f: 0.1, e: 0.78 },
-  { y: 0.15, w: 0.14, f: 0.088, e: 0.78 },
+  { y: -0.085, w: 0.152, f: 0.096, e: 0.78 },
+  { y: -0.03, w: 0.164, f: 0.103, b: 0.1, e: 0.78 },
+  { y: 0.0, w: 0.177, f: 0.115, b: 0.113, e: 0.78 },
+  { y: 0.022, w: 0.1705, f: 0.109, b: 0.109, e: 0.78 },
+  { y: 0.042, w: 0.177, f: 0.114, b: 0.112, e: 0.78 },
+  { y: 0.064, w: 0.168, f: 0.105, b: 0.105, e: 0.78 },
+  { y: 0.088, w: 0.172, f: 0.108, b: 0.106, e: 0.78 },
+  { y: 0.15, w: 0.15, f: 0.092, e: 0.78 },
   { y: 0.165, w: 0, f: 0 }
 ]);
 const BELT = new Loft([
@@ -99,6 +106,9 @@ export function suit(b: PartSet) {
     b.add('chest', cutout(ANCHOR, 0.007, 0.002), BRASS, { at: [0, 0.064, front - 0.033], rot: [0, Math.PI, 0], scale: [1.25, 1.25, 1], look: shine(b) });
     b.mirror((_, sign) => b.box('chest', [0.036, 0.02, 0.012], BRASS, { at: [sign * 0.058, 0.118, front - 0.03], look: shine(b), bevel: 0.004 }));
     b.add('chest', TORSO.mesh({ t0: TORSO.tAt(-0.004), t1: TORSO.tAt(0.024), cols, lift: 0.005, thick: 0.005, back: false }), RUBBER, { look: 'rubber' });
+    // Doubled canvas yoke where the suit is clamped under the corselet, and the hem of the jacket over the waist.
+    b.add('chest', TORSO.mesh({ t0: TORSO.tAt(0.15), t1: TORSO.tAt(0.222), cols, rows: 3, lift: 0.003, thick: 0.004, back: false }), PATCH, { look: 'rubber' });
+    b.add('chest', TORSO.mesh({ t0: TORSO.tAt(-0.05), t1: TORSO.tAt(-0.034), cols, lift: 0.003, thick: 0.004, back: false }), PATCH, { look: 'rubber' });
   }
 }
 
@@ -129,7 +139,7 @@ export function tank(b: PartSet) {
   b.box('chest', [0.09, 0.032, 0.044], BRASS, { at: [0, 0.242, 0.196], look: shine(b), bevel: 0.006 });
   if (q >= 2) {
     b.cyl('chest', 0.008, 0.008, 0.03, BRONZE, { at: [0, 0.27, 0.196], look: 'metal', seg: 6 });
-    b.cyl('chest', 0.026, 0.026, 0.008, BRONZE, { at: [0, 0.288, 0.196], look: 'metal', seg: pick(b, 8, 10, 16) });
+    b.lathe('chest', [[0, -0.004], [0.024, -0.004], [0.027, -0.001], [0.027, 0.002], [0.022, 0.0052], [0.008, 0.0068], [0, 0.007]], BRONZE, { at: [0, 0.288, 0.196], look: 'metal', seg: pick(b, 8, 10, 16) });
   }
   b.mirror((_, sign) => {
     const path: V3[] = [
@@ -143,8 +153,10 @@ export function tank(b: PartSet) {
     const ribs = 17;
     b.add('chest', sweep(path, q === 3 ? (t) => 0.0145 + 0.003 * Math.max(0, Math.cos(t * ribs * Math.PI * 2)) : 0.016, { seg: q === 3 ? ribs * 4 : pick(b, 6, 10, 0), radial: pick(b, 5, 6, 8) }), RUBBER, { look: 'rubber' });
     if (q >= 2) {
-      b.cyl('chest', 0.021, 0.021, 0.022, BRASS, { at: [sign * 0.052, 0.249, 0.194], rot: [0.9, sign * 1.92, 0], look: shine(b), seg: pick(b, 6, 8, 12) });
-      b.cyl('chest', 0.022, 0.022, 0.026, BRASS, { at: [sign * 0.13, 0.254, -0.076], rot: [0.94, sign * 0.75, 0], look: shine(b), seg: pick(b, 6, 8, 12) });
+      // Union nuts with chamfered faces: a flat end would face the rim light square on and bleach.
+      const nut = (r: number, h: number): [number, number][] => [[r * 0.72, -h / 2], [r, -h / 2 + r * 0.24], [r, h / 2 - r * 0.24], [r * 0.72, h / 2]];
+      b.lathe('chest', nut(0.021, 0.024), BRASS, { at: [sign * 0.052, 0.249, 0.194], rot: [0.9, sign * 1.92, 0], look: shine(b), seg: pick(b, 6, 8, 12) });
+      b.lathe('chest', nut(0.022, 0.028), BRASS, { at: [sign * 0.13, 0.254, -0.076], rot: [0.94, sign * 0.75, 0], look: shine(b), seg: pick(b, 6, 8, 12) });
     }
   });
   if (q === 3) b.add('chest', barnacles([[0.05, -0.1, 0.25], [0.066, -0.075, 0.228], [0.036, -0.128, 0.256]], [0.4, 0, 1], [1, 0.75, 1.15]), SHELL, { look: 'plastic' });
@@ -194,65 +206,10 @@ export function belt(b: PartSet) {
       const a = (i / 8) * Math.PI * 2;
       return [0.202 + x + Math.sin(a) * lean, -0.058 + Math.cos(a) * r, 0.006 + Math.sin(a) * r * 0.92];
     });
-  const loops: [number, number, number][] = q >= 2 ? [[0.06, 0, 0.004], [0.054, 0.014, -0.006], [0.063, 0.024, 0.002]] : [[0.058, 0.01, 0]];
-  for (const [r, x, lean] of loops) b.add('pelvis', sweep(loop(r, x, lean), q >= 2 ? 0.0095 : 0.014, { seg: pick(b, 8, 12, 24), radial: pick(b, 4, 5, 7), loop: true, up: [1, 0, 0] }), ROPE, { look: 'cloth' });
+  const loops: [number, number, number][] = q === 3 ? [[0.06, 0, 0.004], [0.054, 0.014, -0.006], [0.063, 0.024, 0.002]] : q === 2 ? [[0.06, 0, 0.004], [0.056, 0.016, -0.004]] : [[0.058, 0.01, 0]];
+  for (const [r, x, lean] of loops) b.add('pelvis', sweep(loop(r, x, lean), q >= 2 ? 0.0095 : 0.014, { seg: pick(b, 8, 10, 24), radial: pick(b, 4, 5, 7), loop: true, up: [1, 0, 0] }), ROPE, { look: 'cloth' });
   b.box('pelvis', [0.05, 0.05, 0.018], RUBBER, { at: [0.2, 0.004, 0.006], rot: [0, Math.PI / 2, 0], look: 'rubber', bevel: 0.004 });
   if (q >= 2) b.cyl('pelvis', 0.014, 0.014, 0.05, BRASS, { at: [0.214, -0.114, 0.006], rot: ACROSS, look: shine(b), seg: pick(b, 6, 8, 12) });
-}
-
-const SHEATH = new Loft([
-  { y: -0.156, w: 0.005, f: 0.008, e: 0.7 },
-  { y: -0.142, w: 0.011, f: 0.02, e: 0.7 },
-  { y: -0.02, w: 0.012, f: 0.022, e: 0.7 },
-  { y: -0.008, w: 0.015, f: 0.026, e: 0.7 },
-  { y: 0.004, w: 0.015, f: 0.026, e: 0.7 },
-  { y: 0.006, w: 0, f: 0 }
-]);
-
-/** Patches, wrist clamps, and the knife strapped to the left thigh. */
-export function fittings(b: PartSet) {
-  const q = tier(b);
-  const seg = pick(b, 8, 12, 20);
-  b.mirror((side, sign) => {
-    const fa = `forearm${side}` as const;
-    const sh = `shin${side}` as const;
-    const round = pick(b, 6, 10, 18);
-    b.add(sh, S.blob(0.112, 0.124, 0.056, 0.62, round, 0), SEAM, { at: [0, -0.006, -0.05], look: 'rubber' });
-    b.add(fa, S.blob(0.094, 0.1, 0.05, 0.62, round, 0), SEAM, { at: [0, -0.008, 0.03], look: 'rubber' });
-    b.cyl(fa, 0.0605, 0.0605, 0.016, BRASS, { at: [0, -0.212, 0], look: shine(b), seg, open: true });
-    if (q >= 2) {
-      b.box(fa, [0.02, 0.022, 0.018], BRASS, { at: [sign * 0.062, -0.212, 0], look: shine(b), bevel: 0.004 });
-      b.cyl(`shin${side}`, 0.062, 0.058, 0.02, SEAM, { at: [0, -0.3, 0.002], look: 'rubber', seg, open: true });
-    }
-  });
-  if (q < 2) return;
-
-  // Raised seams down the outside of each limb; the radii follow the body's limbs at Coral's thickness.
-  const seams: [string, [number, number][]][] = [
-    ['upperArm', [[-0.07, 0.0655], [-0.12, 0.061], [-0.19, 0.056], [-0.25, 0.0525]]],
-    ['forearm', [[-0.06, 0.053], [-0.1, 0.0545], [-0.15, 0.051], [-0.195, 0.047]]],
-    ['thigh', [[-0.07, 0.0915], [-0.17, 0.089], [-0.3, 0.077], [-0.4, 0.069]]],
-    ['shin', [[-0.08, 0.0655], [-0.14, 0.067], [-0.22, 0.059], [-0.29, 0.054]]]
-  ];
-  b.mirror((side, sign) => {
-    for (const [bone, line] of q === 3 ? seams : seams.filter(([bone]) => bone === 'upperArm' || bone === 'thigh')) {
-      const path = line.map(([y, r]) => [sign * (r + 0.0005), y, 0] as V3);
-      b.add(`${bone}${side}` as 'thighL', sweep(path, () => [0.0055, 0.003], { seg: pick(b, 3, 4, 8), radial: pick(b, 4, 4, 6), up: [sign, 0, 0] }), SEAM, { look: 'rubber' });
-    }
-  });
-
-  const x = -0.107;
-  for (const [y, r] of [
-    [-0.14, 0.0945],
-    [-0.27, 0.0855]
-  ] as const) {
-    b.cyl('thighL', r, r - 0.003, 0.02, RUBBER, { at: [0, y, -0.004], scale: [1, 1, 1.04], look: 'rubber', seg, open: true });
-  }
-  const tilt: V3 = [0, 0, -0.06];
-  b.add('thighL', SHEATH.mesh({ cols: pick(b, 6, 8, 12) }), BRASS, { at: [x, -0.135, 0], rot: tilt, look: shine(b) });
-  b.box('thighL', [0.02, 0.012, 0.064], BRONZE, { at: [x + 0.001, -0.125, 0], rot: tilt, look: 'metal', bevel: 0.003 });
-  b.cyl('thighL', 0.0115, 0.013, 0.075, '#8a5a34', { at: [x + 0.003, -0.082, 0], rot: tilt, look: 'plastic', seg: pick(b, 6, 8, 12) });
-  b.ball('thighL', 0.0165, BRASS, { at: [x + 0.006, -0.04, 0], look: shine(b) });
 }
 
 const UPPER = new Loft([

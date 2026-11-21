@@ -1,7 +1,7 @@
-import { WEAPONS, type WeaponId } from '../weapons/defs';
+import { GRENADE, WEAPONS, type WeaponId } from '../weapons/defs';
 import { LOADOUTS } from '../weapons/loadouts';
 import type { Waypoint } from '../world/types';
-import { PLAYER, TICK } from './constants';
+import { MOVE, PLAYER, TICK } from './constants';
 import type { HostSim } from './host';
 import { BUTTON, type Command, type PlayerState } from './types';
 
@@ -25,10 +25,16 @@ interface Brain {
   lastPos: [number, number];
   crouchTime: number;
   grenadeCooldown: number;
+  /** Seconds left to stay clear of a grenade the bot just threw. */
+  clearing: number;
   fireHeld: boolean;
   slot: number;
   /** Waypoint links this bot got stuck on ("a>b" → host time until which it routes around them). */
   avoid: Map<string, number>;
+  /** Seconds spent heading for each waypoint without arriving; a node that never comes is blocked. */
+  heading: Map<number, number>;
+  /** Waypoints given up on → host time until which the bot routes around them. */
+  blocked: Map<number, number>;
   /** Host time until which the bot follows the graph instead of walking straight at its goal. */
   graphOnly: number;
 }
@@ -82,7 +88,10 @@ export class BotDirector {
       lastPos: [player.move.x, player.move.z],
       crouchTime: 0,
       grenadeCooldown: 6,
+      clearing: 0,
       avoid: new Map(),
+      heading: new Map(),
+      blocked: new Map(),
       graphOnly: 0,
       fireHeld: false,
       slot: 0
@@ -160,18 +169,22 @@ export class BotDirector {
       }
       cmd.right = b.strafe * (bot.bot === 'sniper' ? 0.3 : 0.85);
       cmd.forward = dist > prof.keep + 3 ? 1 : dist < prof.keep - 3 ? -0.7 : 0;
-      if (cmd.forward > 0) goal = [target.move.x, target.move.y, target.move.z];
       b.grenadeCooldown -= TICK;
-      if ((bot.bot === 'boss' || bot.bot === 'grunt') && b.grenadeCooldown <= 0 && dist > 8 && dist < 22 && bot.arms.grenades > 0 && Math.random() < 0.01) {
+      if ((bot.bot === 'boss' || bot.bot === 'grunt') && b.grenadeCooldown <= 0 && dist > GRENADE.radius + 4 && dist < 22 && bot.arms.grenades > 0 && Math.random() < 0.01) {
         b.grenadeCooldown = 9;
+        b.clearing = GRENADE.fuse + 0.6;
         cmd.buttons |= BUTTON.grenade;
       }
+      // A bot that walks on after its own grenade (or has it bounce back off cover) blows itself up.
+      if (b.clearing > 0 && dist < GRENADE.radius * 2 + 4) cmd.forward = -1;
+      if (cmd.forward > 0) goal = [target.move.x, target.move.y, target.move.z];
     } else {
       b.seenFor = 0;
       b.fireHeld = false;
       if (bot.arms.ammo[bot.arms.weapon] < WEAPONS[bot.arms.weapon].mag * 0.5) cmd.buttons |= BUTTON.reload;
       goal = b.lastSeen ?? this.nearestEnemy(bot);
     }
+    b.clearing = Math.max(0, b.clearing - TICK);
     if (bot.arms.ammo[bot.arms.weapon] === 0) cmd.buttons |= BUTTON.reload;
     if (b.crouchTime > 0) {
       b.crouchTime -= TICK;
@@ -217,29 +230,73 @@ export class BotDirector {
     }
     cmd.yaw = b.aimYaw;
     cmd.pitch = clamp(b.aimPitch, -1.2, 1.2);
-    if (this.deadlyAhead(bot, cmd)) {
-      cmd.forward = 0;
-      cmd.right = 0;
-      b.strafe *= -1;
-      b.path = [];
-    }
+    this.keepOnGround(bot, b, cmd);
     return cmd;
   }
 
-  /** Strafing and corner-cutting would walk bots off bridges and piers into the kill zone. */
-  private deadlyAhead(bot: PlayerState, cmd: Command) {
-    if (!cmd.forward && !cmd.right) return false;
+  /**
+   * Strafing, corner-cutting and hugging an edge would walk bots off bridges and piers into the kill zone:
+   * stop short of a drop ahead, and veer away from one beside the path.
+   */
+  private keepOnGround(bot: PlayerState, b: Brain, cmd: Command) {
+    if (!cmd.forward && !cmd.right) return;
     const s = Math.sin(cmd.yaw);
     const c = Math.cos(cmd.yaw);
     let dx = -s * cmd.forward + c * cmd.right;
     let dz = -c * cmd.forward - s * cmd.right;
-    const len = Math.hypot(dx, dz);
-    dx /= len;
-    dz /= len;
+    const speed = Math.hypot(dx, dz);
+    dx /= speed;
+    dz /= speed;
     const m = bot.move;
-    const top = m.y + 0.6;
-    const floor = this.host.world.raycast(m.x + dx * 0.8, top, m.z + dz * 0.8, 0, -1, 0, 6, false);
-    return !floor || top - floor.t < this.host.layout.killY + 0.4;
+    // The unstick jump clears a parapet: look past it before leaping.
+    const leap = (cmd.buttons & BUTTON.jump) !== 0 && [1.4, 2.3, 3.2].some((d) => this.deadly(m.x + dx * d, m.y, m.z + dz * d, 1.8));
+    if (leap) {
+      cmd.buttons &= ~BUTTON.jump;
+      b.graphOnly = this.host.time + 3;
+    }
+    const pace = (cmd.buttons & BUTTON.sprint ? MOVE.sprint : MOVE.walk) * (bot.bot === 'rusher' ? 1.15 : 1);
+    // Sliding along a wall, the body goes where the wall lets it, not where the command points.
+    const drift = Math.hypot(m.vx, m.vz);
+    const sliding = m.grounded && drift > 1 && this.overshoots(m.x, m.y, m.z, m.vx / drift, m.vz / drift, Math.max(pace, drift));
+    if (leap || sliding || this.overshoots(m.x, m.y, m.z, dx, dz, pace)) {
+      cmd.forward = 0;
+      cmd.right = 0;
+      b.strafe *= -1;
+      b.path = [];
+      return;
+    }
+    // Right of the heading is (-dz, dx).
+    const side = (sign: number) => this.deadly(m.x + dx * 0.6 - dz * 0.55 * sign, m.y, m.z + dz * 0.6 + dx * 0.55 * sign) || this.deadly(m.x - dz * 0.45 * sign, m.y, m.z + dx * 0.45 * sign);
+    const left = side(-1);
+    const right = side(1);
+    if (left === right) return;
+    const away = left ? 1 : -1;
+    const vx = dx - dz * 0.9 * away;
+    const vz = dz + dx * 0.9 * away;
+    const k = speed / Math.hypot(vx, vz);
+    cmd.forward = (-s * vx - c * vz) * k;
+    cmd.right = (c * vx - s * vz) * k;
+  }
+
+  /** A drop ahead that kills, or one whose fall carries the body past the ledge below it into one. */
+  private overshoots(x: number, y: number, z: number, dx: number, dz: number, pace: number) {
+    const floor = this.floor(x + dx * 0.8, y, z + dz * 0.8);
+    if (floor < this.host.layout.killY + 0.4) return true;
+    const fall = y - floor;
+    if (fall < 1.2) return false;
+    const reach = 1.2 + pace * Math.sqrt((2 * fall) / MOVE.gravity);
+    for (let d = 1.4; d < reach + 0.6; d += 0.6) if (this.deadly(x + dx * d, y, z + dz * d)) return true;
+    return false;
+  }
+
+  private deadly(x: number, y: number, z: number, lift = 0.6) {
+    return this.floor(x, y, z, lift) < this.host.layout.killY + 0.4;
+  }
+
+  private floor(x: number, y: number, z: number, lift = 0.6) {
+    const top = y + lift;
+    const hit = this.host.world.raycast(x, top, z, 0, -1, 0, 5.4 + lift, false);
+    return hit ? top - hit.t : -Infinity;
   }
 
   private aimPoint(target: PlayerState): [number, number, number] {
@@ -316,16 +373,26 @@ export class BotDirector {
     if (b.path.length === 0 || b.repath <= 0) {
       b.repath = 1.5;
       const now = this.host.time;
-      b.path = findPath(wps, nearestWaypoint(wps, m.x, m.y, m.z), nearestWaypoint(wps, gx, gy, gz), (from, to) => (b.avoid.get(`${from}>${to}`) ?? 0) > now);
+      b.path = findPath(wps, nearestWaypoint(wps, m.x, m.y, m.z), nearestWaypoint(wps, gx, gy, gz), (from, to) => (b.avoid.get(`${from}>${to}`) ?? 0) > now || (b.blocked.get(to) ?? 0) > now);
     }
     while (b.path.length) {
       const w = wps[b.path[0]!]!.position;
       const d = Math.hypot(w[0] - m.x, w[2] - m.z);
       if (d < 0.9 && Math.abs(w[1] - m.y) < 1.2) {
-        b.path.shift();
+        b.heading.delete(b.path.shift()!);
         continue;
       }
       if (d < 1e-3) break;
+      // Neighbouring waypoints are a second or two apart; bouncing off the way to one for this long means it can't be reached from here.
+      const spent = (b.heading.get(b.path[0]!) ?? 0) + TICK;
+      if (spent > 3.5) {
+        b.blocked.set(b.path[0]!, this.host.time + 20);
+        b.heading.delete(b.path[0]!);
+        b.path = [];
+        b.repath = 0;
+        break;
+      }
+      b.heading.set(b.path[0]!, spent);
       return [(w[0] - m.x) / d, (w[2] - m.z) / d];
     }
     return direct < 1e-3 ? null : [(gx - m.x) / direct, (gz - m.z) / direct];

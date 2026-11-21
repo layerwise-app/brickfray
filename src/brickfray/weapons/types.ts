@@ -52,6 +52,7 @@ export interface ViewInput {
   sprint: boolean;
   grounded: boolean;
   crouch: number;
+  sliding: boolean;
   /** Aim blend 0…1, already timed by the game from adsTime. */
   ads: number;
   /** Mouse look delta this frame in radians (yaw, pitch). */
@@ -89,6 +90,8 @@ export interface ViewModel {
   update(dt: number, input: ViewInput): void;
   /** Muzzle position in the view camera's space (for tracers and flash). */
   muzzleViewPosition(out: THREE.Vector3): THREE.Vector3;
+  /** Gait bob phase in radians, one cycle per two steps: footsteps land on it. */
+  readonly stepPhase: number;
   /** Called on animation beats. */
   onCue: ((cue: ViewCue) => void) | null;
   /** Hide gun while the sniper scope overlay is up. */

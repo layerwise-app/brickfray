@@ -135,7 +135,8 @@ export type GameEvent =
   | { type: 'damage'; attacker: number; victim: number; amount: number; kind: HitKind; from: [number, number, number]; fatal: boolean }
   | { type: 'explosion'; position: [number, number, number]; owner: number }
   | { type: 'spawn'; player: number }
-  | { type: 'melee'; player: number; hit: boolean }
+  /** `wall`: a swing that met no one but struck the world within reach (what it is made of, where). */
+  | { type: 'melee'; player: number; hit: boolean; wall?: { surface: string; at: [number, number, number] } }
   | { type: 'chat'; player: number; text: string }
   | { type: 'wave'; wave: number }
   | { type: 'join'; player: number; name: string }

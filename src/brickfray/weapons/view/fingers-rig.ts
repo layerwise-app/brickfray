@@ -23,7 +23,7 @@ export function poseFingers(bones: readonly THREE.Bone[], pose: FingerPose, mirr
   for (let i = 0; i < 4; i++) {
     const curl = i === 0 ? pose.index : i === 1 ? pose.middle : i === 2 ? pose.ring : pose.pinky;
     const open = FAN[i]! + SPREAD[i]! * pose.spread;
-    let fan = open + (CONVERGE[i]! - open) * Math.min(1, curl * 1.4);
+    let fan = open + (CONVERGE[i]! - open) * Math.min(1, curl * 1.4) * (1 - (pose.splay ?? 0));
     let knuckle = KNUCKLE * curl ** 0.6;
     let middle = MIDDLE * curl ** 1.25;
     let tip = TIP * curl ** 1.6;
@@ -38,9 +38,12 @@ export function poseFingers(bones: readonly THREE.Bone[], pose: FingerPose, mirr
     set(bones[fingerJoint(i, 2)]!, bend(tip), mirror);
   }
   const curl = pose.thumb;
-  set(bones[THUMB_JOINT]!, q.copy(THUMB_OUT).slerp(THUMB_ACROSS, pose.oppose).multiply(tmp.set(0, Math.sin(curl * THUMB_BASE * 0.5), 0, Math.cos(curl * THUMB_BASE * 0.5))), mirror);
-  set(bones[THUMB_JOINT + 1]!, bend(0.05 + curl * THUMB_KNUCKLE), mirror);
-  set(bones[THUMB_JOINT + 2]!, bend(curl * THUMB_TIP), mirror);
+  if (pose.oppose < 0) q.copy(THUMB_OUT).slerp(THUMB_ALONG, -pose.oppose);
+  else q.copy(THUMB_OUT).slerp(THUMB_ACROSS, pose.oppose);
+  set(bones[THUMB_JOINT]!, q.multiply(tmp.set(0, Math.sin(curl * THUMB_BASE * 0.5), 0, Math.cos(curl * THUMB_BASE * 0.5))), mirror);
+  const hook = pose.hook ?? 0;
+  set(bones[THUMB_JOINT + 1]!, bend(0.05 + curl * THUMB_KNUCKLE + hook * HOOK_KNUCKLE), mirror);
+  set(bones[THUMB_JOINT + 2]!, bend(curl * THUMB_TIP + hook * HOOK_TIP), mirror);
 }
 
 /**
@@ -62,6 +65,9 @@ const HOOK_SPREAD = 0.4;
 const THUMB_BASE = 1.1;
 const THUMB_KNUCKLE = 0.6;
 const THUMB_TIP = 1.06;
+/** A hooked thumb: extra bend at its knuckle and tip joints. */
+const HOOK_KNUCKLE = 0.55;
+const HOOK_TIP = 1.0;
 
 const q = new THREE.Quaternion();
 const tmp = new THREE.Quaternion();
@@ -74,9 +80,10 @@ function frame(dir: readonly [number, number, number], pad: readonly [number, nu
   return new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(x, new THREE.Vector3().crossVectors(z, x), z));
 }
 
-/** Thumb base with the thumb out beside the palm, and swung across it to face the fingers. */
+/** Thumb base with the thumb out beside the palm, swung across it to face the fingers, and laid forward along the index finger. */
 const THUMB_OUT = frame([0.1, 0.72, -0.68], [-0.8, -0.4, -0.45]);
 const THUMB_ACROSS = frame([-0.91, 0.24, 0.35], [-0.3, 0.22, -0.93]);
+const THUMB_ALONG = frame([0.02, 0.2, -0.98], [-0.9, -0.4, -0.1]);
 
 function bend(angle: number) {
   return q.set(0, Math.sin(angle / 2), 0, Math.cos(angle / 2));

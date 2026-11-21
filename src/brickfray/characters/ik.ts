@@ -91,6 +91,46 @@ export function window4(t: number, a: number, b: number, c: number, d: number) {
   return smooth(t, a, b) * (1 - smooth(t, c, d));
 }
 
+/**
+ * Keyframes [time, value...] through a monotone cubic: speed carries through a key while a channel keeps going the same
+ * way, and stops only where it turns back or holds, so a swing whips through its keys instead of halting at each one.
+ */
+export function spline(t: number, keys: readonly (readonly number[])[], out: number[]) {
+  const n = keys.length;
+  let i = 0;
+  while (i < n - 2 && t > keys[i + 1]![0]!) i++;
+  const k0 = keys[i]!;
+  const k1 = keys[Math.min(i + 1, n - 1)]!;
+  const h = k1[0]! - k0[0]!;
+  const u = h <= 0 ? 1 : clamp((t - k0[0]!) / h, 0, 1);
+  const u2 = u * u;
+  const u3 = u2 * u;
+  const h00 = 2 * u3 - 3 * u2 + 1;
+  const h10 = u3 - 2 * u2 + u;
+  const h01 = -2 * u3 + 3 * u2;
+  const h11 = u3 - u2;
+  for (let j = 1; j < k0.length; j++) {
+    const m0 = slope(keys, i, j);
+    const m1 = slope(keys, Math.min(i + 1, n - 1), j);
+    out[j - 1] = h00 * k0[j]! + h10 * h * m0 + h01 * k1[j]! + h11 * h * m1;
+  }
+  return out;
+}
+
+/** Fritsch–Carlson tangent of channel `j` at key `i`: zero at the ends, at turning points and on holds. */
+function slope(keys: readonly (readonly number[])[], i: number, j: number) {
+  if (i <= 0 || i >= keys.length - 1) return 0;
+  const a = keys[i - 1]!;
+  const b = keys[i]!;
+  const c = keys[i + 1]!;
+  const d0 = (b[j]! - a[j]!) / Math.max(1e-6, b[0]! - a[0]!);
+  const d1 = (c[j]! - b[j]!) / Math.max(1e-6, c[0]! - b[0]!);
+  if (d0 * d1 <= 0) return 0;
+  const m = (d0 + d1) / 2;
+  const cap = 3 * Math.min(Math.abs(d0), Math.abs(d1));
+  return Math.sign(m) * Math.min(Math.abs(m), cap);
+}
+
 /** Piecewise keyframes [time, value...] with smoothstep easing between keys. */
 export function keyed(t: number, keys: readonly (readonly number[])[], out: number[]) {
   let i = 0;

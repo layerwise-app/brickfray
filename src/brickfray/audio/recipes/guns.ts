@@ -13,7 +13,10 @@ type GunIds = `fire:${WeaponId}` | `fireFar:${WeaponId}` | 'dryFire';
  */
 interface GunVoice {
   duration: number;
-  /** Loudness targets near / far; short shots sit a little lower than the big ones. */
+  /**
+   * Loudness targets near / far: shotgun, sniper and cannon sit 3-4 dB over pistol, nailer and buzzer. Low enough
+   * that a recorded shot reaches them without the loader's limiter: the transient stays a transient.
+   */
   loudness: [number, number];
   mech(s: Synth): void;
   crack: { hp: number; decay: number; gain: number };
@@ -28,7 +31,7 @@ interface GunVoice {
 const BASE = {
   ar: {
     duration: 0.7,
-    loudness: [-9.5, -11.5],
+    loudness: [-17, -19],
     mech: (s) => {
       clack(s, 0, { pitch: 2300, gain: 0.7, decay: 0.04 });
       clack(s, 0.028 * vary(s, 0.1), { pitch: 3400, gain: 0.4, decay: 0.03 });
@@ -44,7 +47,7 @@ const BASE = {
   },
   shotgun: {
     duration: 1.1,
-    loudness: [-9, -11],
+    loudness: [-15.5, -17.5],
     mech: (s) => {
       clack(s, 0, { pitch: 1500, gain: 0.6, decay: 0.06 });
       const count = 4 + Math.floor(s.rng() * 3);
@@ -62,7 +65,7 @@ const BASE = {
   },
   sniper: {
     duration: 1.6,
-    loudness: [-9, -11],
+    loudness: [-15.5, -17.5],
     mech: (s) => {
       clack(s, 0, { pitch: 2000, gain: 0.4, decay: 0.05 });
       tone(s, 0.004, { freq: 3700 * vary(s, 0.03), decay: 0.15, gain: 0.06 });
@@ -77,7 +80,7 @@ const BASE = {
   },
   pistol: {
     duration: 0.5,
-    loudness: [-10.5, -12.5],
+    loudness: [-19, -21],
     mech: (s) => {
       clack(s, 0, { pitch: 3000, gain: 0.7, decay: 0.035 });
       clack(s, 0.034 * vary(s, 0.1), { pitch: 2500, gain: 0.5, decay: 0.04 });
@@ -99,7 +102,7 @@ const VOICES: Record<WeaponId, GunVoice> = {
   nailer: {
     ...BASE.ar,
     duration: 0.5,
-    loudness: [-10.5, -12.5],
+    loudness: [-19.5, -21.5],
     mech: (s) => {
       clack(s, 0, { pitch: 2900, gain: 0.6, decay: 0.03 });
       noise(s, 0.004, { attack: 0.001, decay: 0.05, gain: 0.25, filter: { type: 'highpass', freq: 5000, q: 0 } });
@@ -111,6 +114,7 @@ const VOICES: Record<WeaponId, GunVoice> = {
   // Pulse Carbine: a bright electric zap riding on a rifle report.
   pulse: {
     ...BASE.ar,
+    loudness: [-17.5, -19.5],
     mech: (s) => {
       clack(s, 0, { pitch: 2600, gain: 0.5, decay: 0.035 });
       tone(s, 0, { freq: 1800 * vary(s, 0.03), decay: 0.08, gain: 0.12 });
@@ -122,6 +126,7 @@ const VOICES: Record<WeaponId, GunVoice> = {
   harpoon: {
     ...BASE.sniper,
     duration: 1.2,
+    loudness: [-17.5, -19.5],
     mech: (s) => {
       clack(s, 0, { pitch: 1300, gain: 0.7, decay: 0.07 });
       noise(s, 0, { attack: 0.002, decay: 0.12, gain: 0.5, filter: { type: 'bandpass', freq: 900, q: 1 } });
@@ -133,7 +138,7 @@ const VOICES: Record<WeaponId, GunVoice> = {
   cannon: {
     ...BASE.pistol,
     duration: 0.9,
-    loudness: [-9.5, -11.5],
+    loudness: [-16, -18],
     crack: { hp: 1800, decay: 0.024, gain: 1.7 },
     burst: { freq: 1600, to: 500, q: 0.8, decay: 0.16, gain: 3.2 },
     thump: { from: 140, to: 48, glide: 0.07, decay: 0.3, gain: 0.6 },
@@ -143,7 +148,7 @@ const VOICES: Record<WeaponId, GunVoice> = {
   buzzer: {
     ...BASE.pistol,
     duration: 0.5,
-    loudness: [-11, -13],
+    loudness: [-19, -21],
     burst: { freq: 3200, to: 1500, q: 1, decay: 0.07, gain: 2.4 },
     thump: { from: 220, to: 100, glide: 0.03, decay: 0.1, gain: 0.25 }
   }

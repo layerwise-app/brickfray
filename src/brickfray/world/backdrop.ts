@@ -1,47 +1,15 @@
 import type { Drawer } from './plan';
 import { Pen } from './props-kit';
+import { skyline } from './skyline';
 import { Frame, mix, Rng } from './util';
+
+export { skyline };
 
 /** Far scenery: big cheap shapes without colliders, tinted toward the haze. */
 const origin = (d: Drawer) => new Pen(d, new Frame(0, 0, 0));
 
 function hazed(color: string, haze: string, t: number) {
   return mix(color, haze, t);
-}
-
-/** Ring of distant blocks around a rectangle, skipping a side if asked. */
-export function skyline(d: Drawer, opts: { inner: [number, number]; outer: number; haze: string; colors: string[]; seed: number; minH: number; maxH: number; skip?: ('n' | 's' | 'e' | 'w')[] }) {
-  const t = origin(d);
-  const rng = new Rng(opts.seed);
-  const [ix, iz] = opts.inner;
-  for (let i = 0; i < (d.detail === 0 ? 70 : 120); i++) {
-    const side = rng.int(0, 3);
-    const name = (['n', 's', 'e', 'w'] as const)[side]!;
-    if (opts.skip?.includes(name)) continue;
-    const along = rng.range(-opts.outer, opts.outer);
-    const depth = rng.range(0, opts.outer - (side < 2 ? iz : ix));
-    const x = side < 2 ? along : (side === 2 ? 1 : -1) * (ix + depth);
-    const z = side < 2 ? (side === 0 ? -1 : 1) * (iz + depth) : along;
-    if (Math.abs(x) < ix && Math.abs(z) < iz) continue;
-    const dist = Math.hypot(x, z);
-    const w = rng.range(6, 14);
-    const dd = rng.range(6, 14);
-    const h = rng.range(opts.minH, opts.maxH) * (0.7 + (dist / opts.outer) * 0.5);
-    const fade = Math.min(0.75, Math.max(0.2, (dist - 30) / 120));
-    const c = hazed(rng.pick(opts.colors), opts.haze, fade);
-    t.box(x, 0, z, w, h, dd, c, undefined, 0);
-    if (d.detail > 0) {
-      const glass = hazed('#6f8fa8', opts.haze, fade);
-      const rows = Math.floor(h / 3.4);
-      const nx = -Math.sign(x) * (Math.abs(x) > Math.abs(z) ? 1 : 0);
-      const nz = -Math.sign(z) * (Math.abs(z) >= Math.abs(x) ? 1 : 0);
-      for (let r = 1; r < rows; r += d.detail === 2 ? 1 : 2) {
-        if (nz !== 0) t.box(x, r * 3.4, z + nz * (dd / 2 + 0.02), w * 0.8, 1.2, 0.1, glass, undefined, 0);
-        else t.box(x + nx * (w / 2 + 0.02), r * 3.4, z, 0.1, 1.2, dd * 0.8, glass, undefined, 0);
-      }
-      if (rng.chance(0.3)) t.box(x, h, z, w * 0.4, rng.range(1.5, 4), dd * 0.4, hazed('#b7bcc2', opts.haze, fade), undefined, 0);
-    }
-  }
 }
 
 /** Soft rolling hills: squashed faceted balls far out. */
@@ -73,7 +41,11 @@ export function forest(d: Drawer, opts: { count: number; dist: [number, number];
     const x = Math.cos(a) * dist;
     const z = Math.sin(a) * dist;
     if (rng.chance(0.55)) t.cone(x, 0, z, 2.2 * s, 0, 7 * s, hazed(rng.pick(colors), opts.haze, fade), undefined, 6);
-    else t.ball(x, 3.5 * s, z, 2.6 * s, hazed(rng.pick(colors), opts.haze, fade), [1, 1.2, 1], 0.15, (i % 4) + 1);
+    else {
+      const c = hazed(rng.pick(colors), opts.haze, fade);
+      t.cyl(x, 0, z, 0.35 * s, 2.0 * s, hazed('#6e4a2f', opts.haze, fade));
+      for (const [r, y] of [[1.9, 1.6], [2.5, 2.6], [2.2, 3.6], [1.4, 4.6]] as const) t.cyl(x, y * s, z, r * s, 1.0 * s, c, undefined, 0, 8);
+    }
   }
 }
 

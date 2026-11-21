@@ -12,6 +12,7 @@ export interface QualityProfile {
   shadowMapSize: number;
   shadowRadius: number;
   ambientOcclusion: boolean;
+  /** Multisampling; without it the frame renders single-sample and gets FXAA on the way to the canvas. */
   antialias: boolean;
   /** Bevel width on brick edges in meters; 0 keeps plain boxes. */
   bevel: number;
@@ -27,7 +28,7 @@ export interface QualityProfile {
 export const QUALITY: Record<QualityLevel, QualityProfile> = {
   low: {
     level: 'low',
-    resolutionScale: 0.85,
+    resolutionScale: 1,
     maxPixelRatio: 1,
     pbr: false,
     clearcoat: false,

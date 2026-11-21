@@ -3,29 +3,22 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import type { Kit } from '../../engine/kit';
 import { latheZ, stud, tube } from '../shapes';
 import { paint, surfaceMaterial } from '../surface';
+import { MuzzleFlash, type FlashStyle } from './flash';
 
 export type CasingKind = 'brass' | 'shell' | 'long';
 
-/** Flash size per weapon: star radius, petal length, petal width, side blasts. */
-export interface FlashStyle {
-  star: number;
-  petal: number;
-  width: number;
-  side: number;
-}
-
-const QUADS = 6;
 const MAX_CASINGS = 10;
+/** An aimed shot's case: thrown in view space (right, a little up, away from the eye), and drawn this much smaller so it never looms in front of the sight. */
+const AIMED_THROW = new THREE.Vector3(2.8, 0.3, -0.35);
+const AIMED_SMALLER = 0.5;
+/** A fired spear is seen leaving: carried on down the line of fire at this speed (m/s) for this long (s). */
+const SPEAR_SPEED = 10;
+const SPEAR_LIFE = 0.1;
 
-/**
- * Muzzle flash (star + petals + core, one additive draw call, 1–2 frames) and
- * spent casings that tumble out of the ejection port and fall out of view.
- */
+/** Muzzle flash and spent casings that tumble out of the ejection port and fall out of view. */
 export class ViewFx {
-  readonly flash: THREE.Mesh;
-  private readonly flashGeo: THREE.BufferGeometry;
-  private readonly texture: THREE.CanvasTexture;
-  private flashAge = 1;
+  private readonly flash: MuzzleFlash;
+  private flight: { body: THREE.Object3D; velocity: THREE.Vector3; age: number } | null = null;
   private readonly casings: Record<CasingKind, { mesh: THREE.InstancedMesh; live: Casing[] }>;
   readonly shellGeometry: THREE.BufferGeometry;
 
@@ -33,28 +26,7 @@ export class ViewFx {
     private readonly scene: THREE.Scene,
     kit: Kit
   ) {
-    this.texture = flashAtlas();
-    this.flashGeo = new THREE.BufferGeometry();
-    this.flashGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(QUADS * 4 * 3), 3));
-    this.flashGeo.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(QUADS * 4 * 2), 2));
-    const index: number[] = [];
-    for (let q = 0; q < QUADS; q++) index.push(q * 4, q * 4 + 1, q * 4 + 2, q * 4, q * 4 + 2, q * 4 + 3);
-    this.flashGeo.setIndex(index);
-    this.flash = new THREE.Mesh(
-      this.flashGeo,
-      new THREE.MeshBasicMaterial({
-        map: this.texture,
-        color: new THREE.Color(1.6, 1.35, 1.1),
-        transparent: true,
-        blending: THREE.AdditiveBlending,
-        depthWrite: false,
-        side: THREE.DoubleSide,
-        toneMapped: false
-      })
-    );
-    this.flash.frustumCulled = false;
-    this.flash.renderOrder = 10;
-    this.flash.visible = false;
+    this.flash = new MuzzleFlash(scene);
 
     const material = surfaceMaterial(kit.materials);
     const seg = kit.profile.detail >= 1 ? 12 : 8;
@@ -70,69 +42,50 @@ export class ViewFx {
     this.casings = { brass: make(brassGeometry(seg)), shell: make(this.shellGeometry), long: make(longGeometry(seg)) };
   }
 
-  /** Re-roll the flash cards and show them; `parent` is the muzzle node. */
-  fire(parent: THREE.Object3D, style: FlashStyle) {
-    parent.add(this.flash);
-    const pos = this.flashGeo.getAttribute('position') as THREE.BufferAttribute;
-    const uv = this.flashGeo.getAttribute('uv') as THREE.BufferAttribute;
-    const rnd = (a: number, b: number) => a + Math.random() * (b - a);
-    let q = 0;
-    const quad = (cell: number, corners: THREE.Vector3[]) => {
-      corners.forEach((c, i) => pos.setXYZ(q * 4 + i, c.x, c.y, c.z));
-      const u0 = cell / 3;
-      uv.setXY(q * 4, u0, 0);
-      uv.setXY(q * 4 + 1, u0 + 1 / 3, 0);
-      uv.setXY(q * 4 + 2, u0 + 1 / 3, 1);
-      uv.setXY(q * 4 + 3, u0, 1);
-      q++;
-    };
-    // Front star facing back along the barrel, random spin and size.
-    const s = style.star * rnd(0.8, 1.2);
-    const spin = Math.random() * Math.PI;
-    const ca = Math.cos(spin) * s;
-    const sa = Math.sin(spin) * s;
-    quad(0, [new THREE.Vector3(-ca + sa, -sa - ca, -0.01), new THREE.Vector3(ca + sa, sa - ca, -0.01), new THREE.Vector3(ca - sa, sa + ca, -0.01), new THREE.Vector3(-ca - sa, -sa + ca, -0.01)]);
-    // Petals: cards containing the barrel axis, flaring forward.
-    const petals = 2 + (Math.random() < 0.5 ? 1 : 0);
-    for (let i = 0; i < 3; i++) {
-      const len = i < petals ? style.petal * rnd(0.7, 1.25) : 0;
-      const w = style.width * rnd(0.8, 1.2) * 0.5;
-      const a = (i / petals) * Math.PI + rnd(-0.4, 0.4);
-      const ax = Math.cos(a) * w;
-      const ay = Math.sin(a) * w;
-      quad(1, [new THREE.Vector3(-ax, -ay, 0.004), new THREE.Vector3(ax, ay, 0.004), new THREE.Vector3(ax, ay, -len), new THREE.Vector3(-ax, -ay, -len)]);
-    }
-    // Side blasts out of a muzzle brake (sniper), else unused.
-    const side = style.side * rnd(0.8, 1.2);
-    quad(1, [new THREE.Vector3(0, -side * 0.3, -0.004), new THREE.Vector3(0, side * 0.3, -0.004), new THREE.Vector3(side * 2, side * 0.3, -0.004), new THREE.Vector3(side * 2, -side * 0.3, -0.004)]);
-    // Hot core.
-    const c = style.star * 0.42;
-    quad(2, [new THREE.Vector3(-c, -c, -0.02), new THREE.Vector3(c, -c, -0.02), new THREE.Vector3(c, c, -0.02), new THREE.Vector3(-c, c, -0.02)]);
-    pos.needsUpdate = true;
-    uv.needsUpdate = true;
-    this.flash.visible = true;
-    this.flashAge = -1;
+  /** Lay out a fresh flash on the muzzle node; `aim` 0…1 is how far the gun is aimed. */
+  fire(muzzle: THREE.Object3D, style: FlashStyle, aim = 0) {
+    this.flash.fire(muzzle, style, aim);
   }
 
-  /** Spawn a casing at the port, thrown along the port's +X and up. */
-  eject(kind: CasingKind, port: THREE.Object3D, power = 1) {
+  /** A copy of the seated spear `part` takes over from it and flies off down the muzzle's line of fire. */
+  launch(part: THREE.Object3D, muzzle: THREE.Object3D) {
+    this.flight?.body.removeFromParent();
+    const body = part.clone(true);
+    body.visible = true;
+    part.updateWorldMatrix(true, false);
+    part.matrixWorld.decompose(body.position, body.quaternion, body.scale);
+    this.scene.add(body);
+    this.flight = { body, velocity: new THREE.Vector3(0, 0, -SPEAR_SPEED).transformDirection(muzzle.matrixWorld).multiplyScalar(SPEAR_SPEED), age: 0 };
+  }
+
+  /** Spawn a casing at the port, thrown along the port's +X and up; `aim` 0…1 is how far the gun is aimed. */
+  eject(kind: CasingKind, port: THREE.Object3D, power = 1, aim = 0) {
     const set = this.casings[kind];
     if (set.live.length >= MAX_CASINGS) set.live.shift();
     const p = port.getWorldPosition(new THREE.Vector3());
     const q = port.getWorldQuaternion(new THREE.Quaternion());
-    const v = new THREE.Vector3(0.55 + Math.random() * 0.35, 1.5 + Math.random() * 0.45, 0.35 + Math.random() * 0.3).multiplyScalar(power).applyQuaternion(q);
+    const v = new THREE.Vector3(0.55 + Math.random() * 0.35, 1.5 + Math.random() * 0.45, 0.35 + Math.random() * 0.3).applyQuaternion(q);
+    // Aimed, the port sits a hand's width under the eye: the case is flung straight out to the right, flat and fast, and is out of the picture in a few frames instead of crossing the sight.
+    v.lerp(AIMED_THROW.clone().multiplyScalar(0.9 + Math.random() * 0.25), aim).multiplyScalar(power);
     const spin = new THREE.Vector3((Math.random() - 0.5) * 30, (Math.random() - 0.5) * 20, 18 + Math.random() * 18);
-    set.live.push({ p, q: q.clone(), v, spin, age: 0 });
+    set.live.push({ p, q: q.clone(), v, spin, age: 0, size: 1 - AIMED_SMALLER * aim });
   }
 
   update(dt: number) {
-    if (this.flashAge < 0) this.flashAge = 0;
-    else this.flashAge += dt;
-    this.flash.visible = this.flashAge < 0.03;
+    this.flash.update(dt);
+    const f = this.flight;
+    if (f) {
+      f.age += dt;
+      f.body.position.addScaledVector(f.velocity, dt);
+      if (f.age >= SPEAR_LIFE) {
+        f.body.removeFromParent();
+        this.flight = null;
+      }
+    }
     const m = new THREE.Matrix4();
     const dq = new THREE.Quaternion();
     const e = new THREE.Euler();
-    const one = new THREE.Vector3(1, 1, 1);
+    const size = new THREE.Vector3();
     for (const set of Object.values(this.casings)) {
       set.live = set.live.filter((c) => c.age < 1.2 && c.p.y > -1.2);
       set.live.forEach((c, i) => {
@@ -141,7 +94,7 @@ export class ViewFx {
         c.p.addScaledVector(c.v, dt);
         e.set(c.spin.x * dt, c.spin.y * dt, c.spin.z * dt);
         c.q.multiply(dq.setFromEuler(e));
-        set.mesh.setMatrixAt(i, m.compose(c.p, c.q, one));
+        set.mesh.setMatrixAt(i, m.compose(c.p, c.q, size.setScalar(c.size)));
       });
       set.mesh.count = set.live.length;
       set.mesh.visible = set.live.length > 0;
@@ -150,10 +103,8 @@ export class ViewFx {
   }
 
   dispose() {
-    this.flash.removeFromParent();
-    this.flashGeo.dispose();
-    this.texture.dispose();
-    (this.flash.material as THREE.Material).dispose();
+    this.flash.dispose();
+    this.flight?.body.removeFromParent();
     for (const set of Object.values(this.casings)) {
       set.mesh.removeFromParent();
       set.mesh.geometry.dispose();
@@ -168,6 +119,7 @@ interface Casing {
   v: THREE.Vector3;
   spin: THREE.Vector3;
   age: number;
+  size: number;
 }
 
 function merged(parts: [THREE.BufferGeometry, string, 'metal' | 'plastic' | 'dark'][]) {
@@ -191,56 +143,4 @@ function shellGeometry(seg: number) {
   const hull = tube(0.0098, 0.05, seg, 0.0015).clone().translate(0, 0, -0.006);
   const head = tube(0.0104, 0.014, seg, 0.001).clone().translate(0, 0, 0.025);
   return merged([[hull, '#d3302a', 'plastic'], [head, '#d4a443', 'metal']]);
-}
-
-/** 3-cell atlas: spiky star, flame petal, soft core. */
-function flashAtlas(): THREE.CanvasTexture {
-  const S = 128;
-  const canvas = document.createElement('canvas');
-  canvas.width = S * 3;
-  canvas.height = S;
-  const g = canvas.getContext('2d')!;
-  const glow = (cx: number, cy: number, r: number) => {
-    const grad = g.createRadialGradient(cx, cy, 0, cx, cy, r);
-    grad.addColorStop(0, 'rgba(255,255,240,1)');
-    grad.addColorStop(0.25, 'rgba(255,226,140,0.95)');
-    grad.addColorStop(0.6, 'rgba(255,140,40,0.55)');
-    grad.addColorStop(1, 'rgba(255,90,20,0)');
-    return grad;
-  };
-  // Star: 7 uneven spikes.
-  g.save();
-  g.translate(S / 2, S / 2);
-  g.beginPath();
-  const spikes = 7;
-  for (let i = 0; i < spikes * 2; i++) {
-    const a = (i / (spikes * 2)) * Math.PI * 2;
-    const r = i % 2 === 0 ? S * (0.38 + 0.1 * Math.sin(i * 2.3)) : S * 0.13;
-    g.lineTo(Math.cos(a) * r, Math.sin(a) * r);
-  }
-  g.closePath();
-  g.fillStyle = glow(0, 0, S * 0.48);
-  g.fill();
-  g.restore();
-  // Petal: teardrop pointing up (v = 1 is the far end).
-  g.save();
-  g.translate(S * 1.5, 0);
-  g.beginPath();
-  g.moveTo(0, S * 0.98);
-  g.bezierCurveTo(S * 0.42, S * 0.7, S * 0.3, S * 0.2, 0, S * 0.02);
-  g.bezierCurveTo(-S * 0.3, S * 0.2, -S * 0.42, S * 0.7, 0, S * 0.98);
-  const pg = g.createLinearGradient(0, S, 0, 0);
-  pg.addColorStop(0, 'rgba(255,250,225,1)');
-  pg.addColorStop(0.35, 'rgba(255,205,110,0.9)');
-  pg.addColorStop(0.75, 'rgba(255,120,40,0.45)');
-  pg.addColorStop(1, 'rgba(255,80,20,0)');
-  g.fillStyle = pg;
-  g.fill();
-  g.restore();
-  // Core.
-  g.fillStyle = glow(S * 2.5, S / 2, S * 0.5);
-  g.fillRect(S * 2, 0, S, S);
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  return texture;
 }

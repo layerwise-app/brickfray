@@ -17,7 +17,7 @@ export function railTop(b: ModelBuilder, x: number, y: number, z0: number, z1: n
   const len = Math.abs(z1 - z0);
   const zc = (z0 + z1) / 2;
   b.add(box(width, 0.004, len, b.lod.bevel * 0.5), color, 'satin', T(x, y + 0.002, zc));
-  if (b.detail === 0) return;
+  if (b.lod.third) return;
   const pitch = 0.0095;
   const n = Math.floor(len / pitch);
   const ridge = box(width * 1.14, 0.0035, pitch * 0.55);
@@ -31,7 +31,7 @@ export function railSide(b: ModelBuilder, side: 1 | -1, x: number, y: number, z0
   const len = Math.abs(z1 - z0);
   const zc = (z0 + z1) / 2;
   b.add(box(0.004, height, len, b.lod.bevel * 0.5), color, 'satin', T(x + side * 0.002, y, zc));
-  if (b.detail === 0) return;
+  if (b.lod.third) return;
   const pitch = 0.0095;
   const n = Math.floor(len / pitch);
   const ridge = box(0.0035, height * 1.14, pitch * 0.55);

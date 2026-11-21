@@ -1,5 +1,6 @@
 import type { Drawer } from './plan';
-import { forest, hills } from './backdrop';
+import { forest } from './backdrop';
+import { mountainRange } from './mountains';
 import { Pen } from './props-kit';
 import { Frame, mix, Rng } from './util';
 
@@ -7,20 +8,10 @@ import { Frame, mix, Rng } from './util';
 export function castleBackdrop(d: Drawer) {
   const haze = '#efd9bd';
   forest(d, { count: 70, dist: [42, 70], haze, seed: 7, colors: ['#2f6a3a', '#3f7f3a', '#4f8a3a', '#1f5a32'] });
-  hills(d, { count: 14, radius: [26, 48], dist: [85, 130], colors: ['#6f9a4a', '#7fa65a', '#5f8a42'], haze, seed: 3, height: 0.5 });
+  mountainRange(d, { count: 14, dist: [85, 130], radius: [26, 44], height: [9, 18], haze, seed: 3, rock: ['#6f9a4a'], slope: '#7fa65a', forest: '#3f7f3a', green: true });
+  mountainRange(d, { count: 11, dist: [125, 150], radius: [30, 46], height: [34, 58], haze, seed: 17, rock: ['#5f6b7a', '#6c7480', '#565f6c'], slope: '#4f6a40' });
   const t = new Pen(d, new Frame(0, 0, 0));
   const rng = new Rng(17);
-  for (let i = 0; i < 9; i++) {
-    const a = rng.range(0, Math.PI * 2);
-    const dist = rng.range(125, 150);
-    const r = rng.range(28, 44);
-    const h = rng.range(34, 56);
-    const fade = 0.55;
-    const x = Math.cos(a) * dist;
-    const z = Math.sin(a) * dist;
-    t.cone(x, -2, z, r, 0, h, mix(rng.pick(['#7d8a9a', '#8a93a3', '#717f90']), haze, fade), undefined, 7);
-    t.cone(x, -2 + h * 0.62, z, r * 0.38, 0, h * 0.38 + 0.4, mix('#f4f1ea', haze, 0.3), undefined, 7);
-  }
   for (let i = 0; i < 10; i++) {
     const a = 2.2 + rng.range(-0.25, 0.25);
     const dist = rng.range(62, 78);

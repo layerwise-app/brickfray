@@ -1,4 +1,4 @@
-import { drawBlock, slab, type Masonry } from './blocks';
+import { checkerFloor, drawBlock, type Masonry } from './blocks';
 import type { Drawer, Element } from './plan';
 import { Pen } from './props-kit';
 import { box, Frame, shade, type PlanCollider, type Vec3 } from './util';
@@ -51,8 +51,16 @@ export const CLOCK_TOWER: Element<Record<string, never>> = {
       if (b.kind === 'roof') continue;
       drawBlock(d, { min: b.min, max: b.max, surface: 'stone', style: TOWER_STONE, top: b.kind === 'parapet' || b.kind === 'pillar' ? 'tiles' : 'none', topColor: TOWER_TRIM });
     }
-    slab(d, [x0 + 0.02, floor - 0.02, -z + 0.02], [x1 - 0.02, floor, z - 0.02], '#c9b48a');
+    checkerFloor(d, x0, -z, x1, z, floor + 0.006, ['#efe5cf', '#c96a4a'], 1.6);
     const t = new Pen(d, new Frame(0, 0, 0));
+    for (const px of [x0, shaftX1 - 0.8]) {
+      for (const pz of [-z, z - 0.8]) {
+        t.box(px + 0.4, floor, pz + 0.4, 0.96, 0.32, 0.96, TOWER_TRIM, undefined, 0.02);
+        t.box(px + 0.4, belfryTop - 0.4, pz + 0.4, 0.96, 0.4, 0.96, TOWER_TRIM, undefined, 0.02);
+      }
+    }
+    for (const pz of [-z + 0.4, z - 0.4]) t.box((x0 + shaftX1) / 2, belfryTop - 0.56, pz, shaftX1 - x0 - 1.6, 0.56, 0.5, TOWER_TRIM, undefined, 0.02);
+    for (const px of [x0 + 0.4, shaftX1 - 0.4]) t.box(px, belfryTop - 0.56, 0, 0.5, 0.56, 2 * z - 1.6, TOWER_TRIM, undefined, 0.02);
     if (d.detail > 0) {
       for (const xx of [x0, x1]) t.box(xx, TOWER.tunnelTop, 0, 0.3, 0.32, TOWER.tunnel * 2 + 0.4, TOWER_TRIM, undefined, 0.02);
       t.box((x0 + x1) / 2, floor - 0.32, -z - 0.06, x1 - x0 + 0.1, 0.32, 0.12, TOWER_TRIM, undefined, 0.02);
@@ -77,9 +85,8 @@ export const CLOCK_TOWER: Element<Record<string, never>> = {
 function clockFace(d: Drawer, x: number, y: number, z: number, nx: number, nz: number) {
   const turns = nz === 1 ? 0 : nz === -1 ? 2 : nx === 1 ? 1 : 3;
   const t = new Pen(d, new Frame(x, y, z, turns));
-  t.cylZ(0, 0, 0.06, 0.95, 0.12, TOWER_TRIM, undefined, 0.03);
-  t.cylZ(0, 0, 0.14, 0.82, 0.04, '#fbf8ef');
-  if (d.detail === 0) return;
+  t.cylZ(0, 0, 0.06, 0.95, 0.12, TOWER_TRIM, undefined, 0.03, 24);
+  t.cylZ(0, 0, 0.14, 0.82, 0.04, '#fbf8ef', undefined, 0, 24);
   for (let i = 0; i < 12; i++) {
     const a = (i / 12) * Math.PI * 2;
     const r = 0.68;
@@ -181,8 +188,15 @@ export const ARCADE_EL: Element<Record<string, never>> = {
   draw(d) {
     const { x0, x1, z0, z1, deck, slab: s } = ARCADE;
     const style: Masonry = { colors: ['#e7e1d2', '#d9d2c1', '#f2ede2'], variance: 0.2 };
-    drawBlock(d, { min: [x0, deck - s, z0], max: [x1, deck, z1], surface: 'stone', style, faces: ['w', 'n', 's'], top: 'tiles', topColor: '#c4553a' });
+    drawBlock(d, { min: [x0, deck - s, z0], max: [x1, deck, z1], surface: 'stone', style, faces: ['w', 'n', 's'], top: 'none' });
+    checkerFloor(d, x0, z0, x1, z1, deck + 0.006, ['#ead9b8', '#cf6a4a'], 1.6);
     const t = new Pen(d, new Frame(0, 0, 0));
+    for (let zz = z0 + 3.8; zz < z1 - 1; zz += 7.6) {
+      if (ARCADE_STAIRS.some((g) => zz > g - 0.4 && zz < g + 2.8)) continue;
+      t.box(x0 + 0.16, deck + 1.0, zz, 0.08, 1.6, 0.08, '#2f363d', 'metal', 0);
+      t.box(x0 + 0.16, deck + 2.6, zz, 0.3, 0.06, 0.3, '#2f363d', 'metal', 0);
+      t.cyl(x0 + 0.16, deck + 2.32, zz, 0.13, 0.28, '#fff1c4', 'glow', 0, 8);
+    }
     for (let zz = z0; zz <= z1 + 0.01; zz += 3.8) {
       t.box(x0 + 0.25, 0.16, zz, 0.6, 0.3, 0.6, '#d9d2c1', undefined, 0.03);
       t.cyl(x0 + 0.25, 0.46, zz, 0.2, deck - s - 0.76, '#f2ede2', undefined, 0);

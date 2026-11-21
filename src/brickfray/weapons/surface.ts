@@ -9,7 +9,8 @@ export type Surface = 'plastic' | 'satin' | 'rubber' | 'metal' | 'chrome' | 'glo
 
 export const SURFACES: Record<Surface, readonly [number, number, number, number]> = {
   plastic: [0.36, 0, 0, 1],
-  satin: [0.55, 0, 0, 0.45],
+  /** Large flat plates: a thin coat, so a studio's bright surround cannot wash a whole side out at a glancing angle. */
+  satin: [0.55, 0, 0, 0.2],
   rubber: [0.86, 0, 0, 0],
   metal: [0.36, 0.85, 0, 0.1],
   chrome: [0.14, 1, 0, 0],

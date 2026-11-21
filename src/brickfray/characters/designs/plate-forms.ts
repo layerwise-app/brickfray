@@ -214,7 +214,8 @@ export class Loft {
   /** Outward surface normal at (a, t). */
   normal(a: number, t: number, out: THREE.Vector3) {
     const h = 0.003;
-    const da = a < h ? [a, a + h] : [a - h, a];
+    // Centered around the angle: a one-sided step tilts the normal at the centerline, and halves lifted along it part there.
+    const da = [a - h, a + h];
     const dt = t < h ? [t, t + h] : [t - h, t];
     out.subVectors(this.point(da[1]!, t, va), this.point(da[0]!, t, vb));
     out.cross(vc.subVectors(this.point(a, dt[0]!, va), this.point(a, dt[1]!, vb))).normalize();

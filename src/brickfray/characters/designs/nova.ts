@@ -1,25 +1,27 @@
 import { buildBody } from '../body';
+import { lowBall, lowSection } from '../body-low';
 import type { PartSet } from '../parts';
 import type { Stance } from '../stance';
 import { antenna, arm, C, chestUnit, helmet, leg, pack, waist } from './nova-suit';
+import { panels, visorDepth } from './nova-trim';
 
 const BULK = 1.08;
 const LIMBS = 1.13;
 
-/** Signature showroom pose. */
+/** A big wave with the open left hand, carbine angled up in the right, weight on the right leg and the left leg stretched out to the side. */
 export const stance: Stance = {
-  pelvis: { at: [0.04, 0.0, 0], rot: [0.2, 0, -0.06] },
-  chest: [-0.12, 0.1, 0.05],
-  head: [-0.5, 0.18, 0.06],
+  pelvis: { at: [0.06, 0.012, 0.01], rot: [0.08, 0, 0.1] },
+  chest: [-0.15, 0.05, -0.12],
+  head: [-0.45, 0.1, -0.1],
   feet: {
-    L: { at: [-0.19, 0, 0.1], heading: -0.55, pitch: -0.6, knee: 0.1 },
-    R: { at: [0.1, 0, -0.02], heading: 0.2 }
+    R: { at: [0.19, 0, 0.035], heading: 0.32, knee: 0.04 },
+    L: { at: [-0.25, 0, -0.07], heading: -0.55, knee: -0.05 }
   },
   arms: {
-    R: { wrist: [0.25, 0.06, -0.19], hand: [0.3, 1.42, 0.0], elbow: [0.8, -0.7, 0.3], space: 'chest', shape: 'grip' },
-    L: { wrist: [-0.5, -0.1, -0.1], hand: [-1.2, -0.3, -0.9], elbow: [-0.6, -0.4, 0.8], space: 'chest', shape: 'open' }
+    R: { wrist: [0.266, 0.05, -0.195], hand: [0.783, 0.933, -0.328], elbow: [0.044, -0.991, 0.124], space: 'chest', shape: 'grip' },
+    L: { wrist: [-0.46, 0.56, -0.07], hand: [-2.285, 1.389, 0.209], elbow: [-0.8, -0.6, 0.2], space: 'chest', shape: 'open', wave: 0.2 }
   },
-  life: { breath: 1, sway: 1.3, look: 0.6 }
+  life: { breath: 1, sway: 1, look: 0.6 }
 };
 
 /** Nova: astronaut in a white suit with purple trim: bubble helmet with a gold visor, chest controls, ribbed joints and a life-support pack. */
@@ -36,10 +38,13 @@ export function nova(b: PartSet) {
     pantsLook: 'plastic',
     boot: C.suit,
     sole: C.purple,
+    bootClosure: 'sealed',
     belt: C.purple,
     buckle: C.chrome,
     bulk: BULK,
     limbs: LIMBS,
+    cuff: 0.86,
+    joints: 'hinge',
     omit: low ? ['head'] : ['head', 'neck', 'abdomen']
   });
   if (low) return plain(b);
@@ -48,6 +53,8 @@ export function nova(b: PartSet) {
   chestUnit(b);
   pack(b);
   waist(b, BULK);
+  visorDepth(b);
+  panels(b, BULK, LIMBS);
   b.mirror((side, sign) => {
     arm(b, side, sign, LIMBS);
     leg(b, side, sign, LIMBS);
@@ -57,8 +64,8 @@ export function nova(b: PartSet) {
 /** The low tier's costume: a handful of flat parts. */
 function plain(b: PartSet) {
   b.cyl('neck', 0.09, 0.1, 0.07, C.purple, { look: 'gloss' });
-  b.ball('head', 0.17, C.suit, { at: [0, 0.095, 0.005], look: 'gloss' });
-  b.section('head', 0.174, 2.1, 1.35, C.visor, { at: [0, 0.095, 0.005], look: 'gold' });
+  lowBall(b, 'head', 0.17, C.suit, { at: [0, 0.095, 0.005], look: 'gloss', seg: 13 });
+  lowSection(b, 'head', 0.174, 2.1, 1.35, C.visor, { at: [0, 0.095, 0.005], look: 'gold', seg: 12 });
   b.mirror((_, sign) => b.cyl('head', 0.04, 0.045, 0.03, C.shade, { at: [sign * 0.165, 0.09, 0.0], rot: [0, 0, Math.PI / 2], look: 'plastic' }));
   b.cyl('dangleHead', 0.006, 0.008, 0.22, C.chrome, { at: [0, 0.11, 0], look: 'chrome' });
   b.ball('dangleHead', 0.018, '#ff5ab0', { at: [0, 0.23, 0], look: 'glow' });

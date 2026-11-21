@@ -49,7 +49,7 @@ export const CRANE: Element<CraneParams> = {
     }
     for (const sz of [-1, 1]) {
       t.box(0, PORTAL - 0.8, sz * LEG_Z, LEG_X * 2, 0.8, 0.5, YELLOW, 'metal', 0.02);
-      if (d.detail > 0) for (const sx of [-1, 1]) t.beam(sx * (LEG_X - 0.3), PORTAL - 2.4, sz * LEG_Z, sx * (LEG_X - 1.8), PORTAL - 0.8, sz * LEG_Z, 0.2, YELLOW, 'metal');
+      for (const sx of [-1, 1]) t.beam(sx * (LEG_X - 0.3), PORTAL - 2.4, sz * LEG_Z, sx * (LEG_X - 1.8), PORTAL - 0.8, sz * LEG_Z, 0.2, YELLOW, 'metal');
     }
     t.box(0, PORTAL, 0, LEG_X * 2 + 1.2, HOUSE - PORTAL, LEG_Z * 2 + 1.2, DARK, 'metal', 0.04);
     t.cyl(0, HOUSE, 0, 1.6, 0.3, '#545c63', 'metal', 0.04);
@@ -69,12 +69,12 @@ function house(t: Pen, detail: number) {
   t.box(0, y, -3.6, 3.6, 1.6, 1.2, '#545c63', 'metal', 0.04);
   t.box(1.4, y + 0.4, 1.6, 1.4, 1.9, 1.4, WHITE, 'metal', 0.03);
   t.box(1.4, y + 1.1, 2.32, 1.2, 0.9, 0.04, '#3f6f8f', 'glass', 0);
-  if (detail === 0) return;
-  t.box(2.12, y + 1.1, 1.6, 0.04, 0.9, 1.1, '#3f6f8f', 'glass', 0);
-  t.box(0, y + 1.6, 1.22, 4.0, 0.3, 0.04, YELLOW, 'metal', 0);
-  for (const x of [-1.2, -0.4, 0.4]) t.box(x, y + 0.8, 1.22, 0.5, 0.9, 0.05, '#b7bcc2', 'metal', 0);
   for (const sx of [-1, 1]) t.beam(sx * 1.6, y + 2.5, -0.6, APEX[0] + sx * 0.4, APEX[1], APEX[2], 0.26, YELLOW, 'metal');
   t.beam(0, y + 2.5, -2.8, APEX[0], APEX[1], APEX[2], 0.22, YELLOW, 'metal');
+  t.box(0, y + 1.6, 1.22, 4.0, 0.3, 0.04, YELLOW, 'metal', 0);
+  if (detail === 0) return;
+  t.box(2.12, y + 1.1, 1.6, 0.04, 0.9, 1.1, '#3f6f8f', 'glass', 0);
+  for (const x of [-1.2, -0.4, 0.4]) t.box(x, y + 0.8, 1.22, 0.5, 0.9, 0.05, '#b7bcc2', 'metal', 0);
 }
 
 function boom(t: Pen, detail: number) {
@@ -89,27 +89,24 @@ function boom(t: Pen, detail: number) {
     const h = h0 + (h1 - h0) * u;
     return [px + (tx - px) * u + sx * w, py + (ty - py) * u + sy * h, pz + (tz - pz) * u];
   };
-  const chords: [number, number][] = detail === 0 ? [[-1, 0], [1, 0]] : [[-1, -1], [1, -1], [-1, 1], [1, 1]];
-  for (const [sx, sy] of chords) {
+  for (const [sx, sy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]] as const) {
     const a = at(0, sx, sy);
     const b = at(1, sx, sy);
-    t.beam(a[0], a[1], a[2], b[0], b[1], b[2], detail === 0 ? 0.3 : 0.16, YELLOW, 'metal');
+    t.beam(a[0], a[1], a[2], b[0], b[1], b[2], 0.16, YELLOW, 'metal');
   }
-  if (detail > 0) {
-    const n = detail === 2 ? 14 : 8;
-    for (let i = 0; i < n; i++) {
-      const u0 = i / n;
-      const u1 = (i + 1) / n;
-      for (const sx of [-1, 1]) {
-        const a = at(u0, sx, i % 2 ? -1 : 1);
-        const b = at(u1, sx, i % 2 ? 1 : -1);
-        t.beam(a[0], a[1], a[2], b[0], b[1], b[2], 0.08, YELLOW, 'metal');
-      }
-      for (const sy of [-1, 1]) {
-        const a = at(u0, i % 2 ? -1 : 1, sy);
-        const b = at(u1, i % 2 ? 1 : -1, sy);
-        t.beam(a[0], a[1], a[2], b[0], b[1], b[2], 0.07, YELLOW, 'metal');
-      }
+  const n = detail === 2 ? 14 : 8;
+  for (let i = 0; i < n; i++) {
+    const u0 = i / n;
+    const u1 = (i + 1) / n;
+    for (const sx of [-1, 1]) {
+      const a = at(u0, sx, i % 2 ? -1 : 1);
+      const b = at(u1, sx, i % 2 ? 1 : -1);
+      t.beam(a[0], a[1], a[2], b[0], b[1], b[2], 0.08, YELLOW, 'metal');
+    }
+    for (const sy of [-1, 1]) {
+      const a = at(u0, i % 2 ? -1 : 1, sy);
+      const b = at(u1, i % 2 ? 1 : -1, sy);
+      t.beam(a[0], a[1], a[2], b[0], b[1], b[2], 0.07, YELLOW, 'metal');
     }
   }
   t.box(tx, ty - 0.5, tz, 0.9, 0.9, 0.9, DARK, 'metal', 0.05);
@@ -130,7 +127,7 @@ function hook(t: Pen, p: CraneParams, detail: number) {
   for (const sx of [-1, 1]) t.beam(tx + sx * 0.15, ty - 0.5, tz, tx + sx * 0.15, y + H + 1.2, tz, 0.04, '#1b1f23', 'metal');
   t.box(tx, y + H + 0.9, tz, 0.7, 0.5, 0.5, YELLOW, 'metal', 0.04);
   t.box(tx, y + H + 0.1, tz, L - 0.2, 0.2, 2.2, YELLOW, 'metal', 0.02);
-  if (detail > 0) for (const sx of [-1, 1]) t.beam(tx, y + H + 0.9, tz, tx + sx * (L / 2 - 0.4), y + H + 0.3, tz, 0.05, '#1b1f23', 'metal');
+  for (const sx of [-1, 1]) t.beam(tx, y + H + 0.9, tz, tx + sx * (L / 2 - 0.4), y + H + 0.3, tz, 0.05, '#1b1f23', 'metal');
   CONTAINER.draw(t.d, { color: p.loadColor ?? '#2f7fbf', ...stand(p, y, tz) });
 }
 

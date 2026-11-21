@@ -1,7 +1,8 @@
 import * as THREE from 'three';
-import { DECAL, GROUND } from './blocks';
+import { DECAL } from './blocks';
 import { BOAT, BOAT_EL, BOAT_GANGWAYS } from './boat';
 import { docksBackdrop } from './backdrop-docks';
+import { docksGround } from './docks-ground';
 import { GANGWAY, PIER, QUAY_EDGE, QUAY_WALL, RAILS } from './docks-parts';
 import { docksYard } from './docks-yard';
 import type { LabView } from './lab-map';
@@ -11,6 +12,7 @@ import { yawToward } from './util';
 import { BARREL, crateStack, PALLET } from './props-harbor';
 import { FORKLIFT } from './props-vehicles';
 import { METAL_STAIRS, RACK, WAREHOUSE, WH } from './warehouse';
+import { warehouseDressing } from './warehouse-dressing';
 
 const BOAT_AT = { x: 0, z: 26.4 };
 const PIERS: [number, number][] = [[-25.6, -22.4], [-1.6, 1.6], [22.4, 25.6]];
@@ -19,17 +21,7 @@ const EDGE = 36.4;
 const BACK = -28.4;
 
 function ground(p: Plan) {
-  p.add(GROUND, { x0: -EDGE, z0: BACK, x1: EDGE, z1: QUAY_EDGE, y: 0, color: '#d4c39f', surface: 'stone', smooth: true });
-  const decal = (x0: number, z0: number, x1: number, z1: number, color: string, y = 0.004) => p.add(DECAL, { x0, z0, x1, z1, y, color, surface: 'stone', smooth: true });
-  decal(-EDGE, -14.4, EDGE, 4.8, '#8f7f6a');
-  for (let x = -EDGE + 4.8; x < EDGE; x += 4.8) decal(x - 0.03, -28.4, x + 0.03, -14.4, '#b1a691', 0.005);
-  decal(-EDGE, 5.2, EDGE, 5.36, '#f6c624', 0.006);
-  decal(-EDGE, 9.0, EDGE, 9.16, '#f6c624', 0.006);
-  for (const s of [-1, 1]) {
-    for (let i = 0; i < 4; i++) decal(s * (26 + i * 2.4) - 0.06, -27.2, s * (26 + i * 2.4) + 0.06, -22.4, '#f2f2ee', 0.006);
-    decal(s > 0 ? 15.2 : -35.6, -12.8, s > 0 ? 35.6 : -15.2, -12.64, '#f2f2ee', 0.006);
-  }
-  for (let i = 0; i < 6; i++) decal(-6.4 + i * 2.4, -13.6, -5.2 + i * 2.4, -12.2, '#f6c624', 0.006);
+  docksGround(p, EDGE, BACK, QUAY_EDGE);
   const land = '#b5ab98';
   for (const [x0, z0, x1, z1] of [[-160, -160, 160, BACK], [-160, BACK, -EDGE, QUAY_EDGE], [EDGE, BACK, 160, QUAY_EDGE]] as const) p.add(DECAL, { x0, z0, x1, z1, y: 0, color: land, surface: 'stone' });
 }
@@ -45,6 +37,7 @@ function harbor(p: Plan) {
 
 function warehouse(p: Plan) {
   p.add(WAREHOUSE, {});
+  warehouseDressing(p);
   const style = { colors: ['#8a9096'], variance: 0 };
   for (const s of [-1, 1] as const) {
     p.add(RACK, { x: s * 10.0, z: -27.0, length: 7.2 });

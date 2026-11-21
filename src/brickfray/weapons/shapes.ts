@@ -29,6 +29,15 @@ export function useLod(lod: Lod | null) {
   active = lod;
 }
 
+/** Runs `make` with the tier's segment budget raised to at least `seg`: for the few round parts that fill the screen. */
+export function rounder<T>(seg: number, make: () => T): T {
+  const was = active;
+  if (was && was.seg < seg) active = { ...was, seg };
+  const made = make();
+  active = was;
+  return made;
+}
+
 function segs(seg: number) {
   return active ? Math.max(4, Math.min(seg, active.seg)) : seg;
 }

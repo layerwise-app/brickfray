@@ -6,6 +6,9 @@ import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { QUALITY, type QualityLevel, type QualityProfile } from './quality';
 import { Materials } from './materials';
 import { FrameTimer } from './frame-timer';
+import { installSmoothShadows } from './shadow-filter';
+import { PostAA } from './post-aa';
+import { buildClouds, CLOUD_DRIFT } from './clouds';
 
 export interface Atmosphere {
   zenith: string;
@@ -16,6 +19,8 @@ export interface Atmosphere {
   /** Direction the light travels from (points toward the sun). */
   sunDirection: THREE.Vector3;
   fogNear: number;
+  /** Slab clouds circling the sky. */
+  clouds?: { count: number; seed: number };
 }
 
 export const DEFAULT_ATMOSPHERE: Atmosphere = {
@@ -39,8 +44,8 @@ export function plainLights(a: Atmosphere) {
     sky: new THREE.Color(a.horizon).lerp(new THREE.Color(a.zenith), 0.5).lerp(WHITE, 0.35),
     ground: new THREE.Color(a.ground).lerp(WHITE, 0.25),
     sun: new THREE.Color(a.sunColor).lerp(WHITE, 0.3),
-    hemi: 2.4,
-    sunIntensity: a.sunIntensity * 0.85
+    hemi: 2.0,
+    sunIntensity: a.sunIntensity
   };
 }
 
@@ -73,11 +78,13 @@ export class GameRenderer {
   readonly hemi: THREE.HemisphereLight;
   readonly sun: THREE.DirectionalLight;
   readonly sky: THREE.Mesh<THREE.SphereGeometry, THREE.ShaderMaterial>;
+  private readonly clouds = new THREE.Group();
   private envTarget: THREE.WebGLRenderTarget | null = null;
   private composer: EffectComposer | null = null;
   private worldPass: RenderPass | null = null;
   private viewPass: RenderPass | null = null;
   private aoPass: GTAOPass | null = null;
+  private postAA: PostAA | null = null;
   private width = 1;
   private height = 1;
   atmosphere: Atmosphere = DEFAULT_ATMOSPHERE;
@@ -87,6 +94,7 @@ export class GameRenderer {
     level: QualityLevel
   ) {
     this.profile = QUALITY[level];
+    installSmoothShadows();
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance', stencil: false });
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.NeutralToneMapping;
@@ -121,13 +129,14 @@ export class GameRenderer {
       })
     );
     this.sky.frustumCulled = false;
-    this.sky.renderOrder = -10;
+    // Last of the opaque pass: drawn first it shades the whole screen before the scenery covers most of it.
+    this.sky.renderOrder = 1e6;
     this.applyProfile();
   }
 
   /** Lights, sky and fog for a scene; call once per scene and after setAtmosphere. */
   dress(scene: THREE.Scene) {
-    scene.add(this.hemi, this.sun, this.sun.target, this.sky);
+    scene.add(this.hemi, this.sun, this.sun.target, this.sky, this.clouds);
     this.applyAtmosphere(scene);
   }
 
@@ -159,6 +168,13 @@ export class GameRenderer {
       this.hemi.intensity = l.hemi;
     }
     scene.fog = new THREE.Fog(a.horizon, a.fogNear, this.profile.drawDistance);
+    for (const c of [...this.clouds.children] as THREE.Mesh[]) {
+      this.clouds.remove(c);
+      c.geometry.dispose();
+      (c.material as THREE.Material).dispose();
+    }
+    const clouds = buildClouds(a);
+    if (clouds) this.clouds.add(clouds);
     this.buildEnvironment(scene);
   }
 
@@ -219,6 +235,10 @@ export class GameRenderer {
     this.composer?.dispose();
     this.composer = null;
     this.aoPass = null;
+    if (p.antialias) {
+      this.postAA?.dispose();
+      this.postAA = null;
+    }
     this.resize(this.width, this.height);
   }
 
@@ -227,11 +247,12 @@ export class GameRenderer {
     return Math.min(dpr, this.profile.maxPixelRatio) * this.profile.resolutionScale;
   }
 
-  resize(width: number, height: number) {
+  /** `ratio` is what the canvas is drawn at now (the menu draws sharper than a match); post-processing keeps the match's. */
+  resize(width: number, height: number, ratio = this.pixelRatio) {
     this.width = Math.max(1, width);
     this.height = Math.max(1, height);
-    this.renderer.setPixelRatio(this.pixelRatio);
-    this.renderer.setSize(this.width, this.height, false);
+    // One call: setPixelRatio followed by setSize reallocates the canvas twice.
+    this.renderer.setDrawingBufferSize(this.width, this.height, ratio);
     this.composer?.setPixelRatio(this.pixelRatio);
     this.composer?.setSize(this.width, this.height);
   }
@@ -281,6 +302,8 @@ export class GameRenderer {
 
   render(scene: THREE.Scene, camera: THREE.Camera, viewScene: THREE.Scene | null = null, viewCamera: THREE.Camera | null = null) {
     this.sky.position.copy((camera as THREE.PerspectiveCamera).position);
+    this.clouds.position.copy(this.sky.position);
+    this.clouds.rotation.y = (performance.now() / 1000) * CLOUD_DRIFT;
     this.renderer.info.reset();
     this.renderer.shadowMap.needsUpdate = this.profile.shadows;
     if (this.profile.ambientOcclusion) {
@@ -288,6 +311,8 @@ export class GameRenderer {
       this.composer!.render();
       return;
     }
+    const post = this.profile.antialias ? null : (this.postAA ??= new PostAA());
+    post?.begin(this.renderer);
     this.renderer.autoClear = false;
     this.renderer.clear();
     this.renderer.render(scene, camera);
@@ -295,10 +320,12 @@ export class GameRenderer {
       this.renderer.clearDepth();
       this.renderer.render(viewScene, viewCamera);
     }
+    post?.end(this.renderer);
   }
 
   dispose() {
     this.composer?.dispose();
+    this.postAA?.dispose();
     this.envTarget?.dispose();
     this.materials.dispose();
     this.renderer.dispose();

@@ -1,3 +1,4 @@
+import type { ForeEnd } from './body-grasp';
 import { hand } from './body-hands';
 import { FACE_Z, sculptFace, sculptHead } from './body-head';
 import { bodyKit } from './body-kit';
@@ -7,6 +8,20 @@ import { torso } from './body-torso';
 import type { Look, PartSet } from './parts';
 
 export type BodyPart = 'hips' | 'abdomen' | 'chest' | 'neck' | 'head' | 'face' | 'upperArms' | 'forearms' | 'hands' | 'thighs' | 'shins' | 'boots' | 'belt';
+
+/** How the eyes and brows are set on the sculpted face. */
+export interface Expression {
+  /** Upper lids: 0 shut, 1 wide open; 0.8 is awake and relaxed. */
+  open?: number;
+  /** Lower lids pushed up by the cheeks, 0…1: a smiling or narrowed eye. */
+  squint?: number;
+  /** Slant of the lids in radians; positive drops the outer corners. Follows the brows when omitted. */
+  lidTilt?: number;
+  /** Where the eyes look, each -1…1: toward the character's right, and up. */
+  gaze?: [number, number];
+  /** Brow height offsets [left, right] in model units; unequal values cock one brow. */
+  brows?: [number, number];
+}
 
 export interface BodyStyle {
   skin: string;
@@ -20,6 +35,12 @@ export interface BodyStyle {
   elbow?: string;
   glove: string;
   gloveLook?: Look;
+  /** Glove cuff girth on the detailed tiers; 1 is a gauntlet a little wider than the forearm. */
+  cuff?: number;
+  /** Finger thickness on the detailed tiers; plate gauntlets have fingers to match their cuffs. */
+  fingerGirth?: number;
+  /** The gun's fore-end a `hold` hand closes round, when it holds one rather than a melee haft. */
+  fore?: ForeEnd;
   /** Fingerless gloves show skin fingers. */
   fingers?: string;
   pants: string;
@@ -28,11 +49,15 @@ export interface BodyStyle {
   bootLook?: Look;
   sole?: string;
   belt?: string;
+  /** Belt surface on the detailed tiers (rubber by default). */
+  beltLook?: Look;
   buckle?: string;
   /** Torso width multiplier at the shoulders. */
   bulk?: number;
   /** Arm/leg thickness multiplier. */
   limbs?: number;
+  /** Leg thickness when it differs from the arms'. */
+  legs?: number;
   /** Pupil and lash colour. */
   eyes?: string;
   /** Iris colour on the detailed tiers. */
@@ -41,7 +66,16 @@ export interface BodyStyle {
   blush?: string;
   brow?: string;
   browTilt?: number;
-  mouth?: 'smile' | 'flat' | 'grin' | 'none';
+  mouth?: 'smile' | 'flat' | 'grin' | 'smirk' | 'none';
+  /** Lashes flicking out from the outer corners of the eyes, on the detailed tiers. */
+  lashes?: boolean;
+  /** Nose size on the detailed tiers; 1 is the small default. */
+  nose?: number;
+  expression?: Expression;
+  /** What closes the showroom boot: laces, armour lames (the default on metal), or nothing, for a costume that seals it itself. */
+  bootClosure?: 'laces' | 'lames' | 'sealed';
+  /** The showroom's elbows and knees: cloth bending over the joint by default; a hard suit or armour keeps hinge barrels. */
+  joints?: 'cloth' | 'hinge';
   omit?: BodyPart[];
 }
 

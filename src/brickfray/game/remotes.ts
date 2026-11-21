@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import { createCharacter } from '../characters';
+import { Rig } from '../characters/rig';
 import type { AnimState, CharacterRig } from '../characters/types';
+import { FootStrikes } from '../audio/step-triggers';
 import type { Kit } from '../engine/kit';
 import type { RemoteSnapshotPlayer, Snapshot } from '../net/codec';
 import type { RosterEntry } from '../net/protocol';
@@ -27,7 +29,8 @@ export interface Remote {
   yaw: number;
   visible: boolean;
   knock: THREE.Vector3;
-  stepTimer: number;
+  /** Heel strikes of the rig's walk, for footsteps. */
+  feet: FootStrikes;
 }
 
 const anim: AnimState = {
@@ -80,7 +83,8 @@ export class Remotes {
       if (!r || r.entry.character !== entry.character) {
         if (r) this.remove(id);
         const rig = createCharacter(entry.character, this.kit);
-        r = { entry, rig, guns: {}, weapon: null, state: null, alive: false, shots: 0, sinceShot: 9, sinceHurt: 9, hurtDir: { x: 0, z: 0 }, position: new THREE.Vector3(), yaw: 0, visible: false, knock: new THREE.Vector3(), stepTimer: 0 };
+        if (rig instanceof Rig) rig.animator.vary(id);
+        r = { entry, rig, guns: {}, weapon: null, state: null, alive: false, shots: 0, sinceShot: 9, sinceHurt: 9, hurtDir: { x: 0, z: 0 }, position: new THREE.Vector3(), yaw: 0, visible: false, knock: new THREE.Vector3(), feet: new FootStrikes(rig.root) };
         rig.root.visible = false;
         this.group.add(rig.root);
         this.map.set(id, r);
@@ -109,6 +113,8 @@ export class Remotes {
     }
     r.rig.setWeapon(gun.root, gun.supportGrip);
     r.weapon = weapon;
+    // Effects tell which gun fired (its flash and tracer) from the muzzle a shot starts at.
+    r.rig.root.userData.gun = { weapon, muzzle: gun.muzzle };
   }
 
   /** Interpolate every remote at `renderTime` (host clock) from the snapshot buffer. */
@@ -125,6 +131,7 @@ export class Remotes {
     older ??= snapshots[0];
     const k = older && newer ? THREE.MathUtils.clamp((renderTime - older.time) / Math.max(1e-4, newer.time - older.time), 0, 1) : 0;
     const extra = older && !newer ? Math.min(0.25, Math.max(0, renderTime - older.time)) : 0;
+    if (older?.self) this.group.userData.selfWeapon = older.self.arms.weapon;
     for (const r of this.map.values()) {
       const a = older?.players.find((p) => p.id === r.entry.id);
       if (!a) {
@@ -135,7 +142,10 @@ export class Remotes {
       const b = newer?.players.find((p) => p.id === r.entry.id) ?? a;
       const s = k < 0.5 ? a : b;
       r.state = s;
-      if (s.alive && !r.alive) r.rig.reset();
+      if (s.alive && !r.alive) {
+        r.rig.reset();
+        r.feet.reset();
+      }
       r.alive = s.alive;
       r.position.set(a.x + (b.x - a.x) * k + a.vx * extra, a.y + (b.y - a.y) * k, a.z + (b.z - a.z) * k + a.vz * extra);
       r.yaw = lerpAngle(a.yaw, b.yaw, k);
@@ -179,13 +189,7 @@ export class Remotes {
       anim.sinceHurt = r.sinceHurt;
       anim.hurtDirection = r.hurtDir;
       r.rig.update(dt, anim);
-      if (anim.grounded && anim.speed > 1.2 && anim.crouch < 0.5) {
-        r.stepTimer -= dt;
-        if (r.stepTimer <= 0) {
-          r.stepTimer = s.sprinting ? 0.29 : 0.4;
-          this.onStep?.(r, s.sprinting);
-        }
-      } else r.stepTimer = 0.15;
+      if (r.feet.update() > 0 && anim.grounded && anim.speed > 1.2 && anim.crouch < 0.5) this.onStep?.(r, s.sprinting);
     }
   }
 

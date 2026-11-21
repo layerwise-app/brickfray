@@ -53,12 +53,12 @@ function respawn(s: Synth) {
 }
 
 export const FEEDBACK_SOUNDS: Record<FeedbackIds, SoundSpec> = {
-  hitmarker: { category: 'marker', duration: 0.12, loudness: -21, render: (s) => tick(s, 0, 3200 * vary(s, 0.01), 1) },
+  hitmarker: { category: 'marker', duration: 0.12, loudness: -18.5, render: (s) => tick(s, 0, 4200 * vary(s, 0.01), 1) },
   // A helmet "tink" then a bell-like ding: unmistakably different from the body tick.
   headshotMarker: {
     category: 'marker',
     duration: 0.5,
-    loudness: -17,
+    loudness: -16.5,
     render: (s) => {
       tick(s, 0, 4200, 1);
       glock(s, 0.03, midiHz(100), 0.75);
@@ -132,7 +132,7 @@ export const FEEDBACK_SOUNDS: Record<FeedbackIds, SoundSpec> = {
     variants: 3,
     render: (s) => {
       clack(s, 0, { pitch: 2000, gain: 0.5, decay: 0.03 });
-      clack(s, 0.045, { pitch: 1500, gain: 0.45, decay: 0.035 });
+      clack(s, 0, { pitch: 1500, gain: 0.45, decay: 0.035 });
     }
   },
   matchStart: {

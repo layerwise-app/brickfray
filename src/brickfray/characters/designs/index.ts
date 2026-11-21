@@ -1,4 +1,4 @@
-import type { PartSet } from '../parts';
+import { TORSO_DEPTH, type PartSet } from '../parts';
 import type { RestOverrides } from '../skeleton';
 import type { BotKind, CharacterId } from '../types';
 import { bot } from './bots';
@@ -20,10 +20,10 @@ export const BOT_KINDS: readonly BotKind[] = ['grunt', 'rusher', 'sniper', 'boss
 
 export const DESIGNS: Record<CharacterId | BotKind, Design> = {
   rivet: { build: rivet },
-  vega: { build: vega, rest: { dangleHead: [0, 0.215, 0.125], dangleBack: [0, 0.21, 0.115] } },
+  vega: { build: vega, rest: { dangleHead: [0, 0.215, 0.125], dangleBack: [0, 0.21, 0.115 * TORSO_DEPTH] } },
   clack: { build: clack, rest: { dangleHead: [0, 0.26, 0.02] } },
   coral: { build: coral },
-  moss: { build: moss, rest: { dangleBack: [0, 0.22, 0.135] } },
+  moss: { build: moss, rest: { dangleBack: [0, 0.22, 0.135 * TORSO_DEPTH] } },
   nova: { build: nova, rest: { dangleHead: [0.11, 0.24, 0.04] } },
   grunt: { build: bot('grunt') },
   rusher: { build: bot('rusher') },

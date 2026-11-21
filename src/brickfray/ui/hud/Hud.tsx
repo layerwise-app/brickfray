@@ -5,6 +5,7 @@ import { useApp, useGame, useHud } from '../App';
 import { useT } from '../i18n';
 import { HeadshotIcon, SkullIcon, WeaponIcon } from '../icons';
 import { Crosshair } from './Crosshair';
+import { KillConfirm } from './KillConfirm';
 import { Results, Scoreboard } from './Scoreboard';
 
 export function Hud() {
@@ -12,14 +13,14 @@ export function Hud() {
   const app = useApp();
   const game = useGame();
   const { t } = useT();
-  const low = hud.alive && hud.health < 35;
   const playing = hud.phase === 'playing' || hud.phase === 'warmup' || hud.phase === 'intermission';
 
   return (
     <div className='pointer-events-none absolute inset-0 select-none'>
-      <div className='bf-vignette' style={{ opacity: low ? 0.35 + (1 - hud.health / 35) * 0.5 : 0 }} />
+      <LowHealth level={hud.alive ? Math.min(1, Math.max(0, (0.45 - hud.health / hud.maxHealth) / 0.35)) : 0} />
       {hud.scoped && <div className='bf-scope' />}
       {hud.alive && playing && <Crosshair hidden={hud.scoped || hud.aiming} />}
+      <KillConfirm />
       <TopBar />
       <KillFeed />
       {hud.alive && (
@@ -88,12 +89,9 @@ function Ammo() {
   const lowAmmo = hud.ammo <= Math.ceil(def.mag * 0.25);
   return (
     <div className='absolute bottom-6 right-6 flex flex-col items-end gap-2'>
-      <div className='flex gap-1.5'>
-        {Array.from({ length: Math.max(hud.grenades, 0) }, (_, i) => (
-          <WeaponIcon key={i} weapon='grenade' size={34} className='text-[var(--bf-yellow)] drop-shadow-[0_2px_0_rgba(0,0,0,.5)]' />
-        ))}
-        {Array.from({ length: Math.max(0, GRENADE.perLife - hud.grenades) }, (_, i) => (
-          <WeaponIcon key={`e${i}`} weapon='grenade' size={34} className='text-white/20' />
+      <div className='flex items-end gap-1'>
+        {Array.from({ length: GRENADE.perLife }, (_, i) => (
+          <Grenade key={i} full={i < hud.grenades} />
         ))}
       </div>
       <div className='flex items-end gap-4'>
@@ -110,6 +108,54 @@ function Ammo() {
   );
 }
 
+/**
+ * Below 45% health the screen edges drain of colour and a dark red rim beats like a pulse, both creeping inward with
+ * the health lost (`level` 0…1); the middle of the screen keeps its colour and contrast to aim through.
+ */
+function LowHealth({ level }: { level: number }) {
+  const on = level > 0;
+  const edge = `radial-gradient(ellipse 72% 72% at center, transparent ${Math.round(60 - 10 * level)}%, black ${Math.round(86 - 8 * level)}%)`;
+  const beat = on ? `bf-heartbeat ${(1.15 - level * 0.4).toFixed(2)}s ease-in-out infinite` : undefined;
+  return (
+    <>
+      <style>{`@keyframes bf-heartbeat { 0%, 100% { opacity: .45; } 9% { opacity: 1; } 20% { opacity: .6; } 30% { opacity: .92; } 55% { opacity: .45; } }`}</style>
+      <div
+        className='absolute inset-0'
+        style={{
+          backdropFilter: on ? `saturate(${(1 - 0.7 * level).toFixed(3)})` : undefined,
+          WebkitBackdropFilter: on ? `saturate(${(1 - 0.7 * level).toFixed(3)})` : undefined,
+          maskImage: on ? edge : undefined,
+          WebkitMaskImage: on ? edge : undefined
+        }}
+      />
+      <div className='absolute inset-0' style={{ opacity: on ? 0.45 + 0.55 * level : 0, transition: 'opacity .4s ease' }}>
+        <div
+          className='absolute inset-0'
+          style={{
+            background: `radial-gradient(ellipse 70% 70% at center, transparent ${Math.round(60 - 8 * level)}%, rgba(170,0,0,.5) ${Math.round(75 - 5 * level)}%, rgba(90,0,0,.95) 96%)`,
+            animation: beat
+          }}
+        />
+      </div>
+    </>
+  );
+}
+
+/** One grenade of the loadout: a toy pineapple with a pin ring, solid while held, an outline once thrown. */
+function Grenade({ full }: { full: boolean }) {
+  return (
+    <svg width={30} height={38} viewBox='0 0 30 38' aria-hidden className={full ? 'drop-shadow-[0_2px_0_rgba(0,0,0,.5)]' : ''}>
+      <g fill={full ? 'var(--bf-yellow)' : 'rgba(255,255,255,.14)'} stroke={full ? 'rgba(40,30,0,.55)' : 'rgba(255,255,255,.45)'} strokeWidth={1.5}>
+        <rect x={4} y={12} width={20} height={24} rx={7} />
+        <rect x={9} y={6} width={10} height={7} rx={2} />
+        <path d='M19 8h5l3 4' fill='none' />
+        <circle cx={25} cy={5} r={3.5} fill='none' />
+      </g>
+      {full && <path d='M5 21h18M5 27h18M14 13v22' stroke='rgba(60,40,0,.35)' strokeWidth={1.5} />}
+    </svg>
+  );
+}
+
 function clock(seconds: number) {
   const s = Math.max(0, Math.ceil(seconds));
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
@@ -122,9 +168,11 @@ function TopBar() {
   if (!mode) return null;
   const me = hud.rows.find((r) => r.me);
   const leader = hud.rows[0];
+  // The wave banner announces the wave; the pill steps aside until it is gone so the number never shows twice.
+  const announcing = mode === 'solo' && !!hud.banner;
   return (
     <div className='absolute left-1/2 top-4 flex -translate-x-1/2 flex-col items-center gap-1'>
-      <div className='flex items-stretch overflow-hidden rounded-2xl bg-black/45 shadow-[0_4px_0_rgba(0,0,0,.3)] backdrop-blur-sm'>
+      <div className='flex items-stretch overflow-hidden rounded-2xl bg-black/45 shadow-[0_4px_0_rgba(0,0,0,.3)] backdrop-blur-sm' style={{ opacity: announcing ? 0 : 1, transition: 'opacity .3s ease' }}>
         {mode === 'tdm' && <Score value={hud.teamScore[0]} color={TEAM_COLORS[0]} highlight={hud.myTeam === 0} />}
         {mode === 'ffa' && <Score value={me?.kills ?? 0} color='#ffcd2e' highlight />}
         <div className='bf-display bf-hud-text flex min-w-24 items-center justify-center px-4 text-3xl tabular-nums'>
@@ -180,8 +228,8 @@ function Banner() {
   const { t } = useT();
   if (!hud.banner) return null;
   return (
-    <div key={hud.banner.key} className='bf-pop absolute left-1/2 top-[28%] -translate-x-1/2 text-center'>
-      <div className='bf-display bf-hud-text text-7xl text-[var(--bf-yellow)]'>{t('wave', { n: hud.banner.sub ?? '' })}</div>
+    <div key={hud.banner.key} className='bf-pop absolute left-1/2 top-[11%] -translate-x-1/2 text-center'>
+      <div className='bf-display bf-hud-text text-5xl text-[var(--bf-yellow)]'>{t('wave', { n: hud.banner.sub ?? '' })}</div>
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { track, type Clip, type ClipCtx, type ClipEvent, type Frame, type Keys } from './clip';
 import { goal, type Goal } from './goals';
-import { seg } from './springs';
+import { env, seg } from './springs';
 
 export const Z = [0, 0, 0, 0, 0, 0];
 export type Events = (readonly [number, ClipEvent])[];
@@ -95,16 +95,48 @@ export interface Swap {
   /** Knocks the gun takes from the rip and from the seat. */
   rip: readonly number[];
   slam: readonly number[];
+  /** A cell that goes in turned this far about the well's axis and is locked with a twist once seated, over TWIST seconds. */
+  twist?: number;
 }
+
+const TWIST = 0.075;
 
 /**
  * A hand-carried magazine change: pulled down the well, carried out of frame
  * in view space, a fresh one brought back the same way and slammed home.
  * The hand rides the magazine's hold node the whole time.
  */
+/** While the other hand is away the gun hand alone carries the weight: it shifts and settles instead of locking still. */
+const SETTLE = [0.005, 0.009, 0.005, 0.045, 0.026, 0.06];
+const sway = [0, 0, 0, 0, 0, 0];
+/** Halfway through the fetch the gun hand takes a fresh grip: the gun sags and rolls toward level, then is hitched back up. */
+const REGRIP = [0.008, -0.022, 0.01, -0.07, -0.05, 0.2];
+const SAG_TIME = 0.09;
+const HITCH_TIME = 0.16;
+
+/** Weight (0…1) of a re-grip that started `seconds` ago: the sag, then the hitch back; `pace` < 1 makes it quicker. */
+export function regrip(seconds: number, pace = 1) {
+  const sag = SAG_TIME * pace;
+  if (seconds <= 0) return 0;
+  if (seconds < sag) return seg(seconds, 0, sag);
+  return 1 - seg(seconds, sag, sag + HITCH_TIME * pace);
+}
+
+/** The gun hand's re-grip while the other hand is away, starting at `at` seconds. */
+export function regripGun(f: Frame, t: number, at: number, k = 1, pace = 1) {
+  f.gun(REGRIP, regrip(t - at, pace) * k);
+}
+
+/** The gun hand alone carrying the weight: a slow shift that never locks still, `time` running on across clips. */
+export function settleGun(f: Frame, time: number, k: number) {
+  for (let i = 0; i < 6; i++) sway[i] = SETTLE[i]! * Math.sin(time * (10 + i * 1.3) + i * 0.9);
+  f.gun(sway, k);
+}
+
 export function magSwap(o: Swap) {
   const a = o.at;
-  const local: Keys = [[a[0], Z], [a[1], o.tug], [a[2], o.clear], [a[6], o.under], [a[7], o.mouth], [a[8], scale(o.mouth, 0.86)], [a[9], Z]];
+  const turned = (v: readonly number[]) => (o.twist ? [v[0]!, v[1]!, v[2]!, v[3]!, v[4]! + o.twist, v[5]!] : v);
+  const local: Keys = [[a[0], Z], [a[1], o.tug], [a[2], o.clear], [a[6], turned(o.under)], [a[7], turned(o.mouth)], [a[8], turned(scale(o.mouth, 0.86))], [a[9], turned(Z)], ...(o.twist ? ([[a[9] + TWIST, Z]] as const) : [])];
   let path: Keys | null = null;
   return (t: number, f: Frame, c: ClipCtx) => {
     const seat = c.goals.magazineSeat!;
@@ -120,6 +152,9 @@ export function magSwap(o: Swap) {
     ];
     f.gun(o.rip, jolt(t - (a[1] + a[2]) / 2));
     f.gun(o.slam, jolt(t - a[9] + 0.01));
+    if (o.twist) f.gun([0, 0.004, 0, 0.012, 0.02, -0.03], jolt(t - a[9] - TWIST));
+    settleGun(f, t - a[2], env(t, a[2], a[3], a[5], a[6]));
+    regripGun(f, t, (a[3] + a[4]) / 2);
     const k = seg(t, a[1] + 0.03, a[2] + 0.04) * (1 - seg(t, a[5] + 0.06, a[6] + 0.02));
     carry(f, c, 'magazine', seat, hold, track(t, local), track(t, path), k);
   };

@@ -1,4 +1,4 @@
-import { C } from './castle-parts';
+import { C, GATE } from './castle-parts';
 import { BLOCK } from './blocks';
 import { CASTLE_STONE } from './castle-parts';
 import { STOREHOUSE, TENT } from './fortress-parts';
@@ -19,6 +19,7 @@ export function fortressDressing(p: Plan) {
     const colors = s < 0 ? BLUE : RED;
     for (const x of [-24, -20.8, 20.8, 24]) p.add(BANNER, { x, z: s * wallZ, y: 3.5, turns: s < 0 ? 0 : 2, colors, width: 1.4, height: 2.6, pattern: 'chevron' });
     for (const x of [-2.6, 2.6]) p.add(TORCH, { x, z: s * (wallZ - 1.6), y: 2.3, turns: s < 0 ? 0 : 2 });
+    for (const x of [-4.1, 4.1]) p.add(BANNER, { x, z: s * (wallZ - GATE.depth), y: 6.1, turns: s < 0 ? 0 : 2, colors, width: 1.1, height: 2.6, pattern: 'border' });
     for (const x of [-12, 12]) p.add(TORCH, { x, z: s * wallZ, y: 2.4, turns: s < 0 ? 0 : 2 });
     p.add(TENT, { x: s * 24.8, z: s * -24.4, turns: s < 0 ? 2 : 0, color: s < 0 ? '#2f6ab0' : '#c0392b' });
     p.add(TENT, { x: s * -24.8, z: s * -24.4, turns: s < 0 ? 0 : 2, color: s < 0 ? '#e7e1d2' : '#e7e1d2', trim: s < 0 ? '#1f62c7' : '#c8231b' });

@@ -6,6 +6,7 @@ import { screw, shade, slot, studGrid, studSide } from './details';
 const C = {
   shell: '#eef0f4',
   lower: '#d4d8df',
+  guard: '#5b6273',
   purple: '#7b4fd6',
   graphite: '#2e323d',
   dark: '#1b1f27',
@@ -20,8 +21,10 @@ const C = {
 const BORE = 0.108;
 const SIGHT_Y = 0.178;
 const SIGHT_Z = -0.1022;
+/** Where a shot sets the hot cell off from, relative to its rest at the coil pack: the back of the capacitor strips. */
+export const SPARK_RUN = [0, 0, 0.126] as const;
 
-/** Pulse Carbine: white two-tone shell, capacitor strips, coil emitter, holo ring sight and a boxy energy cell. */
+/** Pulse Carbine: white shell over a gunmetal shroud, capacitor strips, coil emitter, holo ring sight and a boxy energy cell. */
 export function buildPulse(b: ModelBuilder) {
   const { lod } = b;
   const d = b.detail;
@@ -72,11 +75,11 @@ export function buildPulse(b: ModelBuilder) {
     }
   }
 
-  // Barrel shroud: chamfered white block, studded top, capacitor strips and a purple fore-grip.
+  // Barrel shroud: chamfered gunmetal block, studded top, capacitor strips and a purple fore-grip.
   const shroud: [number, number][] = [[-0.021, 0.08], [0.021, 0.08], [0.0235, 0.1], [0.0235, 0.124], [0.0165, 0.137], [-0.0165, 0.137], [-0.0235, 0.124], [-0.0235, 0.1]];
-  b.add(prism(shroud, 0.226, lod, [0.006, 0.006, 0.002, 0.004, 0.004, 0.004, 0.002, 0.006]), C.shell, 'plastic', T(0, 0, -0.283));
+  b.add(prism(shroud, 0.226, lod, [0.006, 0.006, 0.002, 0.004, 0.004, 0.004, 0.002, 0.006]), C.guard, 'satin', T(0, 0, -0.283));
   b.add(prism([[-0.017, 0.073], [0.017, 0.073], [0.0195, 0.084], [-0.0195, 0.084]], 0.15, lod, 0.004), C.purple, 'plastic', T(0, 0, -0.29));
-  if (b.minor) studGrid(b, 0, 0.137, -0.29, 2, d >= 1 ? 7 : 4, d >= 1 ? 0.0165 : 0.033, d >= 1 ? 0.0056 : 0.0064, C.shell);
+  if (b.minor) studGrid(b, 0, 0.137, -0.29, 2, d >= 1 ? 7 : 4, d >= 1 ? 0.0165 : 0.033, d >= 1 ? 0.0056 : 0.0064, C.guard);
   for (const s of [1, -1] as const) {
     b.add(box(0.002, 0.013, 0.17, 0.0005), C.dark, 'dark', T(s * 0.0236, 0.111, -0.286));
     if (d >= 1) for (let i = 0; i < 7; i++) b.add(box(0.0016, 0.0074, 0.017), C.energy, 'glow', T(s * 0.0242, 0.111, -0.223 - i * 0.021));
@@ -84,20 +87,29 @@ export function buildPulse(b: ModelBuilder) {
   }
   if (d >= 1) {
     for (let i = 0; i < 7; i++) b.add(box(0.036, 0.0034, 0.005, 0.0008), shade(C.purple, 0.78), 'plastic', T(0, 0.0727, -0.236 - i * 0.018));
-    for (const s of [1, -1]) b.add(box(0.0016, 0.0035, 0.226), shade(C.shell, 0.72), 'dark', T(s * 0.0236, 0.0955, -0.283));
+    for (const s of [1, -1]) b.add(box(0.0016, 0.0035, 0.226), shade(C.guard, 0.6), 'dark', T(s * 0.0236, 0.0955, -0.283));
   }
   if (d >= 2) for (const s of [1, -1]) for (const z of [-0.18, -0.387]) screw(b, s * 0.0238, 0.0905, z, 'x', 0.0022);
+
+  // Stubby raked hand stop under the fore-grip rail: the support hand's vertical grip.
+  b.add(slab([[-0.316, 0.075], [-0.274, 0.075], [-0.248, 0.008], [-0.255, 0.0], [-0.277, 0.0], [-0.287, 0.008]], 0.027, lod, [0.003, 0.003, 0.008, 0.006, 0.006, 0.008]), C.graphite, 'satin');
+  b.add(slab([[-0.29, 0.012], [-0.246, 0.012], [-0.244, 0.002], [-0.252, -0.006], [-0.279, -0.006], [-0.289, 0.002]], 0.0295, lod, 0.004), C.purple, 'plastic');
+  if (d >= 1) for (const s of [1, -1] as const) for (let i = 0; i < 3; i++) b.add(box(0.0014, 0.0032, 0.022, 0.0005), shade(C.graphite, 1.5), 'satin', T(s * 0.0138, 0.026 + i * 0.013, -0.2735 - i * 0.0052, -0.38));
 
   // Coil accelerator: glowing core wrapped in purple rings under a white top spine.
   b.add(tube(0.0085, 0.13, lod.seg), C.core, 'metal', T(0, BORE, -0.455));
   b.add(tube(0.0128, 0.07, lod.seg), C.energy, 'glow', T(0, BORE, -0.432));
+  b.add(box(0.014, 0.011, 0.09, lod.bevel), C.shell, 'plastic', T(0, 0.1305, -0.437));
+  if (d >= 1) b.add(box(0.008, 0.0016, 0.07), C.purple, 'plastic', T(0, 0.1366, -0.437));
+  // Coil pack (animated, recoils along the core on every shot).
+  b.part('slide', new THREE.Vector3(0, BORE, -0.4315));
   const ring = latheZ([[0.0126, -0.0055], [0.0171, -0.0055], [0.0178, -0.0048], [0.0178, 0.0048], [0.0171, 0.0055], [0.0126, 0.0055]], lod.seg);
   for (const z of [-0.405, -0.4315, -0.458]) b.add(ring, C.purple, 'satin', T(0, BORE, z));
-  b.add(box(0.014, 0.011, 0.09, lod.bevel), C.shell, 'plastic', T(0, 0.1305, -0.437));
-  if (d >= 1) {
-    b.add(box(0.008, 0.0016, 0.07), C.purple, 'plastic', T(0, 0.1366, -0.437));
-    for (const z of [-0.405, -0.4315, -0.458]) b.add(torus(0.0181, 0.0012, lod.seg), shade(C.purple, 0.7), 'satin', T(0, BORE, z));
-  }
+  if (d >= 1) for (const z of [-0.405, -0.4315, -0.458]) b.add(torus(0.0181, 0.0012, lod.seg), shade(C.purple, 0.7), 'satin', T(0, BORE, z));
+  // The hot cell (animated): a shot sets it at the back of each capacitor strip and it runs forward into the coil pack.
+  b.part('spark', new THREE.Vector3(0, 0.111, -0.349));
+  if (!lod.third) for (const s of [1, -1]) b.add(box(0.0018, 0.0082, 0.018, 0.0004), '#f4fdff', 'glow', T(s * 0.0246, 0.111, -0.349));
+  b.part('body');
 
   // Emitter: flared white muzzle ring around a glowing bore.
   b.add(

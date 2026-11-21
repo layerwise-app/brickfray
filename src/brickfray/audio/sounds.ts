@@ -1,4 +1,5 @@
 import type { SoundSpec } from './catalog';
+import { AMBIENT_SOUNDS } from './recipes/ambient';
 import { FEEDBACK_SOUNDS } from './recipes/feedback';
 import { FOLEY_SOUNDS } from './recipes/foley';
 import { GUN_SOUNDS } from './recipes/guns';
@@ -9,7 +10,8 @@ export const SOUNDS: Record<SoundId, SoundSpec> = {
   ...GUN_SOUNDS,
   ...FOLEY_SOUNDS,
   ...IMPACT_SOUNDS_ALL,
-  ...FEEDBACK_SOUNDS
+  ...FEEDBACK_SOUNDS,
+  ...AMBIENT_SOUNDS
 };
 
 export const SOUND_IDS = Object.keys(SOUNDS) as SoundId[];

@@ -11,16 +11,19 @@ import { yawToward } from './util';
 
 const SAND = '#d6c290';
 const COBBLE = '#a8a294';
+const MARKET = '#c79c74';
+const PADDOCK = '#a9895a';
 const W = C.walk;
 
 function ground(p: Plan) {
-  const g = (x0: number, z0: number, x1: number, z1: number) => p.add(GROUND, { x0, z0, x1, z1, y: 0, color: SAND, surface: 'stone' });
+  const g = (x0: number, z0: number, x1: number, z1: number, color = SAND) => p.add(GROUND, { x0, z0, x1, z1, y: 0, color, surface: 'plastic' });
   g(-36, -36, 36, -K.moat);
   g(-36, K.moat, 36, 36);
-  g(-36, -K.moat, -K.moat, K.moat);
+  g(-36, -K.moat, -K.moat, K.moat, MARKET);
   g(K.moat, -K.moat, 36, K.moat);
-  p.add(GROUND, { x0: -K.island, z0: -K.island, x1: K.island, z1: K.island, y: 0, color: '#9aa386', surface: 'stone' });
-  const decal = (x0: number, z0: number, x1: number, z1: number, color: string, smooth = false) => p.add(DECAL, { x0, z0, x1, z1, y: 0.004, color, surface: 'stone', smooth });
+  p.add(GROUND, { x0: -K.island, z0: -K.island, x1: K.island, z1: K.island, y: 0, color: '#86a95f', surface: 'plastic' });
+  const decal = (x0: number, z0: number, x1: number, z1: number, color: string, smooth = false) => p.add(DECAL, { x0, z0, x1, z1, y: 0.004, color, surface: 'plastic', smooth });
+  for (const s of [-1, 1]) decal(15.2, s < 0 ? -18.4 : 8.8, 22.4, s < 0 ? -8.8 : 18.4, PADDOCK);
   for (const s of [-1, 1]) {
     decal(-2.0, s > 0 ? K.moat : -29.2, 2.0, s > 0 ? 29.2 : -K.moat, COBBLE);
     decal(s > 0 ? K.moat : -24.8, -1.2, s > 0 ? 24.8 : -K.moat, 1.2, COBBLE);

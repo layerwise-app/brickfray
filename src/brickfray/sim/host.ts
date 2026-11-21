@@ -245,8 +245,14 @@ export class HostSim {
       best = p;
       bestD = d;
     }
-    this.events.push({ type: 'melee', player: attacker.id, hit: !!best });
-    if (!best) return;
+    if (!best) {
+      const aim = aimDirection(attacker.yaw, attacker.pitch);
+      const struck = this.world.raycast(eye[0], eye[1], eye[2], aim[0], aim[1], aim[2], melee.range, true);
+      const wall = struck && { surface: struck.surface, at: [eye[0] + aim[0] * struck.t, eye[1] + aim[1] * struck.t, eye[2] + aim[2] * struck.t] as [number, number, number] };
+      this.events.push({ type: 'melee', player: attacker.id, hit: false, ...(wall ? { wall } : {}) });
+      return;
+    }
+    this.events.push({ type: 'melee', player: attacker.id, hit: true });
     const toVictim = Math.atan2(-(best.move.x - attacker.move.x), -(best.move.z - attacker.move.z));
     const facing = Math.cos(best.yaw - toVictim);
     // Victim facing away from the attacker: their forward points along attacker→victim.

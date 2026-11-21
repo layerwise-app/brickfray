@@ -125,24 +125,10 @@ export const RACK: Element<{ x: number; z: number; length: number; turns?: numbe
 };
 
 function wallPanel(d: Drawer, min: Vec3, max: Vec3) {
-  const t = new Pen(d, new Frame(0, 0, 0));
   const baseTop = Math.min(max[1], 1.44);
   if (min[1] < 1.44) drawBlock(d, { min, max: [max[0], baseTop, max[2]], surface: 'stone', style: BASE, top: max[1] > 1.44 ? 'none' : 'tiles', topColor: '#7c8389' });
   const y0 = Math.max(min[1], 1.44);
-  if (max[1] <= y0) return;
-  t.span(min[0], y0, min[2], max[0], max[1], max[2], SIDING, 'metal', 0);
-  if (d.detail === 0) return;
-  const alongX = max[0] - min[0] > max[2] - min[2];
-  const len = alongX ? max[0] - min[0] : max[2] - min[2];
-  const n = Math.floor(len / (d.detail === 2 ? 0.4 : 0.8));
-  for (let i = 0; i < n; i++) {
-    const u = (alongX ? min[0] : min[2]) + (i + 0.5) * (len / n);
-    for (const side of [-1, 1]) {
-      const off = side < 0 ? (alongX ? min[2] : min[0]) - 0.03 : (alongX ? max[2] : max[0]) + 0.03;
-      if (alongX) t.box(u, y0, off, 0.14, max[1] - y0, 0.06, shade(SIDING, 0.08), 'metal', 0);
-      else t.box(off, y0, u, 0.06, max[1] - y0, 0.14, shade(SIDING, 0.08), 'metal', 0);
-    }
-  }
+  if (max[1] > y0) d.siding.box([min[0], y0, min[2]], max, SIDING);
 }
 
 function landing(d: Drawer, min: Vec3, max: Vec3) {
@@ -155,7 +141,9 @@ function landing(d: Drawer, min: Vec3, max: Vec3) {
 
 function deckPanel(d: Drawer, min: Vec3, max: Vec3) {
   const t = new Pen(d, new Frame(0, 0, 0));
-  t.span(min[0], min[1], min[2], max[0], max[1], max[2], '#b3aa98', 'metal', 0.01);
+  t.span(min[0], min[1], min[2], max[0], max[1], max[2], '#737a81', undefined, 0.01);
+  const top = max[1] + 0.006;
+  d.ground.push({ x0: min[0], z0: min[2], x1: max[0], z1: max[2], y: top, base: top, color: '#a39a8b' });
   if (d.detail === 0) return;
   const alongX = max[0] - min[0] > max[2] - min[2];
   t.span(min[0], min[1] - 0.2, alongX ? min[2] : (min[2] + max[2]) / 2 - 0.08, max[0], min[1], alongX ? min[2] + 0.16 : (min[2] + max[2]) / 2 + 0.08, '#f6c624', 'metal', 0);
@@ -180,8 +168,19 @@ function railings(d: Drawer) {
   }
 }
 
+/** Steel beams under the flat ceiling: across every 4.8 m and a spine girder along, clear of the lamps. */
+function trusses(d: Drawer) {
+  const { x0, x1, z0, z1, wall, height: H } = WH;
+  const t = new Pen(d, new Frame(0, 0, 0));
+  const steel = '#4a5259';
+  const finish = d.detail === 0 ? 'rubber' : 'metal';
+  for (const x of [-12, -7.2, -2.4, 2.4, 7.2, 12]) t.span(x - 0.1, H - 0.34, z0 + wall, x + 0.1, H, z1 - wall, steel, finish, 0);
+  t.span(x0 + wall, H - 0.26, (z0 + z1) / 2 - 0.1, x1 - wall, H, (z0 + z1) / 2 + 0.1, steel, finish, 0);
+}
+
 function roof(d: Drawer) {
   const { x0, x1, z0, z1, height: H } = WH;
+  trusses(d);
   const t = new Pen(d, new Frame((x0 + x1) / 2, H, (z0 + z1) / 2));
   const D = z1 - z0 + 0.6;
   const L = x1 - x0 + 0.6;
@@ -208,10 +207,17 @@ export const METAL_STAIRS: Element<StairParams> = {
     const top = p.steps * p.rise;
     const f = new Frame(p.x, p.y0, p.z, sideways ? (sgn > 0 ? 0 : 2) : sgn > 0 ? 3 : 1);
     const t = new Pen(d, f);
-    for (let i = 0; i < p.steps; i++) t.box((i + 0.5) * p.run, (i + 1) * p.rise - 0.08, 0, p.run - 0.04, 0.08, p.width - 0.1, '#b3aa98', 'metal', 0);
+    // Treads span between the stringers' inner faces and close onto riser plates: no tread ends poking through
+    // the stringers, no slots between treads to sparkle at a distance.
+    const inner = p.width - 0.14;
+    for (let i = 0; i < p.steps; i++) {
+      t.box((i + 0.5) * p.run, (i + 1) * p.rise - 0.08, 0, p.run, 0.08, inner, '#a39a8b', undefined, 0);
+      t.box(i * p.run + 0.015, i * p.rise, 0, 0.03, p.rise - 0.08, inner, '#545c63', 'metal', 0);
+    }
     for (const z of [-p.width / 2 + 0.04, p.width / 2 - 0.04]) {
-      const plate: [number, number][] = [[0, 0], [len, 0], [len, top], [len - p.run, top], [0, p.rise]];
-      t.prism(`stringer:${p.steps}:${p.run}:${p.rise}`, plate, 0.06, 0, 0, z, '#545c63', 'metal', Math.PI / 2);
+      const lip = 0.1;
+      const plate: [number, number][] = [[0, 0], [len, 0], [len, top], [len - p.run, top + lip], [0, p.rise + lip]];
+      t.prism(`stringer2:${p.steps}:${p.run}:${p.rise}`, plate, 0.06, 0, 0, z, '#545c63', 'metal', Math.PI / 2);
       t.beam(0.1, p.rise + 0.9, z, len - 0.1, top + 0.9, z, 0.06, RAIL, 'metal');
       t.box(0.1, p.rise, z, 0.05, 0.92, 0.05, RAIL, 'metal', 0);
       t.box(len - 0.1, top, z, 0.05, 0.92, 0.05, RAIL, 'metal', 0);

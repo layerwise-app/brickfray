@@ -3,6 +3,7 @@ import { CATEGORIES, DEFAULT_VARIANTS } from './catalog';
 import { SONGS, renderMusic } from './music';
 import { SAMPLES } from './samples';
 import { SOUNDS, SOUND_IDS } from './sounds';
+import { PEAK_AT, alignPeak } from './sync';
 import { hashString, mulberry32, whiteNoise } from './synth';
 import type { MusicTrack, SoundId } from './types';
 
@@ -91,8 +92,8 @@ function finish(full: Float32Array<ArrayBuffer>, sampleRate: number, target: num
 /** Samples below this are lead-in silence (encoder padding, room tone before the transient). */
 const LEAD_IN = 0.004;
 
-/** Fetches and decodes one recording per variant, mixed to mono with lead-in silence removed. */
-async function loadSamples(files: readonly string[], sampleRate: number, target: number): Promise<RenderedSound> {
+/** Fetches and decodes one recording per variant, mixed to mono with lead-in silence removed (and its peak placed, if `peakAt`). */
+async function loadSamples(files: readonly string[], sampleRate: number, target: number, peakAt?: number): Promise<RenderedSound> {
   const decoder = new OfflineAudioContext(1, 1, sampleRate);
   const done = await Promise.all(
     files.map(async (file) => {
@@ -107,7 +108,8 @@ async function loadSamples(files: readonly string[], sampleRate: number, target:
       const peak = peakOf(mono);
       let start = 0;
       while (start < mono.length && Math.abs(mono[start]!) < peak * LEAD_IN) start++;
-      return finish(mono.slice(Math.max(0, start - 16)), sampleRate, target);
+      const trimmed = mono.slice(Math.max(0, start - 16));
+      return finish(peakAt === undefined ? trimmed : alignPeak(trimmed, sampleRate, peakAt), sampleRate, target);
     })
   );
   return { buffers: done.map((d) => d.buffer), raw: done.map((d) => d.raw), target };
@@ -119,7 +121,7 @@ export async function renderSound(id: SoundId, sampleRate: number): Promise<Rend
   const files = SAMPLES[id];
   if (files?.length) {
     try {
-      return await loadSamples(files, sampleRate, spec.loudness ?? CATEGORIES[spec.category].loudness);
+      return await loadSamples(files, sampleRate, spec.loudness ?? CATEGORIES[spec.category].loudness, PEAK_AT[id]);
     } catch (error) {
       console.error(`Sound ${id} falls back to its synthesized recipe`, error);
     }

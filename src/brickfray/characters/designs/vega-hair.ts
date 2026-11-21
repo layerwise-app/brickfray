@@ -1,4 +1,6 @@
 import * as THREE from 'three';
+import { orb } from '../body-kit';
+import { HEAD } from '../body-head';
 import type { PartSet } from '../parts';
 import * as S from '../shapes';
 import type { V3 } from '../skeleton';
@@ -17,7 +19,9 @@ export const C = {
   dark: '#2a2f38',
   slate: '#39424e',
   steel: '#cfd6da',
-  amber: '#ffb347'
+  amber: '#ffb347',
+  mouth: '#5a2c22',
+  lip: '#e5a888'
 };
 
 const HALF = Math.PI / 2;
@@ -42,12 +46,12 @@ export function hair(b: PartSet) {
     b.add(bone, strand(points, tapering(r, o.tip), { flat: o.flat ?? 0.5, side: o.side ?? [0, 1, 0], seg: seg + (o.more ?? 0), radial }), color, { look: 'cloth' });
   };
 
-  // Cap: all around above the brow, behind the ears below it, down to the nape, closed over the crown.
-  const y0 = 0.026;
+  // Cap: all around above the brow, behind the ears below it, down to the hairline at the nape, closed over the crown.
+  const y0 = -0.016;
   const y1 = 0.223;
   const cap = (t: number): [number, number] => {
     const y = lerp(y0, y1, t);
-    const behindEars = lerp(0.5, HALF - 0.42, smoothstep(y, y0, 0.06));
+    const behindEars = lerp(0.85, HALF - 0.42, smoothstep(y, y0, 0.05));
     const half = lerp(lerp(behindEars, HALF + 0.62, smoothstep(y, 0.085, 0.118)), Math.PI, smoothstep(y, 0.15, 0.172));
     return [Math.PI - half, Math.PI + half];
   };
@@ -69,8 +73,8 @@ export function hair(b: PartSet) {
   if (hi) {
     for (const [i, a] of (b.hero ? [2.3, 2.75, Math.PI, 3.53, 3.98] : [2.45, Math.PI, 3.83]).entries()) {
       const up = SKULL.path([
-        [0.036, lerp(a, Math.PI, 0.45), 0.008],
-        [0.1, a, 0.014],
+        [0.0, lerp(a, Math.PI, 0.45), 0.008],
+        [0.09, a, 0.014],
         [0.17, lerp(a, Math.PI, 0.25), 0.016]
       ]);
       lock('head', [...up, knot], b.hero ? 0.03 : 0.042, i % 2 ? C.hairLight : C.hair, { flat: 0.36, side: SKULL.around(0.12, a), tip: 0.75 });
@@ -246,4 +250,22 @@ export function freckles(b: PartSet) {
   ] as const) {
     b.mirror((_, sign) => b.cyl('head', 0.0026, 0.0026, 0.0012, '#c98a62', { ...SKULL.stud(y, SKULL.front(y, sign * x), 0.0002), look: 'skin', seg: 6 }));
   }
+}
+
+/** Her smirk, rising toward her left, in head space. */
+const SMIRK: [number, number][] = [
+  [-0.029, -0.0095],
+  [-0.014, -0.0125],
+  [0.004, -0.012],
+  [0.02, -0.0065],
+  [0.032, 0.0025]
+];
+
+/** The smirk drawn here instead of by the shared face, so the lower lip sits centred under it and follows its lift. */
+export function smirk(b: PartSet) {
+  const at = (x: number, y: number, out: number): V3 => [x, y, S.loftFrontZ(HEAD, x, y) - out];
+  const points = SMIRK.map(([x, y]) => at(x, y, 0.0015));
+  b.add('head', S.tube(points, 0.0042, b.hero ? 14 : 8, b.hero ? 8 : 5), C.mouth, { look: 'skin' });
+  for (const p of [points[0]!, points[points.length - 1]!]) orb(b, 'head', 0.0044, b.hero ? 8 : 5, C.mouth, { at: p, look: 'skin' });
+  orb(b, 'head', 0.011, b.hero ? 10 : 6, C.lip, { at: at(0.002, -0.0187, -0.0052), rot: [0, 0, 0.12], scale: [1.45, 0.42, 0.5], look: 'skin' });
 }

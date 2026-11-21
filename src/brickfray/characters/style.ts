@@ -39,6 +39,8 @@ export interface Style {
   fidgetLength: number;
   dangleHead?: DangleSpec;
   dangleBack?: DangleSpec;
+  /** Cloth hanging from the belt, front and back. */
+  dangleHip?: DangleSpec;
 }
 
 const base: Style = {
@@ -66,7 +68,7 @@ const stalk: DangleSpec = { up: true, k: 160, damping: 9, hang: 0.25, drag: 0.04
 export const STYLES: Record<CharacterId | BotKind, Style> = {
   rivet: { ...base, stance: 1.25, sway: 1.6, bob: 1.15, lift: 0.95, posture: 0.04, shoulderRoll: 1.9, elbows: 1.4, knees: 0.012, toeOut: 0.22, fidget: 'hat', fidgetLength: 2.2 },
   vega: { ...base, stance: 0.9, stride: 1.05, sway: 0.8, bob: 1.1, bounce: 1, lift: 1.2, lean: 0.05, shoulderRoll: 0.6, elbows: 0.8, toeOut: 0.05, fidget: 'bounce', fidgetLength: 1.6, dangleHead: hair, dangleBack: { ...cloth, drag: 0.14 } },
-  clack: { ...base, stride: 0.95, sway: 0.6, bob: 0.8, lift: 0.9, lean: -0.03, posture: 0.12, hunch: -0.06, shoulderRoll: 0.3, elbows: 1.15, toeOut: 0.16, fidget: 'straighten', fidgetLength: 2, dangleHead: { ...stalk, k: 90, damping: 6, hang: 0.4, drag: 0.06 } },
+  clack: { ...base, stride: 0.95, sway: 0.6, bob: 0.8, lift: 0.9, lean: -0.03, posture: 0.12, hunch: -0.06, shoulderRoll: 0.3, elbows: 1.15, toeOut: 0.16, fidget: 'straighten', fidgetLength: 2, dangleHead: { ...stalk, k: 90, damping: 6, hang: 0.4, drag: 0.06 }, dangleHip: { ...cloth, k: 60, damping: 7, hang: 0.5, drag: 0.1, inertia: 0.05, rest: [0, 0] } },
   coral: { ...base, stance: 1.2, stride: 0.9, sway: 1.25, bob: 1.3, lift: 0.7, lean: 0.07, hunch: 0.04, elbows: 1.3, knees: 0.03, toeOut: 0.18, fidget: 'tapGlass', fidgetLength: 1.9 },
   moss: { ...base, stance: 1.05, stride: 0.98, sway: 0.9, bob: 0.8, lift: 0.85, lean: 0.07, posture: -0.03, hunch: 0.07, shoulderRoll: 0.5, knees: 0.03, toeOut: 0.1, fidget: 'beard', fidgetLength: 2.4, dangleBack: { ...cloth, k: 30, drag: 0.08 } },
   nova: { ...base, stance: 1.1, stride: 1.05, sway: 0.8, bob: 1.3, bounce: 0.6, lift: 1.1, posture: 0.02, shoulderRoll: 0.5, elbows: 1.2, knees: 0.01, fidget: 'wrist', fidgetLength: 2.2, dangleHead: stalk },

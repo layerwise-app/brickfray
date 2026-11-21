@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { tone } from '../body-kit';
 import * as S from '../shapes';
 import type { PartSet } from '../parts';
 import type { V3 } from '../skeleton';
@@ -16,8 +17,14 @@ const RADIUS = 0.166;
 
 /** Where the corselet's lower edge sits: it dips over the chest and back and rides high on the shoulders. */
 const hem = (a: number) => 0.2 - 0.082 * Math.cos(a) ** 2;
+const TOP = 0.262;
+/** How far the corselet stands off the suit: over the shoulders it swells to cover the sleeves' shoulder balls. */
+const off = (a: number, y: number) => {
+  const s = Math.min(1, Math.max(0, (y - hem(a)) / (TOP - hem(a))));
+  return 0.016 + 0.026 * Math.sin(a) ** 2 * Math.sin(Math.PI * (0.25 + 0.6 * s)) * (1 - s ** 4);
+};
 
-/** A band of the suit's chest between two edges that vary around the body, lifted off it. */
+/** A band of the corselet between two edges that vary around the body, `lift` over its surface. */
 function yoke(lower: (a: number) => number, upper: (a: number) => number, lift: number, thick: number, cols: number, rows: number) {
   const n = new THREE.Vector3();
   return surface(
@@ -25,8 +32,9 @@ function yoke(lower: (a: number) => number, upper: (a: number) => number, lift: 
     rows,
     (u, v, out) => {
       const a = u * Math.PI * 2;
-      const t = TORSO.tAt(lower(a) + (upper(a) - lower(a)) * v);
-      TORSO.point(a, t, out).addScaledVector(TORSO.normal(a, t, n), lift);
+      const y = lower(a) + (upper(a) - lower(a)) * v;
+      const t = TORSO.tAt(y);
+      TORSO.point(a, t, out).addScaledVector(TORSO.normal(a, t, n), off(a, y) + lift);
     },
     { thick, back: false, closed: true, inward: true }
   );
@@ -36,8 +44,9 @@ function yoke(lower: (a: number) => number, upper: (a: number) => number, lift: 
 export function corselet(b: PartSet) {
   const q = tier(b);
   const cols = pick(b, 12, 20, 36);
-  b.add('chest', yoke(hem, () => 0.262, 0.016, 0.014, cols, pick(b, 2, 3, 6)), COPPER, { look: shine(b) });
-  b.add('chest', yoke(hem, (a) => hem(a) + 0.026, 0.022, 0.008, cols, 1), BRASS, { look: shine(b) });
+  // Satin and a deeper copper in the showroom: polished and light, its edge beside the arm clips to a pale pink band in the studio light.
+  b.add('chest', yoke(hem, () => TOP, 0, 0.014, cols, pick(b, 2, 3, 6)), b.hero ? tone(COPPER, 0.8) : COPPER, { look: b.hero ? 'metal' : shine(b) });
+  b.add('chest', yoke(hem, (a) => hem(a) + 0.026, 0.006, 0.008, cols, 1), BRASS, { look: shine(b) });
   b.lathe(
     'chest',
     [
@@ -52,22 +61,16 @@ export function corselet(b: PartSet) {
     { look: shine(b), seg: cols }
   );
   if (q < 2) return;
-  const n = q === 3 ? 12 : 8;
+  // A few big hex nuts with domed caps holding the brail down: at menu size small wing nuts read as spiky clutter.
+  const n = 8;
   const studs: Spot[] = Array.from({ length: n }, (_, i) => {
     const a = ((i + 0.5) / n) * Math.PI * 2;
     const t = TORSO.tAt(hem(a) + 0.013);
-    return [TORSO.point(a, t, new THREE.Vector3()).addScaledVector(TORSO.normal(a, t, new THREE.Vector3()), 0.022), TORSO.normal(a, t, new THREE.Vector3())];
+    return [TORSO.point(a, t, new THREE.Vector3()).addScaledVector(TORSO.normal(a, t, new THREE.Vector3()), off(a, hem(a) + 0.013) + 0.006), TORSO.normal(a, t, new THREE.Vector3())];
   });
-  const wings: [number, number][] = [
-    [-0.015, 0.009],
-    [-0.015, 0.022],
-    [-0.004, 0.015],
-    [0.004, 0.015],
-    [0.015, 0.022],
-    [0.015, 0.009]
-  ];
-  const nut = join(placed(S.cylinder(0.0065, 0.0075, 0.012, 6), [0, 0.006, 0]), placed(new THREE.ExtrudeGeometry(new THREE.Shape(wings.map(([x, y]) => new THREE.Vector2(x, y))), { depth: 0.004, bevelEnabled: false }), [0, 0, -0.002]));
-  b.add('chest', mounted(studs, nut, [0.4, 1, 0]), BRONZE, { look: 'metal' });
+  const hex = placed(S.cylinder(0.0115, 0.0125, 0.007, 6), [0, 0.0035, 0]);
+  const nut = q === 3 ? join(hex, placed(new THREE.SphereGeometry(0.0085, 12, 4, 0, Math.PI * 2, 0, Math.PI / 2), [0, 0.006, 0], [0, 0, 0], [1, 0.75, 1])) : hex;
+  b.add('chest', mounted(studs, nut, [0.4, 1, 0]), BRASS, { look: shine(b) });
   // Lanyard eyes for the front weight.
   b.mirror((_, sign) => b.torus('chest', 0.012, 0.004, BRASS, { ...seat(sign * 0.235, 0.14, 0.026), look: shine(b) }));
 }

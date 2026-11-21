@@ -1,12 +1,13 @@
-import { T, type ModelBuilder } from '../builder';
+import { T } from '../builder';
 import { box, slab, stud, torus, tube } from '../shapes';
 import { bladeSlab } from './forms';
 import { shade } from './details';
+import type { MeleeBuilder } from './melee-kit';
 
-const C = { teal: '#1fa7a0', white: '#f2f2ee', rubber: '#2a2f38', steel: '#ccd3db', scarf: '#f5a623' };
+const C = { teal: '#1fa7a0', white: '#f2f2ee', rubber: '#2a2f38', steel: '#d3d9e0', edge: '#f1f4f7', scarf: '#f5a623' };
 
 /** Snap Knife: Vega's compact folding utility knife; origin at the grip, blade up +Y, edge toward -Z. */
-export function buildKnife(b: ModelBuilder) {
+export function buildKnife(b: MeleeBuilder) {
   const { lod } = b;
   const d = b.detail;
 
@@ -41,12 +42,12 @@ export function buildKnife(b: ModelBuilder) {
   // Lanyard loop in Vega's scarf orange.
   b.add(torus(0.0085, 0.0022, lod.segSmall + 4), C.scarf, 'rubber', T(0, -0.074, 0.002, 0, Math.PI / 2));
 
-  // Pivot bolster: white cap on a teal hub, with a stud on each side.
-  b.add(tube(0.0115, 0.022, lod.segSmall + 4, 0.002), C.teal, 'plastic', T(0, 0.052, 0.001, 0, Math.PI / 2));
-  const s = stud(0.0058, 0.0036, lod.segSmall, d >= 1);
+  // Pivot bolster: white cap on a teal hub, pinned by a steel hex screw on each side.
+  b.add(tube(0.0115, 0.022, lod.seg, 0.002), C.teal, 'plastic', T(0, 0.052, 0.001, 0, Math.PI / 2));
   for (const side of [-1, 1]) {
-    b.add(tube(0.0085, 0.0025, lod.segSmall + 4, 0.0008), C.white, 'plastic', T(side * 0.0112, 0.052, 0.001, 0, Math.PI / 2));
-    b.add(s, C.white, 'plastic', T(side * 0.0124, 0.052, 0.001, 0, 0, -side * Math.PI / 2));
+    b.add(tube(0.0085, 0.0025, lod.seg, 0.0008), C.white, 'plastic', T(side * 0.0112, 0.052, 0.001, 0, Math.PI / 2));
+    b.add(tube(0.0052, 0.003, 6), C.steel, 'chrome', T(side * 0.0128, 0.052, 0.001, 0, Math.PI / 2));
+    if (d >= 1) b.add(tube(0.0023, 0.0036, lod.segSmall), C.rubber, 'dark', T(side * 0.0128, 0.052, 0.001, 0, Math.PI / 2));
   }
 
   // Drop-point blade: straight spine, belly sweeping up to the tip, wide flat grind.
@@ -63,7 +64,8 @@ export function buildKnife(b: ModelBuilder) {
     [-0.013, 0.058],
     [-0.006, 0.05]
   ];
-  b.add(bladeSlab(blade, 0.006, 0.008), C.steel, 'satin', T());
+  b.add(bladeSlab(blade, 0.006, 0.008), C.steel, 'metal', T());
+  b.add(bladeSlab(blade, 0.0016, 0.0012), C.edge, 'chrome', T(0, 0.15, -0.005, 0, 0, 0, 1, 1.006, 1.05).multiply(T(0, -0.15, 0.005)));
   // Teal thumb stud near the spine and jimping notches along it.
   b.add(stud(0.0042, 0.003, lod.segSmall, d >= 2), C.teal, 'plastic', T(0.0029, 0.088, 0, 0, 0, -Math.PI / 2));
   b.add(stud(0.0042, 0.003, lod.segSmall, d >= 2), C.teal, 'plastic', T(-0.0029, 0.088, 0, 0, 0, Math.PI / 2));

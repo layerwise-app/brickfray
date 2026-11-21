@@ -57,6 +57,8 @@ export interface CharacterRig {
   setWeapon(model: THREE.Object3D | null, supportGrip: THREE.Object3D | null): void;
   /** Hold a showroom pose instead of the gameplay animation; null returns to it. */
   setStance(stance: Stance | null): void;
+  /** A melee weapon model (origin at its grip, head up +Y) for the left hand; it shows where a stance's `melee` seats it. */
+  setMelee(model: THREE.Object3D | null): void;
   /** Team or player tint shown on an armband/visor stripe; null clears it. */
   setTint(color: THREE.ColorRepresentation | null): void;
   /** Brief white hit flash. */

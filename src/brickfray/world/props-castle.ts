@@ -17,7 +17,7 @@ export const BANNER: Element<At & { colors: string[]; width?: number; height?: n
     const w = p.width ?? 1.2;
     const h = p.height ?? 2.4;
     t.cylX(0, 0, 0.12, 0.04, w + 0.3, IRON, 'metal');
-    if (d.detail > 0) for (const s of [-1, 1]) t.ball(s * (w / 2 + 0.17), 0, 0.12, 0.06, '#c99a3e', undefined, 0, 1, 'chrome');
+    for (const s of [-1, 1]) t.ball(s * (w / 2 + 0.17), 0, 0.12, 0.06, '#c99a3e', undefined, 0, 1, 'chrome');
     const f = frameOf(p);
     const [x, y, z] = f.p(-w / 2, -0.02, 0.16);
     d.anim.flag([x, y, z], f.yaw, w, h, p.colors, true, p.pattern);
@@ -48,8 +48,7 @@ export const TORCH: Element<At> = {
     t.cone(0, -0.08, 0.3, 0.05, 0.1, 0.2, DARK_WOOD, undefined, 8);
     t.cone(0, 0.08, 0.3, 0.1, 0.12, 0.06, IRON, 'metal', 8);
     const f = frameOf(p);
-    d.anim.flame(f.p(0, 0.13, 0.3));
-    if (d.detail === 0) t.ball(0, 0.25, 0.3, 0.09, '#ffb347', undefined, 0, 1, 'glow');
+    d.anim.flame(f.p(0, 0.13, 0.3), { at: f.p(0, 0.32, 0.012), yaw: f.yaw });
   }
 };
 

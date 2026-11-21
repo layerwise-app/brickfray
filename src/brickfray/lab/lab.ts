@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { loadHeroAssets } from '../characters';
 import { GameRenderer } from '../engine/renderer';
 import type { QualityLevel } from '../engine/quality';
 import type { LabContext, LabScene } from './types';
@@ -28,6 +29,10 @@ declare global {
  * it through `window.__lab` for headless screenshots.
  */
 export async function startLab(canvas: HTMLCanvasElement, sceneName: string, quality: QualityLevel) {
+  // `?plain` shows the figures without their baked showroom extras; `?unshaded` and `?bare` are what the bakes are
+  // made from: no baked occlusion, and no draped cloth at all.
+  const query = new URLSearchParams(location.search);
+  if (!query.has('plain')) await loadHeroAssets({ occlusion: !query.has('unshaded') && !query.has('bare'), drapes: !query.has('bare') });
   const gr = new GameRenderer(canvas, quality);
   const scene = new THREE.Scene();
   gr.dress(scene);

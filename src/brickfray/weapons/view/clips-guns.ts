@@ -1,4 +1,50 @@
-export { arReload } from './clips-rifles';
-export { shotgunLoadIn, shotgunLoadOut, shotgunPump, shotgunShell } from './clips-shotgun';
-export { sniperCycle, sniperReload } from './clips-sniper';
-export { pistolReload, SLIDE_LOCK } from './clips-pistol';
+import type { WeaponId } from '../defs';
+import type { Clip } from './clip';
+import { harpoonReload } from './clips-harpoon';
+import { pistolReload } from './clips-pistol';
+import { revolverReload } from './clips-revolver';
+import { arReload } from './clips-rifles';
+import { shotgunLoadIn, shotgunPump } from './clips-shotgun';
+import { sniperCycle, sniperReload } from './clips-sniper';
+
+export { shotgunLoadOut, shotgunShell } from './clips-shotgun';
+
+/** Which reload and cycling animations each gun uses. */
+const RELOAD: Record<WeaponId, 'rifle' | 'pistol' | 'pump' | 'bolt' | 'revolver' | 'harpoon'> = {
+  ar: 'rifle',
+  nailer: 'rifle',
+  pulse: 'rifle',
+  shotgun: 'pump',
+  sniper: 'bolt',
+  harpoon: 'harpoon',
+  pistol: 'pistol',
+  cannon: 'revolver',
+  buzzer: 'pistol'
+};
+
+/** Shell-by-shell loaders hold a loading pose between shells and finish with their own clip. */
+export const loadsShells = (id: WeaponId) => RELOAD[id] === 'pump';
+
+export function reloadClip(id: WeaponId, empty: boolean, duration: number): Clip {
+  switch (RELOAD[id]) {
+    case 'pump':
+      return shotgunLoadIn(duration < 0.6 ? duration : 0.28);
+    case 'rifle':
+      return arReload(id, empty, duration);
+    case 'bolt':
+      return sniperReload(empty, duration);
+    case 'pistol':
+      return pistolReload(empty, duration);
+    case 'revolver':
+      return revolverReload(empty, duration);
+    case 'harpoon':
+      return harpoonReload(empty, duration);
+  }
+}
+
+/** The manual action worked after a shot, for guns that have one. */
+export function cycleClip(id: WeaponId, duration: number): Clip | null {
+  if (RELOAD[id] === 'pump') return shotgunPump(duration, true);
+  if (RELOAD[id] === 'bolt') return sniperCycle(duration);
+  return null;
+}

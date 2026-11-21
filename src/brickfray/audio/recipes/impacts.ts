@@ -1,5 +1,6 @@
 import type { Surface } from '../../world/types';
 import type { SoundSpec } from '../catalog';
+import type { MeleeClass, MeleeHit, WhizClass } from '../types';
 import { clack, drive, gainNode, grains, noise, rand, strike, thump, tone, vary, type Synth } from '../synth';
 import { bounces, metal, rustle, splash, whoosh } from './parts';
 
@@ -107,11 +108,68 @@ type ImpactIds =
   | 'brickClatter'
   | 'casing'
   | 'shell'
-  | 'whiz'
+  | `whiz:${WhizClass}`
   | 'grenadeBounce'
   | 'explosion'
-  | 'malletHit'
-  | 'malletMiss';
+  | 'explosionFar'
+  | `meleeHit:${MeleeHit}`
+  | `meleeSwing:${MeleeClass}`;
+
+const meleeHit = (pitch: number, low: number, ring: number): SoundSpec => ({
+  category: 'hit',
+  duration: 0.6,
+  loudness: -20,
+  render: (s) => {
+    clack(s, 0, { pitch, gain: 0.9, decay: 0.09, bright: 0.7 });
+    thump(s, 0, { from: low * 2, to: low, glide: 0.05, decay: 0.15, gain: 0.9 });
+    noise(s, 0, { attack: 0.0005, decay: 0.06, gain: 0.45, filter: { type: 'bandpass', freq: pitch * 1.5, q: 0.9 } });
+    if (ring) metal(s, 0.002, { base: ring, gain: 0.3, decay: 0.25 });
+    else plasticBits(s, 0.03, { pieces: 2, spread: 0.08, pitch: [1800, 3000], gain: 0.2, hops: 2 });
+  }
+});
+
+/** Peaks 45 ms in: the view model cues the swing 55 ms before the strike. */
+const meleeSwing = (peak: number): SoundSpec => ({
+  category: 'fx',
+  duration: 0.3,
+  loudness: -21,
+  render: (s) => whoosh(s, 0, { from: peak * 0.3, peak: rand(s, peak * 0.9, peak * 1.1), to: peak * 0.35, dur: 0.1, gain: 0.8 })
+});
+
+const MELEE: Record<`meleeHit:${MeleeHit}` | `meleeSwing:${MeleeClass}`, SoundSpec> = {
+  'meleeHit:blade': meleeHit(2600, 140, 0),
+  'meleeHit:chop': meleeHit(1200, 110, 0),
+  'meleeHit:iron': meleeHit(600, 55, 1400),
+  'meleeHit:mallet': meleeHit(500, 70, 0),
+  'meleeHit:clank': meleeHit(1500, 90, 2600),
+  'meleeSwing:blunt': meleeSwing(750),
+  'meleeSwing:blade': meleeSwing(1900),
+  'meleeSwing:heavy': meleeSwing(520)
+};
+
+/** A round passing close: a band of noise sweeping down (Doppler), pitched by the kind of round. */
+const whiz = (pitch: number): SoundSpec => ({
+  category: 'fx',
+  duration: 0.35,
+  render: (s) => {
+    const f = pitch * vary(s, 0.1);
+    noise(s, 0, {
+      attack: 0.07,
+      decay: 0.12,
+      gain: 0.7,
+      filter: { type: 'bandpass', freq: f, q: 2.5, sweep: [[0.15, f * 0.37]] }
+    });
+    tone(s, 0.01, { freq: f * 1.07, sweep: [[0.14, f * 0.5]], attack: 0.06, decay: 0.1, gain: 0.08 });
+  }
+});
+
+const WHIZ: Record<`whiz:${WhizClass}`, SoundSpec> = {
+  'whiz:small': whiz(3400),
+  'whiz:rifle': whiz(2200),
+  'whiz:crack': whiz(4200),
+  'whiz:energy': whiz(2800),
+  'whiz:spear': whiz(900)
+};
 
 const OTHER: Record<ImpactIds, SoundSpec> = {
   impactBody: {
@@ -169,20 +227,7 @@ const OTHER: Record<ImpactIds, SoundSpec> = {
         thump(s, t, { from: 260, to: 180, glide: 0.02, decay: 0.04, gain: gain * 0.3 });
       })
   },
-  whiz: {
-    category: 'fx',
-    duration: 0.35,
-    render: (s) => {
-      const f = 3000 * vary(s, 0.1);
-      noise(s, 0, {
-        attack: 0.07,
-        decay: 0.12,
-        gain: 0.7,
-        filter: { type: 'bandpass', freq: f, q: 2.5, sweep: [[0.15, f * 0.37]] }
-      });
-      tone(s, 0.01, { freq: f * 1.07, sweep: [[0.14, f * 0.5]], attack: 0.06, decay: 0.1, gain: 0.08 });
-    }
-  },
+  ...WHIZ,
   grenadeBounce: {
     category: 'impact',
     duration: 0.3,
@@ -193,24 +238,8 @@ const OTHER: Record<ImpactIds, SoundSpec> = {
     }
   },
   explosion: { category: 'boom', duration: 3.5, render: explosion },
-  malletHit: {
-    category: 'hit',
-    duration: 0.6,
-    render: (s) => {
-      clack(s, 0, { pitch: 800, gain: 0.9, decay: 0.09, bright: 0.7 });
-      thump(s, 0, { from: 140, to: 70, glide: 0.05, decay: 0.15, gain: 0.9 });
-      noise(s, 0, { attack: 0.0005, decay: 0.06, gain: 0.45, filter: { type: 'bandpass', freq: 1200, q: 0.9 } });
-      plasticBits(s, 0.03, { pieces: 2, spread: 0.08, pitch: [1800, 3000], gain: 0.2, hops: 2 });
-    }
-  },
-  malletMiss: {
-    category: 'fx',
-    duration: 0.55,
-    render: (s) => {
-      whoosh(s, 0, { from: 200, peak: rand(s, 650, 850), to: 250, dur: 0.34, gain: 0.8 });
-      rustle(s, 0, { dur: 0.1, gain: 0.15 });
-    }
-  }
+  explosionFar: { category: 'boom', duration: 3.5, loudness: -14, render: explosion },
+  ...MELEE
 };
 
 export const IMPACT_SOUNDS_ALL = { ...IMPACT_SOUNDS, ...OTHER };

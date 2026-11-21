@@ -111,8 +111,10 @@ function facePlacement(face: Face, x0: number, y0: number, z0: number, x1: numbe
 export function masonryFaces(d: Drawer, min: Vec3, max: Vec3, style: Masonry, faces: Face[], openings: Partial<Record<Face, Opening[]>> = {}) {
   const [x0, y0, z0] = min;
   const [x1, y1, z1] = max;
-  const depth = Math.max(d.profile.bevel, 0.012);
+  const depth = Math.max(d.profile.bevel * 1.6, 0.018);
   const course = style.course ?? 0.48;
+  const flat = d.detail === 0;
+  const colors = flat ? [...style.colors, ...style.colors.map((c) => shade(c, -0.07))] : style.colors;
   const seedBase = hashString(`${x0},${y0},${z0},${x1},${y1},${z1}`);
   for (const face of faces) {
     const fp = facePlacement(face, x0, y0, z0, x1, z1, depth);
@@ -131,12 +133,13 @@ export function masonryFaces(d: Drawer, min: Vec3, max: Vec3, style: Masonry, fa
       seed: seedBase + face.charCodeAt(0),
       groups: style.colors.length,
       variance: style.variance ?? 0.22,
-      firstCourse: Math.round(y0 / course)
+      firstCourse: Math.round(y0 / course),
+      flat
     });
     groups.forEach((g, i) => {
       if (!g) return;
       const key = d.uid('face');
-      d.put(fp.frame, key, () => g, 0, 0, 0, { color: style.colors[i]!, finish: style.finish });
+      d.put(fp.frame, key, () => g, 0, 0, 0, { color: colors[i]!, finish: style.finish });
     });
   }
   return depth;
@@ -150,7 +153,7 @@ export function drawBlock(d: Drawer, p: BlockParams) {
   const plateTop = top === 'studs' || top === 'tiles';
   const bodyTop = y1 - (plateTop ? PLATE : 0) - (top === 'ground' ? 0.012 : 0);
   const faces = p.faces ?? ALL_FACES;
-  if (d.detail === 0 || faces.length === 0) {
+  if (faces.length === 0) {
     slab(d, [x0, y0, z0], [x1, bodyTop, z1], main, p.style.finish);
   } else {
     const depth = masonryFaces(d, p.min, [x1, bodyTop, z1], p.style, faces, p.openings);
@@ -160,6 +163,15 @@ export function drawBlock(d: Drawer, p: BlockParams) {
   const topColor = p.topColor ?? main;
   if (top === 'ground') d.ground.push({ x0: x0 + 0.02, z0: z0 + 0.02, x1: x1 - 0.02, z1: z1 - 0.02, y: y1, color: topColor });
   else if (plateTop) plates(d, x0, z0, x1, z1, bodyTop, topColor, top === 'studs' && d.detail > 0);
+}
+
+/** Studded floor in a two-colour checker of `cell`-metre squares (on the stud grid), raised to `y` with no side walls. */
+export function checkerFloor(d: Drawer, x0: number, z0: number, x1: number, z1: number, y: number, colors: [string, string], cell: number) {
+  for (let i = 0, x = x0; x < x1 - 0.01; i++, x += cell) {
+    for (let j = 0, z = z0; z < z1 - 0.01; j++, z += cell) {
+      d.ground.push({ x0: x, z0: z, x1: Math.min(x1, x + cell), z1: Math.min(z1, z + cell), y, base: y, color: colors[(i + j) % 2]! });
+    }
+  }
 }
 
 export const BLOCK: Element<BlockParams> = {

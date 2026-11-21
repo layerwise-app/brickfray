@@ -3,9 +3,13 @@ import type { Drawer, Element } from './plan';
 import { Pen } from './props-kit';
 import { box, Frame, type Face, type PlanCollider, type Vec3 } from './util';
 
-export const CASTLE_STONE: Masonry = { colors: ['#aaa395', '#9c9588', '#b8b1a3', '#8f897c'], variance: 0.35, lens: [3, 4, 2, 5] };
+export const CASTLE_STONE: Masonry = { colors: ['#9ea2a4', '#8e9395', '#adb0b0', '#83888b'], variance: 0.35, lens: [3, 4, 2, 5] };
 export const WALK_TILE = '#c9bea6';
 export const ROOF_RED = '#9a3a2a';
+/** Darker, cooler stone for the gatehouses so they read as their own mass against the curtain walls. */
+const GATE_STONE: Masonry = { colors: ['#7f8287', '#717479', '#8c8f93', '#676a6f'], variance: 0.3, lens: [3, 4, 2, 5] };
+const DRESSED = '#c9c2b2';
+const PLINTH = '#7a756b';
 
 /** Courtyard half-size, wall thickness and wall-walk height of the fortress. */
 export const C = { inner: 30.8, outer: 34.8, walk: 3.84, tower: 27.6 } as const;
@@ -54,6 +58,11 @@ export const CURTAIN: Element<WallParams> = {
   colliders: (p) => wallPieces(p).map((q) => box(q.min, q.max, 'stone', { walk: q.walk })),
   draw(d, p) {
     for (const q of wallPieces(p)) drawBlock(d, { min: q.min, max: q.max, surface: 'stone', style: CASTLE_STONE, faces: q.faces, top: q.top, topColor: q.walk ? WALK_TILE : '#b8b1a3' });
+    const s = p.side === 'n' || p.side === 'w' ? -1 : 1;
+    const f = s * C.inner;
+    const t = new Pen(d, new Frame(0, 0, 0));
+    if (p.side === 'n' || p.side === 's') t.span(p.from, 0, f - s * 0.06, p.to, 0.64, f, PLINTH, undefined, 0.01);
+    else t.span(f - s * 0.06, 0, p.from, f, 0.64, p.to, PLINTH, undefined, 0.01);
   }
 };
 
@@ -119,7 +128,7 @@ function towerCap(p: TowerParams) {
         }
       }
       const t = new Pen(d, new Frame(cx, y, cz));
-      t.cone(0, 0, 0, half * 0.85, 0.1, 5.4, ROOF_RED, undefined, 8, Math.PI / 8);
+      t.cone(0, 0, 0, half * 0.85, 0.1, 5.4, p.sz < 0 ? '#2f5d93' : ROOF_RED, undefined, 8, Math.PI / 8);
       t.cyl(0, 5.5, 0, 0.05, 1.1, '#545c63', 'metal');
       const [fx, fy, fz] = new Frame(cx, y + 6.4, cz).p(0.05, 0, 0);
       d.anim.flag([fx, fy, fz], p.sx * p.sz > 0 ? 0 : Math.PI / 2, 1.4, 0.8, p.sz > 0 ? ['#c8231b', '#f6c624'] : ['#1f62c7', '#f2f2ee'], false, 'border');
@@ -157,9 +166,9 @@ function gatePieces(sz: 1 | -1): Piece[] {
 
 function gateMerlons(sz: 1 | -1): PlanCollider[] {
   const zf = sz * (C.inner - GATE.depth);
-  const [z0, z1] = [Math.min(zf, zf - sz * 0.8), Math.max(zf, zf - sz * 0.8)];
+  const [z0, z1] = [Math.min(zf, zf + sz * 0.8), Math.max(zf, zf + sz * 0.8)];
   return Array.from({ length: 7 }, (_, k) => {
-    const x = -GATE.half + 0.4 + k * 1.8;
+    const x = -GATE.half + 0.4 + (k * (2 * GATE.half - 0.8)) / 6;
     return box([x - 0.4, GATE.top, z0], [x + 0.4, GATE.top + 0.96, z1], 'stone');
   });
 }
@@ -167,10 +176,10 @@ function gateMerlons(sz: 1 | -1): PlanCollider[] {
 export const GATEHOUSE: Element<{ sz: 1 | -1 }> = {
   colliders: (p) => [...gatePieces(p.sz).map((q) => box(q.min, q.max, 'stone', { walk: q.walk })), ...gateMerlons(p.sz)],
   draw(d, p) {
-    for (const q of gatePieces(p.sz)) drawBlock(d, { min: q.min, max: q.max, surface: 'stone', style: CASTLE_STONE, faces: q.faces, top: q.top, topColor: WALK_TILE });
+    for (const q of gatePieces(p.sz)) drawBlock(d, { min: q.min, max: q.max, surface: 'stone', style: GATE_STONE, faces: q.faces, top: q.top, topColor: WALK_TILE });
     const zf = p.sz * (C.inner - GATE.depth);
     const t = new Pen(d, new Frame(0, 0, zf, p.sz > 0 ? 2 : 0));
-    t.box(0, 2.72, 0.1, GATE.alcove * 2 + 0.8, 0.48, 0.24, '#b8b1a3', undefined, 0.03);
+    gateFace(t, p.sz < 0 ? ['#1f62c7', '#f2f2ee'] : ['#c8231b', '#f6c624']);
     const zp = -(C.outer - 1.2 - Math.abs(zf));
     const bars = d.detail === 0 ? 4 : 9;
     for (let i = 0; i < bars; i++) t.box(-GATE.alcove + 0.2 + (i * (GATE.alcove * 2 - 0.4)) / (bars - 1), 0, zp + 0.1, 0.1, 3.0, 0.1, '#3a4148', 'metal', 0);
@@ -180,3 +189,28 @@ export const GATEHOUSE: Element<{ sz: 1 | -1 }> = {
   },
   nav: (p) => [[0, C.walk, p.sz * (C.inner + 1.6)], [0, 0, p.sz * (C.inner - GATE.depth - 1.0)]]
 };
+
+/**
+ * Courtyard face of a gatehouse, in its local frame (x along the face, +z out of it): a stepped brick arch
+ * with dressed jambs and keystone, the side's coat of arms, arrow slits and a corbelled parapet.
+ */
+function gateFace(t: Pen, [field, charge]: [string, string]) {
+  const a = GATE.alcove;
+  const ceil = C.walk + 2.88;
+  for (const s of [-1, 1]) {
+    t.box(s * (a + 0.25), 0, 0.08, 0.5, 3.04, 0.16, DRESSED, undefined, 0.02);
+    t.box(s * (a - 0.2), 2.56, 0.02, 0.4, 0.48, 0.04, DRESSED, undefined, 0.01);
+    t.box(s * (a - 0.6), 2.84, 0.02, 0.4, 0.2, 0.04, DRESSED, undefined, 0.01);
+    t.box(s * 2.4, 4.3, 0.02, 0.16, 1.3, 0.04, '#23272b', undefined, 0);
+    t.box(s * 2.4, 4.86, 0.02, 0.5, 0.14, 0.04, '#23272b', undefined, 0);
+  }
+  t.box(0, 3.04, 0.08, 2 * a + 1.0, 0.56, 0.16, DRESSED, undefined, 0.02);
+  t.box(0, 3.0, 0.12, 0.56, 0.8, 0.24, '#d9d3c4', undefined, 0.02);
+  t.box(0, 4.24, 0.04, 1.5, 1.62, 0.08, '#3a3530', undefined, 0.02);
+  t.box(0, 4.9, 0.1, 1.3, 0.9, 0.08, field, undefined, 0.02);
+  t.prism('gate-shield', [[-0.65, 0], [0.65, 0], [0, -0.62]], 0.08, 0, 4.9, 0.1, field, undefined, Math.PI / 2);
+  t.box(0, 4.42, 0.15, 0.22, 1.28, 0.04, charge, undefined, 0);
+  t.box(0, 5.22, 0.15, 1.1, 0.22, 0.04, charge, undefined, 0);
+  for (let x = -GATE.half + 0.45; x < GATE.half; x += 0.9) t.box(x, ceil - 0.42, 0.14, 0.32, 0.42, 0.28, DRESSED, undefined, 0.02);
+  t.box(0, ceil, 0.16, 2 * GATE.half + 0.3, 0.2, 0.32, DRESSED, undefined, 0.02);
+}

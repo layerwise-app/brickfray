@@ -13,9 +13,129 @@ export interface GroundTile {
   color: THREE.ColorRepresentation;
   /** Smooth tiles (roads, floors) skip the stud pattern. */
   smooth?: boolean;
+  /** Where a raised tile's side walls stop (default 0); a deck top passes its own height for none. */
+  base?: number;
 }
 
 const textureCache = new Map<string, { map: THREE.Texture; normal: THREE.Texture }>();
+
+/** Stud radius and height in stud cells, matching the brick studs (STUD_RADIUS and STUD_HEIGHT over PITCH). */
+const STUD_GLSL = /* glsl */ `
+varying float vStud;
+const float STUD_R = 0.3;
+const float STUD_H = 0.2125;
+// First stud met walking from p + d (height STUD_H) down to p (height 0): returns the fraction s of that walk, 1 for
+// the top cap, or -1. Five probes along the walk, at most 0.63 cells apart, visit every cell whose stud it can touch.
+float studHit(vec2 p, vec2 d, out vec2 center) {
+  float best = -1.0;
+  float a = max(dot(d, d), 1e-6);
+  for (int k = 0; k < 5; k++) {
+    vec2 c = floor(p + d * (float(k) * 0.25)) + 0.5;
+    vec2 o = p - c;
+    float b = dot(o, d);
+    float disc = b * b - a * (dot(o, o) - STUD_R * STUD_R);
+    if (disc < 0.0) continue;
+    float q = sqrt(disc);
+    float s = min((q - b) / a, 1.0);
+    if ((-q - b) / a > 1.0 || s < 0.0 || s <= best) continue;
+    best = s;
+    center = c;
+  }
+  return best;
+}
+vec2 studWalk(vec3 dir) {
+  vec2 d = dir.xz / max(dir.y, 0.02) * STUD_H;
+  return d * min(1.0, 2.5 / max(length(d), 1e-4));
+}
+`;
+
+/**
+ * Near the camera every stud is ray traced against the flat plate, so it stands up with a lit cap, a shaded wall and
+ * a shadow toward the sun; studs too small on screen fade back to the normal-mapped texture.
+ */
+const STUD_TRACE = /* glsl */ `
+vec3 studN = vec3(0.0, 1.0, 0.0);
+float studShade = 1.0;
+// Sun reaching this point past the plate's own studs, and where the stud surface really is (world offset from the
+// plate point), so the shadow map is read on the stud instead of on the plate under it.
+float studSun = 1.0;
+vec3 studLift = vec3(0.0);
+vec3 studBase = diffuseColor.rgb;
+vec2 studFw = fwidth(vMapUv);
+float studK = step(0.5, vStud) * (1.0 - smoothstep(0.07, 0.15, max(studFw.x, studFw.y)));
+if (studK > 0.0) {
+  vec3 toEye = normalize((vec4(vViewPosition, 0.0) * viewMatrix).xyz);
+  vec2 d = studWalk(toEye);
+  studK *= smoothstep(0.04, 0.08, toEye.y);
+  vec2 c;
+  float s = studHit(vMapUv, d, c);
+  if (s < 0.0) {
+    float r = length(fract(vMapUv) - 0.5);
+    studShade = 1.0 - 0.14 * exp(-pow((r - STUD_R) / 0.05, 2.0));
+    #if NUM_DIR_LIGHTS > 0 && defined(STUD_SHADOWS)
+    vec3 toSun = normalize((vec4(directionalLights[0].direction, 0.0) * viewMatrix).xyz);
+    vec2 c2;
+    // Partial: the sunlit side of the stud bounces warm light into its own shadow; without it low suns turn the floor sky-blue.
+    if (toSun.y > 0.05 && studHit(vMapUv, studWalk(toSun), c2) >= 0.0) studSun = 1.0 - 0.55 * studK;
+    #endif
+  } else {
+    studLift = vec3(d.x, STUD_H, d.y) * (s * 0.4 * studK);
+    vec2 radial = (vMapUv + d * s - c) / STUD_R;
+    if (s >= 1.0) {
+      float rim = smoothstep(0.8, 1.0, length(radial)) * 0.9;
+      studN = normalize(vec3(radial.x * rim, 1.0, radial.y * rim));
+      studShade = 1.05;
+    } else {
+      radial = normalize(radial);
+      studN = normalize(vec3(radial.x, smoothstep(0.85, 1.0, s) * 0.9, radial.y));
+      studShade = 0.72 + 0.3 * s;
+    }
+  }
+}
+`;
+
+const SUN_SHADOW =
+  'directLight.color *= ( directLight.visible && receiveShadow ) ? getShadow( directionalShadowMap[ i ], directionalLightShadow.shadowMapSize, directionalLightShadow.shadowIntensity, directionalLightShadow.shadowBias, directionalLightShadow.shadowRadius, vDirectionalShadowCoord[ i ] ) : 1.0;';
+const STUD_SUN_SHADOW = /* glsl */ `
+studLit = ( directLight.visible && receiveShadow ) ? getShadow( directionalShadowMap[ i ], directionalLightShadow.shadowMapSize, directionalLightShadow.shadowIntensity, directionalLightShadow.shadowBias, directionalLightShadow.shadowRadius, vDirectionalShadowCoord[ i ] + directionalShadowMatrix[ i ] * vec4( studLift, 0.0 ) ) : 1.0;
+directLight.color *= studLit * studSun;`;
+
+/**
+ * The sun's shadow is read at the traced stud point and the plate's stud shadows dim the sun only, so a shadow
+ * falls on studs the way it falls on bricks. In shade, sky light takes a normal pulled up on stud walls: walls and
+ * caps darken together instead of the caps turning sky-blue while the walls keep the warm horizon light.
+ */
+function studLighting() {
+  const begin = THREE.ShaderChunk.lights_fragment_begin
+    .replace('vec3 geometryNormal = normal;', 'vec3 geometryNormal = normal;\nfloat studLit = 1.0;')
+    .replace(SUN_SHADOW, STUD_SUN_SHADOW)
+    .replace(
+      'vec3 iblIrradiance = vec3( 0.0 );',
+      'vec3 iblIrradiance = vec3( 0.0 );\nvec3 studSkyN = normalize(mix(geometryNormal, (viewMatrix * vec4(0.0, 1.0, 0.0, 0.0)).xyz, 0.75 * studK * (1.0 - studLit)));'
+    )
+    .replace('getHemisphereLightIrradiance( hemisphereLights[ i ], geometryNormal )', 'getHemisphereLightIrradiance( hemisphereLights[ i ], studSkyN )');
+  const maps = THREE.ShaderChunk.lights_fragment_maps.replace('getIBLIrradiance( geometryNormal )', 'getIBLIrradiance( studSkyN )');
+  if (!begin.includes('studLit * studSun') || !begin.includes('vec3 studSkyN') || !begin.includes('studSkyN );') || maps === THREE.ShaderChunk.lights_fragment_maps) {
+    throw new Error('three light chunks changed: stud lighting not patched');
+  }
+  return `${begin}\n${maps}`;
+}
+
+function traceStuds(material: THREE.Material, shadows: boolean) {
+  if (shadows) material.defines = { ...material.defines, STUD_SHADOWS: '' };
+  material.onBeforeCompile = (shader) => {
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', '#include <common>\nattribute float stud;\nvarying float vStud;')
+      .replace('#include <uv_vertex>', '#include <uv_vertex>\nvStud = stud;');
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', `#include <common>\n${STUD_GLSL}`)
+      .replace('#include <shadowmap_pars_fragment>', '#include <shadowmap_pars_fragment>\n#if defined( USE_SHADOWMAP ) && NUM_DIR_LIGHT_SHADOWS > 0\nuniform mat4 directionalShadowMatrix[ NUM_DIR_LIGHT_SHADOWS ];\n#endif')
+      .replace('#include <map_fragment>', `${STUD_TRACE}\n#include <map_fragment>\ndiffuseColor.rgb = mix(diffuseColor.rgb, studBase * studShade, studK);`)
+      .replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>\nnormal = normalize(mix(normal, (viewMatrix * vec4(studN, 0.0)).xyz, studK));')
+      .replace('#include <lights_fragment_begin>', studLighting())
+      .replace('#include <lights_fragment_maps>', '');
+  };
+}
 
 /**
  * One stud cell as a height field: a raised disc with a soft shoulder. The
@@ -58,7 +178,7 @@ function studTextures(size: number) {
       const d = Math.hypot(dx, dy);
       const ring = Math.exp(-(((d - r - edge * 1.6) / (size * 0.06)) ** 2));
       const cap = THREE.MathUtils.smoothstep(r - edge, r * 0.4, d);
-      const shade = 1 - ring * 0.28 + cap * 0.04 + at(x, y) * 0 - (at(x, y) < 0 ? 0.12 : 0);
+      const shade = 1 - ring * 0.16 + cap * 0.04 - (at(x, y) < 0 ? 0.12 : 0);
       const v = Math.round(THREE.MathUtils.clamp(shade, 0, 1) * 255);
       colorData[i] = v;
       colorData[i + 1] = v;
@@ -92,6 +212,7 @@ export function buildGround(tiles: GroundTile[], profile: QualityProfile): THREE
   const normals: number[] = [];
   const uvs: number[] = [];
   const colors: number[] = [];
+  const stud: number[] = [];
   const color = new THREE.Color();
   const quad = (a: number[], b: number[], c: number[], d: number[], n: number[], studs: boolean) => {
     for (const p of [a, b, c, a, c, d]) {
@@ -101,15 +222,16 @@ export function buildGround(tiles: GroundTile[], profile: QualityProfile): THREE
       if (studs) uvs.push(p[0]! / PITCH, p[2]! / PITCH);
       else uvs.push(0.02, 0.02);
       colors.push(color.r, color.g, color.b);
+      stud.push(studs ? 1 : 0);
     }
   };
   for (const t of tiles) {
     color.set(t.color);
     const studs = !t.smooth;
     quad([t.x0, t.y, t.z0], [t.x0, t.y, t.z1], [t.x1, t.y, t.z1], [t.x1, t.y, t.z0], [0, 1, 0], studs);
-    if (t.y > 0.001) {
+    const y0 = t.base ?? 0;
+    if (t.y - y0 > 0.001) {
       color.multiplyScalar(0.92);
-      const y0 = 0;
       quad([t.x0, y0, t.z1], [t.x1, y0, t.z1], [t.x1, t.y, t.z1], [t.x0, t.y, t.z1], [0, 0, 1], false);
       quad([t.x1, y0, t.z0], [t.x0, y0, t.z0], [t.x0, t.y, t.z0], [t.x1, t.y, t.z0], [0, 0, -1], false);
       quad([t.x1, y0, t.z1], [t.x1, y0, t.z0], [t.x1, t.y, t.z0], [t.x1, t.y, t.z1], [1, 0, 0], false);
@@ -121,6 +243,7 @@ export function buildGround(tiles: GroundTile[], profile: QualityProfile): THREE
   geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
   geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
   geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  geometry.setAttribute('stud', new THREE.Float32BufferAttribute(stud, 1));
   geometry.computeBoundingSphere();
   const tex = studTextures(profile.level === 'low' ? 64 : 128);
   const material = profile.pbr
@@ -140,6 +263,7 @@ export function buildGround(tiles: GroundTile[], profile: QualityProfile): THREE
         shininess: 22,
         specular: 0x1a1a1a
       });
+  traceStuds(material, profile.level !== 'low');
   const mesh = new THREE.Mesh(geometry, material);
   mesh.name = 'ground';
   mesh.receiveShadow = profile.shadows;

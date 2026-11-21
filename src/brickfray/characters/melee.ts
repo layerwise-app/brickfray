@@ -22,9 +22,10 @@ export function meleeProp(b: PartSet, id: MeleeId, bot: boolean) {
         b.box('mallet', [0.15, 0.09, 0.09], '#f5a623', { at: [0, 0, -0.27], look: 'gloss' });
         return;
       }
-      b.cyl('mallet', 0.014, 0.014, 0.34, '#c9a06a', { at: [0, 0, -0.08], rot: ALONG, look: 'cloth', seg: 6 });
-      b.cyl('mallet', 0.055, 0.055, 0.15, '#d8452e', { at: [0, 0, -0.27], rot: ACROSS, look: 'gloss', seg });
-      if (d1) b.mirror((_, sign) => b.cyl('mallet', 0.058, 0.058, 0.016, '#2f363d', { at: [sign * 0.068, 0, -0.27], rot: ACROSS, look: 'rubber', seg }));
+      // A barrel head with its rubber striking pads toward ±Y, so a pad leads the swing.
+      b.cyl('mallet', 0.014, 0.014, 0.34, '#f6c624', { at: [0, 0, -0.08], rot: ALONG, look: 'plastic', seg: 6 });
+      b.cyl('mallet', 0.055, 0.055, 0.15, '#c4261d', { at: [0, 0, -0.27], look: 'gloss', seg });
+      if (d1) b.mirror((_, sign) => b.cyl('mallet', 0.05, 0.05, 0.026, '#2b3036', { at: [0, sign * 0.086, -0.27], look: 'rubber', seg }));
       return;
     case 'sword':
       b.cyl('mallet', 0.017, 0.017, 0.12, '#c8231b', { at: [0, 0, 0.005], rot: ALONG, look: 'cloth', seg: 6 });

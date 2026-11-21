@@ -1,7 +1,10 @@
 import { even, type BodyKit } from './body-kit';
 import * as S from './shapes';
 
-/** Hips, waist, ribcage with a collar, neck and belt: three rigid shells that overlap at the waist joints. */
+/**
+ * Hips, waist, ribcage with a collar, neck and belt: three rigid shells that overlap at the waist joints.
+ * The hips narrow and draw back into a short gusset between the thigh tops, so the legs read as trouser legs meeting at the crotch.
+ */
 export function torso(k: BodyKit) {
   const { b, s, omit, bulk, shirtLook, pantsLook, steps, fine } = k;
   const n = b.hero ? 28 : even(b.seg(8, 12, 16));
@@ -12,13 +15,13 @@ export function torso(k: BodyKit) {
       'pelvis',
       S.loft(
         [
-          { y: -0.122, rx: 0.088, rz: 0.08, e: 2.5 },
-          { y: -0.075, rx: 0.131 * hips, rz: 0.09, e: 2.8 },
-          { y: -0.02, rx: 0.146 * hips, rz: 0.096, e: 3 },
+          { y: -0.106, rx: 0.062, rz: 0.03, back: 0.054, e: 2.4 },
+          { y: -0.07, rx: 0.106 * hips, rz: 0.066, back: 0.084, e: 2.5 },
+          { y: -0.02, rx: 0.146 * hips, rz: 0.089, back: 0.096, e: 3 },
           { y: 0.04, rx: 0.153 * hips, rz: 0.099, e: 3 }
         ],
         n,
-        { steps, bottom: 0.03, top: 0.012 }
+        { steps, bottom: 0.022, top: 0.012 }
       ),
       s.pants,
       { look: pantsLook }
@@ -98,13 +101,14 @@ function belt(k: BodyKit, hips: number) {
   const { b, s, pantsLook, fine } = k;
   const color = s.belt!;
   const buckle = s.buckle ?? '#c9b27a';
+  const look = s.beltLook ?? 'rubber';
   const rx = 0.1625 * hips;
   const rz = 0.1075;
   const e = 3.2;
   const lip = b.hero ? 0.004 : 0;
   const ring = (y: number, grow: number) => ({ y, rx: rx + grow, rz: rz + grow, e });
   const rings = lip ? [ring(0.009, -lip), ring(0.009 + lip, 0), ring(0.061 - lip, 0), ring(0.061, -lip)] : [ring(0.01, 0), ring(0.06, 0)];
-  b.add('pelvis', S.loft(rings, b.hero ? 28 : even(b.seg(8, 12, 16))), color, { look: 'rubber' });
+  b.add('pelvis', S.loft(rings, b.hero ? 28 : even(b.seg(8, 12, 16))), color, { look });
   const front = -(rz + 0.003);
   if (!fine) {
     b.box('pelvis', [0.06, 0.042, 0.02], buckle, { at: [0, 0.035, front], look: 'metal' });
@@ -112,7 +116,7 @@ function belt(k: BodyKit, hips: number) {
   }
   b.box('pelvis', [0.064, 0.048, 0.014], buckle, { at: [0, 0.035, front], look: 'metal', bevel: 0.006 });
   if (!b.hero) return;
-  b.box('pelvis', [0.04, 0.026, 0.012], color, { at: [0, 0.035, front - 0.004], look: 'rubber', bevel: 0.003 });
+  b.box('pelvis', [0.04, 0.026, 0.012], color, { at: [0, 0.035, front - 0.004], look, bevel: 0.003 });
   b.box('pelvis', [0.034, 0.007, 0.008], buckle, { at: [0.004, 0.035, front - 0.009], look: 'metal', bevel: 0.002 });
   for (const x of [-0.092, 0.092]) {
     const z = rz * Math.pow(1 - Math.pow(Math.abs(x) / 0.1625, e), 1 / e) + 0.003;

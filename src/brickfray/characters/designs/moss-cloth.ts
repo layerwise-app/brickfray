@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { tone } from '../body-kit';
 import type { PartSet } from '../parts';
 import { cloth, loop, pick, samples, sgnPow, surface, TAU, type Surface } from './sheet';
 
@@ -18,39 +19,73 @@ function spline(keys: [number, number][]) {
 
 /** The hood's rings from the brim (v = 0) to the tail's tip (v = 1): depth, half width, top and bottom. */
 const HOOD = {
-  z: spline([[0, -0.12], [0.12, -0.075], [0.3, 0.0], [0.5, 0.09], [0.65, 0.165], [0.8, 0.25], [0.92, 0.32], [1, 0.36]]),
-  w: spline([[0, 0.137], [0.12, 0.157], [0.3, 0.164], [0.5, 0.149], [0.65, 0.108], [0.8, 0.062], [0.92, 0.027], [1, 0]]),
-  top: spline([[0, 0.222], [0.12, 0.268], [0.3, 0.282], [0.5, 0.27], [0.65, 0.235], [0.8, 0.162], [0.92, 0.078], [1, 0.0]]),
-  bottom: spline([[0, -0.062], [0.12, -0.068], [0.3, -0.066], [0.5, -0.05], [0.65, 0.0], [0.8, 0.03], [0.92, 0.02], [1, 0.0]])
+  z: spline([[0, -0.132], [0.12, -0.08], [0.3, 0.0], [0.5, 0.095], [0.65, 0.175], [0.8, 0.262], [0.92, 0.335], [1, 0.375]]),
+  w: spline([[0, 0.16], [0.12, 0.172], [0.3, 0.174], [0.5, 0.154], [0.65, 0.11], [0.8, 0.062], [0.92, 0.027], [1, 0]]),
+  top: spline([[0, 0.238], [0.12, 0.29], [0.3, 0.3], [0.5, 0.282], [0.65, 0.24], [0.8, 0.162], [0.92, 0.078], [1, 0.0]]),
+  bottom: spline([[0, -0.08], [0.12, -0.08], [0.3, -0.072], [0.5, -0.05], [0.65, 0.0], [0.8, 0.03], [0.92, 0.02], [1, 0.0]])
 };
 
-/** The hood's outer face in head space: u around the opening from the crown, v from the brim back to the tail's tip. */
+/** The hood's outer face in head space: u around the opening from the crown, v from the brim back to the tail's tip; `ripple` scales the creases down its back. */
 export const hoodAt =
-  (grow = 0): Surface =>
+  (grow = 0, ripple = 1): Surface =>
   (u, v) => {
     const phi = u * TAU;
     const s = Math.sin(phi);
     const co = Math.cos(phi);
     const front = Math.max(0, 1 - v / 0.3) ** 2;
-    const gather = 1 + 0.05 * Math.sin(phi * 7) * Math.max(0, -co) * bump(v, 0.1, 0.7);
+    // Soft rounded creases (a cosine, not a folded |sin|, whose sharp valleys read as hard planes).
+    const gather = 1 + 0.05 * Math.sin(phi * 7) * Math.max(0, -co) * bump(v, 0.1, 0.7) + ripple * 0.085 * (0.7 + 0.3 * Math.sin(phi * 3)) * -Math.cos(phi * 5 + v * 4) * bump(v, 0.18, 1.05) ** 0.6;
     const top = HOOD.top(v);
     const bottom = HOOD.bottom(v);
     const w = v >= 1 ? 0 : (Math.max(0, HOOD.w(v)) + grow) * gather;
     const half = v >= 1 ? 0 : ((top - bottom) / 2 + grow) * gather;
-    const z = HOOD.z(v) - 0.06 * Math.max(0, co) ** 1.5 * front + 0.09 * Math.max(0, -co) ** 1.3 * front;
-    return [w * sgnPow(s, 0.8) * (1 - 0.2 * Math.max(0, co) ** 2), (top + bottom) / 2 + half * sgnPow(co, 0.8), z];
+    const z = HOOD.z(v) - 0.062 * Math.max(0, co) ** 1.5 * front + 0.1 * Math.max(0, -co) ** 1.3 * front;
+    return [w * sgnPow(s, 0.8) * (1 - 0.36 * Math.max(0, co) ** 2.4 * (1 - Math.min(1, v / 0.5))), (top + bottom) / 2 + half * sgnPow(co, 0.8) + 0.02 * Math.max(0, co) ** 8 * front, z];
   };
 
 /** Pointed hood on the head bone: brim over the brow, gathered under the chin, tail drooping behind. */
-export function hood(b: PartSet, color: string, lining: string, trim: string) {
-  const us = loop(pick(b, 12, 20, 44));
-  const body = cloth(us, samples(pick(b, 6, 9, 18), b.detail > 1 ? 0.03 : 0), hoodAt(), 0.016, { closed: true, flip: true, round: [1, 0.05], lined: [0, 0.4] });
+export function hood(b: PartSet, color: string, lining: string, trim: string, piping: string) {
+  const us = loop(pick(b, 12, 20, 64));
+  // Folds need the higher tiers' columns to read as folds rather than facets.
+  const ripple = b.detail > 1 ? 1 : 0;
+  const body = cloth(us, samples(pick(b, 6, 9, 26), b.detail > 1 ? 0.03 : 0), hoodAt(0, ripple), 0.02, { closed: true, flip: true, round: [1, 0.05], lined: [0, 0.45] });
+  const shade = tone(lining, 0.76);
   b.add('head', body.outer, color, { look: 'cloth' });
   b.add('head', body.inner, lining, { look: 'cloth' });
+  // A dark well behind the face closes the gap between head and hood, so the opening reads as shadow under any light.
+  const rim = hoodAt(-0.012, ripple);
+  const well: Surface = (u, t) => {
+    const [x, y, z] = rim(u, 0.2);
+    return [x * t, 0.1 + (y - 0.1) * t, z + 0.03 * (1 - t)];
+  };
+  b.add('head', surface(us, [0.45, 0.75, 1], well, true, true), shade, { look: 'matte' });
+  if (b.hero) b.add('head', hem(us, hoodAt(0, ripple), 0.0065), piping, { look: 'cloth' });
+  else if (b.detail > 1) b.add('head', surface(us, [0.0, 0.007, 0.016], hoodAt(0.0045), true, true), piping, { look: 'cloth' });
   if (!b.hero) return;
-  b.add('head', surface(us, [0.014, 0.05, 0.085], hoodAt(0.0035), true, true), trim, { look: 'cloth' });
+  // A dark band behind the hem that thins into the hood, so its back edge leaves no step.
+  const band: Surface = (u, v) => hoodAt(0.0004 + 0.0032 * (1 - THREE.MathUtils.smoothstep(v, 0.03, 0.085)), ripple)(u, v);
+  b.add('head', surface(us, [0.012, 0.03, 0.045, 0.06, 0.075, 0.085], band, true, true), trim, { look: 'cloth' });
   // Seam along the crown.
   b.add('head', surface([-0.012, 0, 0.012], samples(10).map((i) => 0.1 + i * 0.85), (u, v) => hoodAt(u ? 0.001 : 0.006)(u, v), false, true), trim, { look: 'cloth' });
+}
+
+/** A soft rolled hem of radius r round the open edge (v = 0) of a closed surface. */
+function hem(us: number[], at: Surface, r: number) {
+  const p = new THREE.Vector3();
+  const back = new THREE.Vector3();
+  const side = new THREE.Vector3();
+  const out = new THREE.Vector3();
+  const centre = new THREE.Vector3(0, 0.1, 0);
+  const roll: Surface = (u, t) => {
+    p.set(...at(u, 0.004));
+    back.set(...at(u, 0.03)).sub(p).normalize();
+    side.set(...at((u + 0.002) % 1, 0.004)).sub(out.set(...at((u + 0.998) % 1, 0.004)));
+    out.crossVectors(side, back).normalize();
+    if (out.dot(side.copy(p).sub(centre)) < 0) out.negate();
+    const psi = t * TAU;
+    return [p.x + r * (0.35 * out.x + Math.cos(psi) * out.x - Math.sin(psi) * back.x), p.y + r * (0.35 * out.y + Math.cos(psi) * out.y - Math.sin(psi) * back.y), p.z + r * (0.35 * out.z + Math.cos(psi) * out.z - Math.sin(psi) * back.z)];
+  };
+  return surface(us, samples(8), roll, true, false);
 }
 
 /** Gathered cowl around the neck where the hood meets the mantle, on the chest bone. */
@@ -58,11 +93,11 @@ export function cowl(b: PartSet, color: string) {
   const f: Surface = (u, v) => {
     const al = u * TAU;
     const psi = v * TAU;
-    const rt = 0.034 * (1 + 0.16 * Math.sin(al * 7 + psi * 2)) * (1 - 0.12 * Math.cos(al));
+    const rt = 0.034 * (1 + 0.09 * Math.sin(al * 6 + psi) + 0.04 * Math.sin(al * 11 - psi)) * (1 - 0.12 * Math.cos(al));
     const out = rt * Math.cos(psi);
     return [Math.sin(al) * (0.11 + out), 0.245 - 0.04 * Math.cos(al) + rt * 1.15 * Math.sin(psi), -Math.cos(al) * (0.09 + out) + 0.004];
   };
-  b.add('chest', surface(loop(pick(b, 12, 18, 30)), samples(pick(b, 4, 5, 9)), f, true, true), color, { look: 'cloth' });
+  b.add('chest', surface(loop(pick(b, 12, 18, 64)), samples(pick(b, 4, 5, 16)), f, true, true), color, { look: 'cloth' });
 }
 
 /** Pointed dag k of n around a loop: 0 at the notches, 1 at the tip. */
@@ -75,13 +110,13 @@ export const mantleAt: Surface = (u, v) => {
   const k = s ** 0.9;
   const rx = 0.092 + (0.205 - 0.092) * k;
   const rz = 0.08 + ((Math.cos(al) > 0 ? 0.143 : 0.15) - 0.08) * k;
-  const edge = 0.24 - 0.135 * (1 - Math.abs(Math.sin(al))) ** 0.8;
+  const edge = 0.244 - 0.139 * (1 - Math.abs(Math.sin(al))) ** 2;
   return [Math.sin(al) * rx, 0.272 - (0.272 - edge) * s ** 1.9, -Math.cos(al) * rz];
 };
 
 /** Short dagged cape over chest and back, on the chest bone; the shoulder caps carry it over the arms. */
 export function mantle(b: PartSet, color: string, lining: string) {
-  const piece = cloth(loop(10 * pick(b, 2, 4, 8)), samples(pick(b, 3, 4, 7), b.hero ? 0.06 : 0), mantleAt, 0.012, { closed: true, round: [1, 0.1], lined: [0.3, 1] });
+  const piece = cloth(loop(10 * pick(b, 2, 4, 10)), samples(pick(b, 3, 4, 10), b.hero ? 0.06 : 0), mantleAt, 0.012, { closed: true, round: [1, 0.1], lined: [0.3, 1] });
   b.add('chest', piece.outer, color, { look: 'cloth' });
   b.add('chest', piece.inner, lining, { look: 'cloth' });
 }
@@ -98,7 +133,7 @@ export function shoulderCap(b: PartSet, bone: 'upperArmL' | 'upperArmR', sign: n
     const r = 0.088 * Math.sin(ang) + 0.016 * skirt;
     return [Math.cos(al) * r + sign * 0.006, 0.008 + 0.082 * Math.cos(ang) - skirt * drop, Math.sin(al) * r * 1.08];
   };
-  const piece = cloth(loop(dags * pick(b, 2, 2, 4)), samples(pick(b, 4, 5, 8), b.hero ? 0.05 : 0), f, 0.011, { closed: true, round: [1, 0.08], lined: [0.4, 1] });
+  const piece = cloth(loop(dags * pick(b, 2, 2, 6)), samples(pick(b, 4, 5, 11), b.hero ? 0.05 : 0), f, 0.011, { closed: true, round: [1, 0.08], lined: [0.4, 1] });
   b.add(bone, piece.outer, color, { look: 'cloth' });
   b.add(bone, piece.inner, lining, { look: 'cloth' });
 }
@@ -120,7 +155,7 @@ export function cloak(b: PartSet, color: string, lining: string, trim: string, t
   const piece = cloth(us, samples(pick(b, 4, 7, 16), b.hero ? 0.012 : 0), cloakAt(), 0.012, { flip: true, round: [0.03, 0.03] });
   b.add('dangleBack', piece.outer, color, { look: 'cloth' });
   b.add('dangleBack', piece.inner, lining, { look: 'cloth' });
-  if (b.detail > 1) b.add('dangleBack', surface(us, [0.9, 0.94, 0.975], cloakAt(0.003), false, true), trim, { look: 'cloth' });
+  b.add('dangleBack', surface(us, b.detail > 1 ? [0.9, 0.94, 0.975] : [0.9, 0.975], cloakAt(0.003), false, true), trim, { look: 'cloth' });
   if (!b.hero) return;
   // Stitching above the hem band.
   for (let i = 0; i < 46; i++) {

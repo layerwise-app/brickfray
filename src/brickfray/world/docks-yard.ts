@@ -1,4 +1,5 @@
 import { CRANE } from './crane';
+import { containerSlot } from './docks-ground';
 import type { Plan } from './plan';
 import { CONTAINER, CONTAINER_SIZE, CRATE, BARREL, LIFEBUOY, MOORING, PALLET, PLANKS, ROPE, crateStack } from './props-harbor';
 import { BOLLARD, CONE, LAMP } from './props-street';
@@ -14,8 +15,10 @@ const YARD_STAIR = { y0: 0, width: 1.6, steps: 6, rise: H / 6, run: 0.6, style: 
 export function docksYard(p: Plan) {
   for (const s of [-1, 1] as const) {
     const pal = s < 0 ? WEST : EAST;
-    const c = (x: number, z: number, color: string, o: { turns?: number; y?: number; open?: boolean; walk?: boolean } = {}) =>
+    const c = (x: number, z: number, color: string, o: { turns?: number; y?: number; open?: boolean; walk?: boolean } = {}) => {
+      if (!o.y && z > -14.4) containerSlot(p, s * x, z, o.turns, CONTAINER_SIZE.length, CONTAINER_SIZE.width);
       p.add(CONTAINER, { x: s * x, z, color, turns: o.turns, y: o.y, open: o.open, walk: o.walk });
+    };
     c(1.2, -3.2, s < 0 ? '#c0392b' : '#2f7fbf', { turns: 1, walk: true });
     p.add(METAL_STAIRS, { ...YARD_STAIR, x: s * 6.0, z: -3.2, dir: s < 0 ? 'e' : 'w' });
     c(12.8, -10.4, pal[0]!);

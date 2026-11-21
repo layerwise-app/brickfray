@@ -13,8 +13,28 @@ export interface ContainerParams extends At {
 }
 
 function ribs(t: Pen, len: number, h: number, z: number, color: string, y0: number) {
-  const n = t.detail === 2 ? Math.round(len / 0.3) : Math.round(len / 0.6);
-  for (let i = 0; i < n; i++) t.box(-len / 2 + (i + 0.5) * (len / n), y0, z, (len / n) * 0.42, h, 0.05, color, 'metal', 0.01);
+  const n = t.detail === 2 ? Math.round(len / 0.3) : t.detail === 1 ? Math.round(len / 0.45) : Math.round(len / 0.75);
+  for (let i = 0; i < n; i++) t.box(-len / 2 + (i + 0.5) * (len / n), y0, z, (len / n) * 0.5, h, 0.06, color, 'metal', 0.01);
+}
+
+const MARKS = ['#f2f2ee', '#1f2a33', '#f6c624'] as const;
+
+/**
+ * Painted markings on a side facing local `sz` z: a data plate by the doors and, chosen by the colour,
+ * a contrasting band or a roundel. Plain shapes only, no lettering or marks of real lines.
+ */
+function markings(t: Pen, c: string, sz: number, L: number, W: number, H: number) {
+  const z = sz * (W / 2 + 0.045);
+  const hash = [...c].reduce((a, ch) => (a * 31 + ch.charCodeAt(0)) % 997, 7);
+  const mark = MARKS[hash % MARKS.length]!;
+  const plate = mark === '#1f2a33' ? '#f2f2ee' : '#1f2a33';
+  t.box(L / 2 - 0.75, H - 0.78, z, 0.7, 0.42, 0.012, plate, undefined, 0);
+  for (let i = 0; i < 3; i++) t.box(L / 2 - 0.82 + (i % 2) * 0.06, H - 0.48 - i * 0.1, z + sz * 0.008, 0.4 - (i % 2) * 0.14, 0.04, 0.008, plate === '#f2f2ee' ? '#1f2a33' : '#f2f2ee', undefined, 0);
+  if (hash % 2) t.box(-0.4, H * 0.62, z, L - 2.4, 0.26, 0.012, mark, undefined, 0);
+  else {
+    t.cylZ(-0.6, H * 0.52, z, 0.5, 0.012, mark);
+    t.cylZ(-0.6, H * 0.52, z + sz * 0.008, 0.32, 0.012, c);
+  }
 }
 
 /** Shipping container, 6 m along local x; doors at +x (and -x when open). */
@@ -37,11 +57,19 @@ export const CONTAINER: Element<ContainerParams> = {
     const frame = shade(c, -0.22);
     if (d.detail === 0) {
       if (!p.open) {
-        t.box(0, 0, 0, L, H, W, c, 'metal', 0);
+        t.box(0, 0, 0, L, H, W, shade(c, -0.08), 'metal', 0);
+        for (const sz of [-1, 1]) {
+          ribs(t, L - 0.4, H - 0.4, sz * (W / 2 + 0.01), c, 0.2);
+          markings(t, c, sz, L, W, H);
+        }
         t.box(L / 2, 0.1, 0, 0.04, H - 0.2, W - 0.2, frame, 'metal', 0);
+        for (const k of [-0.55, 0.55]) t.box(L / 2 + 0.03, 0.2, k, 0.04, H - 0.4, 0.05, '#b7bcc2', 'metal', 0);
       } else {
-        t.box(0, 0, -W / 2 + 0.05, L, H, 0.1, c, 'metal', 0);
-        t.box(0, 0, W / 2 - 0.05, L, H, 0.1, c, 'metal', 0);
+        for (const sz of [-1, 1]) {
+          t.box(0, 0, sz * (W / 2 - 0.05), L, H, 0.1, shade(c, -0.08), 'metal', 0);
+          ribs(t, L - 0.4, H - 0.4, sz * (W / 2 + 0.01), c, 0.2);
+          ribs(t, L - 0.4, H - 0.4, sz * (W / 2 - 0.11), shade(c, -0.04), 0.2);
+        }
         t.box(0, H - 0.12, 0, L, 0.12, W - 0.2, c, 'metal', 0);
         t.box(0, 0, 0, L, 0.16, W - 0.2, '#7d5434', undefined, 0);
       }
@@ -51,8 +79,10 @@ export const CONTAINER: Element<ContainerParams> = {
     for (const sz of [-1, 1]) {
       t.box(0, 0, sz * (W / 2 - 0.07), L - 0.32, 0.18, 0.14, frame, 'metal', 0.01);
       t.box(0, H - 0.16, sz * (W / 2 - 0.07), L - 0.32, 0.16, 0.14, frame, 'metal', 0.01);
-      t.box(0, 0.18, sz * (W / 2 - 0.05), L - 0.32, H - 0.34, 0.06, c, 'metal', 0);
-      ribs(t, L - 0.4, H - 0.4, sz * (W / 2 - 0.01), shade(c, 0.06), 0.2);
+      t.box(0, 0.18, sz * (W / 2 - 0.05), L - 0.32, H - 0.34, 0.06, shade(c, -0.1), 'metal', 0);
+      ribs(t, L - 0.4, H - 0.4, sz * (W / 2 - 0.01), c, 0.2);
+      if (p.open) ribs(t, L - 0.4, H - 0.4, sz * (W / 2 - 0.11), shade(c, -0.04), 0.2);
+      if (!p.open) markings(t, c, sz, L, W, H);
     }
     t.box(0, H - 0.1, 0, L - 0.3, 0.1, W - 0.28, c, 'metal', 0);
     if (d.detail >= 2) for (const sx of [-1, 1]) for (const sz of [-1, 1]) for (const y of [0, H - 0.14]) t.box(sx * (L / 2 - 0.09), y, sz * (W / 2 - 0.09), 0.2, 0.15, 0.2, '#545c63', 'metal', 0.01);
@@ -100,7 +130,6 @@ export const CRATE: Element<CrateParams> = {
     const edge = shade(c, -0.25);
     t.box(0, 0, 0, w - 0.02, h, w - 0.02, c, undefined, 0.02);
     t.part(0, h, 0, studs, studs, 1, edge, true);
-    if (d.detail === 0) return;
     for (const sx of [-1, 1]) for (const sz of [-1, 1]) t.box(sx * (w / 2 - 0.05), 0, sz * (w / 2 - 0.05), 0.11, h, 0.11, edge, undefined, 0.01);
     for (const sz of [-1, 1]) {
       t.box(0, 0, sz * (w / 2 - 0.05), w - 0.1, 0.1, 0.11, edge, undefined, 0.01);

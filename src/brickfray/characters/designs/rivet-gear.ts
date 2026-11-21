@@ -1,11 +1,16 @@
 import * as THREE from 'three';
+import { onFace } from '../body-head';
+import { limbBand } from '../body-limbs';
 import type { PartSet } from '../parts';
+import * as S from '../shapes';
 import type { V3 } from '../skeleton';
 import { C } from './rivet-vest';
-import { Garment, lump, plate, SKULL, strand, thigh, tier } from './tailor';
+import { surface } from './plate-forms';
+import { Garment, limbGarment, lump, plate, SKULL, strand, thigh, tier } from './tailor';
 
 const HALF = Math.PI / 2;
 const { lerp, smoothstep } = THREE.MathUtils;
+const STUBBLE = `#${new THREE.Color(C.hair).lerp(new THREE.Color(C.skin), 0.55).getHexString()}`;
 const SHELL: [number, number][] = [
   [0.139, -0.052],
   [0.141, -0.022],
@@ -39,9 +44,9 @@ export function hardHat(b: PartSet) {
     'hat',
     [
       [0.128, -0.06],
-      [0.168, -0.062],
-      [0.174, -0.055],
-      [0.168, -0.048],
+      [0.156, -0.062],
+      [0.162, -0.055],
+      [0.156, -0.048],
       [0.139, -0.045]
     ],
     C.yellow,
@@ -51,13 +56,13 @@ export function hardHat(b: PartSet) {
     'hat',
     [
       [0, -0.008],
-      [0.1, -0.008],
-      [0.112, -0.003],
-      [0.1, 0.003],
+      [0.086, -0.008],
+      [0.097, -0.003],
+      [0.086, 0.003],
       [0, 0.004]
     ],
     C.yellow,
-    { at: [0, -0.052, -0.118], rot: [-0.1, 0, 0], scale: [1.38, 1, 1.02], look: 'gloss', seg: tier(b, 10, 14, 28) }
+    { at: [0, -0.05, -0.109], rot: [-0.17, 0, 0], scale: [1.5, 1, 1.02], look: 'gloss', seg: tier(b, 10, 14, 28) }
   );
 
   // Crown ribs running front to back.
@@ -102,16 +107,24 @@ export function hardHat(b: PartSet) {
 
 /** Short hair under the hat, sideburns, a moustache and a carpenter's pencil behind the ear. */
 export function headKit(b: PartSet) {
-  const y0 = 0.045;
   const y1 = 0.19;
-  const cap = (t: number): [number, number] => {
-    const half = lerp(HALF - 0.4, HALF + 0.52, smoothstep(lerp(y0, y1, t), 0.08, 0.112));
-    return [Math.PI - half, Math.PI + half];
-  };
-  b.add('head', SKULL.panel({ y: [y0, y1], a: cap, lift: 0.001, thick: 0.007, seg: [tier(b, 10, 14, 26), tier(b, 2, 3, 6)] }), C.hair, { look: 'cloth' });
+  const span = HALF + 0.52;
+  // Hairline from the back of the head (angle from the front): a rounded nape, rising behind the ears to the temples.
+  const line = (a: number) => -0.012 + 0.124 * smoothstep(Math.abs(a - Math.PI) / span, 0.1, 0.78) ** 3;
+  const around = (u: number) => Math.PI + (u * 2 - 1) * span;
+  const cols = tier(b, 14, 20, 40);
+  // Thins to nothing at its edges rather than ending in a step, over a faded band of stubble.
+  const crop = surface(cols, tier(b, 4, 5, 9), (u, v, out) => {
+    const a = around(u);
+    const y = lerp(line(a), y1, v ** 1.7);
+    const edge = smoothstep(y - line(a), 0, 0.02) * smoothstep(span - Math.abs(a - Math.PI), 0, 0.25);
+    SKULL.point(y, a, 0.0018 + 0.0065 * edge, out);
+  }, { inward: true });
+  b.add('head', crop, C.hair, { look: 'cloth' });
+  if (b.detail >= 2) b.add('head', surface(cols, 2, (u, v, out) => SKULL.point(line(around(u)) + lerp(-0.014, 0.006, v), around(u), 0.0009, out), { inward: true }), STUBBLE, { look: 'cloth' });
   b.mirror((_, sign) => {
-    b.add('head', SKULL.panel({ y: [0.05, 0.118], a: [sign * (HALF - 0.54), sign * (HALF - 0.27)], lift: 0.001, thick: 0.006, seg: [1, 2] }), C.hair, { look: 'cloth' });
-    lump(b, 'head', [0.056, 0.026, 0.028], tier(b, 6, 8, 14), C.hair, { at: [sign * 0.024, 0.014, -0.128], rot: [0, sign * -0.2, sign * -0.3], look: 'cloth', e: 0.7 });
+    b.add('head', sideburn(b, sign), C.hair, { look: 'cloth' });
+    onFace(b, S.blob(0.056, 0.026, 0.028, 0.7, tier(b, 6, 8, 14)), C.hair, { at: [sign * 0.024, 0.014, -0.128], rot: [0, 0, sign * -0.3], look: 'cloth' });
   });
   if (b.detail < 2) return;
   // Pencil over his left ear.
@@ -122,6 +135,22 @@ export function headKit(b: PartSet) {
   b.cyl('head', 0.0052, 0.001, 0.016, '#e9c9a0', { at: along(0.058), rot, look: 'cloth', seg: 6 });
   b.cyl('head', 0.005, 0.005, 0.012, '#e88a8a', { at: along(-0.056), rot, look: 'rubber', seg: 6 });
   if (b.hero) b.cyl('head', 0.0056, 0.0056, 0.008, C.steel, { at: along(-0.05), rot, look: 'chrome', seg: 6 });
+}
+
+/**
+ * A full sideburn grown out of the temple hair under the brim: it hugs the skull in front of the ear, swells like the
+ * moustache's lobes and ends in a rounded tip at the jaw, thinning to nothing at its edges so it never reads as a stuck-on piece.
+ */
+function sideburn(b: PartSet, sign: number) {
+  const tip = (v: number) => (v < 0.24 ? Math.sqrt(1 - (1 - v / 0.24) ** 2) : 1);
+  return surface(tier(b, 4, 6, 10), tier(b, 6, 8, 16), (u, v, out) => {
+    const front = HALF - 0.62 - 0.12 * (1 - smoothstep(v, 0.12, 0.6));
+    const back = HALF - lerp(0.2, 0.12, v) + 0.55 * smoothstep(v, 0.55, 1);
+    const across = (sign > 0 ? u : 1 - u) * 2 - 1;
+    const a = (front + back) / 2 + (across * (back - front) * tip(v)) / 2;
+    const swell = (1 - across * across) ** 0.7 * tip(v) ** 0.5 * (1 - 0.6 * smoothstep(v, 0.75, 1)) * (1.15 - 0.3 * v);
+    SKULL.point(lerp(0.034, 0.16, v), sign * a, 0.0008 + 0.009 * swell, out);
+  }, { inward: true });
 }
 
 const BELT = new Garment(
@@ -255,38 +284,55 @@ export function toolBelt(b: PartSet) {
   if (hero) b.add('pelvis', rag, '#e8e2d2', { at: [0.079, -0.024, 0.099], rot: [0.1, 0, 0.1], scale: [0.8, 0.9, 1], look: 'cloth' });
 }
 
-const THIGH = thigh(1.08);
+const LIMBS = 1.08;
+/** Leg thickness: a stocky builder stands on thick legs. */
+export const LEGS = 1.2;
+const THIGH = thigh(LEGS);
+const SHIN = limbGarment('shin', LEGS);
 
 /** Work trousers: double fronts, cargo pocket, rule pocket, knee pads on straps, turned-up hems. */
 export function legKit(b: PartSet) {
   const hero = b.hero;
   const soft = tier(b, 6, 8, 16);
-  const round = tier(b, 8, 10, 20);
   const bevel = (v: number) => (hero ? v : 0);
   b.mirror((side, sign) => {
     const th = `thigh${side}` as const;
     const sh = `shin${side}` as const;
     // Knee pad: foam cup, hard shell, straps above and below the knee.
-    lump(b, sh, [0.112, 0.125, 0.058], soft, C.dark, { at: [0, -0.012, -0.052], look: 'rubber', e: 0.5 });
-    lump(b, sh, [0.086, 0.092, 0.036], soft, '#555c63', { at: [0, -0.01, -0.078], look: 'gloss', e: 0.6 });
-    b.cyl(sh, 0.0635, 0.0625, 0.024, C.dark, { at: [0, -0.072, 0.003], look: 'rubber', seg: round });
-    b.cyl(th, 0.0715, 0.0695, 0.024, C.dark, { at: [0, -0.372, 0], look: 'rubber', seg: round });
-    b.cyl(sh, 0.0545, 0.053, 0.04, '#8f7b59', { at: [0, -0.305, 0.001], look: 'cloth', seg: round });
-    b.add(th, THIGH.panel({ y: [-0.355, -0.09], a: [-1.05, 1.05], lift: 0.0012, thick: 0.0022, seg: [tier(b, 4, 4, 10), 1] }), '#86724f', { look: 'cloth' });
+    lump(b, sh, [0.122, 0.13, 0.06], soft, C.dark, { at: [0, -0.012, -0.059], look: 'rubber', e: 0.5 });
+    lump(b, sh, [0.094, 0.096, 0.036], soft, '#555c63', { at: [0, -0.01, -0.086], look: 'gloss', e: 0.6 });
+    b.add(sh, limbBand(b, 'shin', LEGS, -0.084, -0.06, 0.003), C.dark, { look: 'rubber' });
+    b.add(th, limbBand(b, 'thigh', LEGS, -0.384, -0.36, 0.0035), C.dark, { look: 'rubber' });
+    b.add(sh, limbBand(b, 'shin', LEGS, -0.325, -0.285, 0.005), '#8f7b59', { look: 'cloth' });
+    b.add(th, THIGH.panel({ y: [-0.355, -0.09], a: [-1.05, 1.05], lift: 0.0012, thick: 0.004, seg: [tier(b, 4, 4, 10), 1] }), C.duck, { look: 'cloth' });
+    // The trouser leg stacks in folds over the boot.
+    for (const [y, grow] of [
+      [-0.262, 0.0042],
+      [-0.236, 0.0034]
+    ] as const) {
+      b.add(sh, limbBand(b, 'shin', LEGS, y - 0.007, y + 0.007, grow), C.khaki, { look: 'cloth' });
+    }
     if (!hero) return;
-    for (const y of [0.014, -0.01, -0.034]) b.box(sh, [0.06, 0.006, 0.006], C.dark, { at: [0, y, -0.096 + Math.abs(y + 0.01) * 0.12], look: 'rubber', bevel: 0.002 });
-    b.box(sh, [0.012, 0.03, 0.02], C.steel, { at: [sign * 0.0635, -0.072, 0.003], look: 'metal', bevel: 0.003 });
+    // Lower leg: the side seam runs on down, and a kick patch of doubled duck guards the inside of the ankle.
+    b.add(sh, SHIN.panel({ y: [-0.283, -0.1], a: [sign * (HALF - 0.04), sign * (HALF + 0.04)], lift: 0.0008, thick: 0.0014, seg: [1, 4] }), C.khakiDark, { look: 'cloth' });
+    b.add(sh, SHIN.panel({ y: [-0.283, -0.17], a: [-sign * (HALF + 0.75), -sign * (HALF - 0.75)], lift: 0.0046, thick: 0.003, seg: [6, 2] }), C.duck, { look: 'cloth' });
+    b.add(sh, SHIN.panel({ y: [-0.176, -0.173], a: [-sign * (HALF + 0.68), -sign * (HALF - 0.68)], lift: 0.0077, thick: 0.0008, seg: [6, 1] }), C.stitch, { look: 'cloth' });
+    // Topstitching inside the double front's edges.
+    for (const a of [-0.97, 0.97]) b.add(th, THIGH.panel({ y: [-0.35, -0.098], a: [a - 0.012, a + 0.012], lift: 0.0052, thick: 0.0008, seg: [1, 3] }), C.stitch, { look: 'cloth' });
+    b.add(th, THIGH.panel({ y: [-0.1, -0.097], a: [-0.97, 0.97], lift: 0.0052, thick: 0.0008, seg: [8, 1] }), C.stitch, { look: 'cloth' });
+    for (const y of [0.014, -0.01, -0.034]) b.box(sh, [0.064, 0.006, 0.006], C.dark, { at: [0, y, -0.104 + Math.abs(y + 0.01) * 0.12], look: 'rubber', bevel: 0.002 });
+    b.box(sh, [0.012, 0.03, 0.02], C.steel, { at: [sign * 0.0705, -0.072, 0.003], look: 'metal', bevel: 0.003 });
     b.add(th, THIGH.panel({ y: [-0.36, -0.03], a: [sign * (HALF - 0.035), sign * (HALF + 0.035)], lift: 0.0008, thick: 0.0014, seg: [1, 3] }), C.khakiDark, { look: 'cloth' });
-    b.cyl(sh, 0.055, 0.055, 0.003, C.khakiDark, { at: [0, -0.288, 0.001], look: 'cloth', seg: round });
+    b.add(sh, limbBand(b, 'shin', LEGS, -0.2895, -0.2865, 0.0058), C.khakiDark, { look: 'cloth' });
   });
   // Cargo pocket on his left thigh, folding rule in a slim pocket on the right.
-  lump(b, 'thighL', [0.03, 0.115, 0.105], soft, C.khaki, { at: [-0.079, -0.21, 0.0], rot: [0, 0, 0.04], look: 'cloth', e: 0.3 });
-  b.box('thighL', [0.034, 0.04, 0.112], C.khakiDark, { at: [-0.08, -0.165, 0.0], rot: [0, 0, 0.04], look: 'cloth', bevel: bevel(0.004) });
-  b.box('thighR', [0.02, 0.15, 0.05], C.khaki, { at: [0.082, -0.2, 0.02], rot: [0, 0, -0.04], look: 'cloth', bevel: bevel(0.004) });
-  b.box('thighR', [0.012, 0.06, 0.036], '#f4f1e8', { at: [0.086, -0.105, 0.02], rot: [0, 0, -0.04], look: 'gloss', bevel: 0 });
+  lump(b, 'thighL', [0.03, 0.115, 0.105], soft, C.khaki, { at: [-0.089, -0.21, 0.0], rot: [0, 0, 0.04], look: 'cloth', e: 0.3 });
+  b.box('thighL', [0.034, 0.04, 0.112], C.khakiDark, { at: [-0.09, -0.165, 0.0], rot: [0, 0, 0.04], look: 'cloth', bevel: bevel(0.004) });
+  b.box('thighR', [0.02, 0.15, 0.05], C.khaki, { at: [0.092, -0.2, 0.02], rot: [0, 0, -0.04], look: 'cloth', bevel: bevel(0.004) });
+  b.box('thighR', [0.012, 0.06, 0.036], '#f4f1e8', { at: [0.096, -0.105, 0.02], rot: [0, 0, -0.04], look: 'gloss', bevel: 0 });
   if (!hero) return;
-  b.cyl('thighL', 0.007, 0.007, 0.004, C.steel, { at: [-0.098, -0.172, 0.0], rot: [0, 0, HALF], look: 'chrome', seg: 8 });
-  for (const y of [-0.085, -0.1, -0.115]) b.box('thighR', [0.013, 0.002, 0.037], C.red, { at: [0.0865, y, 0.02], rot: [0, 0, -0.04], look: 'plastic', bevel: 0 });
+  b.cyl('thighL', 0.007, 0.007, 0.004, C.steel, { at: [-0.108, -0.172, 0.0], rot: [0, 0, HALF], look: 'chrome', seg: 8 });
+  for (const y of [-0.085, -0.1, -0.115]) b.box('thighR', [0.013, 0.002, 0.037], C.red, { at: [0.0965, y, 0.02], rot: [0, 0, -0.04], look: 'plastic', bevel: 0 });
 }
 
 /** Rolled sleeves, the gloves' wrist tabs and a wristwatch. */
@@ -294,12 +340,12 @@ export function armKit(b: PartSet) {
   const hi = b.detail >= 2;
   const round = tier(b, 8, 10, 20);
   b.mirror((side) => {
-    b.cyl(`upperArm${side}`, 0.0575, 0.056, 0.044, C.collar, { at: [0, -0.215, 0], look: 'cloth', seg: round });
-    if (hi) b.cyl(`upperArm${side}`, 0.059, 0.059, 0.012, C.navy, { at: [0, -0.199, 0], look: 'cloth', seg: round });
+    b.add(`upperArm${side}`, limbBand(b, 'upperArm', LIMBS, -0.237, -0.193, 0.006), C.collar, { look: 'cloth' });
+    if (hi) b.add(`upperArm${side}`, limbBand(b, 'upperArm', LIMBS, -0.205, -0.193, 0.0075), C.navy, { look: 'cloth' });
   });
   if (!hi) return;
   if (b.hero) b.mirror((side, sign) => b.box(`forearm${side}`, [0.008, 0.034, 0.03], C.dark, { at: [sign * 0.0525, -0.232, 0], look: 'rubber', bevel: 0.002 }));
-  b.cyl('forearmL', 0.0475, 0.0465, 0.018, C.dark, { at: [0, -0.186, 0], look: 'rubber', seg: round });
+  b.add('forearmL', limbBand(b, 'forearm', LIMBS, -0.195, -0.177, 0.003), C.dark, { look: 'rubber' });
   b.cyl('forearmL', 0.021, 0.021, 0.014, '#555c63', { at: [-0.047, -0.186, 0], rot: [0, 0, HALF], look: 'metal', seg: round });
   b.cyl('forearmL', 0.0165, 0.0165, 0.016, '#dff3ea', { at: [-0.0475, -0.186, 0], rot: [0, 0, HALF], look: 'gloss', seg: round });
 }

@@ -44,7 +44,7 @@ export default function setup(ctx: LabContext) {
   ctx.controls.enabled = false;
   ctx.camera.updateProjectionMatrix();
 
-  const input: ViewInput = { speed: 0, sprint: false, grounded: true, crouch: 0, ads: 0, look: { yaw: 0, pitch: 0 }, time: 0 };
+  const input: ViewInput = { speed: 0, sprint: false, grounded: true, crouch: 0, sliding: false, ads: 0, look: { yaw: 0, pitch: 0 }, time: 0 };
   let manual = false;
   const cues: string[] = [];
   view.onCue = (cue) => cues.push(`${input.time.toFixed(2)} ${cue}`);
@@ -65,7 +65,11 @@ export default function setup(ctx: LabContext) {
       setCharacter: (id: unknown) => view.setCharacter(id as CharacterId),
       equip: (id: unknown) => view.equip(id as WeaponId),
       act: (action: unknown) => view.act(action as ViewAction),
-      setInput: (partial: unknown) => void Object.assign(input, partial as Partial<ViewInput>),
+      setInput: (partial: unknown) => {
+        Object.assign(input, partial as Partial<ViewInput>);
+        // Specs written before the flag existed slide by crouching at speed.
+        if (!('sliding' in (partial as object))) input.sliding = input.grounded && input.crouch > 0.5 && input.speed > 3;
+      },
       setTime: (t: unknown) => {
         manual = true;
         input.time = Number(t);
@@ -136,9 +140,10 @@ export default function setup(ctx: LabContext) {
       /**
        * Degrees each wrist is bent: `bend` between the forearm and the hand's wrist-to-knuckle line, split into
        * `flex` (toward the palm; negative is extension) and `tilt` (forearm arriving from the pinky side; a relaxed
-       * fist sits near 20, a human wrist manages about 0 … 50).
+       * fist sits near 20, a human wrist manages about 0 … 50). `forearm` is its elbow-to-wrist direction in view space.
        */
       wrists: () => {
+        view.scene.updateMatrixWorld(true);
         const bend = (side: string) => {
           const fore = view.scene.getObjectByName(`forearm:${side}`);
           const hand = view.scene.getObjectByName(`hand:${side}`);
@@ -147,9 +152,24 @@ export default function setup(ctx: LabContext) {
           const reach = new THREE.Vector3(0, 0, -1).transformDirection(hand.matrixWorld);
           const local = along.clone().applyQuaternion(hand.getWorldQuaternion(new THREE.Quaternion()).invert());
           const deg = (v: number) => Math.round(THREE.MathUtils.radToDeg(v));
-          return { bend: deg(along.angleTo(reach)), flex: deg(Math.atan2(side === 'left' ? -local.x : local.x, -local.z)), tilt: deg(Math.asin(local.y)) };
+          return { bend: deg(along.angleTo(reach)), flex: deg(Math.atan2(side === 'left' ? -local.x : local.x, -local.z)), tilt: deg(Math.asin(local.y)), forearm: along.toArray().map((v) => +v.toFixed(2)) };
         };
         return { right: bend('right'), left: bend('left') };
+      },
+      /** Screen box (NDC, y up; the frame is -1 … 1) of a named gun part or node, to prove something stays out of frame. */
+      partBox: (name: unknown) => {
+        const part = view.scene.getObjectByName(String(name));
+        if (!part) return null;
+        const box = new THREE.Box3().setFromObject(part);
+        const lo = new THREE.Vector2(Infinity, Infinity);
+        const hi = new THREE.Vector2(-Infinity, -Infinity);
+        const p = new THREE.Vector3();
+        for (let i = 0; i < 8; i++) {
+          p.set(i & 1 ? box.max.x : box.min.x, i & 2 ? box.max.y : box.min.y, i & 4 ? box.max.z : box.min.z).project(view.camera);
+          lo.min(p as unknown as THREE.Vector2);
+          hi.max(p as unknown as THREE.Vector2);
+        }
+        return { min: [+lo.x.toFixed(3), +lo.y.toFixed(3)], max: [+hi.x.toFixed(3), +hi.y.toFixed(3)] };
       },
       hide: (hidden: unknown) => view.setHidden(Boolean(hidden))
     }

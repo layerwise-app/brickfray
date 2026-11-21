@@ -1,34 +1,65 @@
 import type * as THREE from 'three';
-import { CATEGORIES, FALLOFF, inverseGain } from './catalog';
-import { applyMix, createMixer, outputPeak, type Mixer } from './mixer';
+import type { MapId } from '../world/types';
+import { Ambience } from './ambience';
+import { CATEGORIES, FALLOFF, inverseGain, type Category } from './catalog';
+import { applyMix, busInput, createMixer, outputPeak, setRoom, type Mixer } from './mixer';
+import { MusicPlayer } from './music-player';
 import { renderBank, yieldToMain } from './render';
 import { SOUNDS } from './sounds';
+import { loadSpace, neutralSpace, roomAt, roomSpace } from './space';
 import type { AudioEngine, AudioMix, MusicTrack, PlayOptions, SoundId } from './types';
+import { VariantPicker } from './variants';
 import { VoicePool } from './voices';
 
 export const DEFAULT_MIX: AudioMix = { master: 0.9, effects: 0.85, music: 0.6, ui: 0.8 };
+
+/** Voices playing at once; a firefight with six players and debris peaks near 40. */
+export const VOICES = 48;
+
+/** How much of a sound `distance` m away is its distant recording: 0 up to `blend.from`, 1 past `blend.to`. */
+export function farShare(distance: number, blend: Blend = FAR_BLEND): number {
+  return Math.min(Math.max((distance - blend.from) / (blend.to - blend.from), 0), 1);
+}
+
+/** The distant recording of a sound that has one, and the distances (m) over which it takes over. */
+export function distantOf(id: SoundId): { id: SoundId; blend: Blend } | null {
+  if (id.startsWith('fire:')) return { id: id.replace('fire:', 'fireFar:') as SoundId, blend: FAR_BLEND };
+  if (id === 'explosion') return { id: 'explosionFar', blend: BOOM_BLEND };
+  return null;
+}
+
+interface Blend {
+  from: number;
+  to: number;
+}
 
 export function createAudioEngine(): AudioEngine {
   return new WebAudioEngine();
 }
 
-/** Shots farther than this switch to the distant recipe and arrive late. */
-const FAR_SHOT = 25;
+/** A gunshot cross-fades from its near to its distant recording over this range of distances (m); a blast further out. */
+const FAR_BLEND: Blend = { from: 20, to: 40 };
+const BOOM_BLEND: Blend = { from: 30, to: 70 };
 const SPEED_OF_SOUND = 343;
 const MAX_DELAY = 0.35;
-/** Positional sounds quieter than this after distance attenuation are skipped. */
-const CULL = 0.004;
+/** Loud enough to be heard from far away, so they arrive late by their distance. */
+const TRAVELS: ReadonlySet<Category> = new Set<Category>(['gun', 'gunFar', 'boom']);
+/**
+ * A positional sound estimated quieter than this at the listener (its loudness target after distance and occlusion,
+ * LUFS-like) is not started: it would sit under the map's bed (~-38) and only hold a voice.
+ */
+const AUDIBLE = -50;
+/** A fully occluded source: low-pass cutoff in Hz and gain. */
+const OCCLUDED = { cutoff: 1400, gain: 0.5 };
+/** Air absorption stand-in: the distance low-pass is at half of `top` at `half` metres (8 kHz at 50 m, 5 kHz at 100 m). */
+const AIR = { top: 20000, half: 35 };
+/** Low-pass cutoff at `tone` 0 (a soft knock); `tone` 1 leaves the sound as recorded. */
+const DULL = 1200;
 
 interface Voice {
   source: AudioBufferSourceNode;
   amp: GainNode;
   nodes: AudioNode[];
-}
-
-interface MusicVoice {
-  track: MusicTrack;
-  source: AudioBufferSourceNode;
-  gain: GainNode;
 }
 
 export interface EngineDebug {
@@ -47,16 +78,19 @@ export class WebAudioEngine implements AudioEngine {
   private graph: Mixer | null = null;
   private ready: Promise<void> | null = null;
   private readonly bank = new Map<SoundId, AudioBuffer[]>();
-  private readonly tracks = new Map<MusicTrack, AudioBuffer>();
-  private readonly pool = new VoicePool<Voice>(32);
-  private readonly lastVariant = new Map<SoundId, number>();
+  private readonly music = new MusicPlayer();
+  private ambience: Ambience | null = null;
+  private scene: MapId | null = null;
+  private readonly pool = new VoicePool<Voice>(VOICES);
+  private readonly variants = new VariantPicker();
+  private room = 0;
+  /** Which of the map's rooms the room reverb holds. */
+  private roomIndex = 0;
   private readonly listener = { x: 0, y: 0, z: 0 };
   private mix: AudioMix = { ...DEFAULT_MIX };
   private muffle = 0;
   private suspended = false;
   private disposed = false;
-  private wantMusic: MusicTrack | null = null;
-  private current: MusicVoice | null = null;
   private renderMs: number | null = null;
 
   unlock(): Promise<void> {
@@ -76,17 +110,16 @@ export class WebAudioEngine implements AudioEngine {
     await yieldToMain();
     if (this.disposed) return;
     this.graph = createMixer(ctx);
+    this.ambience = new Ambience(ctx, this.graph.effectsIn);
     this.applyMix();
-    this.syncMusic();
+    this.music.attach(ctx, this.graph.music);
+    this.syncScene();
     const started = performance.now();
     await renderBank({
       sampleRate: ctx.sampleRate,
       cancelled: () => this.disposed,
       onSound: (id, sound) => this.bank.set(id, sound.buffers),
-      onMusic: (track, buffer) => {
-        this.tracks.set(track, buffer);
-        this.syncMusic();
-      }
+      onMusic: (track, buffer) => this.music.add(track, buffer)
     });
     this.renderMs = performance.now() - started;
   }
@@ -96,25 +129,41 @@ export class WebAudioEngine implements AudioEngine {
     const graph = this.graph;
     if (!ctx || !graph || this.disposed || this.suspended) return;
     const pos = options.position;
-    let sound = id;
-    let delay = 0;
-    let distance = 0;
-    if (pos) {
-      const l = this.listener;
-      distance = Math.hypot(pos.x - l.x, pos.y - l.y, pos.z - l.z);
-      if (sound.startsWith('fire:') && distance > FAR_SHOT) sound = sound.replace('fire:', 'fireFar:') as SoundId;
-      if (sound.startsWith('fireFar:')) delay = Math.min(distance / SPEED_OF_SOUND, MAX_DELAY);
+    if (!pos) {
+      this.voice(ctx, graph, id, options, 1, 0, 0);
+      return;
     }
+    const l = this.listener;
+    const distance = Math.hypot(pos.x - l.x, pos.y - l.y, pos.z - l.z);
+    const travel = TRAVELS.has(SOUNDS[id].category) ? Math.min(distance / SPEED_OF_SOUND, MAX_DELAY) : 0;
+    const distant = distantOf(id);
+    if (!distant) {
+      this.voice(ctx, graph, id, options, 1, distance, travel);
+      return;
+    }
+    const far = farShare(distance, distant.blend);
+    if (far < 1) this.voice(ctx, graph, id, options, Math.cos((far * Math.PI) / 2), distance, travel);
+    if (far > 0) this.voice(ctx, graph, distant.id, options, Math.sin((far * Math.PI) / 2), distance, travel);
+  }
+
+  private voice(ctx: AudioContext, graph: Mixer, sound: SoundId, options: PlayOptions, blend: number, distance: number, travel: number): void {
     const buffers = this.bank.get(sound);
     if (!buffers?.length) return;
+    const pos = options.position;
     const cat = CATEGORIES[SOUNDS[sound].category];
-    const volume = options.volume ?? 1;
-    if (pos && volume * inverseGain(cat.falloff, distance) < CULL) return;
+    const occlusion = pos ? Math.min(Math.max(options.occlusion ?? 0, 0), 1) : 0;
+    const volume = (options.volume ?? 1) * blend * (1 - (1 - OCCLUDED.gain) * occlusion);
+    const offset = options.offset ?? 0;
+    if (pos && (SOUNDS[sound].loudness ?? cat.loudness) + 20 * Math.log10(Math.max(volume * inverseGain(cat.falloff, distance), 1e-6)) < AUDIBLE) return;
     const now = ctx.currentTime;
-    const start = now + delay;
-    const buffer = this.pickVariant(sound, buffers);
+    const start = now + travel + Math.max(options.delay ?? 0, 0);
+    const buffer = buffers[this.variants.pick(sound, buffers.length)]!;
+    if (offset >= buffer.duration) return;
     const rate = (options.rate ?? 1) * (1 + (Math.random() * 2 - 1) * cat.jitter);
-    const admission = this.pool.admit(sound, options.priority ?? cat.priority, start, now, cat.burst);
+    const level = 10 ** (((Math.random() * 2 - 1) * (cat.levelJitter ?? 0)) / 20);
+    const key = options.source === undefined ? sound : `${sound}#${options.source}`;
+    const priority = options.priority ?? cat.priority;
+    const admission = this.pool.admit(key, priority, start, now, cat.burst);
     if (!admission) return;
     if (admission.evicted) this.stopVoice(admission.evicted, now);
 
@@ -122,7 +171,7 @@ export class WebAudioEngine implements AudioEngine {
     source.buffer = buffer;
     source.playbackRate.value = rate;
     const amp = ctx.createGain();
-    amp.gain.value = volume * admission.gain;
+    amp.gain.value = volume * admission.gain * level;
     source.connect(amp);
     const nodes: AudioNode[] = [source, amp];
     let out: AudioNode = amp;
@@ -130,17 +179,25 @@ export class WebAudioEngine implements AudioEngine {
       const lp = ctx.createBiquadFilter();
       lp.type = 'lowpass';
       lp.Q.value = -3;
-      lp.frequency.value = 18000 / (1 + distance / 12);
+      const tone = Math.min(Math.max(options.tone ?? 1, 0), 1);
+      lp.frequency.value = Math.min(AIR.top / (1 + distance / AIR.half), 20000 * (OCCLUDED.cutoff / 20000) ** occlusion, 20000 * (DULL / 20000) ** (1 - tone));
       const panner = this.makePanner(ctx, cat.falloff, pos);
       amp.connect(lp).connect(panner);
       nodes.push(lp, panner);
       out = panner;
     }
-    out.connect(cat.bus === 'ui' ? graph.ui : graph.effectsIn);
-    if (cat.reverb > 0 && cat.bus === 'effects') {
+    const bus = pos ? 'effects' : cat.bus;
+    out.connect(busInput(graph, bus));
+    if (cat.reverb > 0 && bus !== 'ui') {
       const send = ctx.createGain();
       send.gain.value = cat.reverb * Math.min(1 + distance / 25, 1.8);
       out.connect(send).connect(graph.reverb);
+      nodes.push(send);
+    }
+    if (!pos && cat.near) {
+      const send = ctx.createGain();
+      send.gain.value = cat.near;
+      out.connect(send).connect(graph.near);
       nodes.push(send);
     }
     const voice: Voice = { source, amp, nodes };
@@ -148,14 +205,23 @@ export class WebAudioEngine implements AudioEngine {
       for (const n of nodes) n.disconnect();
       this.pool.remove(voice);
     };
-    source.start(start);
-    this.pool.add({ handle: voice, key: sound, priority: options.priority ?? cat.priority, start, end: start + buffer.duration / rate });
+    source.start(start, offset);
+    this.pool.add({ handle: voice, key, priority, start, end: start + (buffer.duration - offset) / rate });
   }
 
   setListener(position: THREE.Vector3, forward: THREE.Vector3, up: THREE.Vector3): void {
     this.listener.x = position.x;
     this.listener.y = position.y;
     this.listener.z = position.z;
+    const { index, amount: room } = roomAt(this.scene, position.x, position.y, position.z);
+    if (this.ctx && this.graph && this.scene && index >= 0 && index !== this.roomIndex) {
+      this.roomIndex = index;
+      this.graph.room.buffer = roomSpace(this.ctx, this.scene, index);
+    }
+    if (Math.abs(room - this.room) > 0.02 || (room !== this.room && (room === 0 || room === 1))) {
+      this.room = room;
+      if (this.ctx && this.graph) setRoom(this.ctx, this.graph, room);
+    }
     const l = this.ctx?.listener;
     if (!l) return;
     if (l.positionX) {
@@ -190,17 +256,23 @@ export class WebAudioEngine implements AudioEngine {
     void (suspended ? this.ctx.suspend() : this.ctx.resume());
   }
 
-  playMusic(track: MusicTrack | null): void {
-    this.wantMusic = track;
-    this.syncMusic();
+  playMusic(track: MusicTrack | null, level = 1): void {
+    this.music.set(track, level);
+  }
+
+  setScene(map: MapId | null): void {
+    if (map === this.scene) return;
+    this.scene = map;
+    this.syncScene();
   }
 
   dispose(): void {
     this.disposed = true;
     this.pool.clear();
     this.bank.clear();
-    this.tracks.clear();
-    this.current = null;
+    this.music.clear();
+    this.ambience?.dispose();
+    this.ambience = null;
     void this.ctx?.close();
     this.ctx = null;
     this.graph = null;
@@ -212,19 +284,10 @@ export class WebAudioEngine implements AudioEngine {
       voices: this.pool.size,
       sounds: this.bank.size,
       totalSounds: Object.keys(SOUNDS).length,
-      music: [...this.tracks.keys()],
+      music: this.music.loaded,
       renderMs: this.renderMs,
       outputPeak: this.graph ? outputPeak(this.graph) : 0
     };
-  }
-
-  /** Random variant, never the same one twice in a row. */
-  private pickVariant(id: SoundId, buffers: AudioBuffer[]): AudioBuffer {
-    const last = this.lastVariant.get(id) ?? -1;
-    let i = Math.floor(Math.random() * buffers.length);
-    if (buffers.length > 1 && i === last) i = (i + 1) % buffers.length;
-    this.lastVariant.set(id, i);
-    return buffers[i]!;
   }
 
   private makePanner(ctx: AudioContext, falloff: keyof typeof FALLOFF, pos: { x: number; y: number; z: number }): PannerNode {
@@ -254,32 +317,20 @@ export class WebAudioEngine implements AudioEngine {
     if (this.ctx && this.graph) applyMix(this.ctx, this.graph, this.mix, this.muffle);
   }
 
-  private syncMusic(): void {
+  private syncScene(): void {
     const ctx = this.ctx;
     const graph = this.graph;
-    if (!ctx || !graph || this.current?.track === this.wantMusic) return;
-    const want = this.wantMusic;
-    const buffer = want ? this.tracks.get(want) : null;
-    if (want && !buffer && this.current === null) return;
-    const now = ctx.currentTime;
-    if (this.current) {
-      const { gain, source } = this.current;
-      gain.gain.cancelScheduledValues(now);
-      gain.gain.setValueAtTime(gain.gain.value, now);
-      gain.gain.linearRampToValueAtTime(0, now + 1.2);
-      source.stop(now + 1.3);
-      source.onended = () => gain.disconnect();
-      this.current = null;
+    if (!ctx || !graph) return;
+    const map = this.scene;
+    this.ambience?.set(map);
+    this.roomIndex = 0;
+    graph.room.buffer = map ? roomSpace(ctx, map) : null;
+    if (!map) {
+      graph.space.buffer = neutralSpace(ctx);
+      return;
     }
-    if (!want || !buffer) return;
-    const source = ctx.createBufferSource();
-    source.buffer = buffer;
-    source.loop = true;
-    const gain = ctx.createGain();
-    gain.gain.setValueAtTime(0, now);
-    gain.gain.linearRampToValueAtTime(1, now + 1.5);
-    source.connect(gain).connect(graph.music);
-    source.start(now);
-    this.current = { track: want, source, gain };
+    void loadSpace(ctx, map).then((space) => {
+      if (this.scene === map && this.graph === graph) graph.space.buffer = space;
+    });
   }
 }

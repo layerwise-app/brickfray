@@ -1,18 +1,18 @@
 import * as THREE from 'three';
-import type { AudioEngine } from '../audio/types';
+import type { Vec3 } from '../audio/bullet-sounds';
 import type { Kit } from '../engine/kit';
 import type { Snapshot } from '../net/codec';
 import { createWeaponModel } from '../weapons';
 import type { WeaponModel } from '../weapons/types';
 
-/** Live grenades from snapshots, interpolated, with bounce sounds. */
+/** Live grenades from snapshots, interpolated; each new bounce is reported with the grenade's speed. */
 export class GrenadeView {
   readonly group = new THREE.Group();
   private models = new Map<number, { model: WeaponModel; bounces: number; spin: number }>();
 
   constructor(
     private readonly kit: Kit,
-    private readonly audio: AudioEngine
+    private readonly bounce: (at: Vec3, speed: number) => void
   ) {}
 
   update(snapshots: readonly Snapshot[], renderTime: number) {
@@ -28,7 +28,8 @@ export class GrenadeView {
     a ??= snapshots[0];
     const seen = new Set<number>();
     if (a) {
-      const k = b ? THREE.MathUtils.clamp((renderTime - a.time) / Math.max(1e-4, b.time - a.time), 0, 1) : 0;
+      const span = b ? Math.max(1e-4, b.time - a.time) : 1;
+      const k = b ? THREE.MathUtils.clamp((renderTime - a.time) / span, 0, 1) : 0;
       for (const g of a.grenades) {
         const n = b?.grenades.find((x) => x.id === g.id) ?? g;
         seen.add(g.id);
@@ -45,7 +46,7 @@ export class GrenadeView {
         root.rotation.set(entry.spin, entry.spin * 0.7, 0);
         if (g.bounces > entry.bounces) {
           entry.bounces = g.bounces;
-          this.audio.play('grenadeBounce', { position: root.position, volume: 0.8 });
+          this.bounce(root.position, Math.hypot(n.x - g.x, n.y - g.y, n.z - g.z) / span);
         }
       }
     }

@@ -13,7 +13,10 @@ import type { LabContext } from '../types';
  * `time(seconds)` freezes the idle at a moment, `view(name)` moves the camera (full, bust, face, hands, back, side).
  * `hands(left, right, pitch, heading)` swaps in an unarmed figure holding both hands out in the given shapes;
  * `focus(bone, distance, azimuth, elevation, fov)` frames one bone, e.g. a hand.
- * Backdrop and lights are the main menu's; the lights come round with the camera, so side and back views are lit like the front.
+ * `swatches()` swaps the figure for a row of balls, one per finish, to judge the studio's reflections;
+ * `resurface(roughness, metalness, toRoughness, toMetalness)` repaints one of the figure's surface looks as another, e.g. steel as chrome.
+ * Lights and reflections are the main menu's, over the plain studio sky; the lights come round with the camera, so side and back views are lit like the front.
+ * A shown figure has already idled for a couple of seconds (its outline is measured over them), so `time` counts from there.
  */
 export default function setup(ctx: LabContext) {
   const { renderer: gr, scene } = ctx;
@@ -51,6 +54,37 @@ export default function setup(ctx: LabContext) {
     bare.root.rotation.y = display.figure.rotation.y;
     display.figure.visible = false;
     display.group.add(bare.root);
+  };
+  const balls = new THREE.Group();
+  const ball = new THREE.SphereGeometry(0.17, 48, 24);
+  const swatches = () => {
+    const finishes = [
+      ['#e8ebf0', 'chrome'],
+      ['#b9c0c8', 'metal'],
+      ['#d9a441', 'chrome'],
+      ['#c98a4a', 'metal'],
+      ['#bfe6ff', 'glass'],
+      ['#d5281f', 'plastic'],
+      ['#eef0f4', 'plastic'],
+      ['#20242b', 'plastic']
+    ] as const;
+    finishes.forEach(([color, finish], i) => {
+      const mesh = new THREE.Mesh(ball, display.kit.materials.get(color, finish));
+      mesh.position.set(((i % 4) - 1.5) * 0.4, i < 4 ? 1.62 : 1.22, 0);
+      balls.add(mesh);
+    });
+    display.figure.visible = false;
+    display.group.add(balls);
+  };
+  const resurface = (roughness: number, metalness: number, toRoughness: number, toMetalness: number) => {
+    display.figure.traverse((o) => {
+      const surface = (o as THREE.Mesh).geometry?.getAttribute('surface');
+      if (!surface) return;
+      for (let i = 0; i < surface.count; i++) {
+        if (Math.abs(surface.getX(i) - roughness) < 0.005 && Math.abs(surface.getY(i) - metalness) < 0.005) surface.setXY(i, toRoughness, toMetalness);
+      }
+      surface.needsUpdate = true;
+    });
   };
   show(id);
   ctx.onFrame((dt) => {
@@ -90,6 +124,45 @@ export default function setup(ctx: LabContext) {
         for (let k = 0; k < Math.round(Number(seconds) * 60); k++) display.update(1 / 60);
       },
       view: (name: unknown) => view(String(name)),
+      /** Every mesh of the shown figure as posed, in world space, for baking: base64 Float32 positions and Uint32 indices. */
+      posed: () => {
+        display.group.updateMatrixWorld(true);
+        const b64 = (a: ArrayBufferView) => {
+          const u = new Uint8Array(a.buffer, a.byteOffset, a.byteLength);
+          let out = '';
+          for (let i = 0; i < u.length; i += 0x8000) out += String.fromCharCode(...u.subarray(i, i + 0x8000));
+          return btoa(out);
+        };
+        const meshes: { skinned: boolean; position: string; index: string; bone: string; color: string }[] = [];
+        const v = new THREE.Vector3();
+        display.figure.traverse((o) => {
+          const mesh = o as THREE.Mesh;
+          if (!mesh.isMesh || !mesh.visible) return;
+          const at = mesh.geometry.getAttribute('position');
+          const position = new Float32Array(at.count * 3);
+          for (let i = 0; i < at.count; i++) {
+            mesh.getVertexPosition(i, v).applyMatrix4(mesh.matrixWorld);
+            position.set([v.x, v.y, v.z], i * 3);
+          }
+          const index = mesh.geometry.index ? Uint32Array.from(mesh.geometry.index.array) : Uint32Array.from({ length: at.count }, (_, i) => i);
+          const skin = mesh.geometry.getAttribute('skinIndex');
+          const tint = mesh.geometry.getAttribute('color');
+          meshes.push({
+            skinned: (mesh as THREE.SkinnedMesh).isSkinnedMesh === true,
+            position: b64(position),
+            index: b64(index),
+            bone: skin ? b64(Uint16Array.from({ length: at.count }, (_, i) => skin.getX(i))) : '',
+            color: tint ? b64(Float32Array.from(tint.array)) : ''
+          });
+        });
+        const bones: Record<string, number[]> = {};
+        display.figure.traverse((o) => {
+          if ((o as THREE.Bone).isBone && o.name) bones[o.name] = o.matrixWorld.toArray();
+        });
+        return { meshes, bones };
+      },
+      swatches,
+      resurface: (...values: unknown[]) => resurface(Number(values[0]), Number(values[1]), Number(values[2]), Number(values[3])),
       /** Aims the camera at a bone from `distance` away, `azimuth` radians around it (0 = from +Z) and `elevation` up. */
       focus: (bone: unknown, distance: unknown = 0.6, azimuth: unknown = 0, elevation: unknown = 0.2, fov: unknown = 30) => {
         const root = bare?.root ?? display.figure;
@@ -117,6 +190,7 @@ export default function setup(ctx: LabContext) {
       }
     },
     dispose: () => {
+      ball.dispose();
       bare?.dispose();
       display.dispose();
     }

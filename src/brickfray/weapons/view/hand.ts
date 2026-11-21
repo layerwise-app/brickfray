@@ -3,7 +3,7 @@ import { box, latheZ, tube } from '../shapes';
 import type { Surface } from '../surface';
 
 /** Color slots the character palette fills in: sleeve = primary, trim = secondary. */
-export type Slot = 'sleeve' | 'trim' | 'glove' | 'pad' | 'seam';
+export type Slot = 'sleeve' | 'trim' | 'glove' | 'pad' | 'seam' | 'cuff';
 
 export interface ArmPiece {
   geometry: THREE.BufferGeometry;
@@ -64,6 +64,9 @@ export const HAND_JOINTS: readonly HandJoint[] = (() => {
   return joints;
 })();
 
+/** Thickness of the cuff over its width: a wrist is an oval, flat like the palm. */
+const CUFF_FLAT = 0.8;
+
 const ARC = [0, 0.25, 0.5, 0.75, 1].map((t) => t * Math.PI);
 const inside = new THREE.Vector3();
 const ea = new THREE.Vector3();
@@ -120,10 +123,11 @@ function digit(out: ArmPiece[], d: Digit, first: number, fingers: boolean) {
     const len = d.len[k]!;
     const w = d.width[k]!;
     out.push({ geometry: phalanx(len, d.r[k]!, d.r[k + 1]!, w, 0.0034), matrix: new THREE.Matrix4(), slot: 'glove', surface: 'satin', joint: first + k });
-    if (k < 2 && (fingers || k === 1)) {
-      // Armour plate on the back of the segment, clear of both joints.
+    if (fingers || k > 0) {
+      // Armour plate over most of the back of the segment, clear of both joints: it outlines the finger on a glove-coloured gun.
       const r = (d.r[k]! + d.r[k + 1]!) / 2;
-      out.push({ geometry: box(0.0036, w * 0.7, len * 0.5, 0.0013), matrix: at(r + 0.0006, 0, -len * 0.52), slot: 'pad', surface: 'rubber', joint: first + k });
+      const long = k === 2 ? 0.55 : 0.74;
+      out.push({ geometry: box(0.0036, w * 0.86, len * long, 0.0013), matrix: at(r + 0.0006, 0, -len * (k === 2 ? 0.42 : 0.5)), slot: 'pad', surface: 'rubber', joint: first + k });
     }
   }
 }
@@ -134,22 +138,22 @@ export function handPieces(): ArmPiece[] {
   const glove = (geometry: THREE.BufferGeometry, matrix: THREE.Matrix4) => out.push({ geometry, matrix, slot: 'glove', surface: 'satin' });
   const pad = (geometry: THREE.BufferGeometry, matrix: THREE.Matrix4) => out.push({ geometry, matrix, slot: 'pad', surface: 'rubber' });
   // Palm slab from the heel to the knuckle line, the pinky edge a touch shorter.
-  glove(box(0.0235, 0.058, 0.078, 0.0075), at(0.0282, 0.0095, 0.0175));
+  glove(box(0.0235, 0.058, 0.078, 0.0105), at(0.0282, 0.0095, 0.0175));
   glove(box(0.0225, 0.03, 0.07, 0.0075), at(0.0274, -0.024, 0.0205));
   // Heel of the hand and the pad under the knuckles: the hollow between them takes the held object.
   glove(box(0.013, 0.036, 0.036, 0.0055), at(0.0205, -0.019, 0.0385));
   glove(box(0.009, 0.07, 0.013, 0.004), at(0.0185, 0, -0.0185));
-  pad(box(0.006, 0.058, 0.036, 0.0022), at(0.0412, 0.002, 0.02));
+  pad(box(0.0055, 0.042, 0.029, 0.0034), at(0.041, 0.003, 0.022));
   FINGERS.forEach((f, i) => {
     digit(out, f, fingerJoint(i, 0), true);
     pad(box(0.0075, f.width[0] * 0.82, 0.0155, 0.003), at(f.base[0] + 0.0092, f.base[1], f.base[2] + 0.0035));
   });
   digit(out, THUMB, THUMB_JOINT, false);
-  // Gauntlet cuff around the wrist, aimed back along the forearm.
+  // Short oval cuff behind the heel of the hand, aimed back along the forearm and domed shut at the back, so a bent wrist
+  // shows a rounded joint, never an open or flat-capped tube; no wider than the palm, so it never hides the fingers.
   const dir = WRIST.clone().sub(new THREE.Vector3(0.03, -0.002, 0.018)).normalize();
-  const cuff = new THREE.Matrix4().compose(WRIST.clone().addScaledVector(dir, -0.008), new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), dir), new THREE.Vector3(1, 1, 1));
-  glove(tube(0.036, 0.044, 16, 0.004, 0.039), cuff);
-  out.push({ geometry: tube(0.0395, 0.009, 16, 0.002), matrix: cuff.clone().multiply(new THREE.Matrix4().makeTranslation(0, 0, 0.018)), slot: 'trim', surface: 'plastic' });
+  const cuff = new THREE.Matrix4().compose(WRIST.clone().addScaledVector(dir, 0.006), new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), dir), new THREE.Vector3(CUFF_FLAT, 1, 1));
+  glove(latheZ([[0, -0.016], [0.024, -0.016], [0.0275, -0.009], [0.0288, 0.002], [0.0268, 0.012], [0.019, 0.0195], [0, 0.0225]], 16), cuff);
   return out;
 }
 
@@ -160,8 +164,8 @@ export function upperArmPieces(length: number): ArmPiece[] {
 }
 
 /**
- * Forearm along +Y from the elbow to the wrist: sleeve to mid-forearm with a
- * rolled trim band, then the glove's gauntlet down to the wrist.
+ * Forearm along +Y from the elbow to the wrist: sleeve to mid-forearm ending in a thin hem, then the glove's gauntlet,
+ * flared over the sleeve and tapering to the wrist, where it is rounded off like the cuff it meets.
  */
 export function forearmPieces(length: number): ArmPiece[] {
   const segs = 18;
@@ -169,11 +173,14 @@ export function forearmPieces(length: number): ArmPiece[] {
   const ring = (y: number) => up.clone().premultiply(new THREE.Matrix4().makeTranslation(0, y, 0));
   const cut = length * 0.5;
   return [
-    { geometry: latheZ([[0, -0.035], [0.037, -0.03], [0.042, 0.0], [0.04, cut * 0.6], [0.0375, cut + 0.004], [0, cut + 0.004]], segs), matrix: up, slot: 'sleeve', surface: 'satin' },
-    { geometry: latheZ([[0, cut - 0.01], [0.032, cut - 0.01], [0.031, length * 0.8], [0.029, length], [0, length]], segs), matrix: up, slot: 'glove', surface: 'satin' },
-    { geometry: tube(0.041, 0.02, segs, 0.006, 0.039), matrix: ring(cut), slot: 'trim', surface: 'plastic' },
-    { geometry: tube(0.0328, 0.012, segs, 0.003), matrix: ring(cut + 0.03), slot: 'pad', surface: 'rubber' },
-    { geometry: tube(0.0425, 0.004, segs, 0.0015), matrix: ring(cut * 0.45), slot: 'seam', surface: 'dark' },
-    { geometry: tube(0.0318, 0.003, segs), matrix: ring(length * 0.78), slot: 'seam', surface: 'dark' }
+    { geometry: latheZ([[0, -0.035], [0.037, -0.03], [0.042, 0.0], [0.0425, cut * 0.5], [0.0405, cut - 0.012], [0.039, cut], [0, cut]], segs), matrix: up, slot: 'sleeve', surface: 'satin' },
+    { geometry: tube(0.0412, 0.008, segs, 0.003), matrix: ring(cut - 0.006), slot: 'trim', surface: 'plastic' },
+    {
+      geometry: latheZ([[0, cut - 0.012], [0.0355, cut - 0.012], [0.0372, cut + 0.006], [0.0345, cut + 0.03], [0.0285, length * 0.66], [0.0232, length * 0.84], [0.0205, length - 0.008], [0.016, length + 0.002], [0, length + 0.006]], segs),
+      matrix: up,
+      slot: 'cuff',
+      surface: 'satin'
+    },
+    { geometry: tube(0.0352, 0.003, segs), matrix: ring(cut + 0.026), slot: 'seam', surface: 'dark' }
   ];
 }

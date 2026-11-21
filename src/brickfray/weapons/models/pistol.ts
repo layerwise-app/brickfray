@@ -4,7 +4,7 @@ import { box, prism, slab, tube } from '../shapes';
 import { screw, shade, slot, studSide } from './details';
 
 const C = {
-  frame: '#2f363d',
+  frame: '#a4885e',
   slide: '#b9bec4',
   barrel: '#6b7279',
   dark: '#1d2328',
@@ -15,7 +15,7 @@ const C = {
 const BORE = 0.062;
 const SIGHT_Y = 0.089;
 
-/** Peg Pistol: silver slide with serrations and glow sights on a stippled polymer frame. */
+/** Peg Pistol: silver slide with serrations and glow sights on a stippled tan polymer frame. */
 export function buildPistol(b: ModelBuilder) {
   const { lod } = b;
   const d = b.detail;
@@ -28,13 +28,19 @@ export function buildPistol(b: ModelBuilder) {
   b.add(slab(grip, 0.03, lod, [0.004, 0.012, 0.01, 0.008, 0.01, 0.012]), C.frame, 'satin');
   if (d >= 1) {
     for (const s of [1, -1] as const) {
-      for (let row = 0; row < 4; row++) studSide(b, s, s * 0.0148, -0.05 + row * 0.019, 0.026 + row * 0.0035, 2, 0.012, 0.0028, shade(C.frame, 1.25));
+      for (let row = 0; row < 4; row++) studSide(b, s, s * 0.0148, -0.05 + row * 0.019, 0.026 + row * 0.0035, 2, 0.012, 0.0028, shade(C.frame, 0.8));
     }
-    for (let i = 0; i < 4; i++) b.add(box(0.016, 0.003, 0.0045, 0.0006), shade(C.frame, 1.2), 'satin', T(0, 0.0285, -0.112 + i * 0.009));
+    for (let i = 0; i < 4; i++) b.add(box(0.016, 0.003, 0.0045, 0.0006), shade(C.frame, 0.8), 'satin', T(0, 0.0285, -0.112 + i * 0.009));
     b.add(box(0.004, 0.005, 0.012, 0.0012), C.accent, 'plastic', T(-0.0145, 0.04, -0.012));
     b.add(box(0.004, 0.006, 0.006, 0.0012), C.dark, 'satin', T(-0.0145, 0.026, -0.008));
   }
   if (d >= 2) screw(b, -0.0133, 0.037, -0.05, 'x', 0.0022);
+  if (d >= 1) {
+    // Slide stop and takedown lever on the left of the frame, and a parting line under the slide.
+    b.add(box(0.0024, 0.0042, 0.03, 0.0008), C.dark, 'satin', T(-0.0141, 0.041, -0.03));
+    b.add(box(0.0024, 0.004, 0.009, 0.0008), C.dark, 'satin', T(-0.0141, 0.04, -0.066));
+    for (const s of [1, -1]) b.add(box(0.0012, 0.0012, 0.15, 0.0003), shade(C.frame, 0.6), 'dark', T(s * 0.0131, 0.0438, -0.04));
+  }
 
   // Barrel crown peeking out of the slide.
   b.add(tube(0.0064, 0.012, lod.segSmall + 2, 0.0008), C.barrel, 'metal', T(0, BORE, -0.127));
@@ -45,6 +51,11 @@ export function buildPistol(b: ModelBuilder) {
   const slideSection: [number, number][] = [[-0.013, 0.0445], [0.013, 0.0445], [0.013, 0.074], [0.0085, 0.082], [-0.0085, 0.082], [-0.013, 0.074]];
   b.add(prism(slideSection, 0.176, lod, [0.001, 0.001, 0.003, 0.002, 0.002, 0.003]), C.slide, 'metal', T(0, 0, -0.04));
   slot(b, 0.0062, 0.081, -0.024, 0.009, 0.0024, 0.034);
+  // A lighter milled flat along the lower slide, split from the upper by a line.
+  if (d >= 1) for (const s of [1, -1]) {
+    b.add(box(0.0008, 0.011, 0.15, 0.0003), shade(C.slide, 1.12), 'chrome', T(s * 0.013, 0.0515, -0.045));
+    b.add(box(0.0012, 0.0012, 0.15, 0.0003), shade(C.slide, 0.5), 'dark', T(s * 0.0131, 0.0578, -0.045));
+  }
   b.add(box(0.008, 0.003, 0.03, 0.0008), C.barrel, 'metal', T(0.003, 0.0808, -0.024));
   const grooves = d >= 1 ? 7 : 3;
   for (const s of b.minor ? [1, -1] : []) {

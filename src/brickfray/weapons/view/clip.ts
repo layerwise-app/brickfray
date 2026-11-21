@@ -17,6 +17,8 @@ export interface ClipCtx {
   goals: Record<string, Goal>;
   /** Extra flags: shotgun reload began empty. */
   flags: { empty: boolean };
+  /** The player's aim blend this frame (0 hip … 1 in the sights), before the clip's own `busy` takes any of it away. */
+  ads: number;
 }
 
 /** What a clip contributes this frame, on top of the procedural pose. */
@@ -30,7 +32,10 @@ export class Frame {
   leftFingers: FingerPose | null = null;
   rightFingers: FingerPose | null = null;
   readonly parts = new Map<string, number[]>();
-  show = { mallet: false, grenade: false, shell: false, pin: true };
+  /** Things in the left hand (0 absent, 1 there), and whether the grenade's pin is still to be seen. */
+  show = { mallet: 0, grenade: 0, shell: 0, pin: true };
+  /** The pin: how far its ring has come off the bomb onto the gun hand's thumb (0…1), and seconds since it was flicked away (negative until then). */
+  pin = { hook: 0, fly: -1 };
   /** 0…1: how much the clip overrides aiming and sprint posing. */
   busy = 0;
 
@@ -40,8 +45,10 @@ export class Frame {
     this.left = this.right = null;
     this.leftFingers = this.rightFingers = null;
     this.parts.clear();
-    this.show.mallet = this.show.grenade = this.show.shell = false;
+    this.show.mallet = this.show.grenade = this.show.shell = 0;
     this.show.pin = true;
+    this.pin.hook = 0;
+    this.pin.fly = -1;
     this.busy = 0;
   }
 
@@ -69,6 +76,8 @@ export interface Clip {
   hold?: boolean;
   /** Seconds to blend in from the previous pose; short for strikes that must land on time. */
   fade?: number;
+  /** The hands take the clip up on its first frame (a strike answering the press), not a frame later. */
+  instant?: boolean;
   sample(u: number, f: Frame, ctx: ClipCtx): void;
 }
 
@@ -161,6 +170,20 @@ export class ClipPlayer {
 
   stop() {
     this.clip = null;
+  }
+
+  /** Seconds the running clip still has to go. */
+  get left() {
+    return this.clip ? Math.max(0, this.clip.duration - this.time) : 0;
+  }
+
+  /** Speeds the running clip up from where it is so that it ends `seconds` from now. */
+  hurry(seconds: number) {
+    const clip = this.clip;
+    const u = this.u;
+    if (!clip || u >= 1 || this.left <= seconds) return;
+    clip.duration = seconds / (1 - u);
+    this.time = u * clip.duration;
   }
 
   get u() {

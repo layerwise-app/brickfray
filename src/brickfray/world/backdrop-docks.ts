@@ -9,8 +9,9 @@ const BOX_COLORS = ['#c0392b', '#2f7fbf', '#e67e22', '#2e8b57', '#d9b93a', '#7f8
 
 /** Harbor surroundings: open sea and far shore to the south, container port and town inland. */
 export function docksBackdrop(d: Drawer) {
-  d.anim.water(-420, 10, 420, 420, WATER_Y, '#2d6c86');
-  skyline(d, { inner: [62, 54], outer: 160, haze: HAZE, colors: ['#d9d2c1', '#c9b48a', '#a6abaf', '#d98c5f', '#8fb3c9', '#b0a48c'], seed: 11, minH: 10, maxH: 30, skip: ['s'] });
+  d.anim.water(-420, 10, 420, 420, WATER_Y, '#2c5866');
+  skyline(d, { inner: [62, 54], outer: 160, haze: HAZE, colors: ['#e3d9c6', '#b5523b', '#d9a441', '#6f8496', '#3f8f8a', '#a0705a', '#c8b89a'], seed: 11, minH: 10, maxH: 30, skip: ['s'], dusk: 0.12 });
+  for (const side of [-1, 1]) shore(d, side);
   hills(d, { count: 10, radius: [40, 70], dist: [190, 240], colors: ['#7d8f6a', '#8a9a74', '#6f8262'], haze: HAZE, seed: 5, arc: [Math.PI * 0.2, Math.PI * 0.8], height: 0.32 });
   const t = new Pen(d, new Frame(0, 0, 0));
   const rng = new Rng(29);
@@ -27,9 +28,33 @@ export function docksBackdrop(d: Drawer) {
     }
     for (let i = 0; i < 2; i++) gantry(t, side * (74 + i * 20), 4, side < 0 ? 1 : 0);
   }
-  for (let i = 0; i < 4; i++) ship(t, rng.range(-150, 150), rng.range(130, 220), rng.range(18, 34), rng);
+  for (let i = 0; i < 4; i++) {
+    const x = rng.range(-150, 150);
+    const z = rng.range(130, 220);
+    ship(t, x, Math.abs(x) > SHORE.x - 12 && z < SHORE.z + 12 ? z + 70 : z, rng.range(18, 34), rng);
+  }
   lighthouse(t, 58, 70);
+  d.anim.foam.ring(58, 70, WATER_Y, 3.2, 1.4, 16);
   t.span(30, WATER_Y, 66, 66, 0.6, 74, mix('#8d8f88', HAZE, 0.35), undefined, 0);
+}
+
+/** The town's waterfront either side of the bay: the skyline stands on it instead of in the sea. */
+const SHORE = { x: 62, z: 175, far: 185 } as const;
+
+/** Quay block with a pale coping, a dark wet band and a strip of surf along its foot, hazed with distance. */
+function shore(d: Drawer, side: number) {
+  const t = new Pen(d, new Frame(0, 0, 0));
+  const { x: x0, z: z1, far } = SHORE;
+  const z0 = 8;
+  const haze = (c: string, k: number) => mix(c, HAZE, k);
+  const cx = side * (x0 + far) / 2;
+  t.box(cx, WATER_Y - 0.6, (z0 + z1) / 2, far - x0, 0.6 - WATER_Y, z1 - z0, haze('#a39a8a', 0.45), undefined, 0);
+  t.box(side * (x0 + 0.5), -0.02, (z0 + z1) / 2, 1.2, 0.16, z1 - z0, haze('#d9d2c1', 0.35), undefined, 0);
+  t.box(cx, -0.02, z1 - 0.5, far - x0, 0.16, 1.2, haze('#d9d2c1', 0.45), undefined, 0);
+  t.box(side * (x0 - 0.04), WATER_Y, (z0 + z1) / 2, 0.1, 0.4, z1 - z0, haze('#3d4441', 0.35), undefined, 0);
+  t.box(cx, WATER_Y, z1 + 0.04, far - x0, 0.4, 0.1, haze('#3d4441', 0.45), undefined, 0);
+  t.box(side * (x0 - 0.6), WATER_Y + 0.004, (z0 + z1) / 2, 1.1, 0.01, z1 - z0, haze('#e6ebe6', 0.3), undefined, 0);
+  t.box(cx, WATER_Y + 0.004, z1 + 0.6, far - x0 + 1.2, 0.01, 1.1, haze('#e6ebe6', 0.4), undefined, 0);
 }
 
 function gantry(t: Pen, x: number, z: number, tint: number) {

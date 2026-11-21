@@ -1,8 +1,12 @@
 import { buildBody } from '../body';
+import { tone } from '../body-kit';
+import { heroDrape } from '../hero-assets';
+import { lowBlob, lowTaper } from '../body-low';
 import type { PartSet } from '../parts';
 import type { Stance } from '../stance';
-import { C, freckles, goggles, hair } from './vega-hair';
+import { C, freckles, goggles, hair, smirk } from './vega-hair';
 import { binoculars, fieldKit, jacket, legKit, scarf, sleeves } from './vega-kit';
+import { jacketBack, scarfTails, trousers } from './vega-trim';
 
 const { teal: TEAL, white: WHITE, skin: SKIN, hair: HAIR, scarf: SCARF, dark: DARK } = C;
 
@@ -21,48 +25,63 @@ export function vega(b: PartSet) {
     belt: DARK,
     bulk,
     limbs: 0.93,
+    fore: { half: [0.025, 0.024], corner: 0.009, yaw: 0.6, roll: 0.15, seat: 0.03 },
     brow: HAIR,
     browTilt: 0.05,
-    mouth: 'smile'
+    mouth: b.detail >= 2 ? 'none' : 'smirk',
+    lashes: true,
+    blush: '#f0a78f',
+    expression: { open: 0.93, squint: 0.22, lidTilt: -0.03, brows: [-0.002, 0.008], gaze: [0.2, 0.15] }
   });
   if (b.detail === 0) return blockCostume(b, bulk);
+  if (b.detail >= 2) smirk(b);
   jacket(b);
   sleeves(b);
   scarf(b);
+  const draped = b.hero ? heroDrape('vega-scarf') : undefined;
+  if (draped) {
+    b.add('dangleBack', draped.long!, C.scarf, { look: 'cloth' });
+    b.add('dangleBack', draped.longInner!, tone(C.scarf, 0.82), { look: 'cloth' });
+    b.add('dangleBack', draped.stripe!, C.scarfDark, { look: 'cloth' });
+    b.add('dangleBack', draped.short!, C.scarfDark, { look: 'cloth' });
+    b.add('dangleBack', draped.shortInner!, tone(C.scarfDark, 0.82), { look: 'cloth' });
+  } else scarfTails(b);
   hair(b);
   goggles(b);
   fieldKit(b);
   if (b.detail >= 2) {
     binoculars(b);
     legKit(b);
+    jacketBack(b);
+    trousers(b);
   }
   if (b.hero) freckles(b);
 }
 
-/** Rifle tipped back on her right shoulder, left fist on a cocked hip, right foot on its toe, head tilted at the viewer. */
+/** Rifle at a high ready in both hands, muzzle up past the right shoulder, weight on the front leg, chin up to the viewer. */
 export const stance: Stance = {
-  pelvis: { at: [-0.04, 0, 0], rot: [0.16, 0, 0.08] },
-  chest: [-0.2, 0.04, -0.07],
-  head: [-0.42, 0.05, 0.09],
+  pelvis: { at: [-0.04, -0.075, -0.035], rot: [0.45, -0.06, -0.08] },
+  chest: [0.35, -0.08, 0.02],
+  head: [-0.5, 0.14, 0.06],
   feet: {
-    L: { at: [-0.085, 0, 0.02], heading: -0.22 },
-    R: { at: [0.1, 0, -0.15], heading: 0.28, pitch: -0.6, knee: 0.2 }
+    L: { at: [-0.37, 0, -0.2], heading: -0.4, knee: 0.16 },
+    R: { at: [0.31, 0, 0.15], heading: 0.6, knee: 0.08 }
   },
   arms: {
-    R: { wrist: [0.13, 0.123, -0.328], hand: [2.578, 0.832, -2.609], elbow: [0.6, -1, 0.2], space: 'chest', shape: 'grip' },
-    L: { wrist: [-0.235, 0.075, -0.01], hand: [1.4, -0.3, 0], elbow: [-1, 0, 0.6], space: 'pelvis', shape: 'fist' }
+    R: { wrist: [0.156, 0.063, -0.224], hand: [0.135, 0.885, -0.429], elbow: [-0.037, -0.996, 0.079], space: 'chest', shape: 'grip' },
+    L: { wrist: [0.137, 0.343, -0.312], hand: [1.114, 0.297, 0.69], elbow: [-0.59, -0.64, -0.49], space: 'chest', shape: 'hold' }
   },
-  life: { breath: 1, sway: 0.5, look: 0.6 }
+  life: { breath: 1, sway: 0.5, look: 0.5 }
 };
 
 /** The low tier's costume: a few boxes that keep the silhouette and colours. */
 function blockCostume(b: PartSet, bulk: number) {
   // Jacket: white yoke and sleeve stripes, raised collar, zip.
-  b.taper('chest', [0.36 * bulk, 0.2], [0.4 * bulk, 0.225], 0.09, WHITE, { at: [0, 0.165, 0], look: 'cloth' });
+  lowTaper(b, 'chest', [0.36 * bulk, 0.2], [0.4 * bulk, 0.225], 0.09, WHITE, { at: [0, 0.165, 0], look: 'cloth', caps: 'top' });
   b.mirror((side) => b.cyl(`upperArm${side}`, 0.0565, 0.055, 0.07, WHITE, { at: [0, -0.04, 0], look: 'cloth' }));
   b.mirror((side) => b.cyl(`forearm${side}`, 0.049, 0.047, 0.03, WHITE, { at: [0, -0.15, 0], look: 'cloth' }));
   b.cyl('chest', 0.075, 0.085, 0.07, TEAL, { at: [0, 0.255, 0.0], look: 'cloth' });
-  b.taper('spine', [0.29, 0.19], [0.29 * bulk + 0.02, 0.2], 0.05, TEAL, { at: [0, 0.0, 0], look: 'cloth' });
+  lowTaper(b, 'spine', [0.29, 0.19], [0.29 * bulk + 0.02, 0.2], 0.05, TEAL, { at: [0, 0.0, 0], look: 'cloth' });
 
   // Scarf knot at the throat and its tail on the swinging back bone.
   b.torus('chest', 0.08, 0.03, SCARF, { at: [0, 0.245, 0], rot: [Math.PI / 2, 0, 0], look: 'cloth' });
@@ -70,17 +89,17 @@ function blockCostume(b: PartSet, bulk: number) {
   b.box('dangleBack', [0.08, 0.5, 0.02], SCARF, { at: [0.0, -0.23, 0.0], rot: [0.05, 0, 0.04], look: 'cloth' });
 
   // Hair cap, bangs and the high ponytail on the head's swinging bone.
-  b.blob('head', [0.25, 0.14, 0.265], HAIR, { at: [0, 0.178, 0.012], look: 'cloth', e: 0.55 });
+  lowBlob(b, 'head', [0.255, 0.15, 0.27], HAIR, { at: [0, 0.176, 0.012], look: 'cloth', e: 0.72, seg: 8 });
   b.box('head', [0.2, 0.045, 0.03], HAIR, { at: [0.02, 0.19, -0.12], rot: [0, 0, -0.12], look: 'cloth' });
-  b.blob('head', [0.25, 0.13, 0.1], HAIR, { at: [0, 0.1, 0.09], look: 'cloth', e: 0.6 });
+  lowBlob(b, 'head', [0.25, 0.15, 0.11], HAIR, { at: [0, 0.1, 0.085], look: 'cloth', e: 0.75, seg: 6 });
   b.cyl('dangleHead', 0.03, 0.03, 0.035, TEAL, { at: [0, 0.0, 0.0], rot: [0.5, 0, 0], look: 'gloss' });
-  b.blob('dangleHead', [0.075, 0.2, 0.07], HAIR, { at: [0, -0.1, 0.03], look: 'cloth', e: 0.7, taper: 0.4 });
+  lowBlob(b, 'dangleHead', [0.075, 0.2, 0.07], HAIR, { at: [0, -0.1, 0.03], look: 'cloth', e: 0.8, taper: 0.4, seg: 5 });
 
   // Goggles pushed up on the forehead.
   b.torus('head', 0.128, 0.012, DARK, { at: [0, 0.185, 0.0], rot: [Math.PI / 2 - 0.2, 0, 0], scale: [1, 1.05, 1], look: 'rubber' });
   b.mirror((_, sign) => {
-    b.cyl('head', 0.033, 0.035, 0.03, '#3a3f45', { at: [sign * 0.045, 0.205, -0.12], rot: [Math.PI / 2 - 0.5, 0, 0], look: 'metal' });
-    b.cyl('head', 0.027, 0.027, 0.01, '#ffb347', { at: [sign * 0.045, 0.214, -0.135], rot: [Math.PI / 2 - 0.5, 0, 0], look: 'glass' });
+    b.cyl('head', 0.033, 0.035, 0.03, '#3a3f45', { at: [sign * 0.045, 0.205, -0.12], rot: [Math.PI / 2 - 0.5, 0, 0], look: 'metal', seg: 5 });
+    b.cyl('head', 0.027, 0.027, 0.01, '#ffb347', { at: [sign * 0.045, 0.214, -0.135], rot: [Math.PI / 2 - 0.5, 0, 0], look: 'glass', seg: 5 });
   });
 
   // Scout kit: thigh pouch, belt pouch, knee pads.

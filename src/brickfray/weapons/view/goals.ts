@@ -117,12 +117,3 @@ export function followPath(path: HandPath, out: THREE.Matrix4) {
   qa.slerp(qb, turn);
   return out.compose(pa, qa, one);
 }
-
-/** Blend two world matrices (rigid). */
-export function blendMatrices(a: THREE.Matrix4, b: THREE.Matrix4, t: number, out: THREE.Matrix4) {
-  a.decompose(pa, qa, sc);
-  b.decompose(pb, qb, sc);
-  pa.lerp(pb, t);
-  qa.slerp(qb, t);
-  return out.compose(pa, qa, one);
-}

@@ -19,16 +19,24 @@ const TOE: LoftRing[] = [
   { y: 0.062, rx: 0.05, rz: 0.012, back: 0.026, e: 2.5 }
 ];
 
+/** Where the boot's upper is at `forward` of the ankle, in foot space: the height of its top line and its slope. */
+export function instep(forward: number) {
+  const top = (f: number) => UPPER_Y + S.loftRingAt(UPPER, f).back;
+  return { y: top(forward), pitch: Math.atan2(top(forward + 0.01) - top(forward - 0.01), 0.02) };
+}
+
 /** Boot on the foot and toe bones: padded shaft, heel counter and instep, toe box, welted sole with a heel block. */
 export function boot(k: BodyKit, side: 'L' | 'R') {
-  const { b, s, L, fine } = k;
+  const { b, s, fine } = k;
+  // The shaft follows the leg up to the width of the sole it stands on.
+  const L = Math.min(k.legs, 1.12);
   const steps = k.limbSteps;
   const ft = `foot${side}` as const;
   const toe = `toe${side}` as const;
   const look = s.bootLook ?? 'plastic';
   const sole = s.sole ?? '#2b2f33';
   const n = b.hero ? 16 : even(b.seg(6, 8, 10));
-  const metal = look === 'metal' || look === 'chrome' || look === 'gold';
+  const closure = s.bootClosure ?? (look === 'metal' || look === 'chrome' || look === 'gold' ? 'lames' : 'laces');
 
   b.add(
     ft,
@@ -75,15 +83,14 @@ export function boot(k: BodyKit, side: 'L' | 'R') {
     for (const z of [-0.012, -0.034, -0.056]) b.box(toe, [0.008, 0.013, 0.012], sole, { at: [x * 0.059, -0.0235, z], look: 'rubber', bevel: 0 });
   }
 
-  // Toe cap seam, heel counter and what closes the boot: laces, or lames on armour.
+  // Toe cap seam, heel counter and what closes the boot: laces, lames on armour, or the costume's own seal.
   const seam = tone(s.boot, 0.82);
   b.add(toe, S.loft([{ ...TOE[0]!, y: 0.014, rx: 0.0582, rz: 0.012, back: 0.0335 }, { ...TOE[0]!, y: 0.019, rx: 0.0582, rz: 0.012, back: 0.0335 }], n), seam, { at: [0, 0.004, 0.012], rot: FORWARD, look });
   b.add(ft, S.blob(0.094, 0.052, 0.03, 0.7, 10), seam, { at: [0, -0.034, 0.056], look });
-  const top = (forward: number) => UPPER_Y + S.loftRingAt(UPPER, forward).back;
-  if (metal) {
+  if (closure === 'sealed') return;
+  if (closure === 'lames') {
     for (const forward of [0.05, 0.078, 0.106]) {
-      const y = top(forward);
-      const pitch = Math.atan2(top(forward + 0.01) - top(forward - 0.01), 0.02);
+      const { y, pitch } = instep(forward);
       b.add(ft, S.blob(0.1, 0.012, 0.03, 0.6, 10), seam, { at: [0, y - 0.004, -forward], rot: [pitch, 0, 0], look });
     }
     return;
@@ -92,8 +99,7 @@ export function boot(k: BodyKit, side: 'L' | 'R') {
   const tongue = tone(s.boot, 0.9);
   for (let i = 0; i < 4; i++) {
     const forward = 0.04 + i * 0.019;
-    const y = top(forward);
-    const pitch = Math.atan2(top(forward + 0.01) - top(forward - 0.01), 0.02);
+    const { y, pitch } = instep(forward);
     b.add(ft, S.blob(0.034, 0.012, 0.022, 0.7, 8), tongue, { at: [0, y - 0.002, -forward], rot: [pitch, 0, 0], look });
     for (const lean of [-1, 1]) b.cyl(ft, 0.0034, 0.0034, 0.05, lace, { at: [0, y + 0.0035, -forward], rot: [pitch, lean * 0.42, Math.PI / 2], look: 'cloth', seg: 6 });
   }

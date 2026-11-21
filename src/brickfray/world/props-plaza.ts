@@ -92,13 +92,12 @@ export const STALL: Element<At & { colors: [string, string]; seed?: number }> = 
       t.box(x, 0, -0.8, 0.1, 2.68, 0.1, '#8a5f3a', undefined, 0.01);
       t.box(x, 0, 0.62, 0.1, 2.3, 0.1, '#8a5f3a', undefined, 0.01);
     }
-    const stripes = d.detail === 0 ? 2 : 6;
+    const stripes = 6;
     const w = 2.9 / stripes;
     for (let i = 0; i < stripes; i++) {
       t.prism('awning', [[-1.0, 2.64], [1.05, 2.26], [1.05, 2.31], [-1.0, 2.7]], w, -1.45 + w * (i + 0.5), 0, 0, i % 2 ? b : a);
-      if (d.detail > 0) t.box(-1.45 + w * (i + 0.5), 2.04, 1.05, w - 0.02, 0.26, 0.04, i % 2 ? a : b, undefined, 0.01);
+      t.box(-1.45 + w * (i + 0.5), 2.04, 1.05, w - 0.02, 0.26, 0.04, i % 2 ? a : b, undefined, 0.01);
     }
-    if (d.detail === 0) return;
     for (let i = 0; i < 3; i++) {
       const x = -0.85 + i * 0.85;
       const [c1, c2] = rng.pick(PRODUCE);

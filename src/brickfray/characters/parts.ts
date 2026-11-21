@@ -4,12 +4,13 @@ import { BONE, BONES, type BoneName, type V3 } from './skeleton';
 import * as S from './shapes';
 
 /** Surface look per part, baked into the `surface` vertex attribute (roughness, metalness, glow, tint flag). */
-export type Look = 'plastic' | 'gloss' | 'cloth' | 'rubber' | 'skin' | 'metal' | 'chrome' | 'gold' | 'glow' | 'glass' | 'tint';
+export type Look = 'plastic' | 'gloss' | 'cloth' | 'matte' | 'rubber' | 'skin' | 'metal' | 'chrome' | 'gold' | 'glow' | 'glass' | 'tint';
 
 const LOOKS: Record<Exclude<Look, 'glass'>, [number, number, number, number]> = {
   plastic: [0.36, 0, 0, 0],
   gloss: [0.16, 0, 0, 0],
   cloth: [0.78, 0, 0, 0],
+  matte: [1, 0, 0, 0],
   rubber: [0.88, 0, 0, 0],
   skin: [0.55, 0, 0, 0],
   metal: [0.32, 0.85, 0, 0],
@@ -19,12 +20,14 @@ const LOOKS: Record<Exclude<Look, 'glass'>, [number, number, number, number]> = 
   tint: [0.4, 0, 0.12, 1]
 };
 
-/** `grip` wraps a pistol grip, `cup` holds a handguard from below; the rest are free hands. */
-export type HandShape = 'grip' | 'cup' | 'fist' | 'open' | 'relaxed' | 'point';
+/** `grip` wraps a pistol grip, `cup` holds a handguard from below, `hold` closes around a handle that runs across the palm; the rest are free hands. */
+export type HandShape = 'grip' | 'cup' | 'hold' | 'fist' | 'open' | 'relaxed' | 'point';
 export interface Hands {
   L: HandShape;
   R: HandShape;
 }
+/** The hands every match build has: on the gun. */
+export const DEFAULT_HANDS: Hands = { L: 'cup', R: 'grip' };
 
 export interface PartOptions {
   at?: V3;
@@ -48,6 +51,14 @@ export interface BakedCharacter {
   pieces: { bone: number; geometry: THREE.BufferGeometry; glass: boolean; center: THREE.Vector3 }[];
   triangles: number;
 }
+
+/**
+ * Costumes are drawn on a slim torso and every torso part is deepened by this much when it is added,
+ * so the body has a chest and a seat in profile and each garment keeps its fit.
+ */
+export const TORSO_DEPTH = 1.12;
+const TORSO = new Set<BoneName>(['pelvis', 'spine', 'chest']);
+const deepen = new THREE.Matrix4().makeScale(1, 1, TORSO_DEPTH);
 
 const e = new THREE.Euler();
 const q = new THREE.Quaternion();
@@ -73,7 +84,7 @@ export class PartSet {
   ) {
     this.hero = options.hero ?? false;
     this.detail = this.hero ? 2 : profile.detail;
-    this.hands = options.hands ?? { L: 'cup', R: 'grip' };
+    this.hands = options.hands ?? DEFAULT_HANDS;
   }
 
   /** Segment count for the current tier. */
@@ -91,7 +102,9 @@ export class PartSet {
     q.setFromEuler(e.set(rx, ry, rz, 'YXZ'));
     v.set(...(o.at ?? [0, 0, 0]));
     sc.set(...(o.scale ?? [1, 1, 1]));
-    this.pieces.push({ geometry, bone: BONE[bone], color: new THREE.Color(color), look: o.look ?? 'plastic', matrix: new THREE.Matrix4().compose(v, q, sc) });
+    const matrix = new THREE.Matrix4().compose(v, q, sc);
+    if (TORSO.has(bone)) matrix.premultiply(deepen);
+    this.pieces.push({ geometry, bone: BONE[bone], color: new THREE.Color(color), look: o.look ?? 'plastic', matrix });
     return this;
   }
 

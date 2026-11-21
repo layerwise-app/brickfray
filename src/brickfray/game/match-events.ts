@@ -44,7 +44,7 @@ export class MatchEvents {
     return this.mv.session.roster.get(id)?.team ?? -1;
   }
 
-  /** Remote players' shots: tracer from their gun, impacts, sound with distance and a whiz if it passed close. */
+  /** Remote players' shots: tracer from their gun, impacts and their sound near the listener, the shot with distance, a whiz if it passed close. */
   traces(list: readonly ShotTrace[]) {
     const mv = this.mv;
     const me = mv.session.you;
@@ -54,24 +54,23 @@ export class MatchEvents {
       const remote = mv.remotes.map.get(t.shooter);
       const from = remote ? mv.remotes.muzzleOf(remote, new THREE.Vector3()) : new THREE.Vector3(...t.origin);
       const pellet = t.ends.length > 1;
-      let whiz = false;
+      mv.sound.bullets.volley();
       for (const e of t.ends) {
         const end = new THREE.Vector3(...e.point);
-        mv.effects.tracers.add(from, end, { streak: t.weapon === 'sniper' ? 12 : pellet ? 2 : 4.5, width: t.weapon === 'sniper' ? 0.05 : 0.03, color: t.weapon === 'sniper' ? '#bfe9ff' : '#ffc46b' });
+        mv.effects.tracers.add(from, end, { weapon: t.weapon, streak: t.weapon === 'sniper' ? 12 : pellet ? 2 : 4.5, width: t.weapon === 'sniper' ? 0.05 : 0.03, color: t.weapon === 'sniper' ? '#bfe9ff' : '#ffc46b' });
         if (e.hitPlayer) {
-          if (e.hitPlayer !== me) mv.effects.bodyHit(end, end.clone().sub(from).normalize(), '#f2f2ee', false);
+          if (e.hitPlayer !== me) {
+            mv.effects.bodyHit(end, end.clone().sub(from).normalize(), '#f2f2ee', false);
+            mv.sound.bullets.strike('body', end, end.distanceTo(from), t.weapon, pellet);
+          }
         } else if (e.surface !== 'none') {
           mv.effects.impact(end, new THREE.Vector3(...e.normal), e.surface);
+          mv.sound.bullets.strike(e.surface, end, end.distanceTo(from), t.weapon, pellet);
         }
-        // Closest approach of the bullet path to the listener.
-        const seg = end.clone().sub(from);
-        const len = seg.length();
-        const along = THREE.MathUtils.clamp(cam.clone().sub(from).dot(seg) / Math.max(1e-4, len * len), 0, 1);
-        if (e.hitPlayer !== me && from.clone().addScaledVector(seg, along).distanceTo(cam) < 1.6 && along > 0.05 && along < 0.98) whiz = true;
       }
       const distance = from.distanceTo(cam);
-      mv.play(distance > 30 ? `fireFar:${t.weapon}` : `fire:${t.weapon}`, from, 1, distance > 30 ? 4 : 6);
-      if (whiz) mv.play('whiz', null, 0.8, 6);
+      mv.play(`fire:${t.weapon}`, from, 1, distance > 30 ? 4 : 6, mv.sound.occlusion(t.shooter, from));
+      mv.sound.bullets.flyby(from, t.ends.filter((e) => e.hitPlayer !== me).map((e) => ({ x: e.point[0], y: e.point[1], z: e.point[2] })), t.weapon);
     }
   }
 
@@ -112,7 +111,7 @@ export class MatchEvents {
             const pieces = victim.rig.shatter(impulse);
             if (e.headshot) popHead(pieces, impulse);
             mv.effects.shatter(pieces);
-            mv.play('shatter', victim.position, 1, 7);
+            mv.play('shatter', victim.position, 1, 7, mv.sound.occlusion(e.victim, victim.position, 1));
           }
           if (e.victim === me) {
             mv.deathCam = { at: mv.fp.camera.position.clone(), killer: e.killer, t: 0 };
@@ -143,7 +142,7 @@ export class MatchEvents {
         case 'explosion': {
           const p = new THREE.Vector3(...e.position);
           mv.effects.explosion(p, [PLASTIC.red, PLASTIC.yellow, PLASTIC.darkGray, PLASTIC.orange, PLASTIC.white]);
-          mv.play('explosion', p, 1, 9);
+          mv.play('explosion', p, 1, 9, mv.sound.occlusion(null, p, 0.3));
           const d = p.distanceTo(mv.fp.camera.position);
           if (d < 18) mv.fp.addShake(Math.max(0, 1 - d / 18) * 1.1);
           break;
@@ -155,10 +154,7 @@ export class MatchEvents {
           }
           break;
         case 'melee':
-          if (e.player !== me) {
-            const r = mv.remotes.map.get(e.player);
-            mv.play(e.hit ? 'malletHit' : 'malletMiss', r?.position ?? null, 1, 6);
-          } else if (e.hit) mv.play('malletHit', null, 1, 8);
+          mv.sound.melee(mv.session.roster.get(e.player)?.character, e.hit, mv.remotes.map.get(e.player)?.position ?? null, e.player === me, e.wall);
           break;
         case 'chat':
           this.chat.push({ key: feedKey++, name: this.name(e.player), text: e.text, team: this.team(e.player), at: this.clock });
@@ -201,6 +197,7 @@ export class MatchEvents {
     const now = mv.session.hostNow();
     const match = board?.match;
     const phase = match?.phase ?? 'warmup';
+    mv.sound.setPhase(phase, match?.phaseEnds ? Math.max(0, match.phaseEnds - now) : 0);
     const info = mv.renderer.renderer.info.render;
     mv.hud.set({
       phase,

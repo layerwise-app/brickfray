@@ -1,14 +1,18 @@
 import * as THREE from 'three';
-import type { PartSet } from '../parts';
+import type { Look, PartSet } from '../parts';
 import * as S from '../shapes';
 import type { BoneName, V3 } from '../skeleton';
 import { cloakAt, hoodAt, leaf, mantleAt } from './moss-cloth';
+import { buildHatchet } from '../../weapons/models/hatchet';
+import { sweep } from './plate-fittings';
 import { lump, pick } from './sheet';
+import { stow } from './stowed';
 
 export const C = {
   cloak: '#4f7a3a',
   cloakDark: '#3d6230',
   lining: '#273b21',
+  hoodLining: '#4b6f41',
   tunic: '#6b6e3a',
   tunicDark: '#55582d',
   leaf: '#8aa13f',
@@ -24,9 +28,15 @@ export const C = {
   copper: '#b5683a',
   steel: '#a0a6ab',
   thread: '#dccba0',
+  sash: '#c68c2b',
+  sashDark: '#9c6c1d',
+  pantsDark: '#333c2b',
   feather: '#ece2c8',
   featherTip: '#5b4630'
 };
+
+/** Leather has a soft sheen; a fully matte look veils it grey-pink under the studio key. */
+export const HIDE: Look = 'skin';
 
 const STRAP_TILT = -0.62;
 /** The chest's front leans out toward the top; the strap lies on it. */
@@ -75,21 +85,28 @@ function onStrap(s: number, off: number, out = 0): V3 {
 
 /** Chest strap from under the mantle to the satchel, with rifle rounds in loops. */
 export function bandolier(b: PartSet) {
-  b.box('chest', [0.042, 0.34, 0.012], C.leather, { at: onStrap(-0.06, 0), rot: [-STRAP_LEAN, 0, STRAP_TILT], look: 'rubber' });
-  b.box('chest', [0.042, 0.3, 0.01], C.leather, { at: [0.035, 0.03, 0.104], rot: [0, 0, -STRAP_TILT], look: 'rubber' });
-  b.box('spine', [0.042, 0.15, 0.012], C.leather, { at: [-0.136, -0.012, -0.054], rot: [0, 0.7, -0.42], look: 'rubber' });
+  b.box('chest', [0.042, 0.34, 0.012], C.leather, { at: onStrap(-0.06, 0), rot: [-STRAP_LEAN, 0, STRAP_TILT], look: HIDE });
+  b.box('chest', [0.042, 0.3, 0.01], C.leather, { at: [0.035, 0.03, 0.104], rot: [0, 0, -STRAP_TILT], look: HIDE });
+  // The strap's run from the chest round the waist to the satchel on the hip.
+  const run: V3[] = [
+    [-0.112, 0.092, -0.1],
+    [-0.147, 0.04, -0.088],
+    [-0.168, -0.004, -0.05],
+    [-0.178, -0.04, 0.004]
+  ];
+  b.add('spine', sweep(run, () => [0.021, 0.0055], { seg: pick(b, 3, 4, 8), radial: pick(b, 4, 4, 8), up: [-0.75, 0, -0.66], caps: b.hero }), C.leather, { look: HIDE });
   if (b.detail < 2) return;
   const across: V3 = [-STRAP_LEAN, 0, STRAP_TILT + Math.PI / 2];
   const seg = pick(b, 5, 6, 10);
   for (const s of b.hero ? [-0.03, -0.068, -0.106, -0.144] : [-0.04, -0.085, -0.13]) {
     b.cyl('chest', 0.0078, 0.0078, 0.048, C.brass, { at: onStrap(s, 0.003, 0.014), rot: across, look: 'gold', seg });
     if (b.hero) b.cyl('chest', 0.002, 0.0074, 0.014, C.copper, { at: onStrap(s, -0.027, 0.014), rot: across, look: 'metal', seg });
-    b.box('chest', [0.024, 0.022, 0.02], C.leatherDark, { at: onStrap(s, 0.003, 0.012), rot: [-STRAP_LEAN, 0, STRAP_TILT], look: 'rubber', bevel: b.hero ? 0.004 : 0 });
+    b.box('chest', [0.024, 0.022, 0.02], C.leatherDark, { at: onStrap(s, 0.003, 0.012), rot: [-STRAP_LEAN, 0, STRAP_TILT], look: HIDE, bevel: b.hero ? 0.004 : 0 });
   }
   // Buckle where the strap is let out.
   b.box('chest', [0.054, 0.036, 0.008], C.steel, { at: onStrap(-0.192, 0, 0.007), rot: [-STRAP_LEAN, 0, STRAP_TILT], look: 'metal', bevel: 0.004 });
   if (!b.hero) return;
-  b.box('chest', [0.036, 0.02, 0.01], C.leather, { at: onStrap(-0.192, 0, 0.008), rot: [-STRAP_LEAN, 0, STRAP_TILT], look: 'rubber', bevel: 0.002 });
+  b.box('chest', [0.036, 0.02, 0.01], C.leather, { at: onStrap(-0.192, 0, 0.008), rot: [-STRAP_LEAN, 0, STRAP_TILT], look: HIDE, bevel: 0.002 });
   b.box('chest', [0.005, 0.03, 0.006], C.steel, { at: onStrap(-0.192, 0, 0.014), rot: across, look: 'metal', bevel: 0.001 });
   for (const off of [-0.016, 0.016]) stitches(b, 'chest', onStrap(-0.17, off, 0.0068), onStrap(0.0, off, 0.0068), 20);
 }
@@ -99,15 +116,15 @@ export function satchel(b: PartSet) {
   const sx = -0.214;
   const sz = 0.014;
   if (b.detail < 2) {
-    b.box('pelvis', [0.072, 0.15, 0.19], C.leather, { at: [sx, -0.05, sz], look: 'rubber' });
-    b.box('pelvis', [0.03, 0.085, 0.196], C.leatherLight, { at: [sx - 0.028, -0.014, sz], look: 'rubber' });
+    b.box('pelvis', [0.072, 0.15, 0.19], C.leather, { at: [sx, -0.05, sz], look: HIDE });
+    b.box('pelvis', [0.03, 0.085, 0.196], C.leatherLight, { at: [sx - 0.028, -0.014, sz], look: HIDE });
     return;
   }
   const seg = pick(b, 8, 8, 14);
-  lump(b, 'pelvis', [0.078, 0.15, 0.2], C.leather, seg, { at: [sx, -0.05, sz], look: 'rubber', e: 0.38 });
-  lump(b, 'pelvis', [0.034, 0.1, 0.208], C.leatherLight, seg, { at: [sx - 0.03, -0.012, sz], look: 'rubber', e: 0.42, taper: 0.15 });
-  b.box('pelvis', [0.016, 0.11, 0.04], C.leather, { at: [sx + 0.03, 0.07, sz], rot: [0, 0, 0.3], look: 'rubber' });
-  b.box('pelvis', [0.01, 0.075, 0.03], C.leatherDark, { at: [sx - 0.049, -0.045, sz], look: 'rubber', bevel: 0.003 });
+  lump(b, 'pelvis', [0.078, 0.15, 0.2], C.leather, seg, { at: [sx, -0.05, sz], look: HIDE, e: 0.38 });
+  lump(b, 'pelvis', [0.034, 0.1, 0.208], C.leatherLight, seg, { at: [sx - 0.03, -0.012, sz], look: HIDE, e: 0.42, taper: 0.15 });
+  b.box('pelvis', [0.016, 0.11, 0.04], C.leather, { at: [sx + 0.03, 0.07, sz], rot: [0, 0, 0.3], look: HIDE });
+  b.box('pelvis', [0.01, 0.075, 0.03], C.leatherDark, { at: [sx - 0.049, -0.045, sz], look: HIDE, bevel: 0.003 });
   b.box('pelvis', [0.012, 0.024, 0.04], C.steel, { at: [sx - 0.052, -0.058, sz], look: 'metal', bevel: 0.004 });
   if (!b.hero) return;
   for (const dz of [-0.097, 0.097]) stitches(b, 'pelvis', [sx - 0.046, 0.03, sz + dz], [sx - 0.046, -0.05, sz + dz], 8);
@@ -125,8 +142,8 @@ export function pouches(b: PartSet) {
   for (const [px, pz, size] of b.hero ? spots : spots.slice(0, 1)) {
     const turn = Math.atan2(px, pz * 1.6);
     const out: V3 = [Math.sin(turn), 0, Math.cos(turn)];
-    lump(b, 'pelvis', [size, 0.085, 0.05], C.leather, seg, { at: [px, -0.014, pz], rot: [0, turn, 0], look: 'rubber', e: 0.42 });
-    lump(b, 'pelvis', [size + 0.006, 0.05, 0.056], C.leatherLight, seg, { at: [px, 0.006, pz], rot: [0, turn, 0], look: 'rubber', e: 0.42, taper: 0.25 });
+    lump(b, 'pelvis', [size, 0.085, 0.05], C.leather, seg, { at: [px, -0.014, pz], rot: [0, turn, 0], look: HIDE, e: 0.42 });
+    lump(b, 'pelvis', [size + 0.006, 0.05, 0.056], C.leatherLight, seg, { at: [px, 0.006, pz], rot: [0, turn, 0], look: HIDE, e: 0.42, taper: 0.25 });
     b.add('pelvis', S.sphere(0.007, 6, 4), C.brass, { at: along([px, -0.01, pz], out, 0.029), look: 'gold' });
   }
 }
@@ -138,7 +155,7 @@ export function bedroll(b: PartSet) {
   const seg = pick(b, 10, 12, 22);
   b.cyl('chest', 0.052, 0.052, 0.4, C.tan, { at, rot: across, look: 'cloth', seg });
   for (const bx of [-0.115, 0.115]) {
-    b.cyl('chest', 0.0545, 0.0545, 0.026, C.leatherDark, { at: [bx, at[1], at[2]], rot: across, look: 'rubber', seg, open: true });
+    b.cyl('chest', 0.0545, 0.0545, 0.026, C.leatherDark, { at: [bx, at[1], at[2]], rot: across, look: HIDE, seg, open: true });
     if (b.hero) b.box('chest', [0.03, 0.022, 0.008], C.steel, { at: [bx, at[1] + 0.012, at[2] + 0.055], rot: [0.25, 0, 0], look: 'metal', bevel: 0.003 });
   }
   b.mirror((_, sign) => {
@@ -150,15 +167,22 @@ export function bedroll(b: PartSet) {
   if (b.hero) b.box('chest', [0.39, 0.006, 0.012], C.tanDark, { at: [0, at[1] - 0.02, at[2] + 0.049], rot: [0.4, 0, 0], look: 'cloth', bevel: 0.002 });
 }
 
+/** The hatchet riding on top of the bedroll, head out past his left shoulder with the bit hanging down, under a loop off each strap. */
+export function hatchetOnPack(b: PartSet) {
+  const at: V3 = [0.03, 0.229, 0.2];
+  stow(b, 'chest', buildHatchet, at, [-Math.PI / 2, 0, Math.PI / 2]);
+  for (const [x, r] of [[-0.115, 0.0185], [0.115, 0.0215]] as const) b.cyl('chest', r, r, 0.022, C.leatherDark, { at: [x, at[1], at[2]], rot: [0, 0, Math.PI / 2], look: HIDE, seg: 12, open: true });
+}
+
 /** Leather bracer on a forearm: flared cuff, two buckled straps, lacing. */
 export function bracer(b: PartSet, side: 'L' | 'R', sign: number) {
   const bone = `forearm${side}` as const;
   const seg = pick(b, 10, 12, 20);
   const r = (at: number) => 0.0575 + (at + 0.09) * 0.045;
-  b.lathe(bone, [[0.044, -0.216], [0.05, -0.212], [r(-0.2), -0.2], [r(-0.09), -0.09], [r(-0.09) - 0.003, -0.078], [0.049, -0.075]], C.leather, { look: 'rubber', seg });
+  b.lathe(bone, [[0.044, -0.216], [0.05, -0.212], [r(-0.2), -0.2], [r(-0.09), -0.09], [r(-0.09) - 0.003, -0.078], [0.049, -0.075]], C.leather, { look: HIDE, seg });
   if (b.detail < 2) return;
   for (const at of [-0.108, -0.182]) {
-    b.cyl(bone, r(at) + 0.003, r(at) + 0.0022, 0.018, C.leatherDark, { at: [0, at, 0], look: 'rubber', seg, open: true });
+    b.cyl(bone, r(at) + 0.003, r(at) + 0.0022, 0.018, C.leatherDark, { at: [0, at, 0], look: HIDE, seg, open: true });
     b.box(bone, [0.008, 0.024, 0.026], C.steel, { at: [sign * (r(at) + 0.0035), at, 0], look: 'metal', bevel: b.hero ? 0.003 : 0 });
   }
   if (!b.hero) return;
@@ -179,14 +203,14 @@ export function legWraps(b: PartSet, side: 'L' | 'R') {
   (b.detail > 1 ? [-0.277, -0.247, -0.217, -0.187] : [-0.266, -0.218]).forEach((at, i) => {
     b.cyl(bone, r(at + h / 2), r(at - h / 2) + 0.002, h, i % 2 ? C.tanDark : C.tan, { at: [0, at, 0.003], scale: [1, 1, 1.04], look: 'cloth', seg, open: true });
   });
-  b.lathe(bone, [[0.056, -0.347], [0.0695, -0.34], [0.073, -0.308], [0.068, -0.291], [0.056, -0.295]], C.leatherLight, { look: 'rubber', seg });
+  b.lathe(bone, [[0.056, -0.347], [0.0695, -0.34], [0.073, -0.308], [0.068, -0.291], [0.056, -0.295]], C.leatherLight, { look: HIDE, seg });
   if (b.detail < 2) return;
-  lump(b, bone, [0.098, 0.1, 0.05], C.leather, pick(b, 8, 8, 12), { at: [0, -0.004, -0.045], look: 'rubber', e: 0.55 });
+  lump(b, bone, [0.098, 0.1, 0.05], C.leather, pick(b, 8, 8, 12), { at: [0, -0.004, -0.045], look: HIDE, e: 0.55 });
   if (!b.hero) return;
   stitchRing(b, bone, 0.0735, -0.314, 12);
   for (const sx of [-0.03, 0.03]) stitches(b, bone, [sx, 0.03, -0.0665], [sx, -0.04, -0.0665], 6);
   // Thong crossed over the wraps.
-  for (const lean of [-1, 1]) b.box(bone, [0.006, 0.09, 0.005], C.leatherDark, { at: [0, -0.232, -0.0545], rot: [-0.08, 0, lean * 0.5], look: 'rubber', bevel: 0 });
+  for (const lean of [-1, 1]) b.add(bone, S.torus(0.0565, 0.003, 5, 22), C.leatherDark, { at: [0, -0.232, 0.003], rot: [Math.PI / 2 + lean * 0.3, Math.PI / 2, 0], scale: [1, 1.04, 1], look: HIDE });
 }
 
 /** Bronze leaf clasp at the throat with two cords and acorn beads. */
@@ -198,9 +222,9 @@ export function clasp(b: PartSet) {
     const from: V3 = [sign * 0.014, cy - 0.014, cz - 0.008];
     const to: V3 = [sign * 0.034, cy - 0.1, cz - 0.03];
     const d: V3 = [to[0] - from[0], to[1] - from[1], to[2] - from[2]];
-    b.cyl('chest', 0.0038, 0.0038, Math.hypot(...d), C.leatherDark, { at: along(from, d, 0.5), rot: aim(d, [0, 0, -1]), look: 'rubber', seg: 6 });
+    b.cyl('chest', 0.0038, 0.0038, Math.hypot(...d), C.leatherDark, { at: along(from, d, 0.5), rot: aim(d, [0, 0, -1]), look: HIDE, seg: 6 });
     lump(b, 'chest', [0.017, 0.026, 0.017], C.brass, pick(b, 6, 6, 8), { at: [to[0], to[1] - 0.01, to[2]], look: 'gold', e: 0.9, taper: 0.3 });
-    if (b.hero) b.add('chest', S.dome(0.0095, 8, 3), C.leather, { at: [to[0], to[1] - 0.004, to[2]], look: 'rubber' });
+    if (b.hero) b.add('chest', S.dome(0.0095, 8, 3), C.leather, { at: [to[0], to[1] - 0.004, to[2]], look: HIDE });
   });
 }
 

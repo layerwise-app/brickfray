@@ -44,6 +44,7 @@ export const PIER: Element<PierParams> = {
         const u = (alongX ? p.x0 : p.z0) + 0.2 + (i * (len - 0.4)) / (piles - 1);
         const [x, z] = alongX ? [u, cz + s * (wid / 2 - 0.15)] : [cx + s * (wid / 2 - 0.15), u];
         t.cyl(x, -2.2, z, 0.17, 2.2 + (d.detail > 0 && i % 2 === 0 ? 0.5 : -0.1), POST, undefined, 0.03);
+        d.anim.foam.ring(x, z, WATER_Y, 0.17, 0.32, d.detail === 0 ? 6 : 10);
       }
     }
   }
@@ -88,6 +89,12 @@ export const QUAY_WALL: Element<{ x0: number; x1: number; z: number; gaps: [numb
     const t = new Pen(d, new Frame(0, 0, 0));
     t.span(p.x0, WATER_Y - 1.2, p.z - 0.6, p.x1, -0.02, p.z, '#8d8f88', undefined, 0);
     t.span(p.x0, -0.02, p.z - 0.5, p.x1, 0.06, p.z + 0.02, '#c9c4b5', undefined, 0.01);
+    const reach = 90;
+    let a = Math.max(p.x0, -reach);
+    for (const [g0, g1] of [...p.gaps, [reach, reach] as [number, number]].sort((m, n) => m[0] - n[0])) {
+      if (g0 > a) d.anim.foam.edge(a, p.z + 0.01, Math.min(g0, reach), p.z + 0.01, WATER_Y, 0, 1, 0.9);
+      a = Math.max(a, g1);
+    }
     if (d.detail === 0) return;
     for (let x = p.x0 + 2; x < p.x1 - 1; x += 4) {
       if (p.gaps.some(([a, b]) => x > a - 0.6 && x < b + 0.6)) continue;

@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 import { normalizeGeometry } from '../../engine/geometry';
+import { HEAD } from '../body-head';
+import { limbRings, type LimbPart } from '../body-limbs';
 import type { PartOptions, PartSet } from '../parts';
 import * as S from '../shapes';
 import type { BoneName, V3 } from '../skeleton';
@@ -177,33 +179,17 @@ export class Garment {
   }
 }
 
-/** The shared head's surface (the rings of body-head.ts), for hair and headgear that hug it. */
+/** The shared head's surface, for hair and headgear that hug it. */
 export const SKULL = new Garment(
-  [
-    [-0.028, 0.12, 0.162, -0.023],
-    [0.002, 0.188, 0.21, -0.015],
-    [0.042, 0.222, 0.2325, -0.008],
-    [0.092, 0.235, 0.247, -0.0015],
-    [0.152, 0.228, 0.245, 0.0015],
-    [0.2, 0.184, 0.203, 0.0025],
-    [0.223, 0.116, 0.13, 0.002]
-  ],
+  HEAD.map((r): Ring => [r.y, 2 * r.rx, r.rz + (r.back ?? r.rz), ((r.back ?? r.rz) - r.rz) / 2]),
   2.6
 );
 
-/** A thigh of the shared legs (the rings of body-limbs.ts) at a limb thickness, for seams, piping and patches. */
-export const thigh = (limbs: number) =>
-  new Garment(
-    (
-      [
-        [-0.412, 0.059],
-        [-0.33, 0.0655],
-        [-0.17, 0.0755],
-        [-0.04, 0.079]
-      ] as const
-    ).map(([y, r]): Ring => [y, 2 * r * limbs, 2.08 * r * limbs]),
-    2.15
-  );
+/** A thigh of the shared legs at a limb thickness, for seams, piping and patches. */
+export const thigh = (limbs: number) => limbGarment('thigh', limbs);
+
+/** One of the shared limbs (body-limbs.ts) as a garment to cut panels, seams and pockets from. */
+export const limbGarment = (part: LimbPart, limbs: number) => new Garment(limbRings(part, limbs).map((r): Ring => [r.y, 2 * r.rx, 2 * r.rz, r.cz ?? 0]), 2.15);
 
 export interface StrandOptions {
   /** Thickness across the flat side, as a fraction of the radius (1 = round). */
@@ -212,6 +198,8 @@ export interface StrandOptions {
   side?: V3;
   seg?: number;
   radial?: number;
+  /** A ring with no ends: the last point runs on into the first. */
+  closed?: boolean;
 }
 
 /**
@@ -219,7 +207,11 @@ export interface StrandOptions {
  * or flattened into a band: hair locks, scarf folds, straps, cables.
  */
 export function strand(points: V3[], radius: number | ((t: number) => number), o: StrandOptions = {}) {
-  const curve = new THREE.CatmullRomCurve3(points.map((q) => new THREE.Vector3(...q)));
+  const closed = o.closed ?? false;
+  const curve = new THREE.CatmullRomCurve3(
+    points.map((q) => new THREE.Vector3(...q)),
+    closed
+  );
   const seg = o.seg ?? 8;
   const radial = o.radial ?? 6;
   const flat = o.flat ?? 1;
@@ -253,6 +245,10 @@ export function strand(points: V3[], radius: number | ((t: number) => number), o
     centers.push(c);
   }
   const out = new Mesher();
+  if (closed) {
+    rings[seg] = rings[0]!;
+    normals[seg] = normals[0]!;
+  }
   for (let k = 0; k < seg; k++) {
     for (let f = 0; f < radial; f++) {
       const g = (f + 1) % radial;
@@ -260,6 +256,7 @@ export function strand(points: V3[], radius: number | ((t: number) => number), o
       out.tri(rings[k]![g]!, rings[k + 1]![g]!, rings[k + 1]![f]!, normals[k]![g]!, normals[k + 1]![g]!, normals[k + 1]![f]!);
     }
   }
+  if (closed) return out.build();
   for (const [k, sign] of [
     [0, -1],
     [seg, 1]

@@ -1,5 +1,6 @@
 import type { Element } from './plan';
 import { frameOf, pen, type At, type Pen } from './props-kit';
+import { WATER_Y } from './docks-parts';
 import { box, shade, type PlanCollider, type Vec3 } from './util';
 
 /** Moored coaster, 19.6 m along local x (bow +x), boarded from local -z by gangways. */
@@ -112,6 +113,7 @@ export const BOAT_EL: Element<At> = {
 
 function hull(t: Pen) {
   const plan: [number, number][] = [[BOAT.aft, -2.8], [5.6, -2.8], [8.0, -2.0], [BOAT.bow, 0], [8.0, 2.0], [5.6, 2.8], [BOAT.aft, 2.8]];
+  t.d.anim.foam.outline(plan.map(([x, z]) => t.f.p(x * 1.004, 0, z * 1.012)).map(([x, , z]) => [x, z] as [number, number]), WATER_Y, 0.8);
   t.prismUp('boat-hull', plan, BOAT.deck + 1.28, 0, -1.3, 0, HULL, 'plastic');
   const low = plan.map(([x, z]) => [x * 1.004, z * 1.012] as [number, number]);
   t.prismUp('boat-belly', low, 0.5, 0, -1.2, 0, RED, 'plastic');

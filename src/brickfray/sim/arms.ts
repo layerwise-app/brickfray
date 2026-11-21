@@ -235,7 +235,7 @@ export function stepArms(player: PlayerState, cmd: Command, dt: number, hooks: A
   if (pressed & BUTTON.reload && !busy) startReload(arms, hooks);
 
   // Aim.
-  const canAim = (b & BUTTON.ads) !== 0 && !sprinting && !busy;
+  const canAim = (b & BUTTON.ads) !== 0 && !sprinting && !busy && arms.reload <= 0;
   arms.ads = canAim ? Math.min(1, arms.ads + dt / def.adsTime) : Math.max(0, arms.ads - dt / (def.adsTime * 0.8));
 
   // Fire.

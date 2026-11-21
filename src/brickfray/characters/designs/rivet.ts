@@ -1,7 +1,8 @@
 import { buildBody } from '../body';
+import { lowBlob, lowTaper } from '../body-low';
 import type { PartSet } from '../parts';
 import type { Stance } from '../stance';
-import { armKit, hardHat, headKit, legKit, toolBelt } from './rivet-gear';
+import { armKit, hardHat, headKit, legKit, LEGS, toolBelt } from './rivet-gear';
 import { C, vest } from './rivet-vest';
 
 const { orange: ORANGE, navy: NAVY, skin: SKIN, yellow: YELLOW, tape: REFLECT, leather: LEATHER, khaki: KHAKI } = C;
@@ -25,9 +26,12 @@ export function rivet(b: PartSet) {
     buckle: '#c0c4c8',
     bulk,
     limbs: 1.08,
+    legs: LEGS,
+    nose: 1.3,
     brow: '#3b2a1e',
     browTilt: -0.12,
-    mouth: 'grin'
+    mouth: 'grin',
+    expression: { open: 0.96, squint: 0.42, brows: [0.006, 0.006] }
   });
   if (b.detail === 0) return blockCostume(b, bulk);
   vest(b);
@@ -38,33 +42,34 @@ export function rivet(b: PartSet) {
   if (b.detail >= 2) legKit(b);
 }
 
-/** Mallet over the left shoulder, nailer hanging in the right hand, weight on the right leg, grinning at the viewer. */
+/** Mallet slung over the left shoulder, nailer up and ready in the right fist, hips cocked onto the right leg, grinning at the viewer. */
 export const stance: Stance = {
-  pelvis: { at: [0.03, 0, 0], rot: [0.12, 0, -0.05] },
-  chest: [-0.24, 0.07, 0.05],
-  head: [-0.5, 0.08, -0.05],
+  pelvis: { at: [0.1, -0.03, 0], rot: [0.12, 0, 0.17] },
+  chest: [-0.1, 0.08, -0.13],
+  waist: 1,
+  head: [-0.45, 0.06, 0.02],
   feet: {
-    R: { at: [0.205, 0, 0.05], heading: 0.38 },
-    L: { at: [-0.235, 0, -0.07], heading: -0.5, knee: 0.1 }
+    R: { at: [0.14, 0, 0.03], heading: 0.3 },
+    L: { at: [-0.26, 0, -0.16], heading: -0.6, knee: 0.15 }
   },
   arms: {
-    R: { wrist: [0.27, -0.26, -0.07], hand: [0.3, -1.15, 0], elbow: [0.6, -0.2, 1], space: 'chest', shape: 'grip' },
-    L: { wrist: [-0.198, 0.179, -0.243], hand: [-2.972, 0.583, 3.048], elbow: [-0.5, -1, 0.1], space: 'chest', shape: 'fist' }
+    R: { wrist: [0.292, -0.093, -0.156], hand: [0.914, 0.492, -0.002], elbow: [-0.364, -0.916, 0.167], space: 'chest', shape: 'grip' },
+    L: { wrist: [-0.211, 0.073, -0.163], hand: [0.246, 1.3, -0.116], elbow: [-0.6, -1, 0.1], space: 'chest', shape: 'hold' }
   },
-  melee: true,
+  melee: { head: 'thumb', slide: -0.035, twist: 0.9 },
   life: { breath: 1, sway: 0.6, look: 0.5 }
 };
 
 /** The low tier's costume: a few boxes that keep the silhouette and colours. */
 function blockCostume(b: PartSet, bulk: number) {
   // Hi-vis vest over chest and waist, with a zip line and reflective bands.
-  b.taper('chest', [0.33 * bulk, 0.21], [0.41 * bulk, 0.235], 0.24, ORANGE, { at: [0, 0.08, 0], look: 'cloth' });
-  b.taper('spine', [0.3, 0.2], [0.32 * bulk, 0.21], 0.15, ORANGE, { at: [0, 0.07, 0], look: 'cloth' });
+  lowTaper(b, 'chest', [0.33 * bulk, 0.21], [0.41 * bulk, 0.235], 0.24, ORANGE, { at: [0, 0.08, 0], look: 'cloth', caps: 'top' });
+  lowTaper(b, 'spine', [0.3, 0.2], [0.32 * bulk, 0.21], 0.15, ORANGE, { at: [0, 0.07, 0], look: 'cloth' });
   for (const [bone, y, w, d] of [
     ['chest', 0.03, 0.375 * bulk, 0.228],
     ['spine', 0.07, 0.32 * bulk, 0.212]
   ] as const) {
-    b.box(bone, [w + 0.006, 0.028, d + 0.006], REFLECT, { at: [0, y, 0], look: 'gloss' });
+    lowTaper(b, bone, [w + 0.006, d + 0.006], [w + 0.006, d + 0.006], 0.028, REFLECT, { at: [0, y, 0], look: 'gloss' });
   }
   b.mirror((_, sign) => {
     b.box('chest', [0.03, 0.2, 0.012], REFLECT, { at: [sign * 0.085, 0.11, -0.118], look: 'gloss' });
@@ -100,7 +105,7 @@ function blockCostume(b: PartSet, bulk: number) {
   b.box('hat', [0.17, 0.012, 0.07], YELLOW, { at: [0, -0.05, -0.17], rot: [-0.12, 0, 0], look: 'gloss' });
 
   // Short hair under the hat, sideburns, stubble.
-  b.box('head', [0.23, 0.08, 0.1], '#3b2a1e', { at: [0, 0.16, 0.08], look: 'cloth' });
+  lowBlob(b, 'head', [0.235, 0.1, 0.12], '#3b2a1e', { at: [0, 0.15, 0.075], look: 'cloth', e: 0.75, seg: 6 });
   b.mirror((_, sign) => b.box('head', [0.016, 0.06, 0.04], '#3b2a1e', { at: [sign * 0.117, 0.09, -0.03], look: 'cloth' }));
   b.box('head', [0.085, 0.022, 0.024], '#3b2a1e', { at: [0, 0.013, -0.128], look: 'cloth', bevel: 0.006 });
 }

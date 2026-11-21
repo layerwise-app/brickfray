@@ -9,6 +9,27 @@ import { useT } from '../i18n';
  */
 const HEAD_GOLD = '#ffd23f';
 
+/**
+ * A slim crescent on a ring about 0.4 of the screen's short side out (clear of anything being aimed at near the
+ * reticle), thickest in the middle and pointed at the ends, with a small tick pointing at the shooter; drawn at the
+ * top (in front). Sized in viewport units.
+ */
+const HURT_ARC = (() => {
+  const R = 172;
+  const SPAN = 17;
+  const outer: string[] = [];
+  const inner: string[] = [];
+  for (let i = 0; i <= 16; i++) {
+    const a = ((-SPAN + (2 * SPAN * i) / 16) * Math.PI) / 180;
+    const half = 2.5 * Math.cos(((-SPAN + (2 * SPAN * i) / 16) / SPAN) * (Math.PI / 2)) + 0.3;
+    const at = (r: number) => `${(Math.sin(a) * r).toFixed(1)},${(-Math.cos(a) * r).toFixed(1)}`;
+    outer.push(at(R + half));
+    inner.unshift(at(R - half));
+  }
+  const path = `M${outer.join('L')}L${inner.join('L')}Z`;
+  return `<svg viewBox="-200 -200 400 400" style="display:block;overflow:visible;width:92vmin;height:92vmin"><path d="${path}" fill="#ff3b30" stroke="rgba(50,0,0,.75)" stroke-width="1.1"/><path d="M-4,${-R - 3.6}L0,${-R - 9}L4,${-R - 3.6}Z" fill="#ff3b30" stroke="rgba(50,0,0,.75)" stroke-width="1.1"/></svg>`;
+})();
+
 export function Crosshair({ hidden }: { hidden: boolean }) {
   const game = useGame();
   const { t } = useT();
@@ -42,13 +63,13 @@ export function Crosshair({ hidden }: { hidden: boolean }) {
         const head = p.kind === 'head' || !!p.headshot;
         const color = p.kind === 'kill' ? '#ff3b30' : head ? HEAD_GOLD : '#ffffff';
         el.style.setProperty('--hit', color);
-        el.style.setProperty('--thick', head ? '4px' : '3px');
-        el.style.setProperty('--len', head ? '13px' : '11px');
+        el.style.setProperty('--thick', head ? '4.5px' : '4px');
+        el.style.setProperty('--len', head ? '15px' : '14px');
         el.style.opacity = '1';
         el.style.transition = 'none';
         // Head hits pop in large and settle, so they read even mid-spray.
         const settle = p.kind === 'body' ? 1 : 1.35;
-        play(el.firstElementChild as HTMLElement, { transform: `translate(-50%,-50%) scale(${head ? 1.9 : settle})` }, { transform: `translate(-50%,-50%) scale(${settle})` }, 'transform .14s ease-out');
+        play(el.firstElementChild as HTMLElement, { transform: `translate(-50%,-50%) scale(${head ? 1.9 : settle * 1.35})` }, { transform: `translate(-50%,-50%) scale(${settle})` }, 'transform .12s ease-out');
         clearTimeout(markerTimer);
         markerTimer = window.setTimeout(() => {
           el.style.transition = 'opacity .18s ease';
@@ -83,14 +104,33 @@ export function Crosshair({ hidden }: { hidden: boolean }) {
         return;
       }
       if (p.type === 'hurt' && arcs.current) {
-        const el = document.createElement('div');
-        el.className = 'absolute left-1/2 top-1/2 h-[220px] w-[220px] -translate-x-1/2 -translate-y-1/2';
-        el.style.transform = `translate(-50%, -50%) rotate(${p.angle}rad)`;
-        el.style.background = `radial-gradient(ellipse 36% 9% at 50% 4%, rgba(255,40,30,${Math.min(0.95, 0.45 + p.amount / 60)}) 0 60%, transparent 100%)`;
-        el.style.transition = 'opacity .9s ease-in';
-        arcs.current.appendChild(el);
-        requestAnimationFrame(() => (el.style.opacity = '0'));
-        setTimeout(() => el.remove(), 950);
+        const strength = Math.min(1, 0.55 + p.amount / 45);
+        const arc = document.createElement('div');
+        arc.className = 'absolute left-1/2 top-1/2';
+        arc.style.transform = `translate(-50%, -50%) rotate(${p.angle}rad)`;
+        arc.style.filter = 'drop-shadow(0 0 1.5px rgba(40,0,0,.7)) drop-shadow(0 0 4px rgba(255,40,20,.45))';
+        arc.innerHTML = HURT_ARC;
+        arc.style.opacity = String(strength);
+        // A flash on the screen edge the shot came from, as strong as the hit was hard.
+        const hard = Math.min(1, p.amount / 50);
+        const x = 50 + Math.sin(p.angle) * 62;
+        const y = 50 - Math.cos(p.angle) * 62;
+        const edge = document.createElement('div');
+        edge.className = 'absolute inset-0';
+        edge.style.background = `radial-gradient(ellipse 55% 55% at ${x.toFixed(1)}% ${y.toFixed(1)}%, rgba(225,28,14,.75), rgba(225,28,14,0) 70%)`;
+        edge.style.opacity = String(0.4 + 0.5 * hard);
+        arcs.current.appendChild(edge);
+        arcs.current.appendChild(arc);
+        requestAnimationFrame(() => {
+          arc.style.transition = 'opacity .35s ease-in .25s';
+          edge.style.transition = 'opacity .45s ease-in .1s';
+          arc.style.opacity = '0';
+          edge.style.opacity = '0';
+        });
+        setTimeout(() => {
+          arc.remove();
+          edge.remove();
+        }, 700);
       }
     };
     const off = game.hud.onPulse(onPulse);
@@ -125,10 +165,11 @@ export function Crosshair({ hidden }: { hidden: boolean }) {
                 width: 'var(--thick)',
                 height: 'var(--len)',
                 background: 'var(--hit)',
-                boxShadow: '0 0 0 1px rgba(0,0,0,.6)',
+                borderRadius: 1,
+                boxShadow: '0 0 0 1.5px rgba(0,0,0,.8), 0 1px 3px rgba(0,0,0,.5)',
                 left: 'calc(var(--thick) / -2)',
                 top: 'calc(var(--len) / -2)',
-                transform: `rotate(${deg}deg) translateY(-13px)`
+                transform: `rotate(${deg}deg) translateY(-15px)`
               }}
             />
           ))}

@@ -1,3 +1,4 @@
+import { FEEDBACK_SAMPLES } from './samples-feedback';
 import { WEAPON_SAMPLES } from './samples-weapons';
 import { WORLD_SAMPLES } from './samples-world';
 import type { SoundId } from './types';
@@ -9,4 +10,4 @@ import type { SoundId } from './types';
  */
 export type SampleMap = Partial<Record<SoundId, readonly string[]>>;
 
-export const SAMPLES: SampleMap = { ...WEAPON_SAMPLES, ...WORLD_SAMPLES };
+export const SAMPLES: SampleMap = { ...WEAPON_SAMPLES, ...WORLD_SAMPLES, ...FEEDBACK_SAMPLES };

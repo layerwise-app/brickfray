@@ -3,8 +3,9 @@ import { LOADOUTS } from '../weapons/loadouts';
 import { disposePieceMaterials } from './material';
 import { clearShapeCache } from './shapes';
 import { DESIGNS } from './designs';
+import { occlude } from './hero-assets';
 import { meleeProp } from './melee';
-import { PartSet, type BakedCharacter, type Hands } from './parts';
+import { DEFAULT_HANDS, PartSet, type BakedCharacter, type Hands } from './parts';
 import { Rig } from './rig';
 import { ROSTER } from './roster';
 import { restModelPositions, restOffsets } from './skeleton';
@@ -16,6 +17,7 @@ export { CHARACTER_IDS, ROSTER } from './roster';
 export { BOT_KINDS } from './designs';
 export { idleState } from './labState';
 export { STANCES } from './stances';
+export { loadHeroAssets } from './hero-assets';
 export type { Stance } from './stance';
 
 const cache = new Map<string, BakedCharacter>();
@@ -31,9 +33,11 @@ export function createCharacter(id: CharacterId | BotKind, kit: Kit, hero?: { ha
     design.build(parts);
     meleeProp(parts, LOADOUTS[id].melee, !(id in ROSTER));
     baked = parts.bake(restModelPositions(rest));
+    if (hero) occlude(id, baked.glass ? [baked.main, baked.glass] : [baked.main]);
     cache.set(key, baked);
   }
-  return new Rig({ id, baked, rest, style: STYLES[id], scale: design.scale ?? 1 }, kit);
+  const hands = hero ? hero.hands : kit.profile.detail === 2 ? DEFAULT_HANDS : null;
+  return new Rig({ id, baked, hands, rest, style: STYLES[id], scale: design.scale ?? 1 }, kit);
 }
 
 /** Frees every cached character geometry (after a quality change or when leaving the game). */

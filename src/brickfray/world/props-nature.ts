@@ -18,40 +18,16 @@ const BARK = '#6e4a2f';
 /** Trunk height in meters before scaling; players collide with the trunk only. */
 const TRUNK: Record<TreeKind, number> = { oak: 2.4, pine: 1.4, poplar: 1.9, blossom: 2.1, birch: 2.6 };
 
-function canopy(p: Pen, rng: Rng, cy: number, s: number, colors: string[], spread: number) {
-  const det = p.detail;
-  const lumps = det === 0 ? 1 : det === 1 ? 7 : 12;
-  if (det === 0) {
-    p.ball(0, cy, 0, 1.5 * s * spread, colors[0]!, [1, 0.85, 1]);
-    return;
-  }
-  p.ball(0, cy, 0, 1.25 * s * spread, colors[0]!, [1, 0.9, 1], 0.12, 3);
-  for (let i = 0; i < lumps; i++) {
-    const a = (i / lumps) * Math.PI * 2 + rng.range(-0.3, 0.3);
-    const ring = i % 3 === 0 ? 0.45 : 1;
-    const r = rng.range(0.55, 0.8) * s * spread;
-    const dist = 1.05 * s * spread * ring;
-    const y = cy + (ring < 1 ? 0.75 * s : rng.range(-0.35, 0.35) * s);
-    p.ball(Math.cos(a) * dist, y, Math.sin(a) * dist, r, colors[(i + 1) % colors.length]!, [1, 0.88, 1], 0.18, (i % 4) + 1);
-  }
-}
-
 /** Toy canopy of stacked rounded discs with leaf clumps poking out. */
 function discCanopy(p: Pen, rng: Rng, y0: number, s: number, radii: number[], colors: string[]) {
-  if (p.detail === 0) {
-    const r = Math.max(...radii) * s;
-    p.cone(0, y0, 0, r * 0.75, r * 0.45, radii.length * 0.32 * s * 0.45, colors[0]!, undefined, 7);
-    p.cone(0, y0 + radii.length * 0.32 * s * 0.45, 0, r, r * 0.35, radii.length * 0.32 * s * 0.55, colors[1] ?? colors[0]!, undefined, 7);
-    return;
-  }
   const h = 0.32 * s;
   radii.forEach((r, i) => {
     const jx = rng.range(-0.08, 0.08) * s;
     const jz = rng.range(-0.08, 0.08) * s;
-    p.cyl(jx, y0 + i * h, jz, r * s, h - 0.01, colors[i % colors.length]!, undefined, 0.07 * s, p.detail === 2 ? 12 : 9);
+    p.cyl(jx, y0 + i * h, jz, r * s, h - 0.01, colors[i % colors.length]!, undefined, 0.07 * s, [8, 9, 12][p.detail]);
   });
   const widest = radii.indexOf(Math.max(...radii));
-  const clumps = p.detail === 2 ? 7 : 4;
+  const clumps = [3, 4, 7][p.detail]!;
   for (let i = 0; i < clumps; i++) {
     const a = (i / clumps) * Math.PI * 2 + rng.range(-0.3, 0.3);
     const layer = Math.max(0, Math.min(radii.length - 2, widest + rng.int(-2, 1)));
@@ -66,10 +42,6 @@ function discCanopy(p: Pen, rng: Rng, y0: number, s: number, radii: number[], co
 
 function trunk(p: Pen, h: number, r: number, color: string) {
   p.cyl(0, 0, 0, r * 1.5, 0.16, shade(color, -0.1), undefined, 0.03);
-  if (p.detail === 0) {
-    p.box(0, 0, 0, r * 1.8, h, r * 1.8, color, undefined, 0);
-    return;
-  }
   const seg = 0.48;
   for (let y = 0.16, i = 0; y < h - 0.01; y += seg, i++) p.cyl(0, y, 0, r * (1 - i * 0.03), Math.min(seg, h - y) - 0.004, i % 2 ? shade(color, 0.06) : color, undefined, 0.02);
 }
@@ -93,27 +65,25 @@ export const TREE: Element<TreeParams> = {
       }
       case 'blossom': {
         trunk(t, h, 0.2 * s, BARK);
-        if (d.detail > 0) {
-          t.cylX(0.35 * s, h * 0.8, 0, 0.08 * s, 0.7 * s, BARK);
-          t.cylZ(0, h * 0.7, -0.3 * s, 0.07 * s, 0.6 * s, BARK);
-        }
-        canopy(t, rng, h + 0.9 * s, s, BLOSSOM, 0.85);
+        t.cylX(0.35 * s, h * 0.8, 0, 0.08 * s, 0.7 * s, BARK);
+        t.cylZ(0, h * 0.7, -0.3 * s, 0.07 * s, 0.6 * s, BARK);
+        discCanopy(t, rng, h - 0.1 * s, s, [0.8, 1.25, 1.5, 1.55, 1.4, 1.1, 0.7, 0.35], BLOSSOM);
         break;
       }
       case 'birch': {
         trunk(t, h, 0.15 * s, '#ece8dc');
-        if (d.detail > 0) for (let i = 0; i < 5; i++) t.box(0, 0.4 + i * 0.5 * s, 0, 0.32 * s, 0.06, 0.32 * s, '#2f363d', undefined, 0, i);
-        canopy(t, rng, h + 0.8 * s, s * 0.8, ['#8fc23f', '#6fae3a', '#a6c629'], 0.9);
+        for (let i = 0; i < 5; i++) t.box(0, 0.4 + i * 0.5 * s, 0, 0.32 * s, 0.06, 0.32 * s, '#2f363d', undefined, 0, i);
+        discCanopy(t, rng, h - 0.2 * s, s, [0.7, 1.0, 1.15, 1.1, 0.95, 0.75, 0.45], ['#8fc23f', '#6fae3a', '#a6c629']);
         break;
       }
       case 'pine': {
         trunk(t, h, 0.16 * s, BARK);
-        const tiers = d.detail === 0 ? 2 : 4;
+        const tiers = 4;
         for (let i = 0; i < tiers; i++) {
           const k = i / tiers;
           const r0 = (1.55 - k * 1.05) * s;
-          const height = (d.detail === 0 ? 2.2 : 1.35) * s;
-          const y = h * 0.7 + i * (d.detail === 0 ? 1.6 : 0.95) * s;
+          const height = 1.35 * s;
+          const y = h * 0.7 + i * 0.95 * s;
           t.cone(0, y, 0, r0, i === tiers - 1 ? 0 : r0 * 0.28, height, PINES[i % PINES.length]!, undefined, d.detail === 0 ? 7 : 9);
         }
         break;
@@ -142,21 +112,19 @@ export const BUSH: Element<BushParams> = {
     const s = p.size ?? 1;
     const t = pen(d, p);
     const rng = new Rng(p.seed ?? Math.round(p.x * 13 + p.z * 7));
-    if (d.detail === 0) {
-      t.ball(0, 0.4 * s, 0, 0.75 * s, GREENS[0]!, [1, 0.7, 1]);
-      return;
-    }
-    const n = d.detail === 1 ? 4 : 6;
+    const segs = d.detail === 0 ? 8 : 10;
+    const layers: [number, number][] = [[0.72, 0], [0.62, 0.28], [0.42, 0.56]];
+    layers.forEach(([r, y], i) => t.cyl(0, y * s, 0, r * s, 0.27 * s, GREENS[i % GREENS.length]!, undefined, 0.06 * s, segs));
+    const n = d.detail === 2 ? 5 : 3;
     for (let i = 0; i < n; i++) {
       const a = (i / n) * Math.PI * 2 + rng.range(0, 0.6);
-      const dist = i === 0 ? 0 : 0.38 * s;
-      t.ball(Math.cos(a) * dist, 0.42 * s, Math.sin(a) * dist, rng.range(0.38, 0.5) * s, GREENS[i % GREENS.length]!, [1, 0.85, 1], 0.2, (i % 3) + 1);
+      t.cyl(Math.cos(a) * 0.55 * s, 0.14 * s, Math.sin(a) * 0.55 * s, 0.26 * s, 0.3 * s, GREENS[(i + 1) % GREENS.length]!, undefined, 0.05 * s, 8);
     }
     if (p.flowers && d.detail >= 2) {
       for (let i = 0; i < 7; i++) {
         const a = rng.range(0, Math.PI * 2);
-        const dist = rng.range(0.1, 0.55) * s;
-        t.ball(Math.cos(a) * dist, 0.72 * s + rng.range(-0.1, 0.05), Math.sin(a) * dist, 0.07, i % 3 ? p.flowers : '#fff6d8');
+        const dist = rng.range(0.1, 0.45) * s;
+        t.cyl(Math.cos(a) * dist, 0.83 * s, Math.sin(a) * dist, 0.07, 0.05, i % 3 ? p.flowers : '#fff6d8', undefined, 0.02, 6);
       }
     }
   }
@@ -239,7 +207,7 @@ export const HEDGE: Element<HedgeParams> = {
     const n = Math.max(2, Math.round(p.length / 0.55));
     for (let i = 0; i < n; i++) {
       const x = -p.length / 2 + (i + 0.5) * (p.length / n);
-      t.ball(x, h - 0.26, 0, dd * 0.42, GREENS[i % GREENS.length]!, [1.2, 0.8, 1], 0.16, (i % 3) + 1);
+      t.cyl(x, h - 0.24, 0, dd * 0.42, 0.26, GREENS[i % GREENS.length]!, undefined, 0.05, 8);
     }
   }
 };

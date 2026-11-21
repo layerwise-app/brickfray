@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { ANKLE_H, BALL, HEEL } from './skeleton';
+import { ANKLE_H, BALL, HEEL, type V3 } from './skeleton';
 import { clamp, damp, dampAngle, lerp, smooth } from './ik';
 import type { Style } from './style';
 
@@ -45,7 +45,7 @@ export function gaitParams(v: number, crouch: number, sprint: number, back: numb
   return {
     stride,
     duty: lerp(lerp(0.6, 0.36, run) - 0.04 * sprint, 0.6, crouch),
-    lift: (lerp(0.075, 0.2, run) + 0.08 * sprint) * st.lift * lerp(1, 0.55, crouch) * lerp(1, 0.6, back),
+    lift: (lerp(0.075, 0.2, run) + 0.08 * sprint) * st.lift * lerp(1, 0.8, crouch) * lerp(1, 0.6, back),
     skew: lerp(1.15, 0.72, run),
     heel: lerp(0.32, 0.16, run) * lerp(1, 0.5, back),
     toe: lerp(0.5, 0.8, run) * lerp(1, 0.7, crouch),
@@ -187,4 +187,57 @@ export class Gait {
     this.roll = -P.roll * Math.sin(ph) * st.sway;
     return clamp(h, -0.8, 0.8) * 0.9;
   }
+}
+
+/** Foot targets of the standing figure (model space), blended with the gait by the animator. */
+export const IDLE: { pos: V3; heading: number }[] = [
+  { pos: [-0.11, 0, -0.07], heading: -0.12 },
+  { pos: [0.12, 0, 0.1], heading: 0.42 }
+];
+/**
+ * Idle crouch as a kneel: the lead (left) foot flat ahead with its knee up, the rear knee near the floor
+ * on the ball of the foot. A bouncy character keeps the rear knee off the floor, ready to spring.
+ */
+export function crouchFoot(i: number, st: Style, out: { pos: V3; heading: number; pitch: number }) {
+  const ready = clamp(st.bounce, 0, 1);
+  if (i === 0) {
+    out.pos = [-0.085 * st.stance, 0, -0.29 - 0.03 * ready];
+    out.heading = -0.04 - st.toeOut * 0.4;
+    out.pitch = 0;
+  } else {
+    out.pos = [0.115 * st.stance, 0, 0.3 - 0.07 * ready];
+    out.heading = 0.22 + st.toeOut;
+    out.pitch = -1.05 + 0.3 * ready;
+  }
+  return out;
+}
+export const crouchPose = { pos: [0, 0, 0] as V3, heading: 0, pitch: 0 };
+
+/**
+ * Feet in the air (model space). Rising, the lead knee drives up and forward with the foot tucked back under it
+ * while the push leg trails long behind: a leap, not a seated tuck. Falling, the lead foot reaches down and forward
+ * for the floor and the trail leg folds behind. Just off the ground both feet are still pointed from the push.
+ */
+export const AIR_TUCK: V3[] = [
+  [-0.1, 0.36, 0.0],
+  [0.1, 0.2, 0.24]
+];
+export const AIR_FALL: V3[] = [
+  [-0.11, 0.1, -0.14],
+  [0.11, 0.26, 0.16]
+];
+export const AIR_PUSH: V3[] = [
+  [-0.1, 0.1, 0.06],
+  [0.1, 0.07, 0.15]
+];
+/** Foot pitch in the air (negative points the toes): pointed while rising, the lead foot flattening to land. */
+export const AIR_PITCH = { tuck: [-0.75, -0.95], fall: [0.05, -0.7], push: [-0.95, -1.0] } as const;
+
+/** Ankle position for a foot standing on its ball with the heel raised by `pitch` (≤ 0). */
+export function ballPivot(pitch: number, heading: number, flat: THREE.Vector3) {
+  const along = -BALL * Math.cos(pitch) - ANKLE_H * Math.sin(pitch) + BALL;
+  flat.x += Math.sin(heading) * along;
+  flat.z -= Math.cos(heading) * along;
+  flat.y = -BALL * Math.sin(pitch) + ANKLE_H * Math.cos(pitch);
+  return flat;
 }

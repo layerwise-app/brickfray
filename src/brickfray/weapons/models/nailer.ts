@@ -29,6 +29,11 @@ const MAG_REAR = -0.088;
 const MAG_FRONT = -0.148;
 const RAKE = 0.32;
 const magZ = (y: number, edge: number) => edge - (MAG_TOP - y) * Math.tan(RAKE);
+/** Spacing of the collated nails up the strip. */
+const PITCH = 0.0068;
+
+/** One nail's step down the raked strip, in the magazine's frame: a shot starts the strip this far back and feeds it up. */
+export const NAIL_STEP = [0, -PITCH, -PITCH * Math.tan(RAKE)] as const;
 
 /** Nailer: safety-yellow power-tool SMG with a drum cylinder head, sprung contact nose, nail-strip mag and a slide-on battery. */
 export function buildNailer(b: ModelBuilder) {
@@ -73,12 +78,12 @@ export function buildNailer(b: ModelBuilder) {
   for (const s of [1, -1]) b.add(box(0.0048, 0.0105, 0.009, lod.bevel * 0.4), C.dark, 'satin', T(s * 0.0071, 0.1555, REAR_Z));
   if (b.minor) for (const s of [1, -1]) b.add(box(0.0016, 0.0016, 0.0008), C.dot, 'glow', T(s * 0.0071, 0.1575, REAR_Z + 0.0047));
 
-  // Cylinder head drum: ribbed rubber saddle underneath for the support hand, bumper cap in front.
+  // Cylinder head drum in a rubber boot, ribbed saddle underneath for the support hand, bumper cap in front.
   const drumZ = -0.194;
   b.add(
     latheZ([[0, 0.044], [0.03, 0.044], [0.035, 0.04], [0.036, 0.032], [0.036, -0.03], [0.0345, -0.038], [0.029, -0.044], [0, -0.044]], lod.seg),
-    C.body,
-    'plastic',
+    C.rubber,
+    'rubber',
     T(0, BORE, drumZ)
   );
   const arc = Math.max(4, lod.curve * 2 + 2);
@@ -93,7 +98,7 @@ export function buildNailer(b: ModelBuilder) {
   }
   b.add(prism(saddle, 0.054, lod, 0.002), C.rubber, 'rubber', T(0, BORE, drumZ + 0.002));
   for (const z of [0.038, -0.034]) b.add(tube(0.0368, 0.006, lod.seg, 0.0015), C.rubber, 'rubber', T(0, BORE, drumZ + z));
-  if (d >= 1) for (let i = 0; i < 5; i++) b.add(torus(0.0384, 0.0016, 10, Math.PI * 0.8), shade(C.rubber, 0.7), 'rubber', T(0, BORE, drumZ + 0.002 + (i - 2) * 0.0105, 0, 0, Math.PI * 1.1));
+  if (d >= 1) for (let i = 0; i < 5; i++) b.add(torus(0.0384, 0.0016, 10, Math.PI * 0.8), shade(C.rubber, 1.6), 'rubber', T(0, BORE, drumZ + 0.002 + (i - 2) * 0.0105, 0, 0, Math.PI * 1.1));
   b.add(tube(0.03, 0.01, lod.seg, 0.003, 0.026), C.rubber, 'rubber', T(0, BORE, -0.242));
   b.add(tube(0.021, 0.006, lod.seg, 0.001), C.steel, 'metal', T(0, BORE, -0.249));
   if (d >= 2) for (let i = 0; i < 4; i++) {
@@ -111,6 +116,11 @@ export function buildNailer(b: ModelBuilder) {
     b.add(tube(0.0016, 0.0016, 10), C.dot, 'glow', T(0, SIGHT_Y, FRONT_Z + 0.0004));
   }
 
+  // Driver (animated, punches back on every shot): the sprung nose, and a flag in a track on the left of the housing.
+  slot(b, -0.0222, 0.117, -0.088, 0.0014, 0.0085, 0.07);
+  b.part('slide', new THREE.Vector3(0, BORE, -0.29));
+  b.add(box(0.0018, 0.005, 0.026, 0.0005), C.bright, 'metal', T(-0.0226, 0.117, -0.1));
+  b.add(box(0.0065, 0.0105, 0.012, 0.002), C.orange, 'plastic', T(-0.0255, 0.117, -0.113));
   // Steel nose, coil spring and the contact trip sleeve with teeth.
   b.add(latheZ([[0, -0.248], [0.0185, -0.248], [0.0185, -0.252], [0.0135, -0.272], [0.0122, -0.3], [0, -0.3]], lod.seg), C.steel, 'metal', T(0, BORE, 0));
   b.add(box(0.006, 0.0032, 0.062, 0.0006), C.steel, 'metal', T(0, BORE - 0.0148, -0.284));
@@ -126,6 +136,8 @@ export function buildNailer(b: ModelBuilder) {
     b.add(gear(0.0068, 0.008, d >= 2 ? 14 : 9, 0.006), C.orange, 'plastic', T(-0.0175, BORE - 0.004, -0.264, 0, Math.PI / 2));
     b.add(tube(0.0034, 0.003, lod.segSmall), C.steel, 'metal', T(-0.0212, BORE - 0.004, -0.264, 0, Math.PI / 2));
   }
+
+  b.part('body');
 
   // Trigger guard, long power-tool trigger, mode switch (left) and mag release (right).
   b.add(slab([[-0.088, 0.052], [-0.012, 0.052], [-0.014, 0.012], [-0.086, 0.017]], 0.0095, lod, 0.006, [[[-0.079, 0.05], [-0.021, 0.05], [-0.022, 0.021], [-0.078, 0.025]]]), C.rubber, 'rubber');
@@ -195,7 +207,9 @@ export function buildNailer(b: ModelBuilder) {
   const open = !lod.third;
   b.add(slab(outline, 0.022, lod, 0.004, open ? [win] : []), C.mag, 'satin');
   if (open) {
-    const pitch = 0.0068;
+    // The collated strip (animated): fed up a nail on every shot.
+    b.part('strip', new THREE.Vector3(0, 0.05, -0.118));
+    const pitch = PITCH;
     const count = Math.floor((0.036 - winBottom) / pitch) + 1;
     const seg = Math.min(8, lod.segSmall);
     const shankR = 0.0017;
@@ -220,6 +234,7 @@ export function buildNailer(b: ModelBuilder) {
       const z = magZ(yMid, MAG_REAR) - 0.0095 - f * (0.06 - 0.02);
       for (const s of [1, -1]) b.add(box(0.0012, span, 0.0042), C.strip, 'plastic', T(s * 0.0023, yMid, z, RAKE));
     }
+    b.part('magazine');
   } else if (b.minor) {
     const yMid = (winTop + winBottom) / 2;
     for (const s of [1, -1]) b.add(box(0.0014, (winTop - winBottom) / Math.cos(RAKE), 0.006), C.strip, 'plastic', T(s * 0.0114, yMid, magZ(yMid, MAG_REAR) - 0.022, RAKE));
