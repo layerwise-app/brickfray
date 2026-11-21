@@ -1,5 +1,6 @@
 import { createServerFn } from '@tanstack/react-start';
 import { getRequestHeader, getRequestHeaders } from '@tanstack/react-start/server';
+import { env } from 'cloudflare:workers';
 import { CHARACTER_IDS } from '~/brickfray/characters/roster';
 import { db } from '~/db';
 import { auth } from '~/lib/auth';
@@ -12,13 +13,15 @@ import {
   type LeaderboardPage,
   type LeaderboardQuery,
   type MatchReport,
+  type MatchStart,
   type ProfileView,
   type UploadResult
 } from './contract';
 import { EMPTY_HISTORY, history, leaderboard, storeMatches } from './matches';
 import { claimPlayer, ensurePlayer, findPlayer, getProfile, profileView, updateProfile } from './players';
 import { allowAll, HOUR, ipKey, MINUTE } from './rate';
-import { cleanName, parseHistoryQuery, parseLeaderboardQuery, parseUpload, playerId } from './validate';
+import { issueTicket, openTicket } from './ticket';
+import { admit, cleanName, parseHistoryQuery, parseLeaderboardQuery, parseMatchStart, parseUpload, playerId } from './validate';
 
 // The browser's player id is its credential here; the auth session only decides which account a claim joins.
 
@@ -34,6 +37,31 @@ function record(raw: unknown) {
   if (!raw || typeof raw !== 'object') throw new BoardError('invalid', 'not an object');
   return raw as Record<string, unknown>;
 }
+
+/** Signs match tickets. Layerwise sets the secret on a published app; without one (local dev) a fixed key stands in. */
+function ticketSecret() {
+  return env.BETTER_AUTH_SECRET || (import.meta.env.DEV ? 'brickfray-dev' : '');
+}
+
+/** Called as a match starts: the ticket its report will need (see ticket.ts). */
+export const startMatch = createServerFn({ method: 'POST' })
+  .validator((raw: { playerId: string; mode: string; map: string; difficulty: string | null }) => parseMatchStart(raw))
+  .handler(async ({ data }): Promise<MatchStart | { refused: 'rate' | 'off' }> => {
+    const secret = ticketSecret();
+    if (!secret) return { refused: 'off' };
+    const now = Date.now();
+    const ok = await allowAll(
+      db,
+      [
+        [`start:p:${data.playerId}`, 12, 10 * MINUTE],
+        [`start:p:${data.playerId}`, 40, HOUR],
+        [`start:ip:${await caller()}`, 120, HOUR]
+      ],
+      now
+    );
+    if (!ok) return { refused: 'rate' };
+    return issueTicket(secret, data, now);
+  });
 
 export const uploadMatches = createServerFn({ method: 'POST' })
   .validator((raw: { playerId: string; name: string; matches: MatchReport[] }) => parseUpload(raw, Date.now()))
@@ -53,8 +81,20 @@ export const uploadMatches = createServerFn({ method: 'POST' })
       n
     );
     if (!ok) return { stored: [], refused: data.refused, limited: true };
+    const secret = ticketSecret();
+    const admitted: MatchReport[] = [];
+    const refused = [...data.refused];
+    for (const report of data.matches) {
+      try {
+        admitted.push(admit(report, secret ? await openTicket(secret, report.ticket) : null, data.playerId, now));
+      } catch (error) {
+        if (!(error instanceof BoardError)) throw error;
+        refused.push(report.key);
+      }
+    }
+    if (!admitted.length) return { stored: [], refused, limited: false };
     const player = await ensurePlayer(db, data.playerId, data.name, now);
-    return { stored: await storeMatches(db, player, data.matches, now), refused: data.refused, limited: false };
+    return { stored: await storeMatches(db, player, admitted, now), refused, limited: false };
   });
 
 export const getLeaderboard = createServerFn({ method: 'GET' })

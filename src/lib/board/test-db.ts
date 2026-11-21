@@ -19,6 +19,7 @@ export function report(over: Partial<MatchReport> = {}): MatchReport {
   serial++;
   return {
     key: `match-${String(serial).padStart(4, '0')}`,
+    ticket: null,
     mode: 'ffa',
     map: 'plaza',
     difficulty: null,

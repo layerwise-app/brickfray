@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import type { MapLayout } from '../world/types';
 import { TICK } from './constants';
 import { WEAPONS } from '../weapons/defs';
-import { Match, waveTuning } from './match';
+import { Match } from './match';
+import { waveTuning } from './waves';
 import { BUTTON, DIFFICULTIES, type Difficulty } from './types';
 
 function arena(): MapLayout {

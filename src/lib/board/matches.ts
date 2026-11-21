@@ -20,7 +20,7 @@ export async function storeMatches(db: BoardDb, player: PlayerRef, reports: Matc
   // One statement per match: D1 caps the bound values of a single statement.
   await inOrder(
     db,
-    reports.map(({ key, ...r }) =>
+    reports.map(({ key, ticket: _, ...r }) =>
       db
         .insert(boardMatch)
         .values({ ...r, matchKey: key, playerId: player.id, profileId: player.profileId, createdAt: now })

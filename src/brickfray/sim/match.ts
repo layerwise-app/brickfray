@@ -7,50 +7,12 @@ import { HostSim } from './host';
 import type { MapLayout } from '../world/types';
 import type { Difficulty, HostPlayer, MatchSettings, MatchState } from './types';
 import { drawOffer, takeUpgrade, type UpgradeId } from './upgrades';
+import { WAVE_BREAK, waveBosses, waveTuning } from './waves';
 
 const WARMUP = 4;
-/** Seconds from the upgrade pick (or a wave with nothing left to pick) to the next wave. */
-const WAVE_BREAK = 5;
 /** Seconds the upgrade cards wait before taking the first card for a player who doesn't choose. */
 export const PICK_TIME = 30;
 const RESULTS = 12;
-interface Ramp {
-  /** [wave 1, added per wave, cap] */
-  skill: [number, number, number];
-  damage: [number, number, number];
-  /** [base, added per wave] */
-  count: [number, number];
-  /** [wave 1, added per wave, cap] snapbots on the field at once. */
-  alive: [number, number, number];
-  /** Share of max health restored between waves. */
-  heal: number;
-}
-
-// Wave 1 is as it always was; the climb after it is gentler so the upgrades taken between waves can keep up.
-const RAMP: Record<Difficulty, Ramp> = {
-  easy: { skill: [0.05, 0.04, 0.6], damage: [0.2, 0.02, 0.45], count: [2, 1.2], alive: [2, 0.5, 6], heal: 1 },
-  normal: { skill: [0.18, 0.05, 0.9], damage: [0.3, 0.03, 0.65], count: [3, 1.6], alive: [3, 0.6, 8], heal: 1 },
-  hard: { skill: [0.4, 0.06, 1], damage: [0.45, 0.04, 0.9], count: [4, 2.2], alive: [4, 0.7, 10], heal: 0.5 }
-};
-
-/** From this wave on, aim and damage keep climbing past their caps, so even a fully upgraded run comes to an end. */
-const LATE = 10;
-
-/** How hard a solo wave is: bot aim, bot damage to the player, wave size and how many fight at once. */
-export function waveTuning(difficulty: Difficulty, wave: number) {
-  const r = RAMP[difficulty];
-  const step = wave - 1;
-  const late = Math.max(0, wave - LATE);
-  return {
-    skill: Math.min(1, Math.min(r.skill[2], r.skill[0] + r.skill[1] * step) + 0.02 * late),
-    damage: Math.min(r.damage[2], r.damage[0] + r.damage[1] * step) * (1 + 0.05 * late),
-    count: Math.floor(r.count[0] + r.count[1] * wave),
-    alive: Math.min(r.alive[2], r.alive[0] + Math.floor(r.alive[1] * step)),
-    spawnEvery: Math.max(0.5, 1.4 - 0.08 * step),
-    heal: r.heal
-  };
-}
-
 const BOT_NAMES = ['Bolt', 'Pixel', 'Widget', 'Sprocket', 'Gizmo', 'Ratchet', 'Clicky', 'Dynamo', 'Fuse', 'Cog'];
 const SNAPBOT_NAMES: Record<BotKind, string> = { grunt: 'Snapbot', rusher: 'Zipbot', sniper: 'Scopebot', boss: 'Megabot' };
 
@@ -186,7 +148,7 @@ export class Match {
       const r = (i * 7 + wave * 3) % 10;
       queue.push(r < rushers ? 'rusher' : r >= 10 - snipers ? 'sniper' : 'grunt');
     }
-    if (wave % 5 === 0) for (let i = 0; i < wave / 5; i++) queue.push('boss');
+    for (let i = 0; i < waveBosses(wave); i++) queue.push('boss');
     this.waveQueue = queue;
     this.waveSpawnTimer = 0;
   }

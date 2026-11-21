@@ -22,8 +22,10 @@ export const UPLOAD_BATCH = 20;
 
 /** One finished match of the local player, as the game records it. */
 export interface MatchReport {
-  /** Made by the client when the match ends; a retried upload carries the same key. */
+  /** The key of the match's ticket; a retried upload carries the same key. A match that got no ticket makes its own. */
   key: string;
+  /** What the server signed when the match started (startMatch). Without it the match stays in this browser's history only. */
+  ticket: string | null;
   mode: BoardMode;
   map: string;
   /** Solo only. */
@@ -43,6 +45,12 @@ export interface MatchReport {
   players: number;
   /** Solo: null. */
   result: MatchResult | null;
+}
+
+/** A started match: its ticket and the key its report must carry. */
+export interface MatchStart {
+  key: string;
+  ticket: string;
 }
 
 /** An uploaded picture wins; otherwise a character portrait; otherwise the row's own character. */

@@ -29,9 +29,10 @@ async function send(name: string) {
   }
 }
 
-/** A match just finished: kept here first, then sent. */
+/** A match just finished: kept here first, then sent. One that got no ticket stays here only. */
 export function recordMatch(report: MatchReport, name: string) {
-  addLocalMatch(report);
+  addLocalMatch(report, report.ticket ? 'pending' : 'refused');
+  if (!report.ticket) return;
   // An upload already under way may have read the queue before this match joined it.
   void (running ?? Promise.resolve()).then(() => flushMatches(name));
 }

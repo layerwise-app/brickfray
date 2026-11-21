@@ -37,9 +37,9 @@ export function localMatches() {
   return load();
 }
 
-export function addLocalMatch(report: MatchReport) {
+export function addLocalMatch(report: MatchReport, upload: UploadState) {
   const matches = load().filter((m) => m.key !== report.key);
-  save([...matches, { ...report, upload: 'pending' }]);
+  save([...matches, { ...report, upload }]);
 }
 
 export function pendingMatches(): MatchReport[] {
@@ -65,7 +65,7 @@ export function clearLocalMatches() {
 /** The same page the server would give, from this browser's copy: used while the server cannot be reached. */
 export function localHistory(page: number): HistoryPage {
   const all = load().sort((a, b) => b.endedAt - a.endedAt);
-  const rows: BoardEntry[] = all.slice(page * HISTORY_PAGE, (page + 1) * HISTORY_PAGE).map(({ key: _, upload: __, ...m }, i) => ({ ...m, id: -(page * HISTORY_PAGE + i + 1) }));
+  const rows: BoardEntry[] = all.slice(page * HISTORY_PAGE, (page + 1) * HISTORY_PAGE).map(({ key: _, upload: __, ticket: ___, ...m }, i) => ({ ...m, id: -(page * HISTORY_PAGE + i + 1) }));
   const sum = (pick: (m: LocalMatch) => number) => all.reduce((total, m) => total + pick(m), 0);
   return {
     rows,

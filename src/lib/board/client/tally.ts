@@ -2,11 +2,11 @@ import { CHARACTER_IDS } from '~/brickfray/characters/roster';
 import type { CharacterId } from '~/brickfray/characters/types';
 import type { HudState } from '~/brickfray/game/hud';
 import type { GameEvent, MatchSettings } from '~/brickfray/sim/types';
-import type { MatchReport, MatchResult } from '../contract';
+import type { MatchReport, MatchResult, MatchStart } from '../contract';
 
 /**
  * Watches one match from the local player's side and turns it into a report once: when the match ends, or when a
- * solo run is left after its warm-up. Rooms left early and warm-ups are not reported.
+ * solo run is left after its warm-up with a score. Rooms left early, warm-ups and empty runs are not reported.
  */
 export class MatchTally {
   private startedAt = 0;
@@ -14,11 +14,16 @@ export class MatchTally {
   private played = 0;
   private headshots = 0;
   private done = false;
+  private ticket: MatchStart | null = null;
 
+  /** `ticket` is the server's note of this match's start, asked for as it loads (requestTicket). */
   constructor(
     private readonly settings: MatchSettings,
-    private readonly character: CharacterId
-  ) {}
+    private readonly character: CharacterId,
+    ticket: Promise<MatchStart | null>
+  ) {
+    void ticket.then((t) => (this.ticket = t));
+  }
 
   events(events: readonly GameEvent[], me: number) {
     for (const e of events) if (e.type === 'kill' && e.killer === me && e.victim !== me && e.headshot) this.headshots++;
@@ -40,6 +45,8 @@ export class MatchTally {
   leave(hud: HudState): MatchReport | null {
     if (this.done || this.settings.mode !== 'solo' || !this.startedAt) return null;
     if (hud.phase !== 'playing' && hud.phase !== 'intermission') return null;
+    // A run left before anything was scored would only put an empty row on the board.
+    if (!hud.rows.find((r) => r.me)?.score) return null;
     this.done = true;
     return this.report(hud);
   }
@@ -54,7 +61,8 @@ export class MatchTally {
     if (this.settings.mode === 'tdm') result = hud.winner === null ? 'draw' : hud.winner === me.team ? 'win' : 'loss';
     const seconds = solo ? this.played : (Date.now() - this.startedAt) / 1000;
     return {
-      key: crypto.randomUUID(),
+      key: this.ticket?.key ?? crypto.randomUUID(),
+      ticket: this.ticket?.ticket ?? null,
       mode: this.settings.mode,
       map: this.settings.map,
       difficulty: solo ? this.settings.difficulty : null,

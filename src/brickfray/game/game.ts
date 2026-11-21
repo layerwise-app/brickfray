@@ -24,6 +24,7 @@ import { renderPortraits } from './portraits';
 import type { MatchReport } from '../../lib/board/contract';
 import { recordMatch } from '../../lib/board/client/sync';
 import { MatchTally } from '../../lib/board/client/tally';
+import { requestTicket } from '../../lib/board/client/ticket';
 
 
 function sessionToken() {
@@ -296,7 +297,7 @@ export class Game {
   private enterMatch(settings: MatchSettings) {
     this.app.set({ busy: 'loading' });
     this.report(this.tally?.leave(this.hud.state));
-    this.tally = new MatchTally(settings, this.settings.character);
+    this.tally = new MatchTally(settings, this.settings.character, requestTicket(settings));
     this.match?.dispose();
     this.hud.reset();
     this.hud.set({ settings });
