@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
+import { FullScreenQuad } from 'three/examples/jsm/postprocessing/Pass.js';
 import { createCharacter, type Stance } from '../characters';
 import { CHARACTER_IDS } from '../characters/roster';
 import type { AnimState, CharacterId } from '../characters/types';
@@ -22,11 +23,38 @@ const ABOVE = 0.38;
  * trimmed to its own silhouette, so whatever rises above the tile stands out whole, by the same rule for all six.
  */
 const OVER = 0.34;
+/** The glow round each cutout: its colour, strength, and blur radius in pixels of a 192-pixel-wide shot. */
+const GLOW = { rgb: [255, 246, 232], alpha: 0.5, blur: 3.5 };
 /** Pixels across a shot: twice the tile's on this screen, within these bounds. */
 const SIZES = { min: 128, max: 400, tile: 64 };
 /** Lights from behind the head, high on either side, that edge dark helmets and hair against the tile. */
 const RIMS = [new THREE.Vector3(0.7, 0.8, -1).normalize(), new THREE.Vector3(-0.8, 0.5, -1).normalize()];
 const RIM = { color: '#e2ebff', intensity: 3.2 };
+
+/** Divides the multisampled edges' colour by their coverage before tone mapping, which would brighten and tint them after. */
+const STRAIGHT = /* glsl */ `
+uniform sampler2D tMap;
+varying vec2 vUv;
+void main() {
+  vec4 c = texture2D( tMap, vUv );
+  gl_FragColor = c.a > 0.0 ? vec4( c.rgb / c.a, c.a ) : vec4( 0.0 );
+}`;
+
+/** The last set of portraits drawn: what they were drawn with and how wide, so a larger window can have them drawn again. */
+let drawn: { args: Parameters<typeof renderPortraits>; width: number } | null = null;
+let drawing = false;
+
+/** Pixels across a shot on this screen: twice the picker tile's width, within bounds. */
+function shotWidth() {
+  const tile = document.querySelector('.bf-menu-thumb')?.getBoundingClientRect().width || SIZES.tile;
+  return Math.round(THREE.MathUtils.clamp(2 * tile * (window.devicePixelRatio || 1), SIZES.min, SIZES.max));
+}
+
+/** Draws the portraits again if the picker's tiles have grown well past the size they were drawn for. */
+export function refreshPortraits() {
+  if (!drawn || drawing || shotWidth() <= drawn.width * 1.15) return;
+  void renderPortraits(...drawn.args);
+}
 
 /** Standing square with the arms hanging: nothing a character holds or gestures with reaches into a head shot. */
 function portraitStance(id: CharacterId): Stance {
@@ -53,10 +81,19 @@ function portraitStance(id: CharacterId): Stance {
  * color swatch, with room over the tile. One character per frame, so building six detailed models never stalls the menu.
  */
 export async function renderPortraits(kit: Kit, gr: GameRenderer, pose: AnimState, environment: THREE.Texture | null, onShot: (id: CharacterId, url: string) => boolean) {
+  drawing = true;
+  try {
+    // Drawn at twice the size the picker shows it on this screen, so it stays crisp when the browser scales it down.
+    const width = shotWidth();
+    drawn = { args: [kit, gr, pose, environment, onShot], width };
+    await draw(kit, gr, pose, environment, onShot, width);
+  } finally {
+    drawing = false;
+  }
+}
+
+async function draw(kit: Kit, gr: GameRenderer, pose: AnimState, environment: THREE.Texture | null, onShot: (id: CharacterId, url: string) => boolean, WIDTH: number) {
   const renderer = gr.renderer;
-  // Drawn at twice the size the picker shows it on this screen, so it stays crisp when the browser scales it down.
-  const tile = document.querySelector('.bf-menu-thumb')?.getBoundingClientRect().width || SIZES.tile;
-  const WIDTH = Math.round(THREE.MathUtils.clamp(2 * tile * (window.devicePixelRatio || 1), SIZES.min, SIZES.max));
   const HEIGHT = Math.round((WIDTH * (BELOW + ABOVE + OVER)) / (BELOW + ABOVE));
   const scene = new THREE.Scene();
   scene.environment = environment;
@@ -69,7 +106,16 @@ export async function renderPortraits(kit: Kit, gr: GameRenderer, pose: AnimStat
   scene.add(new THREE.HemisphereLight(sky.color, sky.ground, sky.intensity * 1.4));
   const camera = new THREE.PerspectiveCamera(22, WIDTH / HEIGHT, 0.05, 20);
   const hdr = new THREE.WebGLRenderTarget(WIDTH, HEIGHT, { type: THREE.HalfFloatType, samples: 4 });
+  const straight = new THREE.WebGLRenderTarget(WIDTH, HEIGHT, { type: THREE.HalfFloatType });
   const ldr = new THREE.WebGLRenderTarget(WIDTH, HEIGHT);
+  const unmix = new THREE.ShaderMaterial({
+    uniforms: { tMap: { value: hdr.texture } },
+    vertexShader: /* glsl */ `varying vec2 vUv; void main() { vUv = uv; gl_Position = vec4( position.xy, 0.0, 1.0 ); }`,
+    fragmentShader: STRAIGHT,
+    depthTest: false,
+    depthWrite: false
+  });
+  const quad = new FullScreenQuad(unmix);
   const output = new OutputPass();
   output.renderToScreen = false;
   const pixels = new Uint8Array(WIDTH * HEIGHT * 4);
@@ -77,12 +123,11 @@ export async function renderPortraits(kit: Kit, gr: GameRenderer, pose: AnimStat
   const cutout = document.createElement('canvas');
   canvas.width = cutout.width = WIDTH;
   canvas.height = cutout.height = HEIGHT;
-  const ctx = canvas.getContext('2d')!;
+  // The cutout blurred: the glow's shape.
+  const ctx = canvas.getContext('2d', { willReadFrequently: true })!;
+  ctx.filter = `blur(${(GLOW.blur * WIDTH) / 192}px)`;
   const cut = cutout.getContext('2d')!;
   const image = cut.createImageData(WIDTH, HEIGHT);
-  // A faint glow round the cutout keeps a dark helmet from sinking into a dark swatch.
-  ctx.shadowColor = 'rgba(255, 246, 232, 0.5)';
-  ctx.shadowBlur = (7 * WIDTH) / 192;
   const shot = document.createElement('canvas');
   const out = shot.getContext('2d')!;
   const head = new THREE.Vector3();
@@ -114,32 +159,22 @@ export async function renderPortraits(kit: Kit, gr: GameRenderer, pose: AnimStat
     });
     renderer.setRenderTarget(hdr);
     renderer.render(scene, camera);
-    output.render(renderer, ldr, hdr, 0, false);
+    renderer.setRenderTarget(straight);
+    quad.render(renderer);
+    output.render(renderer, ldr, straight, 0, false);
     renderer.readRenderTargetPixels(ldr, 0, 0, WIDTH, HEIGHT, pixels);
-    // GL rows run bottom-up; edges come back premultiplied by coverage.
-    for (let y = 0; y < HEIGHT; y++) {
-      for (let x = 0; x < WIDTH; x++) {
-        const src = ((HEIGHT - 1 - y) * WIDTH + x) * 4;
-        const dst = (y * WIDTH + x) * 4;
-        const a = pixels[src + 3]!;
-        const k = a > 0 ? 255 / a : 0;
-        image.data[dst] = Math.min(255, pixels[src]! * k);
-        image.data[dst + 1] = Math.min(255, pixels[src + 1]! * k);
-        image.data[dst + 2] = Math.min(255, pixels[src + 2]! * k);
-        image.data[dst + 3] = a;
-      }
-    }
+    // GL rows run bottom-up.
+    for (let y = 0; y < HEIGHT; y++) image.data.set(pixels.subarray((HEIGHT - 1 - y) * WIDTH * 4, (HEIGHT - y) * WIDTH * 4), y * WIDTH * 4);
     cut.putImageData(image, 0, 0);
     ctx.clearRect(0, 0, WIDTH, HEIGHT);
     ctx.drawImage(cutout, 0, 0);
-    // Trimmed to the silhouette's top with room for its glow: the picker anchors the shot at the tile's foot.
+    addGlow(image.data, ctx.getImageData(0, 0, WIDTH, HEIGHT).data);
+    // Trimmed to the top of the silhouette's glow: the picker anchors the shot at the tile's foot.
     let top = 0;
     while (top < HEIGHT - 1 && !rowHasInk(image.data, top, WIDTH)) top++;
-    top = Math.max(0, top - Math.ceil(ctx.shadowBlur));
     shot.width = WIDTH;
     shot.height = HEIGHT - top;
-    out.clearRect(0, 0, WIDTH, HEIGHT);
-    out.drawImage(canvas, 0, top, WIDTH, HEIGHT - top, 0, 0, WIDTH, HEIGHT - top);
+    out.putImageData(image, 0, -top);
     scene.remove(rig.root);
     rig.dispose();
     renderer.setRenderTarget(saved.target);
@@ -150,8 +185,27 @@ export async function renderPortraits(kit: Kit, gr: GameRenderer, pose: AnimStat
   }
   for (const light of lights) light.dispose();
   hdr.dispose();
+  straight.dispose();
   ldr.dispose();
+  unmix.dispose();
+  quad.dispose();
   output.dispose();
+}
+
+/**
+ * Lays the cutout (straight alpha) over a faint warm glow of its own blurred silhouette, in place, so a dark helmet
+ * does not sink into a dark swatch. Done here rather than with a canvas shadow, whose faint outer pixels round to pink.
+ */
+function addGlow(px: Uint8ClampedArray, halo: Uint8ClampedArray) {
+  for (let i = 0; i < px.length; i += 4) {
+    const f = px[i + 3]! / 255;
+    const g = halo[i + 3]! < 4 ? 0 : (GLOW.alpha * halo[i + 3]!) / 255;
+    const a = f + g * (1 - f);
+    if (a <= 0) continue;
+    const k = g * (1 - f);
+    for (let c = 0; c < 3; c++) px[i + c] = (px[i + c]! * f + GLOW.rgb[c]! * k) / a;
+    px[i + 3] = a * 255;
+  }
 }
 
 /** Whether row `y` of an RGBA image `width` wide has anything visible in it. */

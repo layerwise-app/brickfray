@@ -13,6 +13,8 @@ const OVERLAP = 3;
 /** Two stretches that overlap must not play nearly the same part of the recording (it would comb-filter). */
 const APART = 1.5;
 const CURVE_POINTS = 33;
+const OUTSIDE = { gain: 1, cutoff: 20000 };
+const ROOM_GLIDE = 0.12;
 const RISE = Float32Array.from({ length: CURVE_POINTS }, (_, i) => Math.sin((i / (CURVE_POINTS - 1)) * (Math.PI / 2)));
 const FALL = Float32Array.from(RISE).reverse();
 
@@ -42,11 +44,21 @@ export class Ambience {
   private want: MapId | null = null;
   private bed: Bed | null = null;
   private readonly beds = new Map<MapId, AudioBuffer>();
+  /** Every bed plays through the walls of the room the listener is in: quieter and duller indoors. */
+  private readonly input: GainNode;
+  private readonly walls: BiquadFilterNode;
 
   constructor(
     private readonly ctx: BaseAudioContext,
-    private readonly out: AudioNode
-  ) {}
+    out: AudioNode
+  ) {
+    this.input = ctx.createGain();
+    this.walls = ctx.createBiquadFilter();
+    this.walls.type = 'lowpass';
+    this.walls.Q.value = -3;
+    this.walls.frequency.value = 20000;
+    this.input.connect(this.walls).connect(out);
+  }
 
   set(map: MapId | null): void {
     if (map === this.want) return;
@@ -56,6 +68,13 @@ export class Ambience {
     const ready = this.beds.get(map);
     if (ready) this.start(ready);
     else void this.load(map);
+  }
+
+  /** `inside` 0 outdoors .. 1 deep in a room whose walls leave the bed at `bed.gain` below `bed.cutoff` Hz. */
+  setRoom(inside: number, bed: { gain: number; cutoff: number } = OUTSIDE): void {
+    const t = this.ctx.currentTime;
+    this.input.gain.setTargetAtTime(1 + (bed.gain - 1) * inside, t, ROOM_GLIDE);
+    this.walls.frequency.setTargetAtTime(OUTSIDE.cutoff * (bed.cutoff / OUTSIDE.cutoff) ** inside, t, ROOM_GLIDE);
   }
 
   dispose(): void {
@@ -83,7 +102,7 @@ export class Ambience {
     const gain = this.ctx.createGain();
     gain.gain.setValueAtTime(0, now);
     gain.gain.linearRampToValueAtTime(BED_GAIN, now + FADE_IN);
-    gain.connect(this.out);
+    gain.connect(this.input);
     const first = nextStretch(buffer.duration, null, Math.random);
     const bed: Bed = { buffer, gain, t0: now, last: first, sources: new Set() };
     this.bed = bed;

@@ -25,6 +25,8 @@ export interface Settings {
   crosshair: CrosshairSettings;
   damageNumbers: boolean;
   showStats: boolean;
+  /** Lower the render resolution while frames miss the display's refresh. */
+  autoResolution: boolean;
   /** Last solo difficulty picked. */
   difficulty: Difficulty;
   /** Last map picked for a solo run, and the last room set up as host. */
@@ -60,6 +62,7 @@ export function defaultSettings(): Settings {
     crosshair: { color: '#ffffff', size: 1, gap: 1, dot: true },
     damageNumbers: false,
     showStats: false,
+    autoResolution: true,
     difficulty: 'normal',
     soloMap: 'plaza',
     room: { mode: 'ffa', map: 'plaza', minutes: 10, bots: 5 }

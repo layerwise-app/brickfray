@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import type { Kit } from '../engine/kit';
-import { paint, surfaceMaterial, type Surface } from './surface';
+import { lensMaterial, paint, surfaceMaterial, type Surface } from './surface';
 import { useLod, type Lod } from './shapes';
 
 export type View = 'first' | 'third';
@@ -176,7 +176,7 @@ export function instantiate(template: Template, kit: Kit): Instance {
     }
     if (part.opaque) holder.add(new THREE.Mesh(part.opaque, material));
     if (part.glass) {
-      const lens = new THREE.Mesh(part.glass, kit.materials.get(part.glassColor, 'glass'));
+      const lens = new THREE.Mesh(part.glass, lensMaterial(kit.materials, part.glassColor));
       lens.renderOrder = 2;
       holder.add(lens);
     }

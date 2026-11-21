@@ -28,28 +28,25 @@ export function explode(fx: Effects, position: THREE.Vector3, ground: number | n
   const base = ground ?? position.y - 0.4;
   const core = position.clone().setY(Math.max(position.y, base) + 0.75);
 
-  // Flash: bright for two or three frames, soft all the way out, never a white-out. Only high draws through tone
-  // mapping; the other tiers would clip white light to a flat disc, so their flash and the fire's heart are orange.
-  fx.glow.emit({ position: core, size: high ? 5.5 : 4.4, color: high ? '#ffd9a0' : '#ff9f52', alpha: high ? 0.8 : 0.34, life: 0.09, shape: 'soft' });
-  fx.glow.emit({ position: core, size: high ? 1.8 : 1.3, color: high ? '#fff4dc' : '#ffcf96', alpha: high ? 0.9 : 0.5, life: 0.07, shape: 'soft' });
-  const heart = high ? '#ffffff' : '#ffb57a';
-  const flame = high ? '#ffffff' : '#ffd0a2';
-  if (high) fx.glow.emit({ position: core, size: 2.6, color: '#fff4dc', alpha: 0.85, life: 0.06, shape: 'star' });
+  // Flash: a faint halo round the fireball for two or three frames, never a white-out; additive light clips to a flat
+  // disc on the tiers without tone mapping, so theirs is orange and fainter. The fireball itself is opaque and shaded.
+  fx.glow.emit({ position: core, size: high ? 4.6 : 4, color: high ? '#ffd9a0' : '#ff9f52', alpha: high ? 0.32 : 0.2, life: 0.08, shape: 'soft' });
+  if (high) fx.glow.emit({ position: core, size: 2.6, color: '#fff4dc', alpha: 0.6, life: 0.05, shape: 'star' });
   if (!low) fx.glow.emit({ position: core, size: 1.2, grow: 26, color: '#ffe2b0', alpha: high ? 0.18 : 0.1, life: 0.16, shape: 'ring' });
 
   // Fireball: a white-hot heart, billows rolling outward and up, and a few tongues thrown wide.
-  for (let i = 0; i < 4; i++) {
-    fx.billows.emit({ position: core.clone().add(v(rand(-0.2, 0.2), rand(-0.1, 0.25), rand(-0.2, 0.2))), velocity: v(0, rand(0.6, 1.4), 0), size: rand(1.3, 1.7), grow: 2.4, color: heart, life: rand(0.26, 0.34), drag: 3, shape: 'fire', spin: rand(-1, 1) });
+  for (let i = 0; i < 5; i++) {
+    fx.billows.emit({ position: core.clone().add(v(rand(-0.25, 0.25), rand(-0.1, 0.3), rand(-0.25, 0.25))), velocity: v(0, rand(0.6, 1.4), 0), size: rand(1.2, 1.6), grow: 2.4, color: '#ffffff', life: rand(0.26, 0.34), drag: 3, shape: 'fire', spin: rand(-1, 1) });
   }
-  for (let i = 0; i < (low ? 11 : 13); i++) {
+  for (let i = 0; i < 13; i++) {
     const d = outward(0.25);
     const at = core.clone().addScaledVector(d, rand(0.15, 0.5));
     at.y = Math.max(at.y, base + 0.55);
-    fx.billows.emit({ position: at, velocity: d.multiplyScalar(rand(2, 5)).add(v(0, rand(0.8, 1.8), 0)), size: rand(1, 1.5), grow: rand(1.8, 2.6), color: flame, life: rand(0.42, 0.72), drag: 4.2, gravity: -1.5, shape: 'fire', spin: rand(-0.8, 0.8) });
+    fx.billows.emit({ position: at, velocity: d.multiplyScalar(rand(2, 5)).add(v(0, rand(0.8, 1.8), 0)), size: rand(0.95, 1.35), grow: rand(1.6, 2.3), color: '#ffffff', life: rand(0.42, 0.72), drag: 4.2, gravity: -1.5, shape: 'fire', spin: rand(-0.8, 0.8) });
   }
-  for (let i = 0; i < (low ? 6 : 7); i++) {
+  for (let i = 0; i < 7; i++) {
     const d = outward(0.45);
-    fx.billows.emit({ position: core.clone().addScaledVector(d, 0.4), velocity: d.multiplyScalar(rand(6, 10)).add(v(0, 1.5, 0)), size: rand(0.45, 0.7), grow: 1.4, color: flame, life: rand(0.28, 0.42), drag: 5.5, shape: 'fire' });
+    fx.billows.emit({ position: core.clone().addScaledVector(d, 0.4), velocity: d.multiplyScalar(rand(6, 10)).add(v(0, 1.5, 0)), size: rand(0.45, 0.7), grow: 1.4, color: '#ffffff', life: rand(0.28, 0.42), drag: 5.5, shape: 'fire' });
   }
 
   // Soot rises out of the fire as it dies, not with it, or it would hide the flame: big slow puffs make the column,
@@ -95,11 +92,11 @@ export function explode(fx: Effects, position: THREE.Vector3, ground: number | n
   if (high) fx.shockwaves.add(floor, 0.4, 5.6, 0.3, '#c8b896');
   else fx.shockwaves.add(floor, 1, 4.6, 0.24, '#5a3a20', true);
   fx.decals.add('scorch', v(position.x, ground, position.z), UP, 3.6, 0.92);
-  // A ring of dust kicked along the floor.
-  const ring = low ? 7 : 10;
+  // A ring of dust kicked out along the floor: low, fast and close-packed so it reads as one skirt round the blast.
+  const ring = low ? 12 : 16;
   for (let i = 0; i < ring; i++) {
-    const a = (i / ring) * Math.PI * 2 + Math.random() * 0.5;
+    const a = ((i + rand(-0.3, 0.3)) / ring) * Math.PI * 2;
     const d = v(Math.cos(a), 0, Math.sin(a));
-    fx.billows.emit({ position: floor.clone().addScaledVector(d, 0.9).setY(ground + 0.45), velocity: d.multiplyScalar(rand(5, 7.5)).setY(0.4), size: 0.7, grow: 1.9, color: DUST, alpha: 0.7, life: rand(0.9, 1.4), drag: 3.4, shape: 'smoke', spin: rand(-0.5, 0.5), delay: 0.03 });
+    fx.billows.emit({ position: floor.clone().addScaledVector(d, 0.7).setY(ground + 0.22), velocity: d.multiplyScalar(rand(8.5, 11)).setY(0.25), size: rand(0.6, 0.8), grow: 2, color: DUST, alpha: 0.9, life: rand(0.8, 1.2), drag: 3.3, shape: 'smoke', spin: rand(-0.5, 0.5) });
   }
 }

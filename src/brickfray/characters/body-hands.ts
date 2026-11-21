@@ -2,7 +2,8 @@ import * as THREE from 'three';
 import type { BodyStyle } from './body';
 import { orb, tone } from './body-kit';
 import { blockCup, blockGrip } from './body-low';
-import { foreCentre, PISTOL, wrapDigit, type ForeEnd } from './body-grasp';
+import { FINGERS, foreCentre, PISTOL, SIZE, THUMB, wrapDigit, type ForeEnd } from './body-grasp';
+import { foreGrip } from './body-hold';
 import type { HandShape, Look, PartSet } from './parts';
 import * as S from './shapes';
 import type { V3 } from './skeleton';
@@ -18,6 +19,8 @@ interface HandPose {
   /** Where the hand sits off the wrist and its [pitch, yaw, roll], for hands shaped around a weapon. */
   at?: V3;
   rot?: V3;
+  /** How far the finger roots roll toward the palm, as the knuckles do when a hand closes hard round a thick handle. */
+  root?: number;
 }
 
 const CURLED: V3 = [1.45, 1.7, 1.15];
@@ -80,7 +83,7 @@ const POSES: Record<HandShape, HandPose> = {
       [1.14, 0.28, 0.98]
     ],
     spread: [0.02, 0, -0.01, -0.03],
-    thumb: { dir: [-0.82, 0.3, -0.45], toward: [-0.2, 0.15, -1], flex: [0, 0.4, 0.7] }
+    thumb: { dir: [-0.7, 0.34, -0.63], toward: [-0.5, -0.7, -0.5], flex: [0, 0.6, 0.6] }
   },
   // A handguard lies across the palm at 50° to the fingers, so each finger meets its far edge at a different joint.
   cup: {
@@ -97,48 +100,8 @@ const POSES: Record<HandShape, HandPose> = {
   }
 };
 
-/** The hand is modelled at life size against the forearm, then scaled up to the figure's chunky proportions. */
-const SIZE = 1.05;
-
 /** The handle a `hold` hand is closed around, as a right hand: a point on its axis, which runs along the hand's Y. */
 export const HANDLE = { at: [-0.0307, 0, -0.0735] as V3, radius: 0.0155 };
-
-/** Where a `hold` hand's fore-end is centred, in the hand bone's space as a right hand: the stance seats the gun's fore-end there. */
-export function foreAt(fore: ForeEnd): V3 {
-  const [x, y, z] = foreCentre(unscaled(fore));
-  return [x * SIZE, y * SIZE, z * SIZE];
-}
-
-const unscaled = (f: ForeEnd): ForeEnd => ({ ...f, half: [f.half[0] / SIZE, f.half[1] / SIZE], corner: f.corner / SIZE, seat: (f.seat ?? 0) / SIZE });
-
-/**
- * A `hold` hand closed round a gun's fore-end: palm under it, each finger laid up its far face and over the top edge,
- * the thumb along its near face pointing up the barrel.
- */
-function foreGrip(fore: ForeEnd, girth: number): HandPose {
-  const f = unscaled(fore);
-  const centre = foreCentre(f);
-  const spread = POSES.hold.spread;
-  const fingers = FINGERS.map((g, i) =>
-    wrapDigit(f, centre, { from: g.at, dir: [0, Math.sin(spread[i]!), -Math.cos(spread[i]!)], toward: [-1, 0, 0], len: g.len, r: g.r * girth * 0.96, max: [1.75, 1.8, 1.35] })
-  ) as HandPose['fingers'];
-  // The thumb reaches from its root to the near face as far up the barrel as it can, then turns to lie along it.
-  const yaw = fore.yaw ?? 0;
-  const roll = fore.roll ?? 0;
-  const along = new THREE.Vector3(0, Math.cos(yaw), -Math.sin(yaw));
-  const face = new THREE.Vector3(-Math.sin(roll), Math.cos(roll) * Math.sin(yaw), Math.cos(roll) * Math.cos(yaw));
-  const down = new THREE.Vector3(Math.cos(roll), Math.sin(roll) * Math.sin(yaw), Math.sin(roll) * Math.cos(yaw));
-  const root = new THREE.Vector3(...THUMB.at);
-  const line = new THREE.Vector3(...centre).addScaledVector(face, f.half[1] + THUMB.r[1]).addScaledVector(down, f.half[0] * 0.2);
-  const w = root.clone().sub(line);
-  const closest = w.dot(along);
-  const span = THUMB.len[0] + THUMB.len[1] * 0.6;
-  const off = w.lengthSq() - closest * closest;
-  const target = line.addScaledVector(along, closest + Math.sqrt(Math.max(0, span * span - off)));
-  const thumb = { dir: target.sub(root).normalize().toArray() as V3, toward: along.toArray() as V3 };
-  const flex = wrapDigit(f, centre, { from: THUMB.at, ...thumb, len: THUMB.len, r: THUMB.r[1], max: [0, 0.35, 0.7], min: [-0.3, -0.3, -0.3] });
-  return { fingers, spread, thumb: { ...thumb, flex } };
-}
 
 /** Where a hand's wrist sits off its bone, in the bone's space: the hands shaped around a gun are built off-center. */
 export function wristOffset(shape: HandShape, side: 'L' | 'R'): V3 {
@@ -172,16 +135,8 @@ function pistolGrip(girth: number): HandPose {
   return { ...g, at: GRIP.at, fingers };
 }
 
-/** Knuckle positions and proportions, index to pinky. */
-const FINGERS: { at: V3; len: V3; r: number }[] = [
-  { at: [0.002, 0.0325, -0.088], len: [0.031, 0.021, 0.018], r: 0.0112 },
-  { at: [0.002, 0.0108, -0.092], len: [0.034, 0.023, 0.019], r: 0.0115 },
-  { at: [0.002, -0.0107, -0.089], len: [0.032, 0.021, 0.018], r: 0.0108 },
-  { at: [0.002, -0.031, -0.082], len: [0.025, 0.017, 0.015], r: 0.0098 }
-];
 /** Hands that hold nothing; a glove on thick limbs is cut bigger so it is not lost on its cuff. Weapon holds keep their size, the weapon fixes it. */
 const FREE = new Set<HandShape>(['open', 'relaxed', 'fist', 'point']);
-const THUMB = { at: [-0.004, 0.026, -0.018] as V3, len: [0.036, 0.028, 0.025] as V3, r: [0.0165, 0.0128, 0.0116] as V3 };
 
 type Paint = [color: string, look: Look];
 
@@ -209,14 +164,14 @@ export function hand(b: PartSet, s: BodyStyle, side: 'L' | 'R', shape: HandShape
   const bare = s.fingers !== undefined;
   const gloved: Paint = [glove, gloveLook];
   const tips: Paint = bare ? [s.fingers!, 'skin'] : gloved;
-  const radial = b.hero ? 8 : 6;
+  const radial = b.hero ? 12 : 6;
   const mitt = !bare && FREE.has(shape);
   const puff = mitt ? Math.min(1.2, Math.max(1, 1 + ((s.limbs ?? 1) - 1) * 1.5)) : 1;
   const size = SIZE * puff;
   // Six-sided fingers read thinner than round ones; a free glove's fingers are padded, more so on a suit's thick limbs.
   const pad = 1 + (puff - 1) * 1.2;
   const girth = (b.hero ? 1 : 1.07) * (mitt ? 1.14 * pad : 1) * (s.fingerGirth ?? 1);
-  const pose = shape === 'hold' && s.fore ? foreGrip(s.fore, girth) : shape === 'grip' ? pistolGrip(girth) : POSES[shape];
+  const pose: HandPose = shape === 'hold' && s.fore ? foreGrip(s.fore, girth, POSES.hold.spread) : shape === 'grip' ? pistolGrip(girth) : POSES[shape];
 
   baseQ.setFromEuler(euler.set(pose.rot?.[0] ?? 0, pose.rot?.[1] ?? 0, pose.rot?.[2] ?? 0, 'YXZ'));
   base.compose(p.set(...(pose.at ?? [0, 0, 0])), baseQ, new THREE.Vector3(1, 1, 1));
@@ -238,14 +193,16 @@ export function hand(b: PartSet, s: BodyStyle, side: 'L' | 'R', shape: HandShape
     b.add(bone, geometry, color, { at: [o.x, o.y, o.z], rot: [euler.x, euler.y, euler.z], scale: [size, size, size], look });
   };
 
+  // Showroom fingers are near round: close up, a squarer or coarser section reads as faceted blocks.
+  const e = b.hero ? 2.1 : 2.3;
   const segment = (len: number, r: number, tip = false) =>
     S.loft(
       [
-        { y: 0, rx: r, rz: r * 0.94, e: 2.3 },
-        { y: len, rx: r * 0.94, rz: r * 0.88, e: 2.3 }
+        { y: 0, rx: r, rz: r * 0.94, e },
+        { y: len, rx: r * 0.94, rz: r * 0.88, e }
       ],
       radial,
-      { bottom: r * 0.75, top: r * 0.8, domes: tip && b.hero ? 2 : 1 }
+      { bottom: r * 0.75, top: r * 0.8, domes: b.hero ? (tip ? 3 : 2) : 1 }
     );
 
   /** Three segments curling from `from` along `dir` toward `toward`; outside the showroom the last two are one piece. */
@@ -281,11 +238,13 @@ export function hand(b: PartSet, s: BodyStyle, side: 'L' | 'R', shape: HandShape
   const palmSide = new THREE.Vector3(-1, 0, 0);
   // The showroom's back of the hand is domed, with a knuckle over each folded finger; a boxy palm reads as a slab close up.
   const dome = b.hero ? 1.2 : 1;
+  // Its heel is thick too: seen edge on along a handle, a thin palm reads as one more finger standing out of the cuff.
+  const heel = b.hero ? 1.5 : 1;
   place(
     S.loft(
       [
-        { y: 0.004, rx: 0.029, rz: 0.014 * pad * dome, back: 0.013 * pad, e: b.hero ? 2.3 : 2.6 },
-        { y: 0.036, rx: 0.042, rz: 0.0155 * pad * dome, back: 0.017 * pad, cx: 0.002, e: b.hero ? 2.45 : 2.8 },
+        { y: 0.004, rx: 0.029, rz: 0.014 * pad * dome * heel, back: 0.013 * pad * heel, e: b.hero ? 2.3 : 2.6 },
+        { y: 0.036, rx: 0.042, rz: 0.0155 * pad * dome * Math.sqrt(heel), back: 0.017 * pad, cx: 0.002, e: b.hero ? 2.45 : 2.8 },
         { y: 0.072, rx: 0.0445, rz: 0.0145 * pad * dome, back: 0.014 * pad, cx: 0.001, e: b.hero ? 2.55 : 3 },
         // A padded glove's fingers are thicker than the palm's end; it swells to meet them, or they cut ragged notches in it.
         { y: 0.091, rx: 0.0435, rz: 0.0125 * pad, back: 0.0115 * pad + 0.0105 * Math.max(0, girth - 1), cx: 0.001, e: b.hero ? 2.55 + (mitt ? 0.6 : 0) : 3 }
@@ -301,17 +260,18 @@ export function hand(b: PartSet, s: BodyStyle, side: 'L' | 'R', shape: HandShape
   );
   if (b.hero && shape !== 'open' && shape !== 'relaxed') {
     const knuckle = bare ? tone(glove, 0.88) : glove;
-    FINGERS.forEach((f) => place(S.blob(f.r * 2.3, 0.024, 0.011 * pad, 0.88, 10, 0), knuckle, gloveLook, new THREE.Vector3(0.0105 * pad, f.at[1] * 0.97, f.at[2] + 0.011), forward, palmSide));
+    FINGERS.forEach((f) => place(S.blob(f.r * 2.3, 0.024, 0.011 * pad, 0.88, 14, 0), knuckle, gloveLook, new THREE.Vector3(0.0105 * pad, f.at[1] * 0.97, f.at[2] + 0.011), forward, palmSide));
   }
 
   FINGERS.forEach((f, i) => {
     const spread = pose.spread[i]!;
     const dir: V3 = [0, Math.sin(spread), -Math.cos(spread)];
     const r: V3 = [f.r, f.r * 0.95, f.r * 0.9];
+    const from: V3 = [f.at[0] + (pose.root ?? 0), f.at[1], f.at[2]];
     // Fingerless gloves cover the first joint: a sleeve in the showroom, the whole segment on the simpler tier.
-    digit(f.at, dir, [-1, 0, 0], f.len, r, pose.fingers[i]!, [bare && !b.hero ? gloved : tips, tips, tips], b.hero && bare);
+    digit(from, dir, [-1, 0, 0], f.len, r, pose.fingers[i]!, [bare && !b.hero ? gloved : tips, tips, tips], b.hero && bare);
     if (bare && b.hero) {
-      p.set(...f.at);
+      p.set(...from);
       d.set(...dir);
       n.set(-1, 0, 0);
       axis.crossVectors(d, n).normalize();

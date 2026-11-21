@@ -156,11 +156,11 @@ export function sleeves(b: PartSet) {
 export function scarf(b: PartSet) {
   const hi = b.detail >= 2;
   const hero = b.hero;
-  const seg = tier(b, 10, 12, 24);
-  const radial = tier(b, 5, 6, 10);
+  const seg = tier(b, 10, 12, 48);
+  const radial = tier(b, 5, 6, 16);
   const loop = (y: number, rx: number, rz: number, r: number, tilt: number, lean: number, from: number, to: number) => {
     const pts: V3[] = [];
-    const n = 12;
+    const n = hero ? 24 : 12;
     const closed = to - from >= Math.PI * 2 - 1e-6;
     for (let i = 0; i < (closed ? n : n + 1); i++) {
       const a = lerp(from, to, i / n);
@@ -172,8 +172,18 @@ export function scarf(b: PartSet) {
   b.add('chest', loop(0.292, 0.078, 0.074, 0.028, 0.008, -0.008, Math.PI - 0.4, Math.PI * 3 - 0.1), C.scarfDark, { look: 'cloth' });
   if (hero) b.add('chest', loop(0.274, 0.097, 0.088, 0.016, -0.02, 0.012, 1.2, 5.4), '#ffbd45', { look: 'cloth' });
 
-  // Knot and the short end over her left collarbone.
-  lump(b, 'chest', [0.066, 0.06, 0.052], tier(b, 6, 8, 14), C.scarf, { at: [-0.058, 0.232, -0.088], rot: [0.2, 0.3, 0.3], look: 'cloth', e: 0.8 });
+  // Knot and the short end over her left collarbone; close up the knot is a puff gathered by a band wrapped round it.
+  const knot: V3 = [-0.058, 0.232, -0.088];
+  if (hero) {
+    lump(b, 'chest', [0.054, 0.07, 0.046], 18, C.scarf, { at: knot, rot: [0.2, 0.3, 0.3], look: 'cloth', e: 0.85 });
+    const band: V3[] = [];
+    for (let i = 0; i < 16; i++) {
+      const a = (i / 16) * Math.PI * 2;
+      band.push([knot[0] + Math.cos(a) * 0.026, knot[1] - 0.004 + Math.sin(a) * 0.006, knot[2] + Math.sin(a) * 0.022]);
+    }
+    b.add('chest', strand(band, 0.012, { flat: 0.55, side: [0, 1, 0], seg: 32, radial: 10, closed: true }), C.scarf, { look: 'cloth' });
+    b.add('chest', strand(band.map(([x, y, z]): V3 => [x, y - 0.0115, z]), 0.0018, { seg: 32, radial: 5, closed: true }), C.scarfDark, { look: 'cloth' });
+  } else lump(b, 'chest', [0.066, 0.06, 0.052], tier(b, 6, 8, 14), C.scarf, { at: knot, rot: [0.2, 0.3, 0.3], look: 'cloth', e: 0.8 });
   const end = strand(
     [
       [-0.06, 0.226, -0.098],

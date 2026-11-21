@@ -1,6 +1,7 @@
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { ROSTER, CHARACTER_IDS } from '../characters/roster';
 import type { CharacterId } from '../characters/types';
+import { refreshPortraits } from '../game/portraits';
 import { coverStage } from '../game/showroom';
 import { TURN_PER_PIXEL, turntable } from '../game/stage-turn';
 import { useApp, useGame } from './App';
@@ -10,6 +11,9 @@ import { LOADOUTS } from '../weapons/loadouts';
 import { BotIcon, FullscreenIcon, GearIcon, GlobeIcon, PlayIcon, UsersIcon, WeaponIcon } from './icons';
 import { RoomsPanel } from './RoomsPanel';
 import './menu.css';
+import './menu-wide.css';
+import './menu-landscape.css';
+import './menu-stacked.css';
 
 /** A drag that starts on one of these is theirs; anywhere else on the menu it turns the figure. */
 const CONTROLS = 'button, input, a, select, textarea, label, nav, [data-cover], .bf-panel';
@@ -49,6 +53,20 @@ export function MainMenu({ openSettings }: { openSettings: () => void }) {
       coverStage(null);
     };
   }, [character, lang]);
+
+  // A window made larger (past 1440 × 900 the tiles grow with it) gets portraits drawn for the new tile size.
+  useEffect(() => {
+    let timer = 0;
+    const later = () => {
+      clearTimeout(timer);
+      timer = window.setTimeout(refreshPortraits, 400);
+    };
+    window.addEventListener('resize', later);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('resize', later);
+    };
+  }, []);
 
   const begin = async (action: () => Promise<void>) => {
     // The audio context must start inside the click; the sound bank keeps rendering in the background.
@@ -124,7 +142,7 @@ export function MainMenu({ openSettings }: { openSettings: () => void }) {
           <div data-cover className='bf-menu-picker'>
             {CHARACTER_IDS.map((id) => (
               <button key={id} onClick={() => pick(id)} aria-pressed={id === character} className='bf-menu-pick'>
-                <span className='bf-menu-thumb' style={{ background: `linear-gradient(160deg, ${ROSTER[id].primary} 0 55%, ${ROSTER[id].secondary} 55% 100%)` }}>
+                <span className='bf-menu-thumb' style={{ background: `linear-gradient(160deg, ${ROSTER[id].primary} 0 calc(55% - 0.7px), ${ROSTER[id].secondary} calc(55% + 0.7px) 100%)` }}>
                   {app.portraits[id] && <img src={app.portraits[id]} alt='' draggable={false} />}
                 </span>
                 <span className='bf-menu-pick-name'>{ROSTER[id].name}</span>

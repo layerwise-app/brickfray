@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { T, type ModelBuilder } from '../builder';
 import { box, prism, slab, tube } from '../shapes';
-import { screw, shade, slot, studSide } from './details';
+import { screw, shade, sidePanel, slot, studSide } from './details';
 
 const C = {
   frame: '#33383e',
@@ -18,6 +18,8 @@ const C = {
 const BORE = 0.06;
 const SIGHT_Y = 0.0872;
 const MUZZLE = -0.142;
+/** Grip panel side profile [z, y], inside the grip's edges. */
+const GRIP_PANEL: [number, number][] = [[-0.006, 0.022], [0.033, 0.022], [0.051, -0.062], [0.018, -0.067], [0.005, -0.061], [-0.003, -0.022]];
 
 /** Buzzer: stubby olive machine pistol on a charcoal frame, ported brass-trimmed compensator, folding foregrip and a long 20-round mag. */
 export function buildBuzzer(b: ModelBuilder) {
@@ -25,14 +27,16 @@ export function buildBuzzer(b: ModelBuilder) {
   const d = b.detail;
 
   // Frame: long dust cover under the compensator, trigger guard, stippled grip.
-  b.add(slab([[-0.14, 0.0446], [0.044, 0.0446], [0.058, 0.035], [0.046, 0.026], [-0.06, 0.029], [-0.128, 0.029], [-0.14, 0.034]], 0.026, lod, [0.003, 0.004, 0.008, 0.004, 0.004, 0.006, 0.004]), C.frame, 'satin');
+  b.add(slab([[-0.14, 0.0446], [0.044, 0.0446], [0.058, 0.035], [0.046, 0.026], [-0.06, 0.029], [-0.128, 0.029], [-0.14, 0.034]], 0.026, lod, [0.003, 0.004, 0.008, 0.004, 0.004, 0.006, 0.004], [], d >= 1 ? 0.0022 : 0), C.frame, 'satin');
   b.add(slab([[-0.08, 0.034], [-0.012, 0.034], [-0.013, -0.002], [-0.07, -0.004], [-0.081, 0.006]], 0.009, lod, [0.002, 0.004, 0.008, 0.004, 0.004], [[[-0.072, 0.032], [-0.02, 0.032], [-0.021, 0.005], [-0.066, 0.004], [-0.073, 0.01]]]), C.frame, 'satin');
   b.add(slab([[-0.045, 0.034], [-0.037, 0.034], [-0.038, 0.022], [-0.042, 0.013], [-0.049, 0.011], [-0.046, 0.021]], 0.006, lod, 0.002), C.orange, 'plastic');
   const grip: [number, number][] = [[-0.022, 0.032], [0.036, 0.032], [0.056, -0.068], [0.02, -0.075], [0.001, -0.068], [-0.01, -0.02]];
-  b.add(slab(grip, 0.03, lod, [0.004, 0.012, 0.01, 0.008, 0.01, 0.012]), C.frame, 'satin');
+  b.add(slab(grip, 0.03, lod, [0.004, 0.012, 0.01, 0.008, 0.01, 0.012], [], d >= 1 ? 0.0025 : 0), C.frame, 'satin');
   if (d >= 1) {
+    // Rubber grip panels stand proud of the frame, stippled along the rake of the grip.
+    sidePanel(b, GRIP_PANEL, 0.03, shade(C.frame, 1.3));
     for (const s of [1, -1] as const) {
-      for (let row = 0; row < 4; row++) studSide(b, s, s * 0.0148, -0.05 + row * 0.019, 0.026 + row * 0.0035, 2, 0.012, 0.0028, shade(C.frame, 1.3));
+      for (let row = 0; row < 4; row++) studSide(b, s, s * 0.0163, -0.05 + row * 0.019, 0.032 - row * 0.004, 2, 0.012, 0.0028, shade(C.frame, 0.75));
     }
     for (let i = 0; i < 3; i++) slot(b, 0, 0.0285, -0.098 - i * 0.012, 0.016, 0.0016, 0.006);
     b.add(box(0.004, 0.006, 0.006, 0.0012), C.dark, 'satin', T(-0.0145, 0.026, -0.008));

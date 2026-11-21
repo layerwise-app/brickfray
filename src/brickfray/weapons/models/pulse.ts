@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { T, type ModelBuilder } from '../builder';
-import { ball, box, latheZ, pipe, prism, slab, torus, tube } from '../shapes';
+import { ball, box, latheZ, pipe, prism, rounder, slab, torus, tube } from '../shapes';
 import { screw, shade, slot, studGrid, studSide } from './details';
 
 const C = {
@@ -156,11 +156,17 @@ export function buildPulse(b: ModelBuilder) {
   b.add(box(0.022, 0.006, 0.054, lod.bevel), C.graphite, 'satin', T(0, 0.144, -0.082));
   b.add(box(0.027, 0.012, 0.048, lod.bevel), C.graphite, 'satin', T(0, 0.153, -0.08));
   b.add(box(0.012, 0.006, 0.012, lod.bevel * 0.5), C.graphite, 'satin', T(0, 0.157, -0.097));
-  b.add(b.minor ? pipe(0.0205, 0.0172, 0.012, lod.seg) : tube(0.0205, 0.012, lod.seg), C.purple, 'plastic', T(0, SIGHT_Y, -0.098));
-  b.glass(tube(0.0172, 0.0012, lod.seg), C.lens, T(0, SIGHT_Y, SIGHT_Z - 0.0012));
+  // The hoop frames the target at ADS: rounder than the rest of the gun, so it never shows its facets.
+  const hoop = lod.third ? lod.seg : Math.max(24, lod.seg * 2);
+  rounder(hoop, () => {
+    b.add(b.minor ? pipe(0.0205, 0.0172, 0.012, hoop) : tube(0.0205, 0.012, hoop), C.purple, 'plastic', T(0, SIGHT_Y, -0.098));
+    b.glass(tube(0.0172, 0.0012, hoop), C.lens, T(0, SIGHT_Y, SIGHT_Z - 0.0012));
+    if (b.minor) {
+      b.add(torus(0.0042, 0.00042, 24), C.reticle, 'glow', T(0, SIGHT_Y, SIGHT_Z));
+      b.add(tube(0.00075, 0.0006, 10), C.reticle, 'glow', T(0, SIGHT_Y, SIGHT_Z));
+    }
+  });
   if (b.minor) {
-    b.add(torus(0.0042, 0.00042, 24), C.reticle, 'glow', T(0, SIGHT_Y, SIGHT_Z));
-    b.add(tube(0.00075, 0.0006, 10), C.reticle, 'glow', T(0, SIGHT_Y, SIGHT_Z));
     b.add(box(0.014, 0.005, 0.014, lod.bevel * 0.5), C.graphite, 'satin', T(0, 0.1595, -0.066));
   }
   if (d >= 1) {

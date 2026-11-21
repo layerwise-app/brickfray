@@ -254,6 +254,7 @@ export interface GroundParams {
   color: string;
   surface: Surface;
   smooth?: boolean;
+  matte?: boolean;
   /** Collider thickness below the surface. */
   depth?: number;
   walk?: boolean;
@@ -261,12 +262,12 @@ export interface GroundParams {
 
 export const GROUND: Element<GroundParams> = {
   colliders: (p) => [box([p.x0, p.y - (p.depth ?? 2), p.z0], [p.x1, p.y, p.z1], p.surface, { walk: p.walk ?? true })],
-  draw: (d, p) => d.ground.push({ x0: p.x0, z0: p.z0, x1: p.x1, z1: p.z1, y: p.y, color: p.color, smooth: p.smooth })
+  draw: (d, p) => d.ground.push({ x0: p.x0, z0: p.z0, x1: p.x1, z1: p.z1, y: p.y, color: p.color, smooth: p.smooth, matte: p.matte })
 };
 
 /** Ground paint that adds no collider (it sits on another ground tile). */
 export const DECAL: Element<GroundParams> = {
-  draw: (d, p) => d.ground.push({ x0: p.x0, z0: p.z0, x1: p.x1, z1: p.z1, y: p.y, color: p.color, smooth: p.smooth })
+  draw: (d, p) => d.ground.push({ x0: p.x0, z0: p.z0, x1: p.x1, z1: p.z1, y: p.y, color: p.color, smooth: p.smooth, matte: p.matte })
 };
 
 export const WATER: Element<{ x0: number; z0: number; x1: number; z1: number; y: number; color: string }> = {

@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { partGeometry, partKey, PITCH, PLATE, type PartSpec } from './geometry';
 import type { Finish, Materials } from './materials';
 import type { QualityProfile } from './quality';
+import { SceneryBatch } from './shadow-caster';
 
 interface Placement {
   key: string;
@@ -130,7 +131,7 @@ export class BrickBuilder {
       for (const g of geometries.values()) markBevels(g);
       let vertices = 0;
       for (const g of geometries.values()) vertices += g.getAttribute('position').count;
-      const mesh = new THREE.BatchedMesh(list.length, vertices, vertices * 2, this.materials.batch[finish]);
+      const mesh = new SceneryBatch(list.length, vertices, vertices * 2, this.materials.batch[finish]);
       mesh.name = `scenery:${finish}`;
       const ids = new Map<string, number>();
       for (const [key, g] of geometries) ids.set(key, mesh.addGeometry(g));

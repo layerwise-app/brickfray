@@ -104,7 +104,7 @@ export const BOAT_EL: Element<At> = {
       if (d.detail > 0) t.span(a[0], a[1], a[2] - 0.01, b[0], b[1] - 0.08, a[2] + 0.05, '#545c63', 'metal', 0);
     }
     t.box(2.6, BOAT.deck, 0, 3.6, 0.48, 2.4, '#2f363d', 'metal', 0.03);
-    if (d.detail > 0) for (let i = 0; i < 4; i++) t.box(1.15 + i * 0.96, BOAT.deck + 0.48, 0, 0.86, 0.06, 2.2, i % 2 ? '#3a6b4f' : '#33604a', 'metal', 0);
+    for (let i = 0; i < 4; i++) t.box(1.15 + i * 0.96, BOAT.deck + 0.48, 0, 0.86, 0.06, 2.2, i % 2 ? '#3a6b4f' : '#33604a', 'metal', 0);
     t.box(7.6, BOAT.deck, 0, 0.8, 0.5, 1.0, '#2f363d', 'metal', 0.04);
     t.cylZ(7.6, BOAT.deck + 0.55, 0, 0.18, 1.2, RED, 'metal');
     if (d.detail > 0) t.ring(7.6, BOAT.deck + 0.02, 1.4, 0.32, 0.06, '#d8c08a');
@@ -122,9 +122,45 @@ function hull(t: Pen) {
 }
 
 function deck(t: Pen) {
+  if (t.detail === 0) {
+    // Planks as toned strips: hairline seams would break up without multisampling.
+    for (const [x0, x1, h] of DECKS) {
+      const n = Math.round((2 * h - 0.1) / 0.4);
+      const w = (2 * h - 0.1) / n;
+      for (let i = 0; i < n; i++) {
+        const z = -h + 0.05 + i * w;
+        t.span(x0, BOAT.deck - 0.1, z, x1, BOAT.deck, z + w, shade(DECK_WOOD, PLANK_TONES[(i + Math.round(h * 5)) % 3]!), undefined, 0);
+      }
+    }
+    return;
+  }
   for (const [x0, x1, h] of DECKS) t.span(x0, BOAT.deck - 0.1, -h + 0.05, x1, BOAT.deck, h - 0.05, DECK_WOOD, undefined, 0);
-  if (t.detail === 0) return;
   for (let z = -2.4; z <= 2.41; z += 0.8) t.box(-2.0, BOAT.deck, z, 15.2, 0.012, 0.04, shade(DECK_WOOD, -0.2), undefined, 0);
+}
+
+const PLANK_TONES = [-0.07, 0, 0.06] as const;
+
+/** Wheelhouse roof: a studded plate with a smooth hatch tile, rail posts and a mid rail. */
+function roof(t: Pen) {
+  const { x0, x1, z0, z1 } = HOUSE;
+  const R = BOAT.roof;
+  const tile = (ax: number, az: number, bx: number, bz: number, y: number, color: string, smooth?: boolean) => {
+    const [px, , pz] = t.f.p(ax, y, az);
+    const [qx, , qz] = t.f.p(bx, y, bz);
+    t.d.ground.push({ x0: Math.min(px, qx), z0: Math.min(pz, qz), x1: Math.max(px, qx), z1: Math.max(pz, qz), y, base: y, color, smooth });
+  };
+  tile(x0 + 0.1, z0 + 0.1, x1 - 0.1, z1 - 0.1, R, shade(WHITE, -0.08));
+  tile(-6.1, -0.9, -5.1, -0.1, R + 0.004, '#8a9096', true);
+  for (const z of [-0.75, -0.25]) t.box(-5.6, R + 0.004, z, 0.5, 0.03, 0.05, '#545c63', 'metal', 0);
+  const posts: [number, number][] = [];
+  for (let k = 0; k <= 4; k++) posts.push([x0 + 0.05 + (k * (x1 - x0 - 0.1)) / 4, z1 - 0.05]);
+  for (const x of [x0 + 0.05, -5.85, -4.35, x1 - 0.05]) posts.push([x, z0 + 0.05]);
+  for (const x of [x0 + 0.05, x1 - 0.05]) posts.push([x, (z0 + z1) / 2]);
+  for (const [x, z] of posts) t.box(x, R, z, 0.06, 0.82, 0.06, '#f6c624', 'metal', 0);
+  t.span(x0, R + 0.42, z1 - 0.08, x1, R + 0.47, z1 - 0.02, '#f6c624', 'metal', 0);
+  for (const x of [x0 + 0.02, x1 - 0.08]) t.span(x, R + 0.42, z0, x + 0.06, R + 0.47, z1, '#f6c624', 'metal', 0);
+  t.span(x0, R + 0.42, z0 + 0.02, -5.8, R + 0.47, z0 + 0.08, '#f6c624', 'metal', 0);
+  t.span(-4.4, R + 0.42, z0 + 0.02, x1, R + 0.47, z0 + 0.08, '#f6c624', 'metal', 0);
 }
 
 function house(t: Pen) {
@@ -137,9 +173,10 @@ function house(t: Pen) {
       t.span(a[0], b[1] - 0.08, a[2], b[0], b[1], b[2], '#f6c624', 'metal', 0);
       continue;
     }
-    const roof = c.walk;
-    t.span(a[0], a[1], a[2], b[0], b[1], b[2], roof ? shade(WHITE, -0.06) : WHITE, 'metal', 0.02);
+    if (c.walk) t.span(a[0], a[1], a[2], b[0], b[1] - 0.01, b[2], shade(WHITE, -0.06), 'metal', 0.02);
+    else t.span(a[0], a[1], a[2], b[0], b[1], b[2], WHITE, 'metal', 0.02);
   }
+  roof(t);
   t.span(x0 - 0.05, R - 0.12, z0 - 0.05, x1 + 0.05, R - 0.02, z1 + 0.05, '#2f7f7a', 'metal', 0);
   t.span(x0 - 0.02, D + 0.9, z0 - 0.02, x1 + 0.02, D + 1.04, z1 + 0.02, '#2f7f7a', 'metal', 0);
   t.cyl(-7.2, R, 1.0, 0.42, 1.6, RED, 'metal');

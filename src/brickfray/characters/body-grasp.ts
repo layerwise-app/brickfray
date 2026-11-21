@@ -1,6 +1,18 @@
 import * as THREE from 'three';
 import type { V3 } from './skeleton';
 
+/** The hand is modelled at life size against the forearm, then scaled up to the figure's chunky proportions. */
+export const SIZE = 1.05;
+
+/** Knuckle positions and proportions, index to pinky, as a right hand (wrist at the origin, fingers along -Z, palm toward -X). */
+export const FINGERS: { at: V3; len: V3; r: number }[] = [
+  { at: [0.002, 0.0325, -0.088], len: [0.031, 0.021, 0.018], r: 0.0112 },
+  { at: [0.002, 0.0108, -0.092], len: [0.034, 0.023, 0.019], r: 0.0115 },
+  { at: [0.002, -0.0107, -0.089], len: [0.032, 0.021, 0.018], r: 0.0108 },
+  { at: [0.002, -0.031, -0.082], len: [0.025, 0.017, 0.015], r: 0.0098 }
+];
+export const THUMB = { at: [-0.004, 0.026, -0.018] as V3, len: [0.036, 0.028, 0.025] as V3, r: [0.0165, 0.0128, 0.0116] as V3 };
+
 /**
  * A gun's fore-end a `hold` hand closes round: a box with rounded edges seen end on, lying across the palm.
  * `half` is half its depth off the palm and half its width along the fingers.
@@ -16,6 +28,8 @@ export interface ForeEnd {
   over?: { r: number; at: number };
   /** How far the far face lies past the middle finger's knuckle toward the fingertips; by default just inside it. */
   seat?: number;
+  /** How far the handle presses into the palm's pad: a hard grip on a thick fore-end, so the fingers reach over its top. */
+  sink?: number;
 }
 
 /**
@@ -34,11 +48,18 @@ export interface Digit {
   /** Largest bend at each joint, and the smallest (negative lifts the segment off the handle). */
   max: V3;
   min?: V3;
+  /** How far each segment may press into the handle; the soft tip most. */
+  press?: V3;
+  /**
+   * The least bend at the middle and end joints, so a finger on a flat face arches with its pad on the face instead of
+   * lying on it like a stick; each joint then bends only as far as leaves the rest of the finger, so curled, clear of it.
+   */
+  curl?: V3;
 }
 
 /** How deep the palm's skin is under a handle laid on it, and how far each segment of a digit may press into the handle: the soft tip most. */
 const PALM = 0.0165;
-const PRESS = [0.0012, 0.002, 0.0045];
+const PRESS: V3 = [0.0012, 0.002, 0.0045];
 /** The middle finger's knuckle: a slanted fore-end's far face passes just inside it. */
 const KNUCKLE = { y: 0.011, z: -0.09 };
 
@@ -46,7 +67,7 @@ const KNUCKLE = { y: 0.011, z: -0.09 };
 export function foreCentre(f: ForeEnd, fingerR = 0.0112): V3 {
   const [hx, hz] = extent(f);
   const yaw = f.yaw ?? 0;
-  return [-(PALM + hx), 0, KNUCKLE.z + fingerR * 0.9 - (f.seat ?? 0) + hz / Math.cos(yaw) + KNUCKLE.y * Math.tan(yaw)];
+  return [-(PALM - (f.sink ?? 0) + hx), 0, KNUCKLE.z + fingerR * 0.9 - (f.seat ?? 0) + hz / Math.cos(yaw) + KNUCKLE.y * Math.tan(yaw)];
 }
 
 /** Half extents of the rolled box along the hand's X and Z. */
@@ -79,6 +100,7 @@ const n = new THREE.Vector3();
 const axis = new THREE.Vector3();
 const q = new THREE.Vector3();
 const t = new THREE.Vector3();
+const r = new THREE.Vector3();
 
 /**
  * Bends of a digit's three joints that lay it along the fore-end: each segment turns toward the handle as far as it
@@ -90,24 +112,31 @@ export function wrapDigit(f: ForeEnd, centre: V3, g: Digit): V3 {
   d.set(...g.dir).normalize();
   n.set(...g.toward).normalize();
   axis.crossVectors(d, n).normalize();
+  const press = g.press ?? PRESS;
   const out: V3 = [0, 0, 0];
-  const clear = (len: number) => {
+  /** The worst clearance past what may press in, of segment `i` bent by `bend` and, with a curl, the rest of the chain at it. */
+  const clear = (i: number, bend: number) => {
     let worst = Infinity;
-    for (let k = 1; k <= 6; k++) {
-      q.copy(p).addScaledVector(t, (len * k) / 6);
-      worst = Math.min(worst, foreDistance(f, centre, q.x, q.y, q.z) - g.r);
+    q.copy(p);
+    t.copy(d).applyAxisAngle(axis, bend);
+    for (let j = i; j < 3; j++) {
+      if (j > i) t.applyAxisAngle(axis, g.curl![j]!);
+      for (let k = 1; k <= 6; k++) {
+        r.copy(q).addScaledVector(t, (g.len[j]! * k) / 6);
+        worst = Math.min(worst, foreDistance(f, centre, r.x, r.y, r.z) - g.r + press[j]!);
+      }
+      if (!g.curl) break;
+      q.addScaledVector(t, g.len[j]!);
     }
     return worst;
   };
   for (let i = 0; i < 3; i++) {
-    const len = g.len[i]!;
-    const lo = g.min?.[i] ?? 0;
+    const lo = Math.max(g.min?.[i] ?? 0, g.curl?.[i] ?? 0);
     let best = lo;
     let bestGap = -Infinity;
     for (let bend = g.max[i]!; bend >= lo - 1e-9; bend -= 0.01) {
-      t.copy(d).applyAxisAngle(axis, bend);
-      const gap = clear(len);
-      if (gap >= -PRESS[i]!) {
+      const gap = clear(i, bend);
+      if (gap >= 0) {
         best = bend;
         break;
       }
@@ -118,7 +147,7 @@ export function wrapDigit(f: ForeEnd, centre: V3, g: Digit): V3 {
     }
     out[i] = best;
     d.applyAxisAngle(axis, best);
-    p.addScaledVector(d, len);
+    p.addScaledVector(d, g.len[i]!);
   }
   return out;
 }

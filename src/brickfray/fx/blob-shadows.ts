@@ -30,7 +30,7 @@ varying vec3 vLook;
 void main() {
   vec2 d = vUv * 2.0 - 1.0;
   float r = length(d);
-  float shape = mix(smoothstep(1.0, 0.3, r), smoothstep(1.0, 0.5, r), vLook.y);
+  float shape = mix(smoothstep(1.0, 0.3, r), smoothstep(1.0, 0.68, r), vLook.y);
   float tail = 1.0 - vLook.z * smoothstep(-0.5, 1.0, d.y);
   float a = shape * tail * vLook.x;
   if (a < 0.004) discard;
@@ -143,9 +143,9 @@ export class BlobShadows {
       q.setFromAxisAngle(up, Math.atan2(ankle.x - ball.x, ankle.z - ball.z));
       // A little larger than the sole and pushed off it away from the sun, so the dark rim shows around the shoe.
       p.lerpVectors(ankle, ball, 0.45).setY(floor + 0.016);
-      p.x += dx * 0.05 * scale;
-      p.z += dz * 0.05 * scale;
-      this.put(p, 0.14 * scale, 0.235 * scale, 0.85 * planted * strength, 1, 0);
+      p.x += dx * 0.03 * scale;
+      p.z += dz * 0.03 * scale;
+      this.put(p, 0.115 * scale, 0.2 * scale, 0.97 * planted * strength, 1, 0);
     }
   }
 

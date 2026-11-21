@@ -18,15 +18,18 @@ const BORE = 0.104;
 const TUBE_Y = 0.073;
 const SIGHT_Y = 0.142;
 const RING_Z = -0.06;
+/** Ejection port on the right of the receiver, and the raised frame round it ([z, y] side profiles). */
+const PORT: [number, number][] = [[-0.058, 0.1165], [-0.112, 0.1165], [-0.112, 0.0955], [-0.058, 0.0955]];
+const PORT_FRAME: [number, number][] = [[-0.048, 0.1225], [-0.122, 0.1225], [-0.122, 0.0895], [-0.048, 0.0895]];
 
 /** Snapgun: chunky pump shotgun with a ribbed toy-wood forend and a side shell carrier. */
 export function buildShotgun(b: ModelBuilder) {
   const { lod } = b;
   const d = b.detail;
 
-  // Receiver block with a sloped rear and the loading port underneath.
-  b.add(slab([[0.062, 0.122], [0.03, 0.128], [-0.165, 0.128], [-0.165, 0.046], [0.062, 0.046]], 0.04, lod, [0.012, 0.004, 0.006, 0.006, 0.006]), C.receiver, 'satin');
-  slot(b, 0.0198, 0.106, -0.085, 0.0016, 0.02, 0.06);
+  // Receiver block with a sloped rear and the loading port underneath; a raised frame stands round the ejection port, open onto the bolt.
+  b.add(slab([[0.062, 0.122], [0.03, 0.128], [-0.165, 0.128], [-0.165, 0.046], [0.062, 0.046]], 0.04, lod, [0.012, 0.004, 0.006, 0.006, 0.006], [], d >= 1 ? 0.004 : 0), C.receiver, 'satin');
+  b.add(slab(PORT_FRAME, 0.005, lod, 0.004, [PORT], d >= 1 ? 0.0012 : 0), shade(C.receiver, 1.18), 'metal', T(0.0222, 0, 0));
   slot(b, 0, 0.0452, -0.117, 0.026, 0.0016, 0.062);
   if (d >= 1) {
     b.add(box(0.0016, 0.004, 0.2, 0.0006), shade(C.receiver, 0.55), 'dark', T(-0.0201, 0.068, -0.05));
@@ -34,7 +37,7 @@ export function buildShotgun(b: ModelBuilder) {
     b.add(tube(0.004, 0.044, lod.segSmall, 0.001), C.barrel, 'metal', T(0, 0.062, -0.03, 0, Math.PI / 2));
   }
   if (d >= 1) {
-    b.add(box(0.0042, 0.03, 0.1, 0.0019), shade(C.receiver, 1.18), 'metal', T(0.0196, 0.077, -0.04));
+    b.add(slab([[0.01, 0.0915], [-0.09, 0.0915], [-0.09, 0.0625], [0.01, 0.0625]], 0.004, lod, 0.004, [], 0.0012), shade(C.receiver, 1.3), 'satin', T(0.0215, 0, 0));
     b.add(box(0.0012, 0.0024, 0.226), '#15191d', 'dark', T(-0.0202, 0.112, -0.05));
     b.add(box(0.0012, 0.0024, 0.226), '#15191d', 'dark', T(0.0202, 0.122, -0.05));
   }
@@ -47,8 +50,9 @@ export function buildShotgun(b: ModelBuilder) {
   }
   if (d >= 1) for (const s of [1, -1]) for (const z of [0.035, -0.145]) screw(b, s * 0.0202, 0.085, z, 'x', 0.0026);
   if (d >= 1) {
-    // The bolt face shows in the ejection port, and a groove frames the side plate.
-    b.add(box(0.002, 0.014, 0.034, 0.0006), C.barrel, 'metal', T(0.019, 0.106, -0.085));
+    // The bolt shows down in the ejection port, its face cut across, and a groove frames the side plate.
+    b.add(box(0.003, 0.013, 0.04, 0.001), C.barrel, 'metal', T(0.0205, 0.106, -0.087));
+    b.add(box(0.0008, 0.013, 0.0016), C.dark, 'dark', T(0.0221, 0.106, -0.075));
     for (const s of [1, -1]) for (const y of [0.0545, 0.1215]) b.add(box(0.0012, 0.0016, 0.2, 0.0004), shade(C.receiver, 0.55), 'dark', T(s * 0.0201, y, -0.05));
   }
   if (d >= 2) for (const [y, z] of [[0.112, 0.014], [0.112, -0.114], [0.088, 0.014], [0.088, -0.114]] as const) screw(b, -0.0219, y, z, 'x', 0.002);

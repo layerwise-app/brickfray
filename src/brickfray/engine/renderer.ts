@@ -6,69 +6,13 @@ import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { QUALITY, type QualityLevel, type QualityProfile } from './quality';
 import { Materials } from './materials';
 import { FrameTimer } from './frame-timer';
+import { AutoResolution } from './auto-resolution';
 import { installSmoothShadows } from './shadow-filter';
 import { PostAA } from './post-aa';
 import { buildClouds, CLOUD_DRIFT } from './clouds';
+import { createSky, DEFAULT_ATMOSPHERE, plainLights, type Atmosphere } from './atmosphere';
 
-export interface Atmosphere {
-  zenith: string;
-  horizon: string;
-  ground: string;
-  sunColor: string;
-  sunIntensity: number;
-  /** Direction the light travels from (points toward the sun). */
-  sunDirection: THREE.Vector3;
-  fogNear: number;
-  /** Slab clouds circling the sky. */
-  clouds?: { count: number; seed: number };
-}
-
-export const DEFAULT_ATMOSPHERE: Atmosphere = {
-  zenith: '#5fa8f0',
-  horizon: '#dbeaf4',
-  ground: '#9c9688',
-  sunColor: '#fff2dc',
-  sunIntensity: 2.7,
-  sunDirection: new THREE.Vector3(0.55, 0.78, 0.32).normalize(),
-  fogNear: 70
-};
-
-const WHITE = new THREE.Color('#ffffff');
-
-/**
- * Lights for the non-PBR tier, which has no sky reflections: a brighter,
- * less tinted ambient stands in for them so warm skies don't turn the map muddy.
- */
-export function plainLights(a: Atmosphere) {
-  return {
-    sky: new THREE.Color(a.horizon).lerp(new THREE.Color(a.zenith), 0.5).lerp(WHITE, 0.35),
-    ground: new THREE.Color(a.ground).lerp(WHITE, 0.25),
-    sun: new THREE.Color(a.sunColor).lerp(WHITE, 0.3),
-    hemi: 2.0,
-    sunIntensity: a.sunIntensity
-  };
-}
-
-const SKY_VERTEX = /* glsl */ `
-varying vec3 vDir;
-void main() {
-  vDir = normalize(position);
-  vec4 p = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-  gl_Position = p.xyww;
-}`;
-const SKY_FRAGMENT = /* glsl */ `
-uniform vec3 uZenith; uniform vec3 uHorizon; uniform vec3 uGround; uniform vec3 uSun; uniform vec3 uSunColor;
-varying vec3 vDir;
-void main() {
-  vec3 d = normalize(vDir);
-  float h = d.y;
-  vec3 col = mix(uHorizon, uZenith, pow(smoothstep(0.0, 0.62, h), 0.8));
-  col = mix(col, uGround, smoothstep(0.0, -0.08, h));
-  float s = max(dot(d, uSun), 0.0);
-  col += uSunColor * (pow(s, 900.0) * 6.0 + pow(s, 24.0) * 0.18 + pow(s, 4.0) * 0.06);
-  gl_FragColor = vec4(col, 1.0);
-  #include <colorspace_fragment>
-}`;
+export { DEFAULT_ATMOSPHERE, plainLights, type Atmosphere };
 
 export class GameRenderer {
   readonly renderer: THREE.WebGLRenderer;
@@ -87,6 +31,7 @@ export class GameRenderer {
   private postAA: PostAA | null = null;
   private width = 1;
   private height = 1;
+  private readonly resolution: AutoResolution;
   atmosphere: Atmosphere = DEFAULT_ATMOSPHERE;
 
   constructor(
@@ -102,6 +47,7 @@ export class GameRenderer {
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
     this.renderer.info.autoReset = false;
     this.timer = new FrameTimer(this.renderer.getContext() as WebGL2RenderingContext);
+    this.resolution = new AutoResolution(this.renderer, this.timer, this.pixelRatio);
     // GTAO renders the scene a second time; shadows only need one update per frame.
     this.renderer.shadowMap.autoUpdate = false;
     this.materials = new Materials(this.profile);
@@ -111,23 +57,7 @@ export class GameRenderer {
     this.sun.shadow.bias = -0.0004;
     this.sun.shadow.normalBias = 0.04;
 
-    this.sky = new THREE.Mesh(
-      new THREE.SphereGeometry(500, 32, 16),
-      new THREE.ShaderMaterial({
-        vertexShader: SKY_VERTEX,
-        fragmentShader: SKY_FRAGMENT,
-        side: THREE.BackSide,
-        depthWrite: false,
-        fog: false,
-        uniforms: {
-          uZenith: { value: new THREE.Color() },
-          uHorizon: { value: new THREE.Color() },
-          uGround: { value: new THREE.Color() },
-          uSun: { value: new THREE.Vector3() },
-          uSunColor: { value: new THREE.Color() }
-        }
-      })
-    );
+    this.sky = createSky();
     this.sky.frustumCulled = false;
     // Last of the opaque pass: drawn first it shades the whole screen before the scenery covers most of it.
     this.sky.renderOrder = 1e6;
@@ -208,6 +138,7 @@ export class GameRenderer {
     this.profile = QUALITY[level];
     this.materials.dispose();
     this.materials = new Materials(this.profile);
+    this.resolution.restart(this.pixelRatio);
     this.applyProfile();
     if (scene) this.applyAtmosphere(scene);
     return true;
@@ -242,18 +173,47 @@ export class GameRenderer {
     this.resize(this.width, this.height);
   }
 
+  /** The tier's pixel ratio on this screen: the canvas's during a match. */
   get pixelRatio() {
     const dpr = typeof window === 'undefined' ? 1 : window.devicePixelRatio || 1;
     return Math.min(dpr, this.profile.maxPixelRatio) * this.profile.resolutionScale;
   }
 
+  /** What a match renders at: the tier's ratio, or lower while automatic resolution keeps frames on the refresh. */
+  get drawRatio() {
+    return this.resolution.ratio(this.pixelRatio);
+  }
+
+  get autoScale() {
+    return this.resolution.enabled;
+  }
+
+  set autoScale(on: boolean) {
+    if (on === this.resolution.enabled) return;
+    this.resolution.enabled = on;
+    this.resolution.restart(this.pixelRatio);
+    this.composer?.setPixelRatio(this.drawRatio);
+  }
+
+  /** For the stats overlay: frames delivered against the display's rate, the longest gap, then what a frame costs. */
+  statsLine() {
+    const t = this.timer;
+    const hz = t.refresh ? `/${Math.round(1000 / t.refresh)}` : '';
+    const gpu = t.gpuMs === null ? '' : `gpu ${t.gpuMs.toFixed(1)} · `;
+    return `${t.fps}${hz} fps · worst ${t.worstMs.toFixed(1)} ms · ${gpu}cpu ${t.cpuMs.toFixed(1)} ms · res ${+this.drawRatio.toFixed(2)}x`;
+  }
+
   /** `ratio` is what the canvas is drawn at now (the menu draws sharper than a match); post-processing keeps the match's. */
-  resize(width: number, height: number, ratio = this.pixelRatio) {
-    this.width = Math.max(1, width);
-    this.height = Math.max(1, height);
+  resize(width: number, height: number, ratio?: number) {
+    width = Math.max(1, width);
+    height = Math.max(1, height);
+    if (width !== this.width || height !== this.height) this.timer.remeasure();
+    this.width = width;
+    this.height = height;
+    this.resolution.setBase(this.pixelRatio);
     // One call: setPixelRatio followed by setSize reallocates the canvas twice.
-    this.renderer.setDrawingBufferSize(this.width, this.height, ratio);
-    this.composer?.setPixelRatio(this.pixelRatio);
+    this.renderer.setDrawingBufferSize(this.width, this.height, ratio ?? this.drawRatio);
+    this.composer?.setPixelRatio(this.drawRatio);
     this.composer?.setSize(this.width, this.height);
   }
 
@@ -286,7 +246,7 @@ export class GameRenderer {
       this.viewPass.clearDepth = true;
       this.composer.addPass(this.viewPass);
       this.composer.addPass(new OutputPass());
-      this.composer.setPixelRatio(this.pixelRatio);
+      this.composer.setPixelRatio(this.drawRatio);
       this.composer.setSize(this.width, this.height);
     }
     this.worldPass!.scene = scene;
@@ -304,26 +264,33 @@ export class GameRenderer {
     this.sky.position.copy((camera as THREE.PerspectiveCamera).position);
     this.clouds.position.copy(this.sky.position);
     this.clouds.rotation.y = (performance.now() / 1000) * CLOUD_DRIFT;
+    const before = this.drawRatio;
+    if (!this.resolution.prepare(this.pixelRatio, this.width, this.height)) return;
+    if (this.drawRatio !== before) this.composer?.setPixelRatio(this.drawRatio);
     this.renderer.info.reset();
     this.renderer.shadowMap.needsUpdate = this.profile.shadows;
+    const scale = this.resolution.viewport(this.drawRatio);
     if (this.profile.ambientOcclusion) {
       this.ensureComposer(scene, camera, viewScene, viewCamera);
       this.composer!.render();
-      return;
+    } else {
+      const post = this.profile.antialias ? null : (this.postAA ??= new PostAA());
+      post?.begin(this.renderer, scale);
+      this.renderer.autoClear = false;
+      this.renderer.clear();
+      this.renderer.render(scene, camera);
+      if (viewScene && viewCamera) {
+        this.renderer.clearDepth();
+        this.renderer.render(viewScene, viewCamera);
+      }
+      post?.end(this.renderer);
     }
-    const post = this.profile.antialias ? null : (this.postAA ??= new PostAA());
-    post?.begin(this.renderer);
-    this.renderer.autoClear = false;
-    this.renderer.clear();
-    this.renderer.render(scene, camera);
-    if (viewScene && viewCamera) {
-      this.renderer.clearDepth();
-      this.renderer.render(viewScene, viewCamera);
-    }
-    post?.end(this.renderer);
+    this.renderer.setViewport(0, 0, this.width, this.height);
+    this.resolution.drawn();
   }
 
   dispose() {
+    this.resolution.dispose();
     this.composer?.dispose();
     this.postAA?.dispose();
     this.envTarget?.dispose();

@@ -15,6 +15,9 @@ import { Eyelids } from './hero-blink';
 import { HeroLife } from './hero-life';
 import { aimed, blobTexture, KEY_DIRECTION, STUDIO_LIGHTS, studioEnvironment } from './studio';
 
+/** Seeds for each hero's own breathing and glancing rate (`Animator.vary`): Clack and Coral slow and heavy, Rivet quick. */
+const TEMPO: Record<CharacterId, number> = { rivet: 1, vega: 8, clack: 13, coral: 2, moss: 7, nova: 3 };
+
 /** The stance each hero model is baked for; portraits ask for the same hands so they share the geometry. */
 export function heroHands(id: CharacterId) {
   const { arms } = STANCES[id];
@@ -112,6 +115,7 @@ export class HeroDisplay {
     this.lids?.dispose();
     this.lids = null;
     if (this.rig instanceof Rig) {
+      this.rig.animator.vary(TEMPO[id]);
       this.rig.animator.life = this.life;
       this.lids = Eyelids.fit(this.rig);
     }

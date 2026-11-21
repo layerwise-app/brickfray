@@ -23,7 +23,10 @@ const TURN = [-0.08, 0.12, -0.05, 0.45, 0.5, 0.25];
 const RACK = [-0.1, 0.1, -0.04, 0.3, 0.85, 1.05];
 /** Punched forward out of the hand that holds the slide, then drawn back as it lets go. */
 const RACKED = [-0.117, 0.107, -0.052, 0.32, 0.87, 1.07];
-const RACK_OUT = [-0.05, 0.05, -0.015, 0.15, 0.3, 0.2];
+/** Rolling back upright once the slide runs home: an even S through the middle, a few degrees past ready, then back. */
+const UNRACK = [-0.0565, 0.0505, -0.024, 0.145, 0.41, 0.505];
+const PAST = [0.004, -0.006, 0.004, -0.03, -0.05, -0.06];
+const REBOUND = [0.001, 0.002, 0.001, 0.008, 0.012, 0.015];
 const DIP = [0.004, -0.01, 0.006, -0.04, -0.02, 0.05];
 const OVER = [0.004, -0.006, 0.004, -0.03, -0.01, 0.04];
 
@@ -63,7 +66,7 @@ export function pistolReload(empty: boolean, duration: number): Clip {
       f.busy = env(t, 0, 0.14, 1.2, 1.38);
     });
   }
-  const gun: Keys = [[0, Z], [0.06, DIP], [0.19, FLICK], [0.34, RECOVER], [0.52, PRESENT], [0.7, MEET], [0.9, TURN], [1.12, RACK], [1.225, RACKED], [1.37, RACK_OUT], [1.57, OVER], [1.67, Z], [1.7, Z]];
+  const gun: Keys = [[0, Z], [0.06, DIP], [0.19, FLICK], [0.34, RECOVER], [0.52, PRESENT], [0.7, MEET], [0.9, TURN], [1.12, RACK], [1.225, RACKED], [1.24, RACKED], [1.345, UNRACK], [1.45, PAST], [1.55, REBOUND], [1.64, Z], [1.7, Z]];
   const local: Keys = [[0.14, Z], [0.2, [0, -0.03, 0.005]], [0.27, CLEAR], [0.64, UNDER], [0.72, MOUTH], [0.745, [0, -0.043, 0.007, 0.02, 0, 0]], [0.78, Z]];
   const slide: Keys = [[1.14, [0, 0, SLIDE_LOCK]], [1.21, [0, 0, SLIDE_PULL]], [1.24, [0, 0, SLIDE_PULL]], [1.265, Z]];
   let path: Keys | null = null;

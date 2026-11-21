@@ -5,6 +5,8 @@ export const SHADOW_LAYER = 5;
 /** Half-width of the ground square the contact shadow covers, and how high above it a part still darkens it. */
 export const SHADOW_EXTENT = 1.3;
 const SHADOW_HEIGHT = 2.2;
+/** The shadow camera sits this far under the stand's top: soles that dip into it would otherwise be cut by its near plane. */
+const SINK = 0.03;
 const SHADOW_SIZE = 256;
 const KEY_SLANT = new THREE.Vector2(KEY_DIRECTION.x, KEY_DIRECTION.z).multiplyScalar(0.4 / KEY_DIRECTION.y);
 
@@ -14,10 +16,11 @@ const KEY_SLANT = new THREE.Vector2(KEY_DIRECTION.x, KEY_DIRECTION.z).multiplySc
  */
 export class ContactShadow {
   readonly mesh: THREE.Mesh<THREE.CircleGeometry, THREE.MeshBasicMaterial>;
-  readonly camera = new THREE.OrthographicCamera(-SHADOW_EXTENT, SHADOW_EXTENT, SHADOW_EXTENT, -SHADOW_EXTENT, 0, SHADOW_HEIGHT);
+  readonly camera = new THREE.OrthographicCamera(-SHADOW_EXTENT, SHADOW_EXTENT, SHADOW_EXTENT, -SHADOW_EXTENT, 0, SHADOW_HEIGHT + SINK);
   private readonly target = new THREE.WebGLRenderTarget(SHADOW_SIZE, SHADOW_SIZE);
   private readonly soft = new THREE.WebGLRenderTarget(SHADOW_SIZE, SHADOW_SIZE, { depthBuffer: false });
-  private readonly depth = new THREE.MeshDepthMaterial();
+  /** Both sides: seen from below through a sole cut open, a boot's inside still marks its footprint. */
+  private readonly depth = new THREE.MeshDepthMaterial({ side: THREE.DoubleSide });
   private readonly ground = { value: 0 };
   private readonly shear = { value: new THREE.Vector2() };
   private readonly blur: THREE.ShaderMaterial;
@@ -28,6 +31,7 @@ export class ContactShadow {
   constructor(radius: number) {
     // Looks straight up, so depth is height above the floor; image x runs along world x and image y along world z.
     this.camera.rotation.x = Math.PI / 2;
+    this.camera.position.y = -SINK;
     this.camera.layers.set(SHADOW_LAYER);
     this.depth.onBeforeCompile = (shader) => {
       shader.uniforms.uShear = this.shear;
@@ -43,7 +47,8 @@ export class ContactShadow {
         );
       shader.fragmentShader = shader.fragmentShader.replace(
         'gl_FragColor = vec4( vec3( 1.0 - fragCoordZ ), opacity );',
-        'gl_FragColor = vec4( vec3( 0.0 ), pow( 1.0 - fragCoordZ, 2.2 ) );'
+        `float up = max( fragCoordZ - ${(SINK / (SHADOW_HEIGHT + SINK)).toFixed(5)}, 0.0 );
+        gl_FragColor = vec4( vec3( 0.0 ), 0.65 * pow( 1.0 - up, 2.2 ) + 0.35 * pow( 1.0 - up, 40.0 ) );`
       );
     };
     // One pass: every extra render target costs a weak GPU more than these taps do.
@@ -55,13 +60,22 @@ export class ContactShadow {
       fragmentShader: /* glsl */ `
         uniform sampler2D tMap; varying vec2 vUv;
         void main() {
-          float a = texture2D( tMap, vUv ).a * 0.16;
+          float a = texture2D( tMap, vUv ).a;
+          float near = a;
+          a *= 0.1;
           for ( int i = 0; i < 6; i ++ ) {
             float t = float( i ) * 1.0472;
-            a += texture2D( tMap, vUv + vec2( cos( t ), sin( t ) ) * ${(2.2 / SHADOW_SIZE).toFixed(5)} ).a * 0.09;
-            a += texture2D( tMap, vUv + vec2( cos( t + 0.5236 ), sin( t + 0.5236 ) ) * ${(4.6 / SHADOW_SIZE).toFixed(5)} ).a * 0.05;
+            float b = texture2D( tMap, vUv + vec2( cos( t ), sin( t ) ) * ${(2.4 / SHADOW_SIZE).toFixed(5)} ).a;
+            near = max( near, b );
+            a += b * 0.055;
+            a += texture2D( tMap, vUv + vec2( cos( t + 0.5236 ), sin( t + 0.5236 ) ) * ${(5 / SHADOW_SIZE).toFixed(5)} ).a * 0.045;
+            a += texture2D( tMap, vUv + vec2( cos( t ), sin( t ) ) * ${(9 / SHADOW_SIZE).toFixed(5)} ).a * 0.035;
+            a += texture2D( tMap, vUv + vec2( cos( t + 0.5236 ), sin( t + 0.5236 ) ) * ${(14 / SHADOW_SIZE).toFixed(5)} ).a * 0.015;
           }
-          gl_FragColor = vec4( 0.0, 0.0, 0.0, a );
+          // A dark rim a couple of centimetres round whatever touches the tile, in a wider soft penumbra, so the
+          // feet read as standing on it rather than pasted over it.
+          a = 0.5 * near * near + 0.5 * a;
+          gl_FragColor = vec4( 0.0, 0.0, 0.0, 1.0 - pow( 1.0 - min( a, 1.0 ), 2.2 ) );
         }`
     });
     this.quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this.blur);
@@ -72,7 +86,7 @@ export class ContactShadow {
     const position = geometry.getAttribute('position');
     const uv = geometry.getAttribute('uv');
     for (let i = 0; i < uv.count; i++) uv.setXY(i, position.getX(i) / (SHADOW_EXTENT * 2) + 0.5, position.getZ(i) / (SHADOW_EXTENT * 2) + 0.5);
-    this.mesh = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ map: this.soft.texture, transparent: true, depthWrite: false, opacity: 0.9, fog: false }));
+    this.mesh = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ map: this.soft.texture, transparent: true, depthWrite: false, opacity: 0.95, fog: false }));
     this.mesh.position.y = 0.006;
     this.mesh.renderOrder = 2;
   }
@@ -80,7 +94,7 @@ export class ContactShadow {
   render(renderer: THREE.WebGLRenderer, scene: THREE.Scene) {
     this.camera.updateWorldMatrix(true, false);
     const m = this.camera.matrixWorld.elements;
-    this.ground.value = m[13]!;
+    this.ground.value = m[13]! + SINK;
     // Leans the shadow away from the key light, a fraction of the true slant so it stays a contact shadow.
     // The camera's x and y axes are the display's x and z, so this follows the display when it is turned.
     this.shear.value.set(m[0]! * KEY_SLANT.x + m[4]! * KEY_SLANT.y, m[2]! * KEY_SLANT.x + m[6]! * KEY_SLANT.y);

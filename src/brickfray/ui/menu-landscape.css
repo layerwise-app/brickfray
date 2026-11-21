@@ -1,0 +1,138 @@
+/* Main menu: the compact title and loadout, and a phone held sideways (see menu.css). */
+/* Compact title and loadout: on a sideways phone, and in the stacked sheet. */
+@media (orientation: landscape) and (max-height: 560px), (max-width: 1023.98px) {
+  .bf-menu-title {
+    grid-template-areas: 'name role' 'name style';
+    grid-template-columns: auto minmax(0, 1fr);
+    column-gap: 10px;
+    align-items: center;
+  }
+  .bf-menu-role {
+    align-self: end;
+    font-size: 11px;
+    line-height: 1.2;
+  }
+  .bf-menu-style {
+    align-self: start;
+    margin-top: 1px;
+    font-size: 12px;
+    line-height: 1.2;
+  }
+  /* A slot name too long for its card (Primärwaffe, Arma secundaria) wraps at a hyphen; the item names stay level. */
+  .bf-menu-loadout li {
+    display: grid;
+    grid-template-areas: 'arm slot' 'item item';
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-rows: 1fr auto;
+    align-items: center;
+    gap: 2px 6px;
+    padding: 5px 8px;
+    border-radius: 10px;
+  }
+  .bf-menu-slot {
+    grid-area: slot;
+    font-size: 11px;
+    line-height: 1.2;
+    letter-spacing: 0.04em;
+    -webkit-hyphens: auto;
+    hyphens: auto;
+    hyphenate-limit-chars: 8 4 4;
+    overflow-wrap: break-word;
+  }
+  .bf-menu-arm {
+    grid-area: arm;
+    width: 26px;
+    height: auto;
+  }
+  .bf-menu-item {
+    grid-area: item;
+    font-size: 11px;
+    line-height: 1.25;
+  }
+}
+
+/* Short and wide (a phone held sideways): the same columns, everything closed up so the figure keeps the full height. */
+@media (orientation: landscape) and (max-height: 560px) {
+  .bf-menu {
+    --pad: 12px;
+    --gap: 6px;
+    --thumb: 40px;
+    --card: 104px;
+    --name: 30px;
+    --nav: 204px;
+  }
+  .bf-menu-picker {
+    gap: 2px;
+  }
+  .bf-menu-pick {
+    width: calc(var(--thumb) + 14px);
+  }
+  .bf-menu-pick-name {
+    font-size: 12px;
+  }
+  .bf-menu-loadout li {
+    padding: 5px 7px;
+  }
+  .bf-menu-slot {
+    font-size: 11px;
+    letter-spacing: 0.03em;
+  }
+  .bf-menu-logo.bf-logo {
+    font-size: clamp(30px, 9.5vh, 46px);
+  }
+  /* The backdrop's builds stand behind the title at this size: a soft shade under it keeps the small type on calm ground. */
+  .bf-menu-title {
+    position: relative;
+    isolation: isolate;
+  }
+  .bf-menu-title::before {
+    position: absolute;
+    z-index: -1;
+    inset: -18px -40px -14px -24px;
+    background: radial-gradient(closest-side, rgba(6, 9, 22, 0.72), rgba(6, 9, 22, 0.4) 62%, rgba(6, 9, 22, 0));
+    content: '';
+    pointer-events: none;
+  }
+  .bf-menu-tools {
+    gap: 6px;
+  }
+  .bf-menu-tools .bf-btn {
+    height: 38px;
+  }
+  .bf-menu-tools .bf-icon-btn {
+    width: 38px;
+  }
+  .bf-menu-sheet {
+    gap: 12px;
+  }
+  .bf-menu-callsign {
+    width: min(100%, 220px);
+    height: 34px;
+    font-size: 14px;
+  }
+  .bf-menu-nav {
+    gap: 9px;
+  }
+  .bf-btn.bf-big-btn {
+    --icon: 32px;
+    gap: 10px;
+    padding: 7px 10px;
+  }
+  .bf-big-btn-icon {
+    border-radius: 9px;
+  }
+  .bf-big-btn-icon svg {
+    width: 22px;
+    height: 22px;
+  }
+  .bf-big-btn-label {
+    font-size: 21px;
+  }
+  .bf-big-btn-main .bf-big-btn-label {
+    font-size: 25px;
+  }
+  .bf-big-btn-caption {
+    margin-top: 2px;
+    font-size: 11px;
+  }
+}

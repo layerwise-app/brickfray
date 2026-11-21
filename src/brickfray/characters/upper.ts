@@ -52,9 +52,9 @@ interface GunPose {
 const RIFLE = {
   hip: { pos: [0.12, -0.085, -0.31], rot: [0, -0.03, 0] },
   ads: { pos: [0.045, 0.09, -0.34], rot: [0, 0, 0] },
-  ready: { pos: [0.09, -0.2, -0.26], rot: [-0.42, -0.8, 0.12] },
-  sprint: { pos: [0.13, -0.33, -0.12], rot: [-0.62, -0.95, -0.35] },
-  lowered: { pos: [0.2, -0.3, -0.14], rot: [0.15, -1.0, 0.25] }
+  ready: { pos: [0.08, -0.2, -0.25], rot: [-0.8, -0.64, 0.12] },
+  sprint: { pos: [0.1, -0.24, -0.18], rot: [-0.85, -0.6, -0.2] },
+  lowered: { pos: [0.14, -0.33, -0.3], rot: [0.15, 0.02, 0.35] }
 } satisfies Record<string, GunPose>;
 const PISTOL = {
   hip: { pos: [0.06, -0.06, -0.4], rot: [0, -0.02, 0] },
@@ -195,7 +195,7 @@ export function poseUpper(pose: Pose, I: UpperInput) {
   if (adsOffset) pos.set(pos.x + adsOffset[0] * I.ads, pos.y + adsOffset[1] * I.ads, pos.z);
   const lower = Math.max(action.lower, f.gunDrop * (1 - busy));
   blendToward(pos, rot, P.sprint, I.sprint * (1 - I.ads));
-  blendToward(pos, rot, P.lowered, lower * 0.85);
+  blendToward(pos, rot, P.lowered, lower);
   // Between fights the gun rests at low ready: muzzle down in front of the feet and turned in across the body, elbows
   // in. Seen from the front it reads as a gun at rest instead of a barrel pointed at the viewer or past him.
   const ready = I.ready * (1 - I.ads) * (1 - I.sprint) * (1 - busy);
@@ -230,8 +230,8 @@ export function poseUpper(pose: Pose, I: UpperInput) {
   const elbows = st.elbows;
   v2.copy(SOCKET_R).applyQuaternion(gun.q);
   v1.copy(gun.pos).sub(v2);
-  const tuck = Math.max(ready, I.sprint);
-  v2.set((0.55 + 0.4 * shoulder) * elbows * (1 - 0.5 * tuck), -1 + 0.45 * shoulder, 0.3 + 0.15 * shoulder + 0.25 * tuck).applyQuaternion(chestM);
+  const tuck = Math.max(ready, I.sprint, lower);
+  v2.set((0.55 + 0.4 * shoulder) * elbows * (1 - 0.5 * tuck - 0.3 * lower), -1 + 0.45 * shoulder, 0.3 + 0.15 * shoulder + 0.25 * tuck + 0.35 * lower).applyQuaternion(chestM);
   limb(pose, 'R', v1, v2, gun.q);
   // Actual gun after a possibly clamped reach, so the support hand meets the real model.
   gun.q.copy(pose.mq[BONE.handR]!);

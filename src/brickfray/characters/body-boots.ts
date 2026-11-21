@@ -1,3 +1,4 @@
+import * as THREE from 'three';
 import { even, tone, type BodyKit } from './body-kit';
 import * as S from './shapes';
 import type { LoftRing } from './shapes';
@@ -19,6 +20,18 @@ const TOE: LoftRing[] = [
   { y: 0.062, rx: 0.05, rz: 0.012, back: 0.026, e: 2.5 }
 ];
 
+const c1 = new THREE.Color();
+const c2 = new THREE.Color();
+/** Half the sole's width: no wider than the upper, so no dark lip shows round the boot from a distance. */
+const SOLE_X = 0.0572;
+
+/** A near-black sole reads as a hard black rim under a boot seen from a distance: it takes a dark shade of the boot instead. */
+function soleTone(sole: string, boot: string) {
+  c1.set(sole);
+  if (c1.r * 0.21 + c1.g * 0.72 + c1.b * 0.07 > 0.06) return sole;
+  return `#${c1.lerp(c2.set(boot).multiplyScalar(0.4), 0.7).getHexString()}`;
+}
+
 /** Where the boot's upper is at `forward` of the ankle, in foot space: the height of its top line and its slope. */
 export function instep(forward: number) {
   const top = (f: number) => UPPER_Y + S.loftRingAt(UPPER, f).back;
@@ -34,7 +47,7 @@ export function boot(k: BodyKit, side: 'L' | 'R') {
   const ft = `foot${side}` as const;
   const toe = `toe${side}` as const;
   const look = s.bootLook ?? 'plastic';
-  const sole = s.sole ?? '#2b2f33';
+  const sole = soleTone(s.sole ?? '#2b2f33', s.boot);
   const n = b.hero ? 16 : even(b.seg(6, 8, 10));
   const closure = s.bootClosure ?? (look === 'metal' || look === 'chrome' || look === 'gold' ? 'lames' : 'laces');
 
@@ -57,12 +70,12 @@ export function boot(k: BodyKit, side: 'L' | 'R') {
   b.add(toe, S.loft(TOE, n, { steps, top: 0.022 }), s.boot, { at: [0, 0.004, 0.012], rot: FORWARD, look });
 
   const slab = (y0: number, y1: number, cz: number, half: number, grow = 0): LoftRing[] => [
-    { y: y0, rx: 0.0595 + grow, rz: half + grow, cz, e: 3.4 },
-    { y: y1, rx: 0.0595 + grow, rz: half + grow, cz, e: 3.4 }
+    { y: y0, rx: SOLE_X + grow, rz: half + grow, cz, e: 3.4 },
+    { y: y1, rx: SOLE_X + grow, rz: half + grow, cz, e: 3.4 }
   ];
   const toeSlab = (y0: number, y1: number, grow = 0): LoftRing[] => [
-    { y: y0, rx: 0.0595 + grow, rz: 0.048 + grow, back: 0.036, cz: -0.03, e: 3 },
-    { y: y1, rx: 0.0595 + grow, rz: 0.048 + grow, back: 0.036, cz: -0.03, e: 3 }
+    { y: y0, rx: SOLE_X + grow, rz: 0.048 + grow, back: 0.036, cz: -0.03, e: 3 },
+    { y: y1, rx: SOLE_X + grow, rz: 0.048 + grow, back: 0.036, cz: -0.03, e: 3 }
   ];
   if (!b.hero) {
     b.add(ft, S.loft(slab(-0.085, -0.061, -0.025, 0.093), n), sole, { look: 'rubber' });
@@ -73,14 +86,14 @@ export function boot(k: BodyKit, side: 'L' | 'R') {
 
   // Welt, forefoot tread and a heel block with the arch between them.
   const welt = tone(sole, sole === s.boot ? 0.8 : 1.12);
-  b.add(ft, S.loft(slab(-0.071, -0.059, -0.025, 0.093, 0.002), n), welt, { look: 'rubber' });
+  b.add(ft, S.loft(slab(-0.071, -0.059, -0.025, 0.093), n), welt, { look: 'rubber' });
   b.add(ft, S.loft(slab(-0.085, -0.07, -0.079, 0.039), n), sole, { look: 'rubber' });
   b.add(ft, S.loft(slab(-0.085, -0.07, 0.037, 0.031), n), sole, { look: 'rubber' });
-  b.add(toe, S.loft(toeSlab(-0.016, -0.004, 0.002), n), welt, { look: 'rubber' });
+  b.add(toe, S.loft(toeSlab(-0.016, -0.004), n), welt, { look: 'rubber' });
   b.add(toe, S.loft(toeSlab(-0.03, -0.015), n), sole, { look: 'rubber' });
   for (const x of [-1, 1]) {
-    for (const z of [-0.1, -0.078, -0.056, 0.026, 0.048]) b.box(ft, [0.008, 0.013, 0.012], sole, { at: [x * 0.059, -0.0785, z], look: 'rubber', bevel: 0 });
-    for (const z of [-0.012, -0.034, -0.056]) b.box(toe, [0.008, 0.013, 0.012], sole, { at: [x * 0.059, -0.0235, z], look: 'rubber', bevel: 0 });
+    for (const z of [-0.1, -0.078, -0.056, 0.026, 0.048]) b.box(ft, [0.008, 0.013, 0.012], sole, { at: [x * (SOLE_X - 0.0005), -0.0785, z], look: 'rubber', bevel: 0 });
+    for (const z of [-0.012, -0.034, -0.056]) b.box(toe, [0.008, 0.013, 0.012], sole, { at: [x * (SOLE_X - 0.0005), -0.0235, z], look: 'rubber', bevel: 0 });
   }
 
   // Toe cap seam, heel counter and what closes the boot: laces, lames on armour, or the costume's own seal.

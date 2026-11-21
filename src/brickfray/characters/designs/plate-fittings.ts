@@ -11,6 +11,8 @@ export interface SweepOptions {
   /** Round the ends off; otherwise the radius function should taper them. */
   caps?: boolean;
   loop?: boolean;
+  /** Space the rings evenly along the path's length, so ribs set by the radius come out evenly spaced. */
+  even?: boolean;
 }
 
 /**
@@ -28,7 +30,7 @@ export function sweep(points: V3[], radius: number | ((t: number) => number | [n
   const frames: { c: THREE.Vector3; n: THREE.Vector3; b: THREE.Vector3; t: THREE.Vector3 }[] = [];
   const n = new THREE.Vector3(...(o.up ?? [0, 1, 0]));
   for (let k = 0; k <= seg; k++) {
-    const u = k / seg;
+    const u = o.even ? curve.getUtoTmapping(k / seg, 0) : k / seg;
     const t = curve.getTangent(u).normalize();
     n.addScaledVector(t, -n.dot(t));
     if (n.lengthSq() < 1e-8) n.set(Math.abs(t.x) < 0.9 ? 1 : 0, Math.abs(t.x) < 0.9 ? 0 : 1, 0).addScaledVector(t, -(Math.abs(t.x) < 0.9 ? t.x : t.y));

@@ -5,13 +5,15 @@ import { BUILDING, type BuildingParams } from './facade';
 import type { LabView } from './lab-map';
 import { defineMap, Plan } from './plan';
 import { plazaDressing } from './plaza-dressing';
+import { plazaRoad } from './plaza-road';
+import { ARCADE_STAIR } from './plaza-stair';
 import { ARCADE, ARCADE_EL, ARCADE_STAIRS, BANDSTAND, BANDSTAND_EL, CLOCK_TOWER, TOWER } from './plaza-parts';
 import { yawToward, type Face } from './util';
 
 const P = 0.16;
 const PAVING = '#dcc79a';
 const SIDEWALK = '#b7bcc2';
-const ROAD = '#4f565e';
+const ROAD = '#67686a';
 const STONE: Masonry = { colors: ['#e3d6bc', '#d6c7a8', '#efe5cf'], variance: 0.3 };
 
 type Row = { face: Face; fixed: [number, number]; cuts: number[]; floors: number[]; looks: Look[] };
@@ -64,7 +66,7 @@ function buildings(p: Plan) {
 }
 
 function ground(p: Plan) {
-  p.add(GROUND, { x0: -38, z0: -36, x1: 38, z1: 36, y: 0, color: ROAD, surface: 'stone', smooth: true });
+  plazaRoad(p, ROAD, [-27.2, -26.4, 27.2, 26.4], [-21.6, -20.0, 21.6, 20.0]);
   const walk = (x0: number, z0: number, x1: number, z1: number, color = SIDEWALK) => p.add(GROUND, { x0, z0, x1, z1, y: P, color, surface: 'plastic', depth: P });
   walk(-32, -29.6, 32, -26.4);
   walk(-32, 26.4, 32, 29.6);
@@ -86,7 +88,7 @@ function ground(p: Plan) {
   }
   for (const x of [-27.2, 21.6]) {
     crossings.push([x, 14.4, x + 5.6, 18.4]);
-    for (let i = 0; i < 4; i++) decal(x, 18.4 - i * 1.2, x + 5.6, 18.0 - i * 1.2, '#f2f2ee', 0.004, true);
+    for (let i = 0; i < 4; i++) decal(x, 18.0 - i * 1.2, x + 5.6, 18.4 - i * 1.2, '#f2f2ee', 0.004, true);
   }
   const dash = (x0: number, z0: number, x1: number, z1: number) => {
     const alongX = x1 - x0 > z1 - z0;
@@ -118,7 +120,7 @@ function structures(p: Plan) {
   }
   p.add(STAIRS, { x: BANDSTAND.x0 - 2.4, z: 0, y0: P, dir: 'e', width: 2.4, steps: 3, rise: 0.48, run: 0.8, style: STONE, surface: 'plastic', topColor: '#c9a26e' });
   p.add(ARCADE_EL, {});
-  for (const z of ARCADE_STAIRS) p.add(STAIRS, { x: ARCADE.x0 - 6.4, z: z + 1.2, y0: 0, dir: 'e', width: 2.4, steps: 8, rise: 0.48, run: 0.8, style: STONE, surface: 'plastic' });
+  for (const z0 of ARCADE_STAIRS) p.add(ARCADE_STAIR, { z0 });
   p.add(BLOCK, { min: [-32, 0, -14.4], max: [-27.2, 0.96, 14.4], surface: 'plastic', style: { colors: ['#c4553a', '#b44a31', '#d06a4c'], variance: 0.25 }, faces: ['e', 'n', 's'], top: 'ground', topColor: '#e3b17a', walk: true });
   for (const s of [-1, 1] as const) {
     p.add(STAIRS, { x: -29.6, z: s * 16.0, y0: P, dir: s < 0 ? 's' : 'n', width: 2.4, steps: 2, rise: 0.4, run: 0.8, style: STONE, surface: 'plastic' });

@@ -139,13 +139,13 @@ export function frame(profile: Profile, width: number, height: number, cover: St
   const across = (cover?.panels ?? []).filter((r) => r.left < width / 2 && r.right > width / 2);
   const sides = (cover?.panels ?? []).filter((r) => !across.includes(r));
   const stacked = across.length > 0;
-  // A sideways phone has height for the figure alone: it stands on the bottom margin and keeps a little air overhead.
+  // A sideways phone has height for the figure alone: it stands a margin off the bottom edge and keeps a little air overhead.
   const short = height < 560;
-  const top = short ? Math.max(margin, height * 0.07) : margin;
+  const top = short ? Math.max(margin, height * 0.06) : margin;
   const ground = stacked
     ? Math.min(...across.map((r) => r.top)) - Math.max(8, margin * 0.7)
     : short
-      ? height - margin * 0.6
+      ? height - Math.max(14, margin * 1.15)
       : Math.min(height - margin * 0.6, sides.length ? Math.max(...sides.map((r) => r.bottom)) : height - margin);
   const bandLeft = Math.max(0, ...sides.filter((r) => r.right <= width / 2).map((r) => r.right));
   const bandRight = Math.min(width, ...sides.filter((r) => r.left >= width / 2).map((r) => r.left));

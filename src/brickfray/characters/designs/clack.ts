@@ -1,4 +1,4 @@
-import { lowBlob, lowLimb, lowTaper, lowVisor } from '../body-low';
+import { lowBlob, kneePads, lowLimb, lowTaper, lowVisor } from '../body-low';
 import { buildBody } from '../body';
 import type { PartSet } from '../parts';
 import type { Stance } from '../stance';
@@ -55,12 +55,15 @@ function blocky(b: PartSet) {
   b.mirror((side, sign) => {
     const ua = `upperArm${side}` as const;
     lowTaper(b, `thigh${side}`, [0.15, 0.15], [0.17, 0.17], 0.13, STEEL, { at: [sign * 0.01, -0.09, 0], look: 'metal' });
-    lowLimb(b, `shin${side}`, 0.064, 0.064, 0.056, 0.26, -0.04, STEEL, 'metal');
+    lowLimb(b, `shin${side}`, 0.064, 0.064, 0.056, 0.26, -0.04, STEEL, 'metal', 6, 3);
     lowBlob(b, ua, [0.2, 0.1, 0.2], STEEL, { at: [sign * 0.02, 0.03, 0], rot: [0, 0, sign * -0.35], look: 'metal', e: 0.68, seg: 6 });
     lowBlob(b, ua, [0.17, 0.065, 0.18], STEEL, { at: [sign * 0.04, -0.035, 0], rot: [0, 0, sign * -0.5], look: 'metal', e: 0.68, seg: 6 });
     b.ball(`forearm${side}`, 0.054, STEEL, { look: 'metal' });
     b.cyl(`forearm${side}`, 0.066, 0.05, 0.08, STEEL, { at: [0, -0.21, 0], look: 'metal' });
+    // Sabatons: a lame across the instep, so the steel boots read as plate.
+    b.box(`foot${side}`, [0.118, 0.012, 0.05], DARK_STEEL, { at: [0, 0.012, -0.045], rot: [-0.42, 0, 0], look: 'metal' });
   });
+  kneePads(b, 1.1, STEEL, 'metal');
   b.cyl('neck', 0.05, 0.055, 0.1, MAIL, { at: [0, 0.03, 0], look: 'metal' });
   lowBlob(b, 'head', [0.265, 0.315, 0.28], STEEL, { at: [0, 0.098, 0], look: 'metal', e: 0.8, seg: 11 });
   b.cyl('head', 0.135, 0.135, 0.035, DARK_STEEL, { at: [0, 0.125, 0], scale: [1, 1, 1.04], look: 'metal', seg: 10 });
@@ -69,17 +72,17 @@ function blocky(b: PartSet) {
   lowBlob(b, 'dangleHead', [0.05, 0.2, 0.17], RED, { at: [0, 0.1, 0.05], rot: [0.3, 0, 0], look: 'cloth', e: 0.8, seg: 5 });
 }
 
-/** Planted low like a brawler: sword raised in the left gauntlet, shotgun tucked level at the right hip, visor squared to the viewer. */
+/** Planted low like a brawler: sword raised in the left gauntlet, shotgun at the right hip angled down past the viewer, visor squared to the viewer. */
 export const stance: Stance = {
-  pelvis: { at: [0, -0.06, 0.02], rot: [-0.55, 0.1, 0] },
+  pelvis: { at: [0.045, -0.075, 0.02], rot: [-0.55, 0.1, 0.07] },
   chest: [-0.4, -0.1, 0],
   head: [-0.55, 0.12, 0],
   feet: {
-    L: { at: [-0.27, 0, 0.11], heading: -1.25, knee: 0.08 },
-    R: { at: [0.235, 0, -0.13], heading: 0.15, knee: 0.12 }
+    L: { at: [-0.29, 0, 0.15], heading: -1.2, knee: -0.02 },
+    R: { at: [0.2, 0, -0.17], heading: 0.1, knee: 0.2 }
   },
   arms: {
-    R: { wrist: [0.29, -0.059, -0.074], hand: [1.113, 0.074, -0.128], elbow: [0.068, -0.777, 0.625], space: 'chest', shape: 'grip' },
+    R: { wrist: [0.27, -0.1, -0.16], hand: [0.8, -0.12, -0.15], elbow: [0.068, -0.777, 0.625], space: 'chest', shape: 'grip' },
     L: { wrist: [-0.324, 0.143, -0.108], hand: [0.085, 0.576, 0.43], elbow: [-0.229, -0.881, 0.415], space: 'chest', shape: 'hold' }
   },
   melee: { head: 'thumb' },

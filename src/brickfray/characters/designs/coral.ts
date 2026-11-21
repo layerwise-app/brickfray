@@ -1,8 +1,8 @@
 import { buildBody } from '../body';
-import { lowBall, lowTaper } from '../body-low';
+import { lowBall, kneePads, lowTaper } from '../body-low';
 import type { PartSet } from '../parts';
 import type { Stance } from '../stance';
-import { belt, boots, BRASS, COPPER, RUBBER, SEAM, SUIT, suit, tank } from './coral-gear';
+import { belt, boots, BRASS, COPPER, PATCH, RUBBER, SEAM, SUIT, suit, tank } from './coral-gear';
 import { anchorSling, canvas } from './coral-canvas';
 import { limbs } from './coral-limbs';
 import { corselet, helmet } from './coral-helmet';
@@ -24,7 +24,7 @@ export function coral(b: PartSet) {
     buckle: BRASS,
     bulk: 1.1,
     limbs: 1.12,
-    fore: { half: [0.019, 0.025], corner: 0.009, yaw: 0.3, over: { r: 0.021, at: 0.035 }, seat: 0.025 },
+    fore: { half: [0.019, 0.025], corner: 0.009, yaw: 0.3, over: { r: 0.021, at: 0.035 }, seat: 0, sink: 0.004 },
     omit: low ? ['head'] : ['head', 'neck', 'chest', 'abdomen', 'boots', 'upperArms', 'forearms', 'thighs', 'shins']
   });
   if (low) return blocky(b);
@@ -55,6 +55,7 @@ function blocky(b: PartSet) {
     b.cyl('head', 0.042, 0.042, 0.008, '#9fd4e8', { at: [sign * 0.164, 0.1, 0], rot: [0, 0, Math.PI / 2], look: 'glass' });
   });
   b.cyl('head', 0.035, 0.045, 0.04, BRASS, { at: [0, 0.27, 0.02], look: 'metal' });
+  kneePads(b, 1.12, PATCH, 'rubber');
   lowTaper(b, 'chest', [0.44 * bulk, 0.3], [0.26, 0.2], 0.08, BRASS, { at: [0, 0.215, 0], look: 'metal', caps: 'top' });
   b.cyl('chest', 0.075, 0.075, 0.32, COPPER, { at: [0, 0.03, 0.19], look: 'metal' });
   b.ball('chest', 0.075, COPPER, { at: [0, 0.19, 0.19], scale: [1, 0.6, 1], look: 'metal' });
@@ -81,18 +82,18 @@ function blocky(b: PartSet) {
   });
 }
 
-/** Harpoon gun raised in both hands with the spear tipped up, diver's boots planted wide, helmet turned to the viewer. */
+/** Harpoon gun raised in both hands with the spear tipped up, diver's boots planted wide, chest opened three-quarter to the viewer and the helmet turned the rest of the way. */
 export const stance: Stance = {
   pelvis: { at: [0, -0.07, 0], rot: [0.3, 0.05, 0] },
-  chest: [0.6, 0.1, 0],
-  head: [-0.6, 0.08, -0.05],
+  chest: [0.05, 0.1, 0],
+  head: [-0.45, 0.08, -0.05],
   feet: {
     L: { at: [-0.27, 0, -0.1], heading: -0.3 },
     R: { at: [0.25, 0, 0.15], heading: 0.75 }
   },
   arms: {
-    R: { wrist: [0.09, -0.049, -0.129], hand: [-0.263, 0.254, 0], elbow: [0.134, -0.934, 0.331], space: 'chest', shape: 'grip' },
-    L: { wrist: [-0.088, 0.1, -0.422], hand: [1.017, 0.074, 1.328], elbow: [-0.38, -0.64, -0.66], space: 'chest', shape: 'hold' }
+    R: { wrist: [0.214, -0.141, -0.106], hand: [0.255, 0.5, 0.062], elbow: [0.134, -0.934, 0.331], space: 'chest', shape: 'grip' },
+    L: { wrist: [0.214, 0.087, -0.406], hand: [1.588, 0.194, 1.104], elbow: [-0.38, -0.64, -0.66], space: 'chest', shape: 'hold' }
   },
   life: { breath: 1, sway: 0.6, look: 0.6 }
 };

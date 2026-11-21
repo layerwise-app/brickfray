@@ -10,25 +10,34 @@ import { useT } from '../i18n';
 const HEAD_GOLD = '#ffd23f';
 
 /**
- * A slim crescent on a ring about 0.4 of the screen's short side out (clear of anything being aimed at near the
- * reticle), thickest in the middle and pointed at the ends, with a small tick pointing at the shooter; drawn at the
- * top (in front). Sized in viewport units.
+ * A bold crescent with a wedge pointing at the shooter, on a ring about 0.36 of the screen's short side out (clear of
+ * whatever is being aimed at). Toward the lower right, where the held gun fills the screen, the ring pulls in to about
+ * 0.19 so the crescent sits between the crosshair and the gun instead of on it. `angle` is clockwise from straight
+ * ahead (screen up); sized in viewport units (400 units = 92vmin).
  */
-const HURT_ARC = (() => {
-  const R = 172;
-  const SPAN = 17;
+const FAR = 158;
+const NEAR = 76;
+const GUN_SIDE = (140 * Math.PI) / 180;
+function hurtArc(angle: number) {
+  const off = Math.abs(Math.atan2(Math.sin(angle - GUN_SIDE), Math.cos(angle - GUN_SIDE)));
+  const t = Math.min(1, Math.max(0, (off - (32 * Math.PI) / 180) / ((30 * Math.PI) / 180)));
+  const R = NEAR + (FAR - NEAR) * t * t * (3 - 2 * t);
+  const span = 16 * Math.sqrt(FAR / R);
   const outer: string[] = [];
   const inner: string[] = [];
-  for (let i = 0; i <= 16; i++) {
-    const a = ((-SPAN + (2 * SPAN * i) / 16) * Math.PI) / 180;
-    const half = 2.5 * Math.cos(((-SPAN + (2 * SPAN * i) / 16) / SPAN) * (Math.PI / 2)) + 0.3;
+  for (let i = 0; i <= 20; i++) {
+    const u = -1 + (2 * i) / 20;
+    const a = (u * span * Math.PI) / 180;
+    const half = 3.7 * Math.cos(u * (Math.PI / 2)) ** 0.7 + 0.45;
     const at = (r: number) => `${(Math.sin(a) * r).toFixed(1)},${(-Math.cos(a) * r).toFixed(1)}`;
     outer.push(at(R + half));
     inner.unshift(at(R - half));
   }
   const path = `M${outer.join('L')}L${inner.join('L')}Z`;
-  return `<svg viewBox="-200 -200 400 400" style="display:block;overflow:visible;width:92vmin;height:92vmin"><path d="${path}" fill="#ff3b30" stroke="rgba(50,0,0,.75)" stroke-width="1.1"/><path d="M-4,${-R - 3.6}L0,${-R - 9}L4,${-R - 3.6}Z" fill="#ff3b30" stroke="rgba(50,0,0,.75)" stroke-width="1.1"/></svg>`;
-})();
+  const tip = `M-6,${-R - 3.2}L0,${-R - 11}L6,${-R - 3.2}Z`;
+  const ink = 'stroke="rgba(45,0,0,.85)" stroke-width="1.4" stroke-linejoin="round"';
+  return `<svg viewBox="-200 -200 400 400" style="display:block;overflow:visible;width:92vmin;height:92vmin"><path d="${tip}" fill="#ff3b30" ${ink}/><path d="${path}" fill="#ff3b30" ${ink}/><path d="${path}" fill="none" stroke="rgba(255,190,170,.55)" stroke-width=".7" transform="scale(.995)"/></svg>`;
+}
 
 export function Crosshair({ hidden }: { hidden: boolean }) {
   const game = useGame();
@@ -108,8 +117,8 @@ export function Crosshair({ hidden }: { hidden: boolean }) {
         const arc = document.createElement('div');
         arc.className = 'absolute left-1/2 top-1/2';
         arc.style.transform = `translate(-50%, -50%) rotate(${p.angle}rad)`;
-        arc.style.filter = 'drop-shadow(0 0 1.5px rgba(40,0,0,.7)) drop-shadow(0 0 4px rgba(255,40,20,.45))';
-        arc.innerHTML = HURT_ARC;
+        arc.style.filter = 'drop-shadow(0 1px 2px rgba(30,0,0,.75)) drop-shadow(0 0 6px rgba(255,40,20,.5))';
+        arc.innerHTML = hurtArc(p.angle);
         arc.style.opacity = String(strength);
         // A flash on the screen edge the shot came from, as strong as the hit was hard.
         const hard = Math.min(1, p.amount / 50);

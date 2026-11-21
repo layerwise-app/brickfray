@@ -31,7 +31,9 @@ export const FLAGPOLE: Element<At & { colors: string[]; height?: number; pattern
     const t = pen(d, p);
     const h = p.height ?? 4;
     t.cyl(0, 0, 0, 0.14, 0.2, IRON, 'metal', 0.03);
-    t.cyl(0, 0.2, 0, 0.05, h - 0.2, '#b7bcc2', 'metal');
+    // Low has no MSAA: a 2 px pole steps into segments FXAA cannot join, so it is drawn thicker and evenly lit.
+    if (d.detail === 0) t.cyl(0, 0.2, 0, 0.075, h - 0.2, '#c3c7cc', 'plastic', 0, 8);
+    else t.cyl(0, 0.2, 0, 0.05, h - 0.2, '#b7bcc2', 'metal');
     t.ball(0, h + 0.05, 0, 0.09, '#c99a3e', undefined, 0, 1, 'chrome');
     const f = frameOf(p);
     const [x, y, z] = f.p(0.05, h - 0.1, 0);

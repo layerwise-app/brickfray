@@ -6,6 +6,7 @@ import type { Tuning } from './tuning';
 const WALK_SPEED = 4.6;
 /** Share of the hip back-recoil a gun keeps when fully aimed, unless its tuning names its own (`recoil.adsBack`). */
 const ADS_BACK = 0.75;
+const ADS_RISE = 0.45;
 /** Sustained fire: each shot adds HEAT_STEP of heat (cooling over HEAT_COOL s), and a hot gun kicks up to 1 + BURST_GROW times harder. */
 const HEAT_STEP = 0.22;
 const HEAT_COOL = 0.22;
@@ -13,9 +14,9 @@ const BURST_GROW = 0.9;
 /** Each shot also walks the gun up by CLIMB × its rise (rad), easing back at CLIMB_RETURN per second once the trigger rests. */
 const CLIMB = 0.0024;
 const CLIMB_RETURN = 3.5;
-/** Slide pose: the body leans back and over, so the gun drops, comes in toward the middle, tips up a little and rolls hard; [x, y, z] and [pitch, yaw, roll]. */
-const SLIDE_POS = [-0.05, -0.045, 0.03] as const;
-const SLIDE_ROT = [0.05, 0.16, 0.6] as const;
+/** Slide pose: the body leans back and over, so the gun drops low on its side, still pointing ahead, and cants over; [x, y, z] and [pitch, yaw, roll]. */
+const SLIDE_POS = [0.026, -0.058, 0.02] as const;
+const SLIDE_ROT = [0.02, 0.03, 0.36] as const;
 /** The scrape of the slide: a fine fast shake on top, (m, rad) at SCRAPE_HZ. */
 const SCRAPE = [0.0016, 0.006] as const;
 const SCRAPE_HZ = 17;
@@ -65,6 +66,11 @@ export class Motion {
   private heat = 0;
   private climb = 0;
   private tuning: Tuning | null = null;
+
+  /** The shots' kick alone (rotation, rad), already inside `rot`. */
+  get kickRot() {
+    return this.recoilRot.value;
+  }
 
   setTuning(t: Tuning) {
     this.tuning = t;
@@ -170,9 +176,9 @@ export class Motion {
   }
 
   kick(ads: number) {
-    const r: (Tuning['recoil'] & { adsBack?: number }) | undefined = this.tuning?.recoil;
+    const r = this.tuning?.recoil;
     if (!r) return;
-    const aim = 1 - 0.55 * ads;
+    const aim = 1 - (1 - (r.adsRise ?? ADS_RISE)) * ads;
     const rnd = () => Math.random() * 2 - 1;
     const grow = 1 + BURST_GROW * this.heat;
     this.heat = Math.min(1, this.heat + HEAT_STEP);

@@ -43,6 +43,12 @@ const SWING_SKIP = 0.03;
 /** The player's own step level (-1.4 dB), and lower (-3.7 dB) for `hold` s after another player stepped within `near` m. */
 const OWN_STEP = { level: 0.85, ducked: 0.65, near: 15, hold: 0.8 };
 
+/**
+ * Being shot: the first bullet thumps at `volume`; while hits keep coming less than `quiet` s apart they merge, one
+ * ducked thump at most every `gap` s, so a burst reads as one blow and not a drum roll.
+ */
+const HURT = { volume: 0.8, ducked: 0.3, quiet: 0.25, gap: 0.15 };
+
 /** View actions that end a reload before its layers have played. */
 const INTERRUPTS: ReadonlySet<ViewAction['type']> = new Set(['cancelReload', 'switch', 'melee', 'grenadeCook', 'grenadeThrow']);
 /** Reload layers are handed to the engine this long before they are due, with the rest as a delay: sample-exact timing. */
@@ -125,6 +131,8 @@ export class MatchAudio implements Ears {
   private phase: MatchPhase | null = null;
   private counted = 0;
   private heardStep = -Infinity;
+  private lastHit = -Infinity;
+  private lastHurt = -Infinity;
   private nextSpot = 4 + Math.random() * 6;
   private surface: Surface = 'plastic';
   private readonly occluded = new Map<number, { until: number; at: number; value: number }>();
@@ -176,6 +184,15 @@ export class MatchAudio implements Ears {
     this.audio.play(`step:${surface}`, { position, volume: volume * GROUND[kind], priority: priority - 1, occlusion, source });
   }
 
+  /** The local player took a hit from someone else. */
+  hurt(): void {
+    const burst = this.clock - this.lastHit < HURT.quiet;
+    this.lastHit = this.clock;
+    if (burst && this.clock - this.lastHurt < HURT.gap) return;
+    this.lastHurt = this.clock;
+    this.audio.play('hurt', { volume: burst ? HURT.ducked : HURT.volume, priority: 8 });
+  }
+
   /** A grenade striking the ground at `speed` m/s: a soft touch is quiet and dull, a hard throw loud and bright. */
   bounce(at: Vec3, speed: number): void {
     const hard = Math.min(Math.max(speed / 9, 0.12), 1);
@@ -217,13 +234,13 @@ export class MatchAudio implements Ears {
     this.audio.play(`meleeHit:${kind.hit}`, { position, volume: WALL_HIT.weapon, tone: WALL_HIT.tone, priority: 5, delay: late, occlusion });
   }
 
-  /** Countdown ticks over the last three seconds of warmup, a semitone higher each second, then the start and end stingers. */
+  /** Countdown ticks over the last three seconds of warmup, each its own take a semitone higher, then the start and end stingers. */
   setPhase(phase: MatchPhase, left: number): void {
     if (phase === 'warmup' && left > 0 && left <= 3) {
       const second = Math.ceil(left);
       if (second !== this.counted) {
         this.counted = second;
-        this.audio.play('countdown', { priority: 9, rate: 2 ** ((3 - second) / 12) });
+        this.audio.play('countdown', { priority: 9, rate: 2 ** ((3 - second) / 12), variant: 3 - second });
       }
     }
     if (phase === this.phase) return;

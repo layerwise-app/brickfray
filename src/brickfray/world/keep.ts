@@ -104,7 +104,9 @@ export const KEEP: Element<Record<string, never>> = {
     t.box(STAIR.x1 + 0.1, K.roof + 0.9, hz0 + 2.2, 0.1, 0.1, 3.6, '#8a5f3a', undefined, 0);
     t.box(STAIR.x0 + 0.9, K.roof + 0.9, hz0 + 4.1, 1.8, 0.1, 0.1, '#8a5f3a', undefined, 0);
     for (const [fx, fz, c] of [[h - 0.4, h - 0.4, '#c8231b'], [-h + 0.4, -h + 0.4, '#1f62c7']] as const) {
-      t.cyl(fx, K.roof + 0.96, fz, 0.06, 3.2, '#b7bcc2', 'metal');
+      // Low has no MSAA: a 2 px pole steps into segments, so it is drawn thicker and evenly lit there.
+      if (d.detail === 0) t.cyl(fx, K.roof + 0.96, fz, 0.09, 3.2, '#c3c7cc', 'plastic', 0, 8);
+      else t.cyl(fx, K.roof + 0.96, fz, 0.06, 3.2, '#b7bcc2', 'metal');
       d.anim.flag([fx + 0.05, K.roof + 4.0, fz], c === '#c8231b' ? 0 : Math.PI, 1.6, 1.0, [c, c === '#c8231b' ? '#f6c624' : '#f2f2ee'], false, 'border');
     }
     slab(d, [-h + 0.8, 0, -h + 0.8], [h - 0.8, 0.02, h - 0.8], '#8a5f3a');

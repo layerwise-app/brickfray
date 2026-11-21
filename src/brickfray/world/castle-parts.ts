@@ -129,7 +129,7 @@ function towerCap(p: TowerParams) {
       }
       const t = new Pen(d, new Frame(cx, y, cz));
       t.cone(0, 0, 0, half * 0.85, 0.1, 5.4, p.sz < 0 ? '#2f5d93' : ROOF_RED, undefined, 8, Math.PI / 8);
-      t.cyl(0, 5.5, 0, 0.05, 1.1, '#545c63', 'metal');
+      t.cyl(0, 5.5, 0, d.detail === 0 ? 0.075 : 0.05, 1.1, '#545c63', d.detail === 0 ? 'plastic' : 'metal');
       const [fx, fy, fz] = new Frame(cx, y + 6.4, cz).p(0.05, 0, 0);
       d.anim.flag([fx, fy, fz], p.sx * p.sz > 0 ? 0 : Math.PI / 2, 1.4, 0.8, p.sz > 0 ? ['#c8231b', '#f6c624'] : ['#1f62c7', '#f2f2ee'], false, 'border');
     }

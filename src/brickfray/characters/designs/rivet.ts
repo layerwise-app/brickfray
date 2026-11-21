@@ -1,8 +1,9 @@
 import { buildBody } from '../body';
-import { lowBlob, lowTaper } from '../body-low';
+import { lowBand, lowBlob, kneePads, lowTaper } from '../body-low';
 import type { PartSet } from '../parts';
 import type { Stance } from '../stance';
-import { armKit, hardHat, headKit, legKit, LEGS, toolBelt } from './rivet-gear';
+import { armKit, hardHat, legKit, LEGS, toolBelt } from './rivet-gear';
+import { headKit } from './rivet-hair';
 import { C, vest } from './rivet-vest';
 
 const { orange: ORANGE, navy: NAVY, skin: SKIN, yellow: YELLOW, tape: REFLECT, leather: LEATHER, khaki: KHAKI } = C;
@@ -40,9 +41,10 @@ export function rivet(b: PartSet) {
   hardHat(b);
   headKit(b);
   if (b.detail >= 2) legKit(b);
+  else kneePads(b, LEGS, C.dark, 'rubber', '#555c63');
 }
 
-/** Mallet slung over the left shoulder, nailer up and ready in the right fist, hips cocked onto the right leg, grinning at the viewer. */
+/** Mallet resting on top of the left shoulder (fist up by the collarbone, handle over the deltoid, head behind), nailer up and ready in the right fist, hips cocked onto the right leg, grinning at the viewer. */
 export const stance: Stance = {
   pelvis: { at: [0.1, -0.03, 0], rot: [0.12, 0, 0.17] },
   chest: [-0.1, 0.08, -0.13],
@@ -53,8 +55,8 @@ export const stance: Stance = {
     L: { at: [-0.26, 0, -0.16], heading: -0.6, knee: 0.15 }
   },
   arms: {
-    R: { wrist: [0.292, -0.093, -0.156], hand: [0.914, 0.492, -0.002], elbow: [-0.364, -0.916, 0.167], space: 'chest', shape: 'grip' },
-    L: { wrist: [-0.211, 0.073, -0.163], hand: [0.246, 1.3, -0.116], elbow: [-0.6, -1, 0.1], space: 'chest', shape: 'hold' }
+    R: { wrist: [0.25, -0.12, -0.19], hand: [0.75, 0.45, 0.05], elbow: [0.1, -0.95, 0.3], space: 'chest', shape: 'grip' },
+    L: { wrist: [-0.2, 0.125, -0.16], hand: [0, 1.135, 0], elbow: [-0.6, -1, 0.1], space: 'chest', shape: 'hold' }
   },
   melee: { head: 'thumb', slide: -0.035, twist: 0.9 },
   life: { breath: 1, sway: 0.6, look: 0.5 }
@@ -78,7 +80,10 @@ function blockCostume(b: PartSet, bulk: number) {
   b.box('chest', [0.07, 0.17, 0.01], NAVY, { at: [0, 0.13, -0.116], look: 'cloth' });
 
   // Rolled sleeve cuffs.
-  b.mirror((side) => b.cyl(`upperArm${side}`, 0.062, 0.06, 0.04, '#34476a', { at: [0, -0.215, 0], look: 'cloth' }));
+  b.mirror((side) => lowBand(b, `upperArm${side}`, 'upperArm', 1.08, -0.235, -0.195, 0.006, '#34476a', 'cloth'));
+
+  // Knee pads: foam cups with hard shells.
+  kneePads(b, LEGS, C.dark, 'rubber', '#555c63');
 
   // Tool belt: pouches, tape measure, hammer.
   b.mirror((_, sign) => b.box('pelvis', [0.06, 0.1, 0.11], LEATHER, { at: [sign * 0.175, -0.03, -0.02], look: 'rubber' }));

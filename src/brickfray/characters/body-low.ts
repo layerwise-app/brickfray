@@ -39,26 +39,26 @@ export function blockBody(b: PartSet, s: BodyStyle) {
     const sh = `shin${side}` as const;
     const ft = `foot${side}` as const;
     const toe = `toe${side}` as const;
-    if (!omit.has('upperArms')) lowShaped(b, ua, 'upperArm', L, 0.064 * L, sleeve, shirtLook);
-    // Bands and cuffs sit on the tubes, so their ends never show: open cylinders.
-    b.cyl(ua, 0.0585 * L, 0.0565 * L, 0.07, '#ffffff', { at: [0, -0.12, 0], look: 'tint', seg: 8, open: true });
+    if (!omit.has('upperArms')) lowShaped(b, ua, 'upperArm', L, 0.064 * L, sleeve, shirtLook, 6, 3);
+    lowBand(b, ua, 'upperArm', L, -0.155, -0.085, 0.003, '#ffffff', 'tint');
     if (!omit.has('forearms')) {
-      b.add(fa, S.sphere(0.048 * L, 8, 3), s.elbow ?? sleeve, { look: s.elbow ? (s.forearmLook ?? shirtLook) : shirtLook });
+      b.add(fa, S.sphere(0.048 * L, 6, 3), s.elbow ?? sleeve, { look: s.elbow ? (s.forearmLook ?? shirtLook) : shirtLook });
       lowShaped(b, fa, 'forearm', L, 0, s.forearm ?? sleeve, s.forearmLook ?? shirtLook);
-      b.cyl(fa, 0.047 * L, 0.044 * L, 0.05, s.glove, { at: [0, -0.235, 0], look: s.gloveLook ?? 'rubber', seg: 8, open: true });
+      lowBand(b, fa, 'forearm', L, -0.26, -0.21, 0.004, s.glove, s.gloveLook ?? 'rubber');
     }
     if (!omit.has('hands')) (sign > 0 ? blockGrip : blockCup)(b, s);
-    // The hip ball sits under the hips, so it can stay coarse.
-    if (!omit.has('thighs')) lowShaped(b, th, 'thigh', L, 0.08 * L, s.pants, pantsLook, 6);
-    if (!omit.has('shins')) lowShaped(b, sh, 'shin', L, 0.06 * L, s.pants, pantsLook, 8, 3);
+    // The hip ball sits under the hips and the knee ball inside the leg's ends (a pad or cop covers the knee): both coarse.
+    if (!omit.has('thighs')) lowShaped(b, th, 'thigh', L, 0.08 * L, s.pants, pantsLook, 6, 3);
+    if (!omit.has('shins')) lowShaped(b, sh, 'shin', L, 0.056 * L, s.pants, pantsLook, 6, 3);
     if (!omit.has('boots')) {
       const bl = s.bootLook ?? 'plastic';
       const sole = s.sole ?? '#2b2f33';
       b.cyl(ft, 0.061 * L, 0.059 * L, 0.13, s.boot, { at: [0, 0.02, 0.0], look: bl, open: true });
-      b.blob(ft, [0.112, 0.095, 0.205], s.boot, { at: [0, -0.035, -0.035], look: bl, e: 0.35 });
-      b.box(ft, [0.116, 0.024, 0.2], sole, { at: [0, -0.073, -0.035], look: 'rubber' });
-      b.blob(toe, [0.11, 0.062, 0.085], s.boot, { at: [0, 0.0, -0.032], look: bl, e: 0.4, taper: 0.1 });
-      b.box(toe, [0.114, 0.024, 0.085], sole, { at: [0, -0.018, -0.032], look: 'rubber' });
+      // A rounded upper on a flat sole that stands out from it a little all round.
+      b.add(ft, S.blob(0.112, 0.1, 0.21, 0.5, 6, 0), s.boot, { at: [0, -0.032, -0.035], look: bl });
+      b.box(ft, [0.116, 0.022, 0.2], sole, { at: [0, -0.074, -0.035], look: 'rubber' });
+      b.add(toe, S.blob(0.1, 0.07, 0.11, 0.5, 5, 0), s.boot, { at: [0, 0.002, -0.03], rot: [0, Math.PI / 2, 0], look: bl });
+      b.box(toe, [0.114, 0.022, 0.088], sole, { at: [0, -0.019, -0.034], look: 'rubber' });
     }
   });
 }
@@ -78,8 +78,90 @@ export function lowLimb(b: PartSet, bone: BoneName, joint: number, rTop: number,
  */
 function lowShaped(b: PartSet, bone: BoneName, part: LimbPart, L: number, joint: number, color: string, look: Look, jointSeg = 8, jointRings = 4) {
   if (joint > 0) b.add(bone, S.sphere(joint, jointSeg, jointRings), color, { look });
+  b.add(bone, strip(lowRings(part, L)), color, { look });
+}
+
+const lowRings = (part: LimbPart, L: number) => {
   const rings = limbRings(part, L * 1.08);
-  b.add(bone, S.loft([rings[0]!, rings[2]!, rings[3]!], 8), color, { look });
+  return [rings[0]!, rings[2]!, rings[3]!];
+};
+
+/** A band lying on a low-tier limb between heights y0 < y1, `grow` proud of it, cut with the limb's own facets so it never sinks into them. */
+export function lowBand(b: PartSet, bone: BoneName, part: LimbPart, L: number, y0: number, y1: number, grow: number, color: string, look: Look) {
+  const rings = lowRings(part, L);
+  const at = (y: number) => {
+    const r = S.loftRingAt(rings, y);
+    return { ...r, y, rx: r.rx + grow, rz: r.rz + grow, back: r.back + grow };
+  };
+  b.add(bone, strip([at(y0), at(y1)]), color, { look });
+}
+
+const strips = new Map<string, THREE.BufferGeometry>();
+
+/** `S.loft`'s surface through rings in rising y, eight facets around and no end caps: its ends always sit inside a joint, cuff or boot. */
+function strip(rings: S.LoftRing[]) {
+  const key = JSON.stringify(rings);
+  const hit = strips.get(key);
+  if (hit) return hit;
+  const radial = 8;
+  const grid = rings.map((ring) => {
+    const r = S.loftRingAt([ring], ring.y);
+    const p = 2 / r.e;
+    return Array.from({ length: radial }, (_, j) => {
+      const a = (j / radial) * Math.PI * 2;
+      const c = Math.cos(a);
+      const sn = Math.sin(a);
+      return new THREE.Vector3(r.cx + r.rx * Math.sign(c) * Math.abs(c) ** p, r.y, r.cz + (sn < 0 ? r.rz : r.back) * Math.sign(sn) * Math.abs(sn) ** p);
+    });
+  });
+  const tu = new THREE.Vector3();
+  const tv = new THREE.Vector3();
+  const normals = grid.map((ring, i) =>
+    ring.map((_, j) => {
+      tu.subVectors(ring[(j + 1) % radial]!, ring[(j + radial - 1) % radial]!);
+      tv.subVectors(grid[Math.min(i + 1, grid.length - 1)]![j]!, grid[Math.max(i - 1, 0)]![j]!);
+      return new THREE.Vector3().crossVectors(tv, tu).normalize();
+    })
+  );
+  const pos: number[] = [];
+  const nrm: number[] = [];
+  const vertex = (i: number, j: number) => {
+    const v = grid[i]![j]!;
+    const n = normals[i]![j]!;
+    pos.push(v.x, v.y, v.z);
+    nrm.push(n.x, n.y, n.z);
+  };
+  for (let i = 0; i < grid.length - 1; i++) {
+    for (let j = 0; j < radial; j++) {
+      const j1 = (j + 1) % radial;
+      vertex(i, j);
+      vertex(i + 1, j);
+      vertex(i, j1);
+      vertex(i, j1);
+      vertex(i + 1, j);
+      vertex(i + 1, j1);
+    }
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  geometry.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3));
+  strips.set(key, geometry);
+  return geometry;
+}
+
+/**
+ * Knee pads (or cops) over the knee joint of the low and medium tiers: a cup and, when given, a harder shell on it; `L` is
+ * the leg thickness. Five segments around on low, turned so one runs down the front: a ridged pad, symmetric left to right.
+ */
+export function kneePads(b: PartSet, L: number, cup: string, cupLook: Look, shell?: string, shellLook: Look = 'gloss') {
+  // An odd segment count has a seam on one side only: the blob is turned a quarter so it runs down the front instead.
+  const pad = (w: number, h: number, d: number, seg: number, color: string, look: Look, at: V3) =>
+    b.add(at[0] ? 'shinR' : 'shinL', S.blob(seg % 2 ? d : w, h, seg % 2 ? w : d, 0.55, seg, 0), color, { at: [0, at[1], at[2]], rot: [0, seg % 2 ? Math.PI / 2 : 0, 0], look });
+  b.mirror((side) => {
+    const r = side === 'R' ? 1 : 0;
+    pad(0.108 * L, 0.112, 0.06, b.detail === 0 ? 5 : 6, cup, cupLook, [r, -0.014, -0.05 * L]);
+    if (shell) pad(0.08 * L, 0.084, 0.03, 5, shell, shellLook, [r, -0.012, -0.073 * L]);
+  });
 }
 
 type LowOptions = PartOptions & { seg: number };
@@ -178,9 +260,19 @@ export function blockFace(b: PartSet, s: BodyStyle, z = -0.121) {
   const eyes = s.eyes ?? '#1d2026';
   const lip = '#5a2c22';
   b.mirror((_, sign) => {
-    if (b.detail === 0) b.add('head', S.blob(0.034, 0.048, 0.02, 0.8, 5), eyes, { at: [sign * 0.048, 0.074, z + 0.004], look: 'gloss' });
-    else b.blob('head', [0.034, 0.048, 0.02], eyes, { at: [sign * 0.048, 0.074, z + 0.004], look: 'gloss', e: 0.8, keep: true });
-    b.box('head', [0.011, 0.013, 0.008], '#ffffff', { at: [sign * 0.048 + 0.008, 0.084, z - 0.004], look: 'glow', bevel: 0 });
+    if (b.detail === 0) {
+      b.add('head', S.blob(0.034, 0.048, 0.02, 0.8, 5), eyes, { at: [sign * 0.048, 0.074, z + 0.004], look: 'gloss' });
+      b.box('head', [0.011, 0.013, 0.008], '#ffffff', { at: [sign * 0.048 + 0.008, 0.084, z - 0.004], look: 'glow', bevel: 0 });
+    } else {
+      // White, iris, pupil, catchlight and a lash line: an eye that reads at fighting distance, not a dot.
+      const x = sign * 0.048;
+      const ix = x - sign * 0.003;
+      b.add('head', S.blob(0.046, 0.052, 0.014, 0.7, 6), '#f6f3ea', { at: [x, 0.074, z + 0.003], look: 'gloss' });
+      b.add('head', S.cylinder(0.0175, 0, 0.002, 8), s.iris ?? '#6a4a30', { at: [ix, 0.073, z - 0.0045], rot: [-Math.PI / 2, 0, 0], scale: [1, 1, 1.15], look: 'gloss' });
+      b.box('head', [0.016, 0.02, 0.004], eyes, { at: [ix, 0.073, z - 0.006], look: 'gloss', bevel: 0 });
+      b.box('head', [0.008, 0.009, 0.003], '#ffffff', { at: [ix + 0.007, 0.082, z - 0.0085], look: 'glow', bevel: 0 });
+      b.box('head', [0.05, 0.006, 0.01], eyes, { at: [x, 0.1, z + 0.002], rot: [0, 0, sign * 0.08], look: 'gloss', bevel: 0 });
+    }
     if (s.brow) b.box('head', [0.054, 0.014, 0.016], s.brow, { at: [sign * 0.05, 0.121, z - 0.002], rot: [0, 0, sign * (s.browTilt ?? 0.1)], bevel: 0 });
     if (s.blush && b.detail === 0) b.box('head', [0.026, 0.012, 0.008], s.blush, { at: [sign * 0.074, 0.034, z + 0.013], rot: [0, sign * 0.5, 0], look: 'skin', bevel: 0 });
   });

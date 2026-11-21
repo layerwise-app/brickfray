@@ -106,6 +106,7 @@ export const fr: Dictionary = {
   chatPlaceholder: 'Écris quelque chose…',
   scopeHint: 'Maintiens Maj pour stabiliser',
   headshot: 'Tir à la tête',
+  eliminated: 'Éliminé',
 
   graphics: 'Graphismes',
   controls: 'Commandes',
@@ -129,6 +130,8 @@ export const fr: Dictionary = {
   crosshair: 'Réticule',
   damageNumbers: 'Chiffres de dégâts',
   showStats: 'Statistiques de performance',
+  autoResolution: 'Résolution automatique',
+  autoResolutionHint: 'Dessine moins de pixels quand les images ne suivent pas l’écran, pour que la visée reste fluide.',
   language: 'Langue',
   done: 'Terminé',
   keys: 'Touches',

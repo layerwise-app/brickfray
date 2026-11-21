@@ -4,6 +4,7 @@ import type { CharacterId } from '../../characters/types';
 import type { Kit } from '../../engine/kit';
 import type { Atmosphere } from '../../engine/renderer';
 import { MELEES, SIDEARMS, type WeaponId } from '../defs';
+import { aimLenses } from '../surface';
 import { LOADOUTS } from '../loadouts';
 import type { ViewAction, ViewCue, ViewInput, ViewModel } from '../types';
 import { GunAction } from './action';
@@ -16,12 +17,12 @@ import { drawClip, extraGoals, holsterClip, restClip } from './clips-extra';
 import { cookClip, grenadeGoals, throwClip } from './clips-grenade';
 import { meleeClip, meleeGoals } from './clips-melee';
 import { ViewFx } from './fx';
-import { followPath, goalMatrix } from './goals';
 import { THUMB_JOINT } from './hand';
 import { Held } from './held';
 import { ViewLighting } from './lighting';
 import { Motion } from './motion';
 import { Parts } from './parts';
+import { ViewPose } from './pose';
 import { buildGunRig, type GunRig } from './rig';
 import { smooth01 } from './springs';
 
@@ -31,8 +32,9 @@ export function createViewModel(kit: Kit): ViewModel {
 
 /** Seconds a clip takes over from the one it cuts in on, unless it names its own. */
 const FADE = 0.12;
-/** A shot fired from a gun held far off its firing pose (out of a shell-by-shell reload) waits this long while the gun snaps back behind it. */
-const SNAP = 0.05;
+/** A shot fired from a gun held far off its firing pose (out of a shell-by-shell reload) waits SNAP seconds while the gun swings back over SNAP_SPAN, most of the way there when it goes off. */
+const SNAP = 0.06;
+const SNAP_SPAN = 0.1;
 /** How far off (radians of clip offset, or a quarter as many meters) counts as far. */
 const ASTRAY = 0.32;
 /** A switch re-issued mid-holster gets the old gun out of the picture within this many seconds. */
@@ -74,8 +76,9 @@ class FirstPersonView implements ViewModel {
   private readonly carry = new Carry();
   /** Seconds until a snapped shot shows, and whether it emptied the gun. */
   private snap = 0;
-  private stowing = false;
   private snapEmpty = false;
+  private readonly pose: ViewPose;
+  private readonly tmpV = new THREE.Vector3();
 
   constructor(private readonly kit: Kit) {
     this.camera.updateMatrixWorld();
@@ -87,6 +90,7 @@ class FirstPersonView implements ViewModel {
     this.drops = new Drops(this.scene);
     this.extra = { ...extraGoals(this.scene), ...meleeGoals(this.scene), ...grenadeGoals(this.scene), ring: this.held.ringSeat(), ringHook: this.held.ringHook() };
     this.ctx = { id: 'ar', tuning: null!, view: this.scene, goals: {}, flags: { empty: false }, ads: 0 };
+    this.pose = new ViewPose(this.arms, this.held, this.carry, this.motion, this.parts, this.action, this.camera);
     this.setCharacter('rivet');
     this.equip('ar');
   }
@@ -211,14 +215,14 @@ class FirstPersonView implements ViewModel {
 
   private play(clip: Clip) {
     // Whatever the cut-off clip left in the left hand is let go: a shell, a magazine or a spear falls, a melee weapon goes down with the hand.
-    if (this.frame.show.shell) this.fx.eject('shell', this.held.shell, 0.22);
+    if (this.frame.show.shell && !this.held.thumbHome(this.ctx.goals.shellInside)) this.fx.eject('shell', this.held.shell, 0.22);
     this.frame.show.shell = 0;
     this.held.interrupt();
     if (this.parts.capture(this.gun, this.drops)) this.onCue?.('magIn');
     const span = clip.fade ?? FADE;
     // A strike cutting in on a gun held far off its rest (a reload, a bolt cycle) tucks it away over a few frames, not one.
     const tuck = clip.instant ? TUCK * (this.carry.gunRot.value.length() + 4 * this.carry.gunPos.value.length()) : 0;
-    this.carry.cut(span, this.snap > 0 ? SNAP : Math.max(FADE, span, tuck), clip.instant);
+    this.carry.cut(span, this.snap > 0 ? SNAP_SPAN : Math.max(FADE, span, tuck), clip.instant);
     const from = this.extra.leftFrom!;
     this.carry.left.matrix.decompose(from.pos, from.quat, this.tmpV);
     this.player.play(clip);
@@ -292,6 +296,7 @@ class FirstPersonView implements ViewModel {
     this.busy += THREE.MathUtils.clamp(f.busy - this.busy, -dt / BUSY_RAMP, dt / BUSY_RAMP);
     const ads = smooth01(input.ads * (1 - this.busy));
     this.lastAds = ads;
+    aimLenses(this.kit.materials, ads);
     if (input.ads > 0.05 && !this.adsCue) this.onCue?.('cloth');
     this.adsCue = input.ads > 0.05;
     this.carrying += THREE.MathUtils.clamp(this.carryHold(f.busy, input) - this.carrying, -dt / BUSY_RAMP, dt / BUSY_RAMP);
@@ -300,59 +305,12 @@ class FirstPersonView implements ViewModel {
     if (sprinting && !this.sprintCue) this.onCue?.('cloth');
     this.sprintCue = sprinting;
 
-    this.poseGun(ads, dt);
-    this.poseHands(dt);
+    this.pose.gun(this.gun, f, ads, dt);
+    this.pose.hands(this.gun, f, this.ctx.goals, dt);
     if (this.snap > 0 && (this.snap -= dt) <= 0) this.shoot(this.snapEmpty);
     this.fx.update(dt);
     this.drops.update(dt);
     this.camera.updateMatrixWorld();
-  }
-
-  private readonly basePos = new THREE.Vector3();
-  private readonly baseQuat = new THREE.Quaternion();
-  private readonly tmpQ = new THREE.Quaternion();
-  private readonly tmpV = new THREE.Vector3();
-  private readonly tmpE = new THREE.Euler();
-  private readonly tmpM = new THREE.Matrix4();
-
-  private poseGun(ads: number, dt: number) {
-    const f = this.frame;
-    this.motion.rest(this.gun.sight, ads, this.basePos, this.baseQuat);
-    const root = this.gun.rigged.model.root;
-    root.position.copy(this.basePos).add(this.carry.gunPos.apply(f.gunPos, dt)).add(this.motion.pos);
-    this.tmpV.copy(this.carry.gunRot.apply(f.gunRot, dt)).add(this.motion.rot);
-    root.quaternion.copy(this.baseQuat).multiply(this.tmpQ.setFromEuler(this.tmpE.set(this.tmpV.x, this.tmpV.y, this.tmpV.z)));
-
-    // Moving parts: clip offsets, or the action a shot sets off (slide kick, hammer and cylinder).
-    this.parts.apply(this.gun, dt, f, this.action);
-    root.updateMatrixWorld(true);
-    // Shots leave from the screen center, so an aimed sight must stay on it; sway, bob and recoil swing the gun around the dot.
-    const dot = this.gun.rigged.model.sight;
-    if (ads > 0 && dot) {
-      dot.getWorldPosition(this.tmpV);
-      root.position.x -= this.tmpV.x * ads;
-      root.position.y -= this.tmpV.y * ads;
-      root.updateMatrixWorld(true);
-    }
-    this.parts.settle(this.gun, dt, this.camera);
-  }
-
-  private poseHands(dt: number) {
-    const f = this.frame;
-    const g = this.ctx.goals;
-    const grip = this.gun.tuning.fingers;
-    const held = this.held.update(f, dt) ?? grip.left;
-    const onGrip = !f.right || (f.right.from === g.rightRest && f.right.to === g.rightRest);
-    this.arms.setFingers(f.rightFingers ?? grip.right, f.leftFingers ?? held, dt, onGrip, f.rightFingers ? 0 : this.action.squeeze());
-    if (this.stowing && !this.held.stowing) this.carry.left.cut(FADE);
-    this.stowing = this.held.stowing;
-    const left = this.carry.left.apply(this.stowing ? goalMatrix(g.meleeStow!, this.tmpM) : f.left ? followPath(f.left, this.tmpM) : goalMatrix(g.leftRest!, this.tmpM), dt);
-    const hand = this.arms.left.hand;
-    left.decompose(hand.position, hand.quaternion, hand.scale);
-    hand.updateMatrixWorld(true);
-    const right = this.carry.right.apply(f.right ? followPath(f.right, this.tmpM) : goalMatrix(g.rightRest!, this.tmpM), dt);
-    this.arms.pose(right, left, this.tmpV.copy(this.motion.pos).multiplyScalar(0.4));
-    this.held.settle(f);
   }
 
   muzzleViewPosition(out: THREE.Vector3) {

@@ -19,8 +19,14 @@ float foamNoise(vec2 p) {
 const FRAGMENT = /* glsl */ `
 float foamD = clamp(vFoam.x, 0.0, 1.0);
 float drift = foamNoise(vec2(vFoam.y * 0.6, uTime * 0.12));
-float fine = foamNoise(vFoamW * 4.5 + vec2(uTime * 0.21, -uTime * 0.15)) * 0.65 + foamNoise(vFoamW * 9.0 - vec2(uTime * 0.13, uTime * 0.27)) * 0.35;
-float line = (1.0 - smoothstep(0.08, 0.3, foamD + 0.12 * drift)) * (0.75 + 0.25 * fine);
+// Seen edge-on far away the strip is a pixel or less across: the line keeps 1.5 px and dims instead of breaking into
+// dashes, and the fine noise (a 0.1 m grain) settles to its mean once a pixel covers it.
+float foamFw = max(fwidth(vFoam.x), 1e-4);
+float foamGrain = smoothstep(0.03, 0.1, length(fwidth(vFoamW)));
+float fine = mix(foamNoise(vFoamW * 4.5 + vec2(uTime * 0.21, -uTime * 0.15)) * 0.65 + foamNoise(vFoamW * 9.0 - vec2(uTime * 0.13, uTime * 0.27)) * 0.35, 0.5, foamGrain);
+float lineW = 0.19 - 0.12 * drift;
+float lineWpx = max(lineW, 1.5 * foamFw);
+float line = (1.0 - smoothstep(lineWpx - 0.11 - foamFw, lineWpx + 0.11 + foamFw, foamD)) * (lineW / lineWpx) * (0.75 + 0.25 * fine);
 float cut = 0.5 + 0.38 * foamD + 0.12 * drift;
 float lace = smoothstep(cut, cut + 0.07, fine) * (1.0 - foamD);
 float creep = fract(uTime * 0.08 + drift * 0.5);

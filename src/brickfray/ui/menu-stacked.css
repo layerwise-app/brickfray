@@ -1,0 +1,186 @@
+/* Main menu stacked into one sheet across the bottom: tablets and phones held upright (see menu.css). */
+/* Stacked: everything narrower than the wide columns need, unless it is a sideways phone. */
+@media (max-width: 1023.98px) and (orientation: portrait), (max-width: 1023.98px) and (min-height: 560.02px), (max-width: 599.98px) {
+  .bf-menu {
+    --bf-stage: stacked;
+    --pad: 16px;
+    --gap: 10px;
+    --thumb: 46px;
+    --name: 36px;
+  }
+  .bf-menu-logo.bf-logo {
+    font-size: clamp(28px, 7.6vw, 64px);
+  }
+  .bf-menu-tools {
+    gap: 6px;
+  }
+  .bf-menu-tools .bf-btn {
+    height: 42px;
+  }
+  .bf-menu-tools .bf-icon-btn {
+    width: 42px;
+  }
+  .bf-menu-sheet {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+    padding-top: 14px;
+    border-radius: 22px 22px 0 0;
+    background: linear-gradient(180deg, #131c33 0, #0d1528 64px, #0b1222 100%);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.12),
+      0 -14px 34px rgba(3, 6, 14, 0.5);
+    cursor: default;
+  }
+  .bf-menu-title {
+    text-shadow: none;
+  }
+  .bf-menu-loadout {
+    width: 100%;
+  }
+  .bf-menu-loadout li {
+    width: auto;
+    flex: 1 1 0;
+    background: rgba(255, 255, 255, 0.06);
+  }
+  .bf-menu-picker {
+    width: 100%;
+    justify-content: space-between;
+    gap: 2px;
+  }
+  .bf-menu-pick {
+    flex: 1 1 0;
+    width: auto;
+  }
+  .bf-menu-callsign {
+    width: 100%;
+    height: 40px;
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.24);
+  }
+  .bf-menu-nav {
+    display: grid;
+    width: 100%;
+    grid-template-columns: 1fr 1fr;
+    gap: 9px;
+  }
+  .bf-big-btn-main {
+    grid-column: span 2;
+  }
+  .bf-btn.bf-big-btn {
+    --icon: 36px;
+    gap: 10px;
+    padding: 9px 12px;
+  }
+  .bf-big-btn-icon {
+    border-radius: 10px;
+  }
+  .bf-big-btn-icon svg {
+    width: 24px;
+    height: 24px;
+  }
+  .bf-big-btn-label {
+    font-size: 23px;
+  }
+  .bf-big-btn-main .bf-big-btn-label {
+    font-size: 28px;
+  }
+  .bf-big-btn-caption {
+    margin-top: 2px;
+    font-size: 12px;
+  }
+}
+
+/* A stacked sheet with room for two columns (a tablet upright): kit on the left, buttons on the right. */
+@media (min-width: 640px) and (max-width: 1023.98px) and (orientation: portrait), (min-width: 640px) and (max-width: 1023.98px) and (min-height: 560.02px) {
+  .bf-menu {
+    --pad: 24px;
+    --thumb: 52px;
+    --name: 44px;
+  }
+  .bf-menu-sheet {
+    flex-direction: row;
+    align-items: flex-end;
+    gap: 24px;
+    padding-top: 20px;
+  }
+  .bf-menu-info {
+    flex: 1 1 0;
+  }
+  .bf-menu-nav {
+    display: flex;
+    width: 250px;
+  }
+}
+
+/* An upright phone: the header slims and the sheet closes up so the figure gets more of the height. */
+@media (max-width: 639.98px) and (orientation: portrait) {
+  .bf-menu {
+    --pad: 14px;
+    --gap: 8px;
+    /* As wide as six tiles across the sheet allow, so the faces stay apart. */
+    --thumb: clamp(40px, (100vw - 2 * var(--pad) - 46px) / 6, 56px);
+  }
+  .bf-menu-tools .bf-btn {
+    height: 38px;
+  }
+  .bf-menu-tools .bf-icon-btn {
+    width: 38px;
+  }
+  .bf-menu-sheet {
+    gap: 9px;
+    padding-top: 12px;
+  }
+  .bf-menu-callsign {
+    height: 38px;
+  }
+  .bf-menu-nav {
+    gap: 8px;
+  }
+  .bf-btn.bf-big-btn {
+    padding: 6px 12px;
+  }
+  .bf-big-btn-main .bf-big-btn-label {
+    font-size: 26px;
+  }
+}
+
+/* A short upright phone: the sheet gives height back to the figure. */
+@media (max-width: 599.98px) and (max-height: 740px) {
+  .bf-menu {
+    --pad: 12px;
+    --gap: 7px;
+    --thumb: clamp(40px, (100vw - 2 * var(--pad) - 46px) / 6, 48px);
+    --name: 32px;
+  }
+  .bf-menu-tools .bf-btn {
+    height: 38px;
+  }
+  .bf-menu-tools .bf-icon-btn {
+    width: 38px;
+  }
+  .bf-menu-sheet {
+    gap: 9px;
+    padding-top: 10px;
+    border-radius: 18px 18px 0 0;
+  }
+  .bf-menu-callsign {
+    height: 36px;
+  }
+  .bf-menu-nav {
+    gap: 7px;
+  }
+  .bf-btn.bf-big-btn {
+    --icon: 32px;
+    padding: 6px 10px;
+  }
+  .bf-big-btn-label {
+    font-size: 21px;
+  }
+  .bf-big-btn-main .bf-big-btn-label {
+    font-size: 24px;
+  }
+  .bf-big-btn-caption {
+    font-size: 11px;
+  }
+}

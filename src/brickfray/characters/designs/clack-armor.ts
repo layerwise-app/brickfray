@@ -123,7 +123,7 @@ export function cuirass(b: PartSet) {
   const rows = q === 3 ? 3 : 1;
   const strip = pick(b, 2, 3, 5);
   const ring = pick(b, 10, 16, 28);
-  const stud = pick(b, 5, 5, 8);
+  const stud = pick(b, 5, 5, 12);
 
   b.add('chest', TORSO.mesh({ from: 0, to: Math.PI, cols, rows, thick: 0.02, back: false, mirror: true }), STEEL, { look: 'metal' });
   // Tabard: a bib front and back that ends in a point above the waist, edged in gold, its neckline under the gorget's flare.
@@ -184,7 +184,8 @@ export function cuirass(b: PartSet) {
           [0.07, 0.312]
         ],
     STEEL,
-    { look: 'metal', seg: ring }
+    // The lames' stepped edges catch the light all the way round: the showroom turns them finely.
+    { look: 'metal', seg: q === 3 ? 56 : ring }
   );
   if (q === 3) b.torus('chest', 0.098, 0.006, GOLD, { at: [0, 0.31, 0], rot: [Math.PI / 2, 0, 0], look: 'gold' });
   b.cyl('neck', 0.064, 0.072, 0.13, MAIL, { at: [0, 0.015, 0], look: MAIL_LOOK, seg: pick(b, 8, 12, 20) });
@@ -264,10 +265,10 @@ function skirt(s: number, v0: number, v1: number, lift: number, nu: number, nv: 
 }
 
 const SCABBARD = new Loft([
-  { y: -0.47, w: 0.004, f: 0.006, e: 0.6 },
-  { y: -0.45, w: 0.01, f: 0.018, e: 0.6 },
-  { y: -0.2, w: 0.012, f: 0.027, e: 0.6 },
-  { y: 0, w: 0.014, f: 0.032, e: 0.6 }
+  { y: -0.47, w: 0.005, f: 0.006, e: 0.8 },
+  { y: -0.45, w: 0.012, f: 0.018, e: 0.8 },
+  { y: -0.2, w: 0.0145, f: 0.027, e: 0.8 },
+  { y: 0, w: 0.0165, f: 0.032, e: 0.8 }
 ]);
 
 /** Slanted sword belt and the scabbard on the left hip; `drawn` leaves the scabbard empty. */
@@ -279,14 +280,16 @@ export function swordBelt(b: PartSet, drawn: boolean) {
   const dir = new THREE.Vector3(0, 1, 0).applyEuler(new THREE.Euler(hang[0], hang[1], hang[2], 'YXZ'));
   const along = (d: number) => mouth.clone().addScaledVector(dir, d).toArray() as V3;
   b.add('pelvis', BELT.mesh({ cols: ring, t0: 0.2, t1: 0.8, lift: 0.006, thick: 0.006, back: false }), LEATHER, { at: [0, -0.03, 0], rot: [0, 0, 0.2], look: 'cloth' });
-  b.add('pelvis', SCABBARD.mesh({ cols: pick(b, 6, 8, 12) }), '#3f2718', { at: along(0), rot: hang, look: 'plastic' });
+  b.add('pelvis', SCABBARD.mesh({ cols: pick(b, 6, 8, 20) }), '#3f2718', { at: along(0), rot: hang, look: q === 3 ? 'cloth' : 'plastic' });
+  // A raised leather rib down each broad face, so side on it is a shaped sheath and not a flat board.
+  if (q === 3) b.add('pelvis', SCABBARD.mesh({ from: Math.PI / 2 - 0.32, to: Math.PI / 2 + 0.32, t0: 0.9, t1: 2.72, cols: 6, rows: 4, lift: 0.0022, thick: 0.0025, back: false, mirror: true }), '#56351f', { at: along(0), rot: hang, look: 'cloth' });
   if (q >= 2) {
     for (const [t0, t1] of [
       [0, 0.9],
       [1.9, 2.05],
       [2.72, 3]
     ]) {
-      b.add('pelvis', SCABBARD.mesh({ cols: pick(b, 6, 8, 12), t0, t1, lift: 0.003 }), GOLD, { at: along(0), rot: hang, look: 'gold' });
+      b.add('pelvis', SCABBARD.mesh({ cols: pick(b, 6, 8, 20), t0, t1, lift: 0.003 }), GOLD, { at: along(0), rot: hang, look: 'gold' });
     }
   }
   if (drawn) return;

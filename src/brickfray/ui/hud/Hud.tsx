@@ -40,7 +40,7 @@ export function Hud() {
       {hud.scoped && <div className='absolute bottom-[18%] left-1/2 -translate-x-1/2 text-sm font-semibold text-white/70'>{t('scopeHint')}</div>}
       {game.settings.showStats && hud.stats && (
         <div className='absolute left-3 top-3 rounded-md bg-black/55 px-2 py-1 font-mono text-[11px] leading-4 text-white/85'>
-          {hud.fps} fps ({hud.frameMs.toFixed(1)} ms) · {hud.stats.calls} calls · {(hud.stats.triangles / 1000).toFixed(0)}k tris · ping {hud.ping} ms
+          {game.renderer.statsLine()} · {hud.stats.calls} calls · {(hud.stats.triangles / 1000).toFixed(0)}k tris · ping {hud.ping} ms
         </div>
       )}
       {!app.paused && !game.input.active && hud.phase !== 'ended' && <ClickToPlay />}
@@ -96,9 +96,10 @@ function Ammo() {
       </div>
       <div className='flex items-end gap-4'>
         <WeaponIcon weapon={hud.weapon} size={92} className='text-white/90 drop-shadow-[0_2px_0_rgba(0,0,0,.5)]' />
-        <div className='flex items-baseline gap-1.5'>
+        {/* A soft dark plate under the count keeps both numbers legible over bright or red scenery. */}
+        <div className='flex items-baseline gap-1.5 rounded-2xl bg-black/35 px-3 pb-1.5 pt-1 shadow-[0_3px_0_rgba(0,0,0,.25)]'>
           <span className={`bf-display bf-hud-text text-6xl leading-none tabular-nums ${lowAmmo ? 'text-[#ff6a5c]' : ''}`}>{hud.ammo}</span>
-          <span className='bf-display bf-hud-text text-2xl leading-none text-white/60'>/{def.mag}</span>
+          <span className='bf-display bf-hud-text text-3xl leading-none text-white/90'>/{def.mag}</span>
         </div>
       </div>
       <div className='h-1.5 w-40 overflow-hidden rounded-full bg-black/40' style={{ opacity: reloading ? 1 : 0, transition: 'opacity .15s' }}>
@@ -109,12 +110,15 @@ function Ammo() {
 }
 
 /**
- * Below 45% health the screen edges drain of colour and a dark red rim beats like a pulse, both creeping inward with
- * the health lost (`level` 0…1); the middle of the screen keeps its colour and contrast to aim through.
+ * Below 45% health the screen edges drain of colour and darken, and a deep red rim beats like a pulse in the outer
+ * band, both creeping inward with the health lost (`level` 0…1). The middle two thirds of the screen keep their colour
+ * and contrast to aim through. Gradient stops are in units of the half-width / half-height, so 100% is an edge.
  */
 function LowHealth({ level }: { level: number }) {
   const on = level > 0;
-  const edge = `radial-gradient(ellipse 72% 72% at center, transparent ${Math.round(60 - 10 * level)}%, black ${Math.round(86 - 8 * level)}%)`;
+  const clear = Math.round(70 - 14 * level);
+  const edge = `radial-gradient(ellipse 50% 50% at center, transparent ${clear}%, black ${Math.round(clear + 26)}%)`;
+  const grade = `saturate(${(1 - 0.8 * level).toFixed(3)}) brightness(${(1 - 0.28 * level).toFixed(3)})`;
   const beat = on ? `bf-heartbeat ${(1.15 - level * 0.4).toFixed(2)}s ease-in-out infinite` : undefined;
   return (
     <>
@@ -122,17 +126,17 @@ function LowHealth({ level }: { level: number }) {
       <div
         className='absolute inset-0'
         style={{
-          backdropFilter: on ? `saturate(${(1 - 0.7 * level).toFixed(3)})` : undefined,
-          WebkitBackdropFilter: on ? `saturate(${(1 - 0.7 * level).toFixed(3)})` : undefined,
+          backdropFilter: on ? grade : undefined,
+          WebkitBackdropFilter: on ? grade : undefined,
           maskImage: on ? edge : undefined,
           WebkitMaskImage: on ? edge : undefined
         }}
       />
-      <div className='absolute inset-0' style={{ opacity: on ? 0.45 + 0.55 * level : 0, transition: 'opacity .4s ease' }}>
+      <div className='absolute inset-0' style={{ opacity: on ? 0.5 + 0.5 * level : 0, transition: 'opacity .4s ease' }}>
         <div
           className='absolute inset-0'
           style={{
-            background: `radial-gradient(ellipse 70% 70% at center, transparent ${Math.round(60 - 8 * level)}%, rgba(170,0,0,.5) ${Math.round(75 - 5 * level)}%, rgba(90,0,0,.95) 96%)`,
+            background: `radial-gradient(ellipse 50% 50% at center, transparent ${Math.round(clear + 12)}%, rgba(135,0,0,${(0.32 + 0.33 * level).toFixed(2)}) 102%, rgba(70,0,0,.9) 138%)`,
             animation: beat
           }}
         />

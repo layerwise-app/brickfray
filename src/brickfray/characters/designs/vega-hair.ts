@@ -248,7 +248,7 @@ export function freckles(b: PartSet) {
     [0.06, 0.038],
     [0.076, 0.042]
   ] as const) {
-    b.mirror((_, sign) => b.cyl('head', 0.0026, 0.0026, 0.0012, '#c98a62', { ...SKULL.stud(y, SKULL.front(y, sign * x), 0.0002), look: 'skin', seg: 6 }));
+    b.mirror((_, sign) => b.cyl('head', 0.0026, 0.0026, 0.0012, '#c98a62', { ...SKULL.stud(y, SKULL.front(y, sign * x), 0.0002), look: 'skin', seg: b.hero ? 16 : 6 }));
   }
 }
 

@@ -106,6 +106,7 @@ export const ko: Dictionary = {
   chatPlaceholder: '메시지 입력…',
   scopeHint: 'Shift를 누르고 있으면 숨을 참습니다',
   headshot: '헤드샷',
+  eliminated: '처치',
 
   graphics: '그래픽',
   controls: '조작',
@@ -129,6 +130,8 @@ export const ko: Dictionary = {
   crosshair: '조준선',
   damageNumbers: '대미지 숫자',
   showStats: '성능 정보',
+  autoResolution: '자동 해상도',
+  autoResolutionHint: '프레임이 화면 갱신을 따라가지 못하면 그리는 픽셀을 줄여 시점 회전을 부드럽게 유지합니다.',
   language: '언어',
   done: '완료',
   keys: '키 설정',

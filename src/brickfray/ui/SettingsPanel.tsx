@@ -106,6 +106,15 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
                   ))}
                 </div>
               </div>
+              {toggle(
+                'autoResolution',
+                s.autoResolution,
+                (autoResolution) => {
+                  game.renderer.autoScale = autoResolution;
+                  return { ...s, autoResolution };
+                },
+                'autoResolutionHint'
+              )}
               {slider('fov', s.fov, 80, 110, 1, (fov) => ({ ...s, fov }), (v) => `${v}°`)}
               {toggle('showStats', s.showStats, (showStats) => ({ ...s, showStats }))}
             </>

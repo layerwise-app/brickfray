@@ -14,9 +14,9 @@ import { stow } from './stowed';
 const CANVAS = { look: 'rubber' } as const;
 
 /** A piece of doubled canvas lying on a limb, with a rim. */
-function patch(limb: LoftRing[], y: [number, number], a: [number, number], lift: number) {
+function patch(limb: LoftRing[], y: [number, number], a: [number, number], lift: number, cols = 4) {
   const out = surface(
-    4,
+    cols,
     3,
     (u, v, point) => point.copy(on(limb, y[0] + (y[1] - y[0]) * v, a[0] + (a[1] - a[0]) * u, lift + 0.0035)[0]),
     { thick: 0.0035, back: false, inward: a[1] > a[0] }
@@ -25,6 +25,8 @@ function patch(limb: LoftRing[], y: [number, number], a: [number, number], lift:
 }
 
 const stitch = S.box(0.0028, 0.0022, 0.0085, 0);
+/** Where the elbow's chafing patch runs down the forearm. */
+const ELBOW_PATCH: [number, number] = [-0.09, -0.017];
 
 /** Two rows of stitches down a limb at `a`, each `gap` to one side: the mark of a flat-felled seam. */
 function seamStitches(limb: LoftRing[], y0: number, y1: number, a: number, gap: number, lift: number, count: number) {
@@ -62,13 +64,16 @@ export function canvas(b: PartSet) {
     for (const [bone, limb, y0, y1, count] of runs) b.add(`${bone}${side}`, seamStitches(limb, y0, y1, out, 0.0036, 0.0036, count), thread, { look: 'cloth' });
   });
 
-  // A mended tear on the right thigh and a chafing patch on the left forearm.
-  const mends: ['thighR' | 'forearmL', LoftRing[], [number, number], [number, number], string][] = [
-    ['thighR', THIGH, [-0.262, -0.196], [-0.62, 0.02], tone(SUIT, 1.16)],
-    ['forearmL', FOREARM, [-0.15, -0.096], [-2.0, -1.2], PATCH]
+  // A mended tear on the right thigh, a chafing patch on the left forearm, and one behind each elbow: on the forearm's
+  // canvas below the joint, so a bent arm never folds it into the upper sleeve.
+  const mends: ['thighR' | 'forearmL' | 'forearmR', LoftRing[], [number, number], [number, number], string, number][] = [
+    ['thighR', THIGH, [-0.262, -0.196], [-0.62, 0.02], tone(SUIT, 1.16), 4],
+    ['forearmL', FOREARM, [-0.15, -0.096], [-2.0, -1.2], PATCH, 4],
+    ['forearmL', FOREARM, ELBOW_PATCH, [Math.PI - 0.95, Math.PI + 0.95], PATCH, 12],
+    ['forearmR', FOREARM, ELBOW_PATCH, [Math.PI - 0.95, Math.PI + 0.95], PATCH, 12]
   ];
-  for (const [bone, limb, y, a, color] of mends) {
-    b.add(bone, patch(limb, y, a, 0.0006), color, CANVAS);
+  for (const [bone, limb, y, a, color, cols] of mends) {
+    b.add(bone, patch(limb, y, a, 0.0006, cols), color, CANVAS);
     b.add(bone, patchStitches(limb, y, a, 0.0012), thread, { look: 'cloth' });
   }
 

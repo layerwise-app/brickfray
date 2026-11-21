@@ -106,6 +106,7 @@ export const zh: Dictionary = {
   chatPlaceholder: '说点什么…',
   scopeHint: '按住 Shift 屏息',
   headshot: '爆头',
+  eliminated: '击倒',
 
   graphics: '画面',
   controls: '操作',
@@ -129,6 +130,8 @@ export const zh: Dictionary = {
   crosshair: '准星',
   damageNumbers: '伤害数字',
   showStats: '性能信息',
+  autoResolution: '自动分辨率',
+  autoResolutionHint: '画面跟不上屏幕刷新时降低渲染分辨率，转动视角保持流畅。',
   language: '语言',
   done: '完成',
   keys: '按键',

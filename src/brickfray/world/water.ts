@@ -105,8 +105,10 @@ vec3 waterN = normalize(vec3(-slope.x, 1.0, -slope.y));
 normal = normalize((viewMatrix * vec4(waterN, 0.0)).xyz);
 float crest = ((r1.b - 0.5) * k1 + (r2.b - 0.5) * k2 + (r3.b - 0.5) * k3 * 0.8) * chop;
 float facing = clamp(dot(normalize(vViewPosition), (viewMatrix * vec4(0.0, 1.0, 0.0, 0.0)).xyz), 0.0, 1.0);
-diffuseColor.rgb *= 1.0 + (0.22 + 0.5 * facing) * crest;
-diffuseColor.rgb = mix(diffuseColor.rgb, mix(uHorizon, uZenith, 0.35), smoothstep(0.12, 0.42, crest) * 0.24 * facing);`;
+diffuseColor.rgb *= 1.0 + (0.12 + 0.3 * facing) * crest;
+float crestW = fwidth(crest) + 0.015;
+float glint = smoothstep(0.3 - crestW, 0.3 + crestW, crest);
+diffuseColor.rgb = mix(diffuseColor.rgb, mix(uHorizon, vec3(1.0), 0.4), glint * (0.2 + 0.3 * facing));`;
 
 /** Without an environment map (low tier) the sky's reflection is added by hand, with the same Fresnel falloff. */
 const FAKE_SKY = /* glsl */ `

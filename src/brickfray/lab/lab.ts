@@ -34,6 +34,8 @@ export async function startLab(canvas: HTMLCanvasElement, sceneName: string, qua
   const query = new URLSearchParams(location.search);
   if (!query.has('plain')) await loadHeroAssets({ occlusion: !query.has('unshaded') && !query.has('bare'), drapes: !query.has('bare') });
   const gr = new GameRenderer(canvas, quality);
+  // Captures compare pixels: the resolution must not move under them.
+  gr.autoScale = false;
   const scene = new THREE.Scene();
   gr.dress(scene);
   const camera = new THREE.PerspectiveCamera(50, 1, 0.05, 600);

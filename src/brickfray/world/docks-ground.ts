@@ -14,8 +14,8 @@ const WHITE = '#f2f2ee';
 const PAINT = 0.004;
 const YARD = { z0: -14.4, z1: 4.8 } as const;
 
-/** The quay's walkable floor; its look comes from separate plates so no two studded layers overlap. */
-const FLOOR: Element<GroundParams> = { colliders: GROUND.colliders, draw() {} };
+/** A walkable ground collider drawn by nothing: its look comes from separate plates so no two layers overlap. */
+export const FLOOR: Element<GroundParams> = { colliders: GROUND.colliders, draw() {} };
 
 const down = (v: number) => Math.floor(v / STUD + 1e-6) * STUD;
 const up = (v: number) => Math.ceil(v / STUD - 1e-6) * STUD;

@@ -60,7 +60,7 @@ export function helm(b: PartSet) {
   const q = tier(b);
   const cols = pick(b, 12, 18, 32);
   const half = pick(b, 5, 8, 24);
-  const stud = pick(b, 5, 5, 8);
+  const stud = pick(b, 5, 5, 12);
   b.add('head', SKULL.mesh({ cols, rows: q === 3 ? 4 : 1, thick: 0.014, back: false }), STEEL, { look: 'metal' });
   b.add('head', visorPlate((a) => sill(a) - 0.014, (a) => brow(a) + 0.016, half, 2, -0.009, 0), SHADOW, { look: 'rubber' });
   b.add('head', visorPlate(() => -0.036, sill, half, pick(b, 2, 3, 14)), STEEL, { look: 'metal' });
@@ -85,7 +85,21 @@ export function helm(b: PartSet) {
   const pole = SKULL.spans;
   const ridge = [...SKULL.path([[0, SKULL.tAt(0.168)], [0, pole]], 0.002, 6).slice(0, -1), ...SKULL.path([[Math.PI, pole], [Math.PI, SKULL.tAt(0.03)]], 0.002, 8)];
   b.add('head', sweep(ridge, (t) => [0.013, 0.003 + 0.009 * Math.sin(Math.PI * Math.min(1, t * 1.06)) ** 0.5], { seg: pick(b, 8, 12, 24), radial: pick(b, 5, 6, 8), up: [0, 0, -1] }), STEEL, { look: 'metal' });
+  if (q === 3) nape(b, stud);
+}
 
+/** The back of the armet: a nape plate riveted on under the crown with a gilt upper edge, and a rondel on a short stem. */
+function nape(b: PartSet, stud: number) {
+  const [t0, t1] = [SKULL.tAt(-0.02), SKULL.tAt(0.075)];
+  const back = { from: 1.6, to: Math.PI, cols: 16, back: false, mirror: true };
+  b.add('head', SKULL.mesh({ ...back, t0, t1, rows: 4, lift: 0.004, thick: 0.005 }), STEEL, { look: 'metal' });
+  b.add('head', SKULL.mesh({ ...back, t0: t1 - 0.14, t1, rows: 1, lift: 0.0088, thick: 0.003 }), GOLD, { look: 'gold' });
+  const row = SKULL.tAt(0.058);
+  b.add('head', rivets(SKULL.row(Math.PI - 1.35, row, Math.PI + 1.35, row, 9, 0.009), 0.0055, stud), GOLD, { look: 'gold' });
+  const at: [number, number][] = [[Math.PI, SKULL.tAt(0.022)]];
+  b.add('head', mounted(SKULL.spots(at, 0.009), new THREE.CylinderGeometry(0.007, 0.009, 0.012, 12)), STEEL, { look: 'metal' });
+  b.add('head', mounted(SKULL.spots(at, 0.016), new THREE.CylinderGeometry(0.028, 0.028, 0.005, 32)), GOLD, { look: 'gold' });
+  b.add('head', rivets(SKULL.spots(at, 0.0185), 0.02, 24, 0.45), STEEL, { look: 'metal' });
 }
 
 const LOCK: V3[] = [

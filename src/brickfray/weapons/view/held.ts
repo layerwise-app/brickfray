@@ -5,7 +5,8 @@ import { createRiggedModel, type RiggedModel } from '../model';
 import { surfaceMaterial } from '../surface';
 import type { Frame } from './clip';
 import { FINGERS, type FingerPose } from './fingers';
-import { goal, type Goal } from './goals';
+import { goal, goalMatrix, type Goal } from './goals';
+import { smooth01 } from './springs';
 
 /** Where a tool handle's axis sits in the left hand's frame once the fingers close on it. */
 const HANDLE_IN_FIST = new THREE.Vector3(-0.001, 0, -0.0075);
@@ -23,11 +24,22 @@ const PIN_GRAVITY = 9;
 /** How far down the thumb's last joint the ring sits. */
 const HOOK_DEPTH = -0.011;
 
+/** A shotgun shell between the left hand's thumb and fingers, in the hand's frame: brass head toward the wrist. */
+export const SHELL_HOLD = { pos: new THREE.Vector3(0.042, 0.028, 0.0005), quat: new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.PI / 2, 0, 0)) };
+/** Seconds a shell left at the port by a cut takes to be thumbed home. */
+const THUMB_HOME = 0.08;
+/** Further than this from the port a cut-off shell is not thumbed in but let fall (the hand is down out of the picture). */
+const THUMB_REACH = 0.13;
+
 const at = new THREE.Vector3();
 const to = new THREE.Vector3();
 const seat = new THREE.Matrix4();
 const scale = new THREE.Vector3();
 const spin = new THREE.Quaternion();
+const turn = new THREE.Quaternion();
+const held = new THREE.Matrix4();
+const inv = new THREE.Matrix4();
+const one = new THREE.Vector3(1, 1, 1);
 const e = new THREE.Euler();
 
 /** What the left hand holds besides the gun: the melee weapon, the grenade and its pin, a shotgun shell. */
@@ -43,6 +55,10 @@ export class Held {
   private hooked = false;
   private meleeShown = false;
   private linger = 0;
+  /** A cut-off shell sliding home into the port: seconds since, its pose then in the port's frame, and where it goes. */
+  private homing = -1;
+  private readonly homeFrom = new THREE.Matrix4();
+  private home: Goal | null = null;
 
   /** `space` is the view scene; `hook` is the gun hand's thumb tip, which pulls the pin. */
   constructor(
@@ -57,8 +73,8 @@ export class Held {
     hand.add(this.grenade.model.root);
     this.grenade.model.root.position.set(0.0165, 0.016, -0.002);
     this.shell = new THREE.Mesh(shellGeometry, surfaceMaterial(kit.materials));
-    this.shell.position.set(0.042, 0.028, 0.0005);
-    this.shell.quaternion.setFromEuler(new THREE.Euler(Math.PI / 2, 0, 0));
+    this.shell.position.copy(SHELL_HOLD.pos);
+    this.shell.quaternion.copy(SHELL_HOLD.quat);
     hand.add(this.shell);
     // The pin leaves the bomb, so it lives in view space and is put on its seat every frame.
     this.pin = this.grenade.parts.get('pin');
@@ -108,9 +124,24 @@ export class Held {
     return this.linger > 0 && !this.meleeShown;
   }
 
+  /** A shell still in the fingers when its clip is cut: near the port it is thumbed home (it slides in and the receiver hides it); further off the hand is out of the picture and it is let fall. Returns whether it went in. */
+  thumbHome(inside: Goal | undefined) {
+    if (!inside) return false;
+    this.shell.updateWorldMatrix(true, false);
+    inside.node.updateWorldMatrix(true, false);
+    goalMatrix(inside, seat);
+    at.setFromMatrixPosition(this.shell.matrixWorld);
+    if (at.distanceTo(to.setFromMatrixPosition(seat)) > THUMB_REACH) return false;
+    this.homeFrom.copy(inside.node.matrixWorld).invert().multiply(this.shell.matrixWorld);
+    this.home = inside;
+    this.homing = 0;
+    return true;
+  }
+
   reset() {
     this.linger = 0;
     this.meleeShown = false;
+    this.homing = -1;
   }
 
   /** Shows what the frame asks for and returns the fingers that hold it (null for an empty hand). */
@@ -120,17 +151,19 @@ export class Held {
     const melee = this.meleeShown || this.linger > 0;
     this.melee.model.root.visible = melee;
     this.grenade.model.root.visible = f.show.grenade > 0;
-    this.shell.visible = f.show.shell > 0;
+    if (this.homing >= 0 && (this.homing += dt) >= THUMB_HOME) this.homing = -1;
+    this.shell.visible = f.show.shell > 0 || this.homing >= 0;
     return melee ? FINGERS.handle : f.show.grenade ? FINGERS.ball : f.show.shell ? FINGERS.pinch : null;
   }
 
-  /** Once both hands are placed: the pin sits on the bomb, hangs from the thumb that hooked it, or flies off. */
+  /** Once both hands are placed: a shell going into the port leaves the fingers; the pin sits on the bomb, hangs from the thumb that hooked it, or flies off. */
   settle(f: Frame) {
+    this.placeShell(f);
     this.hook.updateWorldMatrix(true, false);
     const pin = this.pin;
     if (!pin) return;
     const fly = f.pin.fly;
-    pin.visible = f.show.pin && (fly >= 0 ? fly < PIN_LIFE : f.show.grenade > 0);
+    pin.visible = f.show.pin && (fly >= 0 ? fly < PIN_LIFE : f.show.grenade > 0 || f.pin.hook > 0);
     if (fly >= 0) {
       pin.position.copy(this.flyFrom).addScaledVector(PIN_FLICK, fly);
       pin.position.y -= PIN_GRAVITY * 0.5 * fly * fly;
@@ -149,5 +182,30 @@ export class Held {
     this.hooked = f.pin.hook > 0;
     this.flyFrom.copy(pin.position);
     this.pinTurn.copy(pin.quaternion);
+  }
+
+  /** The shell rides the fingers, or (pushed into the port, or thumbed home after a cut) follows its seat on the gun. */
+  private placeShell(f: Frame) {
+    const shell = this.shell;
+    shell.position.copy(SHELL_HOLD.pos);
+    shell.quaternion.copy(SHELL_HOLD.quat);
+    let k = 0;
+    if (this.homing >= 0 && this.home) {
+      this.home.node.updateWorldMatrix(true, false);
+      k = smooth01(this.homing / THUMB_HOME);
+      goalMatrix(this.home, seat).decompose(to, spin, scale);
+      held.copy(this.home.node.matrixWorld).multiply(this.homeFrom).decompose(at, turn, scale);
+    } else if (f.shellSeat && f.shellIn > 0) {
+      f.shellSeat.node.updateWorldMatrix(true, false);
+      k = f.shellIn;
+      goalMatrix(f.shellSeat, seat).decompose(to, spin, scale);
+      shell.updateWorldMatrix(true, false);
+      shell.matrixWorld.decompose(at, turn, scale);
+    }
+    if (k <= 0) return;
+    at.lerp(to, k);
+    turn.slerp(spin, k);
+    held.compose(at, turn, one).premultiply(inv.copy(this.hand.matrixWorld).invert()).decompose(shell.position, shell.quaternion, scale);
+    shell.updateMatrixWorld();
   }
 }

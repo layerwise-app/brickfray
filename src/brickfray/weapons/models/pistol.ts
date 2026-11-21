@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { T, type ModelBuilder } from '../builder';
 import { box, prism, slab, tube } from '../shapes';
-import { screw, shade, slot, studSide } from './details';
+import { screw, shade, sidePanel, slot, studSide } from './details';
 
 const C = {
   frame: '#a4885e',
@@ -14,6 +14,9 @@ const C = {
 };
 const BORE = 0.062;
 const SIGHT_Y = 0.089;
+/** Side profiles [z, y]: the grip panel inside the grip's edges, and the slide stop lever with its thumb paddle at the back. */
+const GRIP_PANEL: [number, number][] = [[-0.006, 0.022], [0.033, 0.022], [0.051, -0.062], [0.018, -0.067], [0.005, -0.061], [-0.003, -0.022]];
+const SLIDE_STOP: [number, number][] = [[-0.045, 0.0425], [-0.022, 0.0425], [-0.018, 0.0395], [-0.021, 0.0345], [-0.03, 0.0375], [-0.045, 0.0395]];
 
 /** Peg Pistol: silver slide with serrations and glow sights on a stippled tan polymer frame. */
 export function buildPistol(b: ModelBuilder) {
@@ -21,14 +24,16 @@ export function buildPistol(b: ModelBuilder) {
   const d = b.detail;
 
   // Frame with dust-cover rail, trigger guard and a raked, stud-stippled grip.
-  b.add(slab([[-0.122, 0.0446], [0.044, 0.0446], [0.058, 0.035], [0.046, 0.026], [-0.06, 0.03], [-0.122, 0.031]], 0.026, lod, [0.003, 0.004, 0.008, 0.004, 0.004, 0.003]), C.frame, 'satin');
+  b.add(slab([[-0.122, 0.0446], [0.044, 0.0446], [0.058, 0.035], [0.046, 0.026], [-0.06, 0.03], [-0.122, 0.031]], 0.026, lod, [0.003, 0.004, 0.008, 0.004, 0.004, 0.003], [], d >= 1 ? 0.0022 : 0), C.frame, 'satin');
   b.add(slab([[-0.078, 0.034], [-0.012, 0.034], [-0.013, -0.002], [-0.066, -0.004], [-0.079, 0.008]], 0.009, lod, [0.002, 0.004, 0.008, 0.006, 0.006], [[[-0.07, 0.032], [-0.02, 0.032], [-0.021, 0.005], [-0.064, 0.004], [-0.071, 0.012]]]), C.frame, 'satin');
   b.add(slab([[-0.045, 0.034], [-0.037, 0.034], [-0.038, 0.022], [-0.042, 0.013], [-0.049, 0.011], [-0.046, 0.021]], 0.006, lod, 0.002), C.accent, 'plastic');
   const grip: [number, number][] = [[-0.022, 0.032], [0.036, 0.032], [0.056, -0.068], [0.02, -0.075], [0.001, -0.068], [-0.01, -0.02]];
-  b.add(slab(grip, 0.03, lod, [0.004, 0.012, 0.01, 0.008, 0.01, 0.012]), C.frame, 'satin');
+  b.add(slab(grip, 0.03, lod, [0.004, 0.012, 0.01, 0.008, 0.01, 0.012], [], d >= 1 ? 0.0025 : 0), C.frame, 'satin');
   if (d >= 1) {
+    // Grip panels stand proud of the frame, stippled along the rake of the grip.
+    sidePanel(b, GRIP_PANEL, 0.03, shade(C.frame, 0.84));
     for (const s of [1, -1] as const) {
-      for (let row = 0; row < 4; row++) studSide(b, s, s * 0.0148, -0.05 + row * 0.019, 0.026 + row * 0.0035, 2, 0.012, 0.0028, shade(C.frame, 0.8));
+      for (let row = 0; row < 4; row++) studSide(b, s, s * 0.0163, -0.05 + row * 0.019, 0.032 - row * 0.004, 2, 0.012, 0.0028, shade(C.frame, 0.7));
     }
     for (let i = 0; i < 4; i++) b.add(box(0.016, 0.003, 0.0045, 0.0006), shade(C.frame, 0.8), 'satin', T(0, 0.0285, -0.112 + i * 0.009));
     b.add(box(0.004, 0.005, 0.012, 0.0012), C.accent, 'plastic', T(-0.0145, 0.04, -0.012));
@@ -37,7 +42,7 @@ export function buildPistol(b: ModelBuilder) {
   if (d >= 2) screw(b, -0.0133, 0.037, -0.05, 'x', 0.0022);
   if (d >= 1) {
     // Slide stop and takedown lever on the left of the frame, and a parting line under the slide.
-    b.add(box(0.0024, 0.0042, 0.03, 0.0008), C.dark, 'satin', T(-0.0141, 0.041, -0.03));
+    b.add(slab(SLIDE_STOP, 0.003, lod, 0.0015), C.dark, 'satin', T(-0.0145, 0, 0));
     b.add(box(0.0024, 0.004, 0.009, 0.0008), C.dark, 'satin', T(-0.0141, 0.04, -0.066));
     for (const s of [1, -1]) b.add(box(0.0012, 0.0012, 0.15, 0.0003), shade(C.frame, 0.6), 'dark', T(s * 0.0131, 0.0438, -0.04));
   }

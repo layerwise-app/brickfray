@@ -104,6 +104,7 @@ export const en = {
   chatPlaceholder: 'Say something…',
   scopeHint: 'Hold Shift to steady',
   headshot: 'Headshot',
+  eliminated: 'Eliminated',
 
   graphics: 'Graphics',
   controls: 'Controls',
@@ -127,6 +128,8 @@ export const en = {
   crosshair: 'Crosshair',
   damageNumbers: 'Damage numbers',
   showStats: 'Performance stats',
+  autoResolution: 'Automatic resolution',
+  autoResolutionHint: 'Draws fewer pixels when frames can’t keep up with your display, so turning stays smooth.',
   language: 'Language',
   done: 'Done',
   keys: 'Key bindings',

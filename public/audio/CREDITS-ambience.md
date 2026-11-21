@@ -4,9 +4,9 @@
 
 | File | Source recording(s) | Author | Source URL | License |
 | --- | --- | --- | --- | --- |
-| `ambience/bed-docks.mp3` | Pontoon, marina: 48 s from 52 s, high-passed 80 Hz, events levelled, stereo side reduced to 0.6 with mono bass below 150 Hz | Joseph Sardin (BigSoundBank) | https://bigsoundbank.com/s1444.html | CC0 1.0 |
-| `ambience/bed-fortress.mp3` | Wind in the Trees: 34 s from 0.5 s joined to 24 s from 144 s (the gusty stretches), high-passed 90 Hz, outliers levelled, slow +-3 dB rider, everything over 1.2 kHz cut ~7 dB. Recordings: Wind in the Trees (BigSoundBank #0904) | Joseph Sardin (BigSoundBank) | https://bigsoundbank.com/s0904.html | CC0 1.0 |
-| `ambience/bed-plaza.mp3` | Little Parisian Street: 24 s from 1 s joined to 26 s from 52 s, high-passed 80 Hz, events levelled | Joseph Sardin (BigSoundBank) | https://bigsoundbank.com/s1713.html | CC0 1.0 |
+| `ambience/bed-docks.mp3` | Pontoon, marina: 2-38 s and 42-108 s joined, high-passed 80 Hz, events levelled, slow +-3 dB rider, chirps pulled into the noise, the 2.4-4.6 kHz band levelled, stereo side reduced to 0.6 with mono bass below 150 Hz. Recordings: Pontoon, marina (BigSoundBank #1444) | Joseph Sardin (BigSoundBank) | https://bigsoundbank.com/s1444.html | CC0 1.0 |
+| `ambience/bed-fortress.mp3` | Wind in the Trees: its gustiest 100 s in 10 s windows joined, high-passed 90 Hz, outliers levelled, slow +-3 dB rider, chirps pulled into the noise, the 2.4-4.6 kHz band levelled, everything over 1.2 kHz cut ~7 dB. Recordings: Wind in the Trees (BigSoundBank #0904) | Joseph Sardin (BigSoundBank) | https://bigsoundbank.com/s0904.html | CC0 1.0 |
+| `ambience/bed-plaza.mp3` | Little Parisian Street: 1-27 s, 51-83 s and 93-116 s joined, high-passed 80 Hz, events levelled, slow +-3 dB rider, chirps pulled into the noise, the 2.4-4.6 kHz band levelled. Recordings: Little Parisian Street (BigSoundBank #1713) | Joseph Sardin (BigSoundBank) | https://bigsoundbank.com/s1713.html | CC0 1.0 |
 | `ambience/spot-bell-1.mp3` | a church bell striking. Recordings: 1 church bell (BigSoundBank #0830) | Joseph Sardin (BigSoundBank) | https://bigsoundbank.com/s0830.html | CC0 1.0 |
 | `ambience/spot-bell-2.mp3` | a church bell striking. Recordings: Bell 5 O'clock (BigSoundBank #3445) | Joseph SARDIN & Axeline T. (BigSoundBank) | https://bigsoundbank.com/s3445.html | CC0 1.0 |
 | `ambience/spot-bell-3.mp3` | a church bell striking. Recordings: Bell 1 O'clock (BigSoundBank #3446) | Joseph SARDIN & Axeline T. (BigSoundBank) | https://bigsoundbank.com/s3446.html | CC0 1.0 |

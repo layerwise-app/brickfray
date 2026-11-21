@@ -29,8 +29,9 @@ interface Side {
   shoulder: THREE.Vector3;
   /** The shoulder stays this far behind the wrist in depth, so the forearm arrives from behind the hand, not from under it… */
   trail: number;
-  /** …but never further back than this. */
+  /** …but never further back than this (`aimBack` once aimed: a shouldered gun puts the shoulder well behind the eye, so the forearm runs forward to the grip instead of standing up under it). */
   back: number;
+  aimBack: number;
   pole: THREE.Vector3;
   /** Elbow hint and shoulder trail once the hand is up on the sight line: the elbow drops under the wrist instead of flaring out. */
   aimPole: THREE.Vector3;
@@ -40,7 +41,7 @@ interface Side {
 
 /** A wrist this close to the view axis (m, sideways) and this high (m, below the eye) counts as aimed; the arm eases over between the pairs. */
 const AIM_SIDE = [0.13, 0.05] as const;
-const AIM_HEIGHT = [-0.2, -0.11] as const;
+const AIM_HEIGHT = [-0.25, -0.16] as const;
 
 /**
  * Both first-person arms as one rigidly skinned mesh (one draw call): upper
@@ -82,7 +83,7 @@ export class Arms {
         geos.push(g);
       }
     };
-    const side = (mirror: boolean, shoulder: THREE.Vector3, trail: number, back: number, pole: THREE.Vector3, aimPole: THREE.Vector3, aimTrail: number): Side => {
+    const side = (mirror: boolean, shoulder: THREE.Vector3, trail: number, back: number, pole: THREE.Vector3, aimPole: THREE.Vector3, aimTrail: number, aimBack = back): Side => {
       const upper = new THREE.Bone();
       const fore = new THREE.Bone();
       const joints = createHandBones(mirror);
@@ -96,9 +97,9 @@ export class Arms {
       fore.name = mirror ? 'forearm:left' : 'forearm:right';
       const fingers = { ...FINGERS.relaxed };
       poseFingers(joints, fingers, mirror);
-      return { upper, fore, hand: joints[0]!, joints, fingers, shoulder, trail, back, pole, aimPole, aimTrail, wrist: WRIST.clone().setX(mirror ? -WRIST.x : WRIST.x) };
+      return { upper, fore, hand: joints[0]!, joints, fingers, shoulder, trail, back, aimBack, pole, aimPole, aimTrail, wrist: WRIST.clone().setX(mirror ? -WRIST.x : WRIST.x) };
     };
-    this.right = side(false, new THREE.Vector3(0.2, -0.2, -0.05), 0.535, 0.24, new THREE.Vector3(0.9, -1, 0.15), new THREE.Vector3(0.7, -1.3, 0.1), 0.44);
+    this.right = side(false, new THREE.Vector3(0.2, -0.2, -0.05), 0.535, 0.24, new THREE.Vector3(0.9, -1, 0.15), new THREE.Vector3(0.7, -1, 0.1), 0.62, 0.52);
     this.left = side(true, new THREE.Vector3(-0.16, -0.33, -0.2), 0.46, 0.15, new THREE.Vector3(-0.95, -1.3, 0.1), new THREE.Vector3(-0.7, -1.3, 0.1), 0.44);
     const geometry = mergeGeometries(geos)!;
     for (const g of geos) g.dispose();
@@ -166,7 +167,7 @@ function solve(side: Side, hand: THREE.Matrix4, shift: THREE.Vector3) {
   const aim = ramp(Math.abs(wrist.x), AIM_SIDE) * ramp(wrist.y, AIM_HEIGHT);
   const trail = side.trail + (side.aimTrail - side.trail) * aim;
   pole.copy(side.pole).lerp(side.aimPole, aim);
-  shoulder.copy(side.shoulder).setZ(Math.min(side.back, Math.max(side.shoulder.z, wrist.z + trail))).add(shift);
+  shoulder.copy(side.shoulder).setZ(Math.min(side.back + (side.aimBack - side.back) * aim, Math.max(side.shoulder.z, wrist.z + trail))).add(shift);
   dir.subVectors(wrist, shoulder);
   let dist = dir.length();
   dir.divideScalar(dist);

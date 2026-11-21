@@ -10,6 +10,9 @@ const STUD = { radius: 0.0165, height: 0.012, pitch: 0.05 };
 /** The baseplate floor round the stand: its stud pitch and how far out it is studded. */
 const FLOOR = { pitch: 0.12, radius: 0.036, height: 0.026, from: 0.76, to: 2.5 };
 const KEY = new THREE.Vector3(-0.5, 0.72, 0.48).normalize();
+/** The tile's and its studs' own grey, and how far each takes on the studio's ring colour. */
+const TILE = { color: '#2c3446', tint: 0.17 };
+const STUDS = { color: '#283041', tint: 0.1 };
 
 /** A stud standing on the origin: open side and top cap, unindexed, position and normal only. */
 function stud(radius: number, height: number, segments: number) {
@@ -52,12 +55,14 @@ export class StageDeck {
   /** Turn this with the figure. */
   readonly top = new THREE.Group();
   readonly floor: THREE.InstancedMesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>;
+  private readonly tile: THREE.MeshStandardMaterial;
+  private readonly studs: THREE.MeshStandardMaterial;
   private readonly owned: { geometry: THREE.BufferGeometry; material: THREE.Material }[] = [];
   private readonly radii: number[] = [];
 
   /** `deck` is the height of the stand's deck the tile and studs sit on. */
   constructor(deck: number) {
-    const tile = new THREE.MeshStandardMaterial({ color: '#2f384b', roughness: 0.4, metalness: 0.12, envMapIntensity: 0.5 });
+    const tile = (this.tile = new THREE.MeshStandardMaterial({ color: TILE.color, roughness: 0.4, metalness: 0.12, envMapIntensity: 0.5 }));
     const pieces = [tilePiece(0, 0.15, -1, 0), ...[0, 1, 2, 3].map((i) => tilePiece(0.155, TILE_RADIUS, (i * Math.PI) / 2 + Math.PI / 4, 0.0025))];
     const tiles = new THREE.Mesh(mergeGeometries(pieces)!, tile);
     for (const p of pieces) p.dispose();
@@ -74,7 +79,8 @@ export class StageDeck {
         placed.push(one.clone().translate(Math.cos(a) * r, 0, Math.sin(a) * r));
       }
     }
-    const studs = new THREE.Mesh(mergeGeometries(placed)!, new THREE.MeshStandardMaterial({ color: '#2a3243', roughness: 0.5, metalness: 0.2, envMapIntensity: 0.45 }));
+    this.studs = new THREE.MeshStandardMaterial({ color: STUDS.color, roughness: 0.5, metalness: 0.2, envMapIntensity: 0.45 });
+    const studs = new THREE.Mesh(mergeGeometries(placed)!, this.studs);
     for (const p of placed) p.dispose();
     one.dispose();
     studs.position.y = deck;
@@ -115,10 +121,15 @@ export class StageDeck {
     this.owned.push({ geometry: floorStud, material: this.floor.material });
   }
 
-  /** Colours the floor's studs for a studio: its floor colour, lifted near the stand and by the ring's light at its foot. */
+  /**
+   * Colours the deck for a studio: the tile and its studs tinted toward the ring's colour, and the floor's studs in the
+   * floor colour, lifted near the stand and by the ring's light at its foot.
+   */
   setColors(floor: THREE.ColorRepresentation, ring: THREE.ColorRepresentation, base: number) {
     const f = new THREE.Color(floor);
     const glow = new THREE.Color(ring);
+    this.tile.color.set(TILE.color).lerp(glow, TILE.tint);
+    this.studs.color.set(STUDS.color).lerp(glow, STUDS.tint);
     const c = new THREE.Color();
     const lift = new THREE.Color();
     this.radii.forEach((r, i) => {

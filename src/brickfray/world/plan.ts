@@ -132,7 +132,7 @@ export class Drawer {
       for (const child of [...built.children]) {
         child.castShadow = false;
         group.add(child);
-        if (mode) group.add(detailLod(child as THREE.BatchedMesh, range, mode));
+        if (mode) group.add(...detailLod(child as THREE.BatchedMesh, range, mode));
       }
     };
     add(this.minor.build());

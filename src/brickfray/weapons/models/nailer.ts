@@ -19,9 +19,10 @@ const C = {
   lamp: '#fff4d0'
 };
 const BORE = 0.098;
-const SIGHT_Y = 0.157;
+/** The sight line rides on towers well above the housing, so the aiming eye looks over it, not into it. */
+const SIGHT_Y = 0.176;
 const FRONT_Z = -0.2258;
-const REAR_Z = -0.03;
+const REAR_Z = 0.022;
 /** Nail strip magazine: top edge, rear (nail heads) and front (points) edges, raked forward. */
 const MAG_TOP = 0.064;
 const MAG_BOTTOM = -0.098;
@@ -55,7 +56,7 @@ export function buildNailer(b: ModelBuilder) {
     [0.04, 0.052],
     [0.072, 0.074]
   ];
-  b.add(slab(housing, 0.044, lod, [0.016, 0.02, 0.02, 0.01, 0.004, 0.003, 0.004, 0.004, 0.004, 0.004, 0.012, 0.012]), C.body, 'plastic');
+  b.add(slab(housing, 0.044, lod, [0.016, 0.02, 0.02, 0.01, 0.004, 0.003, 0.004, 0.004, 0.004, 0.004, 0.012, 0.012], [], 0.006), C.body, 'plastic');
   // Black overmold swoosh along the lower rear and a rubber bumper on the back.
   b.add(
     slab([[0.068, 0.106], [0.046, 0.1], [-0.03, 0.095], [-0.078, 0.084], [-0.09, 0.05], [-0.022, 0.0505], [0.04, 0.0505], [0.068, 0.072]], 0.0466, lod, [0.006, 0.02, 0.02, 0.01, 0.003, 0.003, 0.01, 0.006]),
@@ -73,10 +74,19 @@ export function buildNailer(b: ModelBuilder) {
   if (d >= 2) for (const [y, z] of [[0.112, -0.135], [0.07, -0.13], [0.128, 0.04], [0.072, 0.02]] as const) screw(b, -0.0224, y, z, 'x', 0.0024, '#4a5056');
   if (b.minor) studGrid(b, 0, 0.146, -0.078, 2, 3, 0.0165, 0.0052, C.body);
 
-  // Rear open sight: twin posts with a square notch.
-  b.add(box(0.026, 0.005, 0.016, lod.bevel * 0.6), C.dark, 'satin', T(0, 0.1485, REAR_Z));
-  for (const s of [1, -1]) b.add(box(0.0048, 0.0105, 0.009, lod.bevel * 0.4), C.dark, 'satin', T(s * 0.0071, 0.1555, REAR_Z));
-  if (b.minor) for (const s of [1, -1]) b.add(box(0.0016, 0.0016, 0.0008), C.dot, 'glow', T(s * 0.0071, 0.1575, REAR_Z + 0.0047));
+  // Rear sight: a square aperture on a tapered tower bolted to the back of the hump, with windage and elevation knobs.
+  const aperture = 0.0125;
+  const hole = 0.0088;
+  const square = (r: number): [number, number][] => [[-r, -r], [r, -r], [r, r], [-r, r]];
+  b.add(prism(square(aperture), 0.007, lod, 0.004, [square(hole)], 0.0012), C.dark, 'satin', T(0, SIGHT_Y, REAR_Z));
+  const towerTop = SIGHT_Y - aperture + 0.001;
+  const slotHole: [number, number][] = [[-0.0032, 0.1415], [0.0032, 0.1415], [0.0026, towerTop - 0.0045], [-0.0026, towerTop - 0.0045]];
+  b.add(prism([[-0.0105, 0.134], [0.0105, 0.134], [0.0072, towerTop], [-0.0072, towerTop]], 0.018, lod, 0.002, [slotHole], 0.002), C.dark, 'satin', T(0, 0, REAR_Z + 0.002));
+  b.add(box(0.028, 0.006, 0.024, 0.002), C.rubber, 'rubber', T(0, 0.1385, REAR_Z + 0.002));
+  if (b.minor) {
+    for (const s of [1, -1]) b.add(gear(0.0034, 0.0042, 10, 0.004), C.orange, 'plastic', T(s * 0.0105, 0.1495, REAR_Z + 0.002, 0, Math.PI / 2));
+  }
+  if (d >= 2) for (const s of [1, -1]) screw(b, s * 0.0118, 0.1416, REAR_Z - 0.006, 'y', 0.0016, '#4a5056');
 
   // Cylinder head drum in a rubber boot, ribbed saddle underneath for the support hand, bumper cap in front.
   const drumZ = -0.194;
@@ -108,13 +118,13 @@ export function buildNailer(b: ModelBuilder) {
   if (d >= 1) b.add(box(0.012, 0.005, 0.006, 0.0015), C.dark, 'satin', T(0, BORE - 0.031, -0.236, -0.6));
   if (b.minor && !lod.third) b.add(tube(0.0032, 0.0012, 10), C.lamp, 'glow', T(0, BORE - 0.0325, -0.2395, -0.6));
 
-  // Front post on the drum lip, hooded by two ears.
-  b.add(box(0.014, 0.006, 0.014, lod.bevel * 0.5), C.dark, 'satin', T(0, 0.1355, FRONT_Z - 0.003));
-  b.add(box(0.0032, 0.022, 0.006, lod.bevel * 0.3), C.dark, 'satin', T(0, 0.148, FRONT_Z - 0.0032));
-  if (b.minor) {
-    for (const s of [1, -1]) b.add(box(0.0024, 0.017, 0.011, lod.bevel * 0.3), C.dark, 'satin', T(s * 0.0072, 0.1445, FRONT_Z - 0.003));
-    b.add(tube(0.0016, 0.0016, 10), C.dot, 'glow', T(0, SIGHT_Y, FRONT_Z + 0.0004));
-  }
+  // Front sight: a clamp on the drum, a tapered tower, and the post inside a round hood, so the aperture frames a ring around the dot.
+  const hood = 0.0085;
+  b.add(box(0.018, 0.006, 0.016, lod.bevel), C.dark, 'satin', T(0, 0.1355, FRONT_Z - 0.003));
+  b.add(prism([[-0.0065, 0.135], [0.0065, 0.135], [0.0035, SIGHT_Y - hood + 0.001], [-0.0035, SIGHT_Y - hood + 0.001]], 0.008, lod, 0.001), C.dark, 'satin', T(0, 0, FRONT_Z - 0.003));
+  b.add(torus(hood, 0.0017, Math.max(16, lod.seg)), C.dark, 'satin', T(0, SIGHT_Y, FRONT_Z - 0.003));
+  b.add(box(0.0026, 0.0095, 0.004, lod.bevel * 0.3), C.dark, 'satin', T(0, SIGHT_Y - 0.0045, FRONT_Z - 0.0032));
+  if (b.minor) b.add(tube(0.0015, 0.0016, 10), C.dot, 'glow', T(0, SIGHT_Y - 0.0005, FRONT_Z - 0.001));
 
   // Driver (animated, punches back on every shot): the sprung nose, and a flag in a track on the left of the housing.
   slot(b, -0.0222, 0.117, -0.088, 0.0014, 0.0085, 0.07);

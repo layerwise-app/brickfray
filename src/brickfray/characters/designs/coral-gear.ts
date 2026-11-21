@@ -150,8 +150,10 @@ export function tank(b: PartSet) {
       [sign * 0.152, 0.278, -0.052],
       [sign * 0.126, 0.25, -0.08]
     ];
+    // Corrugated: round between narrow grooves, evenly spaced along the hose, so the silhouette stays smooth.
     const ribs = 17;
-    b.add('chest', sweep(path, q === 3 ? (t) => 0.0145 + 0.003 * Math.max(0, Math.cos(t * ribs * Math.PI * 2)) : 0.016, { seg: q === 3 ? ribs * 4 : pick(b, 6, 10, 0), radial: pick(b, 5, 6, 8) }), RUBBER, { look: 'rubber' });
+    const groove = (t: number) => 0.0164 - 0.0026 * Math.max(0, Math.cos(t * ribs * Math.PI * 2)) ** 4;
+    b.add('chest', sweep(path, q === 3 ? groove : 0.016, { seg: q === 3 ? ribs * 6 : pick(b, 6, 10, 0), radial: pick(b, 5, 6, 14), even: q === 3 }), RUBBER, { look: 'rubber' });
     if (q >= 2) {
       // Union nuts with chamfered faces: a flat end would face the rim light square on and bleach.
       const nut = (r: number, h: number): [number, number][] => [[r * 0.72, -h / 2], [r, -h / 2 + r * 0.24], [r, h / 2 - r * 0.24], [r * 0.72, h / 2]];

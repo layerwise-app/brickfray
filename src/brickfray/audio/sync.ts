@@ -9,7 +9,7 @@ import type { SoundId } from './types';
  * shows the part at its stop (weapons/view/clips-*.ts, at each gun's clip length). A mag-out lands on the rip.
  * Whizzes: the swell of the approach up to the pass (a supersonic crack is the pass itself). Swings: the whoosh
  * crests on the shown contact, which the view model cues 42-54 ms ahead. Reload layers: the pouch's knock and the
- * magazine's scrape at the well's mouth (reload-layers.ts).
+ * magazine's scrape at the well's mouth (reload-layers.ts). Distant blasts: every take booms at the same moment.
  */
 export const PEAK_AT: Partial<Record<SoundId, number>> = {
   'cue:slideBack': 0.02,
@@ -35,7 +35,8 @@ export const PEAK_AT: Partial<Record<SoundId, number>> = {
   'whiz:rifle': 0.06,
   'whiz:crack': 0.01,
   'whiz:energy': 0.07,
-  'whiz:spear': 0.12
+  'whiz:spear': 0.12,
+  explosionFar: 0.03
 };
 
 /** Moves a recording so its loudest 2 ms lands `at` seconds in: a longer lead-in is cut behind a short fade-in, a shorter one padded. */

@@ -1,5 +1,5 @@
 import { T, type ModelBuilder } from '../builder';
-import { box, stud, tube } from '../shapes';
+import { box, slab, stud, tube, type Outline } from '../shapes';
 import type { Surface } from '../surface';
 
 /** Darker shade of a hex color for seams, slots and recesses. */
@@ -36,6 +36,14 @@ export function railSide(b: ModelBuilder, side: 1 | -1, x: number, y: number, z0
   const n = Math.floor(len / pitch);
   const ridge = box(0.0035, height * 1.14, pitch * 0.55);
   for (let i = 0; i < n; i++) b.add(ridge, color, 'satin', T(x + side * 0.0055, y, zc - ((n - 1) / 2 - i) * pitch));
+}
+
+/**
+ * A separate panel on both sides of a part `width` across, given by its side profile [z, y]: it stands `proud` of each
+ * face with chamfered edges, so it reads as its own piece where a painted inset reads flat.
+ */
+export function sidePanel(b: ModelBuilder, outline: Outline, width: number, color: string, surface: Surface = 'rubber', proud = 0.0015) {
+  b.add(slab(outline, width + proud * 2, b.lod, 0.003, [], b.detail >= 1 ? 0.0012 : 0), color, surface);
 }
 
 /** Grid of toy studs on an upward face, centered on (x, y, z). */

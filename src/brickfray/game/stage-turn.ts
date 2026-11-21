@@ -12,6 +12,11 @@ const TOP = 14;
 /** Top speed of the eased turn back to the front, and the shortest time it takes. */
 const RETURN_SPEED = 1.5;
 const RETURN_MIN = 1.1;
+/**
+ * Stiffness (rad/s) of the critically damped spring that carries the figure to where the hand has turned it: pointer
+ * events come less often than frames, and it spreads each one's step over them (a steady drag trails by 2/FOLLOW s).
+ */
+const FOLLOW = 28;
 /** A drag sample older than this (seconds) no longer counts as a throw. */
 const STALE = 0.09;
 const TURN = Math.PI * 2;
@@ -32,8 +37,11 @@ const ease = (s: number) => s * s * s * (10 - 15 * s + 6 * s * s);
  * and gets it back once the turn back has brought it into step with the sway again, so neither ever makes it jump.
  */
 export class Turntable {
-  /** Radians away from the front while `engaged`; positive brings the figure's front to the right. */
+  /** Radians away from the front while `engaged`, where the hand puts it; positive brings the figure's front to the right. */
   angle = 0;
+  /** The turn shown, following `angle` every frame, and its speed. */
+  private shown = 0;
+  private shownSpeed = 0;
   /** From a grab until the figure is back in step with the idle sway. */
   engaged = false;
   private velocity = 0;
@@ -51,7 +59,10 @@ export class Turntable {
 
   /** A finger or the mouse button went down on the stage. */
   grab() {
-    if (!this.engaged) this.angle = this.sway;
+    if (!this.engaged) {
+      this.angle = this.shown = this.sway;
+      this.shownSpeed = 0;
+    }
     this.engaged = true;
     this.held = true;
     this.velocity = 0;
@@ -89,13 +100,24 @@ export class Turntable {
   /** `sway` is how far the idle would turn the figure this frame. */
   update(dt: number, sway = 0) {
     this.sway = sway;
+    this.advance(dt, sway);
+    const off = this.shown - this.angle;
+    const k = this.shownSpeed + FOLLOW * off;
+    const decay = Math.exp(-FOLLOW * dt);
+    this.shown = this.angle + (off + k * dt) * decay;
+    this.shownSpeed = (this.shownSpeed - FOLLOW * k * dt) * decay;
+  }
+
+  private advance(dt: number, sway: number) {
     if (this.held) {
       this.sinceDrag += dt;
       return;
     }
     if (!this.engaged) return;
     // Whole turns are the same pose: the way back is never more than half a turn.
-    this.angle -= Math.round((this.angle - sway) / TURN) * TURN;
+    const whole = Math.round((this.angle - sway) / TURN) * TURN;
+    this.angle -= whole;
+    this.shown -= whole;
     if (this.span > 0) {
       this.along = Math.min(this.span, this.along + dt);
       this.angle = sway + this.from * (1 - ease(this.along / this.span));
@@ -117,7 +139,7 @@ export class Turntable {
 
   /** The figure's turn away from the front this frame. */
   get turn() {
-    return this.engaged ? this.angle : this.sway;
+    return this.engaged ? this.shown : this.sway;
   }
 }
 

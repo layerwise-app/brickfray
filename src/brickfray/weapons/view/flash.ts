@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { Cell, CELLS, flashAtlas } from './flash-atlas';
 
 /** How a gun's muzzle lets go: burning powder, a wide shotgun blast, a long rifle flame, an energy ring, a puff of air or a spray of sparks. */
 export type FlashKind = 'powder' | 'blast' | 'long' | 'energy' | 'air' | 'spark';
@@ -19,18 +20,19 @@ const FIRE: Tint = [1, 0.82, 0.55];
 const HOT: Tint = [1, 0.95, 0.85];
 const ENERGY: Tint = [0.35, 0.9, 1];
 const SPARK: Tint = [1, 0.88, 0.45];
+/** The hard-edged cards carry their own colour bands. */
+const PLAIN: Tint = [1, 1, 1];
 const SMOKE = new THREE.Color(0.72, 0.7, 0.68);
 const MIST = new THREE.Color(0.95, 0.98, 1);
 
 /** Fully aimed, the flash facing the eye is this much smaller, and every card this much shorter-lived. */
 const AIM_SMALLER = 0.6;
-const AIM_SHORTER = 0.4;
+const AIM_SHORTER = 0.25;
+/** Seconds every card stays at full strength before it fades: a flash shows whole for at least a frame or two. */
+const HOLD = 0.017;
 /** …and the flame tongues and side jets this much shorter and narrower. */
 const AIM_TIGHTER = 0.35;
 
-const Cell = { Star: 0, Petal: 1, Core: 2, Ring: 3, Puff: 4, Streak: 5 } as const;
-type Cell = (typeof Cell)[keyof typeof Cell];
-const CELLS = 6;
 const CARDS = 12;
 const PUFFS = 8;
 
@@ -75,31 +77,45 @@ function along(len: number, w: number, a: number, tilt = 0, z0 = 0.004): THREE.V
   return [v(-ax, -ay, z0), v(ax, ay, z0), v(ax + ox, ay + oy, -len), v(-ax + ox, -ay + oy, -len)];
 }
 
+/** Cards drawn opaque in their own colour bands (hard-edged toon fire) rather than added as light. */
+const solidCell = (cell: Cell) => cell >= Cell.Bloom3;
+
+/** A batch of flash cards sharing one material. */
+function cardMesh(material: THREE.Material, renderOrder: number) {
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(CARDS * 12), 3));
+  geometry.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(CARDS * 8), 2));
+  geometry.setAttribute('color', new THREE.BufferAttribute(new Float32Array(CARDS * 16), 4));
+  const index: number[] = [];
+  for (let q = 0; q < CARDS; q++) index.push(q * 4, q * 4 + 1, q * 4 + 2, q * 4, q * 4 + 2, q * 4 + 3);
+  geometry.setIndex(index);
+  const mesh = new THREE.Mesh(geometry, material);
+  mesh.frustumCulled = false;
+  mesh.renderOrder = renderOrder;
+  return mesh;
+}
+
 /**
- * First-person muzzle flash: additive cards that change shape over their 2–4 frames (the core burns out first, the
- * flame stretches and thins), plus smoke or mist sprites left hanging where the shot went off.
+ * First-person muzzle flash: cards that change shape over their 2–4 frames (the core burns out first, the flame
+ * stretches and thins), plus smoke or mist sprites left hanging where the shot went off. Powder flashes are hard-edged
+ * opaque blooms and tongues; the rest are additive light.
  */
 export class MuzzleFlash {
-  private readonly mesh: THREE.Mesh;
-  private readonly geometry = new THREE.BufferGeometry();
-  private readonly texture = atlas();
+  private readonly root = new THREE.Group();
+  private readonly glow: THREE.Mesh;
+  private readonly solid: THREE.Mesh;
+  private readonly texture = flashAtlas();
   private readonly cards: Card[] = [];
   private readonly puffs: Puff[] = [];
   private next = 0;
   private age = 1;
 
   constructor(private readonly scene: THREE.Scene) {
-    this.geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(CARDS * 12), 3));
-    this.geometry.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(CARDS * 8), 2));
-    this.geometry.setAttribute('color', new THREE.BufferAttribute(new Float32Array(CARDS * 16), 4));
-    const index: number[] = [];
-    for (let q = 0; q < CARDS; q++) index.push(q * 4, q * 4 + 1, q * 4 + 2, q * 4, q * 4 + 2, q * 4 + 3);
-    this.geometry.setIndex(index);
-    const material = new THREE.MeshBasicMaterial({ map: this.texture, color: new THREE.Color(1.7, 1.7, 1.7), vertexColors: true, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, toneMapped: false });
-    this.mesh = new THREE.Mesh(this.geometry, material);
-    this.mesh.frustumCulled = false;
-    this.mesh.renderOrder = 10;
-    this.mesh.visible = false;
+    const base = { map: this.texture, vertexColors: true, transparent: true, depthWrite: false, side: THREE.DoubleSide, toneMapped: false };
+    this.glow = cardMesh(new THREE.MeshBasicMaterial({ ...base, color: new THREE.Color(1.7, 1.7, 1.7), blending: THREE.AdditiveBlending }), 10);
+    this.solid = cardMesh(new THREE.MeshBasicMaterial(base), 11);
+    this.root.add(this.glow, this.solid);
+    this.root.visible = false;
     const puffMap = this.texture.clone();
     puffMap.repeat.set(1 / CELLS, 1);
     puffMap.offset.set(Cell.Puff / CELLS, 0);
@@ -120,24 +136,37 @@ export class MuzzleFlash {
   fire(muzzle: THREE.Object3D, style: FlashStyle, aim = 0) {
     const reach = 1 - AIM_TIGHTER * aim;
     const s = { ...style, petal: style.petal * reach, width: style.width * reach, side: style.side * reach };
-    muzzle.add(this.mesh);
+    muzzle.add(this.root);
     this.cards.length = 0;
     const brief = 1 - AIM_SHORTER * aim;
     const card = (corners: THREE.Vector3[], cell: Cell, tint: Tint, across: number, along: number, life: number, delay = 0, peak = 1) =>
       this.cards.push({ corners, cell, tint, across, along, delay, life: life * brief, peak });
     const star = s.star * rnd(0.85, 1.15) * (1 - AIM_SMALLER * aim);
     switch (s.kind) {
-      case 'powder':
+      case 'powder': {
+        // A hard-edged bloom of three or four lobes round a white core, cut, turned and stretched afresh every shot, and crisp flame tongues along the line of fire.
+        const lobes = s.prongs >= 4 || Math.random() < 0.5 ? 4 : 3;
+        const cut = Math.random() < 0.5;
+        const bloom = lobes === 4 ? (cut ? Cell.Bloom4 : Cell.Bloom4b) : cut ? Cell.Bloom3 : Cell.Bloom3b;
+        const turn = Math.random() * Math.PI * 2;
+        for (let i = 0; i < s.prongs; i++) {
+          const a = turn + (i / s.prongs) * Math.PI + rnd(-0.3, 0.3);
+          card(along(s.petal * rnd(0.45, 0.75), s.width * rnd(0.85, 1.2), a, rnd(-0.08, 0.08)), Cell.Tongue, PLAIN, -2, 8, rnd(0.035, 0.05));
+        }
+        if (s.side > 0) for (const d of [1, -1]) card(along(s.side * 2, s.side * 0.6, Math.PI / 2, 0, 0).map((p) => v(p.z * -d, p.y, p.x - 0.004)), Cell.Petal, FIRE, 2, 10, 0.04);
+        // Drawn last, so its white core sits over the tongues' roots.
+        const stretch = rnd(0.8, 1.2);
+        card(facing(star, -0.01).map((p) => p.set(p.x * stretch, p.y / stretch, p.z)), bloom, PLAIN, -4, 0, 0.04);
+        break;
+      }
       case 'blast': {
-        const wide = s.kind === 'blast';
         card(facing(star, -0.01), Cell.Star, FIRE, 9, 0, 0.034);
         card(facing(star * 0.45, -0.02), Cell.Core, HOT, 4, 0, 0.018);
         const turn = Math.random() * Math.PI;
         for (let i = 0; i < s.prongs; i++) {
           const a = turn + (i / s.prongs) * Math.PI + rnd(-0.25, 0.25);
-          card(along(s.petal * rnd(0.6, 0.9), s.width * rnd(0.8, 1.2), a, wide ? rnd(0.18, 0.32) : rnd(-0.06, 0.06)), Cell.Petal, FIRE, -3, 16, 0.05);
+          card(along(s.petal * rnd(0.6, 0.9), s.width * rnd(0.8, 1.2), a, rnd(0.18, 0.32)), Cell.Petal, FIRE, -3, 16, 0.05);
         }
-        if (s.side > 0) for (const d of [1, -1]) card(along(s.side * 2, s.side * 0.6, Math.PI / 2, 0, 0).map((p) => v(p.z * -d, p.y, p.x - 0.004)), Cell.Petal, FIRE, 2, 10, 0.04);
         break;
       }
       case 'long': {
@@ -164,15 +193,15 @@ export class MuzzleFlash {
         break;
     }
     this.layout(0);
-    this.mesh.visible = true;
+    this.root.visible = true;
     this.age = -1;
     this.smoke(muzzle, s, 1 - AIM_SMALLER * aim);
   }
 
   update(dt: number) {
     this.age = this.age < 0 ? 0 : this.age + dt;
-    const alive = this.cards.some((c) => this.age < c.delay + c.life);
-    this.mesh.visible = alive;
+    const alive = this.cards.some((c) => this.age < c.delay + HOLD + c.life);
+    this.root.visible = alive;
     if (alive) this.layout(this.age);
     for (const p of this.puffs) {
       if (p.age >= p.life) continue;
@@ -187,9 +216,11 @@ export class MuzzleFlash {
   }
 
   dispose() {
-    this.mesh.removeFromParent();
-    this.geometry.dispose();
-    (this.mesh.material as THREE.Material).dispose();
+    this.root.removeFromParent();
+    for (const mesh of [this.glow, this.solid]) {
+      mesh.geometry.dispose();
+      (mesh.material as THREE.Material).dispose();
+    }
     for (const p of this.puffs) {
       p.sprite.removeFromParent();
       (p.sprite.material as THREE.SpriteMaterial).map?.dispose();
@@ -220,13 +251,18 @@ export class MuzzleFlash {
   }
 
   private layout(age: number) {
-    const pos = this.geometry.getAttribute('position') as THREE.BufferAttribute;
-    const uv = this.geometry.getAttribute('uv') as THREE.BufferAttribute;
-    const color = this.geometry.getAttribute('color') as THREE.BufferAttribute;
+    this.layoutMesh(this.glow, this.cards.filter((c) => !solidCell(c.cell)), age);
+    this.layoutMesh(this.solid, this.cards.filter((c) => solidCell(c.cell)), age);
+  }
+
+  private layoutMesh(mesh: THREE.Mesh, cards: Card[], age: number) {
+    const pos = mesh.geometry.getAttribute('position') as THREE.BufferAttribute;
+    const uv = mesh.geometry.getAttribute('uv') as THREE.BufferAttribute;
+    const color = mesh.geometry.getAttribute('color') as THREE.BufferAttribute;
     for (let q = 0; q < CARDS; q++) {
-      const c = this.cards[q];
+      const c = cards[q];
       const a = c ? age - c.delay : -1;
-      const k = c && a >= 0 ? a / c.life : 1;
+      const k = c && a >= 0 ? Math.max(0, a - HOLD) / c.life : 1;
       const alpha = c && k < 1 ? c.peak * Math.pow(1 - k, 1.4) : 0;
       for (let i = 0; i < 4; i++) {
         const p = c?.corners[i];
@@ -243,77 +279,4 @@ export class MuzzleFlash {
     }
     pos.needsUpdate = uv.needsUpdate = color.needsUpdate = true;
   }
-}
-
-/** Atlas of white-hot shapes the cards tint: spiky star, flame petal, soft core, energy ring, smoke puff, spark streak. */
-function atlas(): THREE.CanvasTexture {
-  const S = 128;
-  const canvas = document.createElement('canvas');
-  canvas.width = S * CELLS;
-  canvas.height = S;
-  const g = canvas.getContext('2d')!;
-  const radial = (cx: number, cy: number, r: number, stops: [number, string][]) => {
-    const grad = g.createRadialGradient(cx, cy, 0, cx, cy, r);
-    for (const [at, c] of stops) grad.addColorStop(at, c);
-    return grad;
-  };
-  const fire: [number, string][] = [[0, 'rgba(255,255,245,1)'], [0.25, 'rgba(255,236,170,0.95)'], [0.6, 'rgba(255,170,80,0.55)'], [1, 'rgba(255,120,40,0)']];
-  // Star: 7 uneven spikes.
-  g.save();
-  g.translate(S / 2, S / 2);
-  g.beginPath();
-  for (let i = 0; i < 14; i++) {
-    const a = (i / 14) * Math.PI * 2;
-    const r = i % 2 === 0 ? S * (0.38 + 0.1 * Math.sin(i * 2.3)) : S * 0.13;
-    g.lineTo(Math.cos(a) * r, Math.sin(a) * r);
-  }
-  g.closePath();
-  g.fillStyle = radial(0, 0, S * 0.48, fire);
-  g.fill();
-  g.restore();
-  // Petal: teardrop, v = 1 the far end.
-  g.save();
-  g.translate(S * 1.5, 0);
-  g.beginPath();
-  g.moveTo(0, S * 0.98);
-  g.bezierCurveTo(S * 0.42, S * 0.7, S * 0.3, S * 0.2, 0, S * 0.02);
-  g.bezierCurveTo(-S * 0.3, S * 0.2, -S * 0.42, S * 0.7, 0, S * 0.98);
-  const pg = g.createLinearGradient(0, S, 0, 0);
-  pg.addColorStop(0, 'rgba(255,252,235,1)');
-  pg.addColorStop(0.35, 'rgba(255,220,150,0.9)');
-  pg.addColorStop(0.75, 'rgba(255,150,70,0.45)');
-  pg.addColorStop(1, 'rgba(255,110,40,0)');
-  g.fillStyle = pg;
-  g.fill();
-  g.restore();
-  // Core.
-  g.fillStyle = radial(S * 2.5, S / 2, S * 0.5, fire);
-  g.fillRect(S * 2, 0, S, S);
-  // Ring: thin bright band with a soft halo, empty middle.
-  g.fillStyle = radial(S * 3.5, S / 2, S * 0.5, [[0, 'rgba(255,255,255,0)'], [0.55, 'rgba(255,255,255,0)'], [0.78, 'rgba(255,255,255,1)'], [0.86, 'rgba(255,255,255,0.5)'], [1, 'rgba(255,255,255,0)']]);
-  g.fillRect(S * 3, 0, S, S);
-  // Puff: lumpy soft blob.
-  for (let i = 0; i < 7; i++) {
-    const a = i * 2.4;
-    const cx = S * 4.5 + Math.cos(a) * S * 0.14 * (i % 3);
-    const cy = S / 2 + Math.sin(a) * S * 0.14 * (i % 3);
-    g.fillStyle = radial(cx, cy, S * 0.32, [[0, 'rgba(255,255,255,0.5)'], [0.6, 'rgba(255,255,255,0.22)'], [1, 'rgba(255,255,255,0)']]);
-    g.fillRect(S * 4, 0, S, S);
-  }
-  // Streak: narrow, brightest at the near end.
-  const sg = g.createLinearGradient(0, S, 0, 0);
-  sg.addColorStop(0, 'rgba(255,255,255,1)');
-  sg.addColorStop(0.6, 'rgba(255,255,255,0.6)');
-  sg.addColorStop(1, 'rgba(255,255,255,0)');
-  g.fillStyle = sg;
-  g.beginPath();
-  g.moveTo(S * 5.5 - S * 0.12, S);
-  g.lineTo(S * 5.5 + S * 0.12, S);
-  g.lineTo(S * 5.5 + S * 0.03, 0);
-  g.lineTo(S * 5.5 - S * 0.03, 0);
-  g.closePath();
-  g.fill();
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  return texture;
 }

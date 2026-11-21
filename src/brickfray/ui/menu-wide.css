@@ -1,0 +1,130 @@
+/* Main menu on wide screens (see menu.css): the narrowest, 1280 and up, and past 1440 × 900. */
+/* The narrowest wide screens: the left column folds to the width of three portraits so the stand has the room between the columns. */
+@media (min-width: 1024px) and (max-width: 1279.98px) and (min-height: 560.02px) {
+  .bf-menu {
+    --thumb: 56px;
+    --name: 44px;
+    --column: 204px;
+  }
+  .bf-menu-loadout {
+    width: var(--column);
+    flex-direction: column;
+    gap: 5px;
+  }
+  .bf-menu-loadout li {
+    display: grid;
+    width: auto;
+    grid-template-areas: 'arm slot' 'arm item';
+    grid-template-columns: 40px minmax(0, 1fr);
+    align-items: center;
+    gap: 1px 10px;
+    padding: 6px 10px;
+  }
+  .bf-menu-arm {
+    grid-area: arm;
+    width: 40px;
+    height: auto;
+    align-self: center;
+  }
+  .bf-menu-slot {
+    grid-area: slot;
+    font-size: 11px;
+    line-height: 1.2;
+    letter-spacing: 0.1em;
+  }
+  .bf-menu-item {
+    grid-area: item;
+    font-size: 13px;
+    line-height: 1.25;
+  }
+  .bf-menu-picker {
+    display: grid;
+    width: var(--column);
+    grid-template-columns: repeat(3, auto);
+    justify-content: space-between;
+    gap: 6px 0;
+  }
+  .bf-menu-callsign {
+    width: var(--column);
+  }
+}
+
+@media (min-width: 1280px) {
+  .bf-menu {
+    --pad: calc(32 * var(--u));
+    --gap: calc(12 * var(--u));
+    --thumb: calc(64 * var(--u));
+    --card: calc(112 * var(--u));
+    --name: calc(60 * var(--u));
+    --nav: calc(320 * var(--u));
+  }
+  .bf-menu-picker {
+    gap: calc(6 * var(--u));
+  }
+  .bf-menu-pick-name {
+    font-size: calc(12 * var(--u));
+  }
+  .bf-btn.bf-big-btn {
+    --icon: calc(48 * var(--u));
+    gap: calc(16 * var(--u));
+    padding: calc(16 * var(--u)) calc(20 * var(--u));
+  }
+  .bf-big-btn-label {
+    font-size: calc(30 * var(--u));
+  }
+  .bf-big-btn-main .bf-big-btn-label {
+    font-size: calc(36 * var(--u));
+  }
+  .bf-big-btn-caption {
+    font-size: calc(14 * var(--u));
+  }
+}
+/* Past 1440 × 900 the overlay grows with the screen, keeping the proportions it has there. */
+@media (min-width: 1440.02px) and (min-height: 900.02px) {
+  .bf-menu {
+    --u: clamp(1px, min(100vw / 1440, 100vh / 900), 2.4px);
+  }
+  .bf-menu-logo.bf-logo {
+    font-size: calc(104 * var(--u));
+  }
+  .bf-menu-tools {
+    gap: calc(12 * var(--u));
+  }
+  .bf-menu-tools .bf-btn {
+    height: calc(48 * var(--u));
+    gap: calc(10 * var(--u));
+    border-radius: calc(14 * var(--u));
+  }
+  .bf-menu-tools .bf-btn.\!px-3 {
+    padding-inline: calc(12 * var(--u)) !important;
+  }
+  .bf-menu-tools .bf-icon-btn {
+    width: calc(48 * var(--u));
+  }
+  .bf-menu-tools svg {
+    width: calc(22 * var(--u));
+    height: calc(22 * var(--u));
+  }
+  .bf-menu-tools .text-sm {
+    font-size: calc(14 * var(--u));
+    line-height: calc(20 * var(--u));
+  }
+  .bf-menu-callsign {
+    font-size: calc(16 * var(--u));
+  }
+  .bf-menu-callsign svg {
+    width: calc(18 * var(--u));
+    height: calc(18 * var(--u));
+  }
+  .bf-btn.bf-big-btn {
+    border-radius: calc(14 * var(--u));
+  }
+  .bf-big-btn-icon svg {
+    width: calc(28 * var(--u));
+    height: calc(28 * var(--u));
+  }
+  .bf-big-btn-main .bf-big-btn-icon svg {
+    width: calc(30 * var(--u));
+    height: calc(30 * var(--u));
+  }
+}

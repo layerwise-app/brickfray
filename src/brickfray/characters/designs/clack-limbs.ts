@@ -39,8 +39,9 @@ const HAND_SEAT: Partial<Record<HandShape, { at: V3; rot: V3 }>> = {
 /** Pauldrons (a fixed cap and two sliding lames), rerebrace, winged couter, vambrace, gauntlet. */
 export function arms(b: PartSet) {
   const q = tier(b);
-  const around = pick(b, 8, 12, 20);
-  const stud = pick(b, 5, 5, 8);
+  // Close up the pauldrons' and lames' gilt rims show every column as a corner in their curve.
+  const around = pick(b, 8, 12, 36);
+  const stud = pick(b, 5, 5, 12);
   b.mirror((side, sign) => {
     const clav = `clav${side}` as const;
     const ua = `upperArm${side}` as const;
@@ -116,7 +117,7 @@ function gauntlet(b: PartSet, side: 'L' | 'R', sign: number) {
   b.add(bone, S.blob(0.014, 0.086, 0.074, 0.6, pick(b, 6, 6, 14), 0), STEEL, { ...seated([0.02, 0.001, -0.05], [0, 0, 0]), look: 'metal' });
   b.add(bone, S.blob(0.016, 0.09, 0.024, 0.6, pick(b, 6, 6, 12), 0), STEEL, { ...seated([0.018, 0.001, -0.09], [0, 0, 0]), look: 'metal' });
   const knuckles = [-0.028, -0.009, 0.01, 0.03].map((y) => [new THREE.Vector3(0.026, y, -0.09), new THREE.Vector3(1, 0, 0)] as Spot);
-  b.add(bone, rivets(knuckles, 0.0065, q === 3 ? 8 : 5), GOLD, { ...seated([0, 0, 0], [0, 0, 0]), look: 'gold' });
+  b.add(bone, rivets(knuckles, 0.0065, q === 3 ? 12 : 5), GOLD, { ...seated([0, 0, 0], [0, 0, 0]), look: 'gold' });
 }
 
 /** The round wing outside a joint cop. On the hero it is dished, because a flat face square to the studio rim light bleaches white. */
@@ -181,7 +182,7 @@ function tasset(b: PartSet, th: 'thighL' | 'thighR', mid: number, cut: (t: numbe
     const roll = TASSET.tAt(y0 + 0.011);
     b.add(th, TASSET.mesh({ t0, t1: roll, cols: 14, rows: 1, lift: lift + 0.0032, thick: 0.0032, back: false, cut: span(t0, roll) }), i === 0 ? GOLD : tone(STEEL, 1.12), { look: i === 0 ? 'gold' : 'metal' });
   }
-  b.add(th, rivets([...TASSET.row(mid - 0.75, TASSET.tAt(-0.128), mid + 0.75, TASSET.tAt(-0.128), 2, 0.0045), ...TASSET.row(mid - 0.6, TASSET.tAt(-0.198), mid + 0.6, TASSET.tAt(-0.198), 2)], 0.0055, 8), GOLD, { look: 'gold' });
+  b.add(th, rivets([...TASSET.row(mid - 0.75, TASSET.tAt(-0.128), mid + 0.75, TASSET.tAt(-0.128), 2, 0.0045), ...TASSET.row(mid - 0.6, TASSET.tAt(-0.198), mid + 0.6, TASSET.tAt(-0.198), 2)], 0.0055, 12), GOLD, { look: 'gold' });
 }
 
 /** What dresses a cuisse: a gilt border above the knee, a lame over the knee cop, flutes down the front and hinge rivets. */
@@ -191,8 +192,8 @@ function cuisseTrim(b: PartSet, th: 'thighL' | 'thighR', sign: number, q: number
   b.add(th, CUISSE.mesh({ from: 0, to: Math.PI, t0: CUISSE.tAt(-0.362), t1: CUISSE.tAt(-0.345), cols, lift: 0.004, thick: 0.004, back: false, mirror: true }), GOLD, { look: 'gold' });
   if (q < 3) return;
   for (const a of [-0.58, 0.58]) b.add(th, flute(CUISSE, a, -0.335, -0.25), STEEL, { look: 'metal' });
-  b.add(th, rivets(CUISSE.row(sign * 1.75, CUISSE.tAt(-0.32), sign * 1.75, CUISSE.tAt(-0.26), 3), 0.0055, 8), GOLD, { look: 'gold' });
-  b.add(th, rivets(CUISSE.row(-0.9, CUISSE.tAt(-0.381), 0.9, CUISSE.tAt(-0.381), 3, 0.0155), 0.005, 8), GOLD, { look: 'gold' });
+  b.add(th, rivets(CUISSE.row(sign * 1.75, CUISSE.tAt(-0.32), sign * 1.75, CUISSE.tAt(-0.26), 3), 0.0055, 12), GOLD, { look: 'gold' });
+  b.add(th, rivets(CUISSE.row(-0.9, CUISSE.tAt(-0.381), 0.9, CUISSE.tAt(-0.381), 3, 0.0155), 0.005, 12), GOLD, { look: 'gold' });
 }
 
 /** Tassets and cuisses on the thighs, winged poleyns, ridged greaves. */
@@ -200,7 +201,7 @@ export function legs(b: PartSet) {
   const q = tier(b);
   const cols = pick(b, 4, 6, 10);
   const rows = q === 3 ? 3 : 1;
-  const stud = pick(b, 5, 6, 8);
+  const stud = pick(b, 5, 6, 12);
   b.mirror((side, sign) => {
     const th = `thigh${side}` as const;
     const sh = `shin${side}` as const;

@@ -62,7 +62,7 @@ export const CATEGORIES: Record<Category, CategoryMix> = {
   move: { loudness: -22, priority: 4, bus: 'effects', reverb: 0.05, falloff: 'normal', jitter: 0.04, burst: 1 },
   impact: { loudness: -18, priority: 4, bus: 'effects', reverb: 0.1, falloff: 'impact', jitter: 0.06, levelJitter: 1, burst: 2 },
   hit: { loudness: -19, priority: 7, bus: 'feedback', reverb: 0.08, falloff: 'normal', jitter: 0.03, burst: 2 },
-  marker: { loudness: -20, priority: 9, bus: 'feedback', reverb: 0, falloff: 'normal', jitter: 0.015, burst: 1 },
+  marker: { loudness: -20, priority: 9, bus: 'marker', reverb: 0, falloff: 'normal', jitter: 0.015, burst: 1 },
   debris: { loudness: -27, priority: 2, bus: 'effects', reverb: 0.06, falloff: 'quiet', jitter: 0.08, levelJitter: 1.5, burst: 2 },
   fx: { loudness: -19, priority: 5, bus: 'effects', reverb: 0.12, falloff: 'normal', jitter: 0.03, burst: 2 },
   player: { loudness: -17, priority: 7, bus: 'feedback', reverb: 0.03, falloff: 'normal', jitter: 0.03, burst: 1 },

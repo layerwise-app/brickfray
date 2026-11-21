@@ -85,35 +85,48 @@ const chip: Draw = (g, rand) => {
   }
 };
 
-/** A bullet strike on stone: dusty grey spall with a broken fractured edge, a grey-black pit, grit thrown out around it. */
+/**
+ * A bullet strike on stone, shaded for light from above like the dent: a halo of pale powder, a chipped crater of
+ * fresh pale stone with an angular broken edge (shadowed lip on top, lit lip below), a dark pit, pale flakes and grit.
+ */
 const spall: Draw = (g, rand) => {
-  smudge(g, rand, '120,116,108', 0.2, 0.8, 7);
-  g.fillStyle = 'rgba(168,164,156,0.42)';
-  ragged(g, rand, 0.3, 0.3, 17);
+  smudge(g, rand, '230,226,216', 0.26, 0.9, 7);
+  smudge(g, rand, '90,84,76', 0.1, 0.5, 3);
+  const r = 0.34 + rand() * 0.05;
+  g.fillStyle = 'rgba(218,212,200,0.85)';
+  ragged(g, rand, r, 0.32, 10);
   g.fill();
-  g.fillStyle = 'rgba(126,122,114,0.66)';
-  ragged(g, rand, 0.21, 0.3, 13);
+  const lip = g.createLinearGradient(0, -r, 0, r);
+  lip.addColorStop(0, 'rgba(58,52,46,0.75)');
+  lip.addColorStop(0.45, 'rgba(110,104,96,0.15)');
+  lip.addColorStop(1, 'rgba(250,248,240,0.7)');
+  g.strokeStyle = lip;
+  g.lineWidth = 0.05;
+  g.lineJoin = 'miter';
+  ragged(g, rand, r * 0.94, 0.26, 10);
+  g.stroke();
+  const bowl = g.createLinearGradient(0, -r * 0.7, 0, r * 0.7);
+  bowl.addColorStop(0, 'rgba(56,52,48,0.92)');
+  bowl.addColorStop(0.5, 'rgba(134,126,116,0.85)');
+  bowl.addColorStop(1, 'rgba(206,198,184,0.85)');
+  g.fillStyle = bowl;
+  ragged(g, rand, r * 0.74, 0.3, 9);
   g.fill();
-  g.strokeStyle = 'rgba(70,66,60,0.6)';
-  g.lineWidth = 0.025;
-  for (let i = 0; i < 5; i++) {
+  g.fillStyle = 'rgba(30,28,26,0.95)';
+  g.save();
+  g.translate((rand() - 0.5) * 0.06, -0.04);
+  ragged(g, rand, 0.12, 0.3, 7);
+  g.fill();
+  g.restore();
+  for (let i = 0; i < 7; i++) {
     const a = rand() * TAU;
-    g.beginPath();
-    g.moveTo(Math.cos(a) * 0.12, Math.sin(a) * 0.12);
-    const b = a + (rand() - 0.5) * 0.5;
-    g.lineTo(Math.cos(b) * (0.26 + rand() * 0.14), Math.sin(b) * (0.26 + rand() * 0.14));
-    g.stroke();
-  }
-  g.fillStyle = 'rgba(46,44,42,0.88)';
-  ragged(g, rand, 0.13, 0.3, 7);
-  g.fill();
-  for (let i = 0; i < 16; i++) {
-    const a = rand() * TAU;
-    const d = 0.34 + rand() * 0.5;
-    g.fillStyle = rand() < 0.5 ? 'rgba(150,146,138,0.7)' : 'rgba(96,92,86,0.65)';
-    g.beginPath();
-    g.arc(Math.cos(a) * d, Math.sin(a) * d, 0.012 + rand() * 0.02, 0, TAU);
+    const d = r + 0.06 + rand() * 0.32;
+    g.save();
+    g.translate(Math.cos(a) * d, Math.sin(a) * d);
+    g.fillStyle = i % 3 ? 'rgba(238,234,224,0.9)' : 'rgba(84,78,70,0.75)';
+    ragged(g, rand, 0.03 + rand() * 0.035, 0.45, 4);
     g.fill();
+    g.restore();
   }
 };
 

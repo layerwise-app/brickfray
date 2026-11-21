@@ -35,14 +35,17 @@ const k9 = [0, 0, 0, 0, 0, 0, 0, 0, 0];
  */
 const MELEE: readonly ActionKey[] = [
   [0.0, -0.02, -0.12, -0.38, 0, 0, 0, -0.4, -1, 0.3],
-  [0.07, -0.37, -0.05, -0.22, 0.9, -0.05, 0, -1, -0.6, 0.3],
-  [0.17, -0.35, 0.27, 0.12, 2.35, 0.04, 0, -1, -0.2, 0.3],
-  [0.23, -0.36, 0.3, 0.16, 2.5, 0.04, 0, -1, -0.2, 0.35],
-  [0.29, -0.34, 0.28, -0.14, 1.3, 0.02, 0, -1, -0.4, 0],
+  [0.07, -0.29, 0.05, -0.27, 1.5, -0.15, 0, -0.7, -0.6, -0.4],
+  [0.12, -0.36, 0.2, -0.08, 2.0, -0.05, 0, -0.9, -0.2, -0.4],
+  [0.17, -0.34, 0.31, 0.1, 2.35, 0.04, 0, -0.8, 0, -0.5],
+  [0.23, -0.35, 0.33, 0.14, 2.5, 0.04, 0, -0.8, 0, -0.45],
+  [0.29, -0.34, 0.29, -0.14, 1.3, 0.02, 0, -0.9, -0.3, -0.3],
   [0.36, -0.2, 0.02, -0.5, -0.45, 0.05, 0, -0.6, -1, 0.2],
-  [0.48, -0.02, -0.3, -0.38, -1.25, 0.2, 0, -0.3, -1, 0.4],
-  [0.62, 0.02, -0.34, -0.33, -1.35, 0.22, 0, -0.3, -1, 0.4],
-  [0.85, -0.02, -0.15, -0.38, -0.4, 0.05, 0, -0.4, -1, 0.3],
+  [0.4, -0.13, -0.1, -0.54, -0.75, 0.1, 0, -0.5, -1, 0.3],
+  [0.44, -0.11, -0.14, -0.53, -0.85, 0.12, 0, -0.5, -1, 0.3],
+  [0.52, 0.0, -0.4, -0.42, -1.3, 0.22, 0, -0.3, -1, 0.4],
+  [0.64, 0.03, -0.42, -0.38, -1.4, 0.24, 0, -0.3, -1, 0.4],
+  [0.86, -0.02, -0.15, -0.38, -0.4, 0.05, 0, -0.4, -1, 0.3],
   [1, -0.02, -0.15, -0.38, -0.4, 0.05, 0, -0.4, -1, 0.3]
 ];
 
@@ -55,15 +58,15 @@ const MELEE: readonly ActionKey[] = [
 const THROW: readonly ActionKey[] = [
   [0.0, -0.03, -0.1, -0.36, 0, 0, 0, -0.4, -1, 0.3],
   [0.1, -0.38, -0.04, -0.06, 1.4, 0.2, 3.14, -1, -0.6, 0.2],
-  [0.2, -0.5, 0.23, 0.15, 2.2, 0.3, 3.14, -1, -0.05, 0.45],
-  [0.25, -0.52, 0.25, 0.17, 2.25, 0.3, 3.14, -1, 0, 0.45],
+  [0.2, -0.34, 0.15, 0.36, 2.3, 0.4, 3.14, -1, 0.05, -0.25],
+  [0.25, -0.35, 0.16, 0.38, 2.35, 0.4, 3.14, -1, 0.05, -0.25],
   [0.3, -0.46, 0.38, 0.04, 1.75, 0.12, 3.14, -0.9, -0.3, -0.2],
   [0.36, -0.38, 0.36, -0.3, 0.9, 0, 3.14, -0.8, -0.6, 0],
   [0.42, -0.32, 0.18, -0.5, 0.4, -0.05, 3.14, -0.7, -0.8, 0.2],
   [0.5, -0.2, -0.04, -0.56, -0.2, 0.05, 3.14, -0.5, -0.9, 0.3],
   [0.6, -0.04, -0.2, -0.52, -0.7, 0.3, 3.14, -0.3, -1, 0.4],
-  [0.72, 0.16, -0.32, -0.36, -1.1, 0.45, 3.14, -0.3, -1, 0.4],
-  [1, 0.15, -0.36, -0.32, -1.2, 0.45, 3.14, -0.3, -1, 0.4]
+  [0.72, 0.06, -0.36, -0.42, -1.1, 0.45, 3.14, -0.3, -1, 0.4],
+  [1, 0.05, -0.38, -0.4, -1.2, 0.45, 3.14, -0.3, -1, 0.4]
 ];
 
 function path(keys: readonly ActionKey[], t: number, out: HandAction) {
@@ -77,8 +80,8 @@ export function meleeAction(m: number, out: HandAction) {
   path(MELEE, m, out);
   out.weight = window4(m, 0, 0.07, 0.72, 0.92);
   out.lower = window4(m, 0, 0.08, 0.75, 0.95);
-  out.twist = -0.42 * window4(m, 0.03, 0.17, 0.23, 0.32) + 0.4 * window4(m, 0.27, 0.38, 0.55, 0.85);
-  out.bend = 0.1 * window4(m, 0.05, 0.17, 0.23, 0.3) - 0.28 * window4(m, 0.29, 0.4, 0.58, 0.85);
+  out.twist = -0.5 * window4(m, 0.03, 0.17, 0.23, 0.32) + 0.5 * window4(m, 0.27, 0.38, 0.62, 0.88);
+  out.bend = 0.12 * window4(m, 0.05, 0.17, 0.23, 0.3) - 0.34 * window4(m, 0.29, 0.4, 0.64, 0.88);
   out.mallet = window4(m, 0.0, 0.05, 0.82, 0.9);
   out.grenade = 0;
 }
@@ -87,26 +90,76 @@ export function throwAction(g: number, out: HandAction) {
   path(THROW, g, out);
   out.weight = window4(g, 0, 0.1, 0.82, 0.97);
   out.lower = window4(g, 0, 0.1, 0.86, 0.99);
-  out.twist = -0.5 * window4(g, 0.02, 0.2, 0.26, 0.34) + 0.45 * window4(g, 0.27, 0.4, 0.8, 0.97);
-  out.bend = 0.12 * window4(g, 0.05, 0.2, 0.26, 0.32) - 0.36 * window4(g, 0.28, 0.44, 0.8, 0.97);
+  out.twist = -0.7 * window4(g, 0.02, 0.2, 0.26, 0.34) + 0.45 * window4(g, 0.27, 0.4, 0.8, 0.97);
+  out.bend = 0.16 * window4(g, 0.05, 0.2, 0.26, 0.32) - 0.36 * window4(g, 0.28, 0.44, 0.8, 0.97);
   out.mallet = 0;
   out.grenade = g < 0.29 ? smooth(g, 0.04, 0.12) : 0;
 }
 
+/** Footwork of a throw or a swing for a figure standing still. */
+export interface ActionLegs {
+  /** Per foot [left, right]: step forward (m), sideways (m, + right), toe turn (+ right), lift (m), heel raise (rad). */
+  reach: number[];
+  side: number[];
+  turn: number[];
+  lift: number[];
+  heel: number[];
+  /** Hips: shift x right, y up, z back (m), then heading (+ right) and pitch (+ back). */
+  hip: number[];
+}
+
+export function emptyLegs(): ActionLegs {
+  return { reach: [0, 0], side: [0, 0], turn: [0, 0], lift: [0, 0], heel: [0, 0], hip: [0, 0, 0, 0, 0] };
+}
+
+const stepArc = (t: number, a: number, b: number, c: number, d: number) => (t < (b + c) / 2 ? Math.sin(Math.PI * smooth(t, a, b)) : Math.sin(Math.PI * smooth(t, c, d)));
+
 /**
- * The thrower's legs: `stride` (0…1) is the right foot stepping out toward the target during the wind-up, `coil` the
- * weight held back while cooking, `lunge` the drive onto the lead foot after the release (hips drop and push forward,
- * rear heel up).
+ * The thrower steps out toward the target with the right foot during the wind-up and holds the weight back while
+ * cooking, then drives onto the lead foot after the release (hips drop and push forward, rear heel up). A swing coils
+ * back onto the right foot, then steps in with the left as the blow comes down and lunges through it.
  */
-export function throwLegs(g: number, out: { stride: number; lift: number; coil: number; lunge: number }) {
-  if (g < 0) {
-    out.stride = out.lift = out.coil = out.lunge = 0;
-    return out;
+export function actionLegs(grenade: number, melee: number, out: ActionLegs) {
+  out.reach.fill(0);
+  out.side.fill(0);
+  out.turn.fill(0);
+  out.lift.fill(0);
+  out.heel.fill(0);
+  out.hip.fill(0);
+  if (grenade >= 0) {
+    const g = grenade;
+    const stride = window4(g, 0.03, 0.2, 0.84, 0.99);
+    const coil = window4(g, 0.06, 0.22, 0.26, 0.36);
+    const lunge = window4(g, 0.27, 0.42, 0.8, 0.98);
+    out.reach[0] = -0.03 * lunge;
+    out.reach[1] = 0.36 * stride;
+    out.side[1] = -0.03 * stride;
+    out.turn[1] = -0.3 * stride;
+    out.lift[1] = 0.07 * stepArc(g, 0.03, 0.2, 0.84, 0.99);
+    out.heel[0] = 0.6 * lunge;
+    out.hip[0] = 0.03 * lunge - 0.02 * coil;
+    out.hip[1] = -0.06 * lunge - 0.025 * stride;
+    out.hip[2] = -0.12 * lunge - 0.06 * stride + 0.05 * coil;
+    out.hip[3] = -0.28 * coil + 0.22 * lunge;
+    out.hip[4] = -0.12 * lunge + 0.04 * coil;
+  } else if (melee >= 0) {
+    const m = melee;
+    const coil = window4(m, 0.02, 0.17, 0.24, 0.33);
+    const step = window4(m, 0.2, 0.36, 0.7, 0.95);
+    const drive = window4(m, 0.28, 0.42, 0.6, 0.9);
+    out.reach[0] = 0.3 * step;
+    out.reach[1] = -0.03 * drive;
+    out.side[0] = 0.02 * step;
+    out.turn[0] = 0.15 * step;
+    out.lift[0] = 0.07 * stepArc(m, 0.2, 0.36, 0.7, 0.95);
+    out.heel[0] = 0.45 * coil;
+    out.heel[1] = 0.55 * drive;
+    out.hip[0] = 0.055 * coil - 0.035 * drive;
+    out.hip[1] = -0.03 * coil - 0.075 * drive;
+    out.hip[2] = 0.07 * coil - 0.14 * drive;
+    out.hip[3] = -0.4 * coil + 0.3 * drive;
+    out.hip[4] = 0.05 * coil - 0.14 * drive;
   }
-  out.stride = window4(g, 0.03, 0.2, 0.84, 0.99);
-  out.lift = g < 0.5 ? Math.sin(Math.PI * smooth(g, 0.03, 0.2)) : Math.sin(Math.PI * smooth(g, 0.84, 0.99));
-  out.coil = window4(g, 0.06, 0.22, 0.26, 0.36);
-  out.lunge = window4(g, 0.27, 0.42, 0.8, 0.98);
   return out;
 }
 
@@ -185,7 +238,7 @@ const still = (time: number): BodyKey => [time, 0, 0, 0, 0, 0, 0];
 const MOTION: Record<ReloadFamily, ReloadMotion> = {
   rifle: {
     hand: [[0, support, 0, 0], [0.13, magazine, 0, 0], [0.2, magazine, -0.1, 0.03], [0.28, magazine, -0.22, 0.05], [0.42, pouch, 0, 0], [0.5, pouch, 0, 0], [0.6, magazine, -0.2, 0.04], [0.7, magazine, -0.01, 0], [0.74, magazine, 0, 0], [0.765, magazine, -0.07, 0], [0.785, magazine, 0.03, 0], [0.84, handle, 0.02, -0.02], [0.9, handle, 0.02, 0.14], [0.96, support, 0, 0], [1, support, 0, 0]],
-    gun: [REST, [0.12, -0.07, -0.1, 0.1, 0.25, 0.55, -0.95], [0.2, -0.06, -0.06, 0.09, 0.2, 0.75, -1.1], [0.36, 0.02, -0.2, 0.08, 0.1, 0.2, -0.45], [0.5, 0.0, -0.18, 0.09, 0.14, 0.28, -0.55], [0.64, -0.07, -0.1, 0.1, 0.28, 0.6, -1.0], [0.73, -0.07, -0.06, 0.09, 0.3, 0.7, -1.05], [0.78, -0.06, -0.11, 0.1, 0.22, 0.55, -0.8], [0.88, -0.03, -0.04, 0.08, 0.05, 0.4, 0.4], at(REST, 0.98)],
+    gun: [REST, [0.12, -0.07, -0.1, 0.1, -0.35, 0.3, -0.95], [0.2, -0.06, -0.06, 0.09, -0.4, 0.4, -1.1], [0.36, 0.02, -0.2, 0.08, -0.4, -0.08, -0.45], [0.5, 0.0, -0.18, 0.09, -0.36, -0.04, -0.55], [0.64, -0.07, -0.1, 0.1, -0.35, 0.3, -1.0], [0.73, -0.07, -0.06, 0.09, -0.3, 0.35, -1.05], [0.78, -0.06, -0.11, 0.1, -0.35, 0.28, -0.8], [0.88, -0.03, -0.06, 0.08, -0.45, 0.12, 0.4], at(REST, 0.98)],
     body: [STILL, [0.12, 0.1, 0.14, 0.06, 0.16, 0.03, 0.015], [0.22, 0.05, 0.2, 0.02, 0.24, 0.045, 0.02], [0.4, -0.42, 0.18, -0.5, 0.32, 0.07, -0.045], [0.5, -0.4, 0.16, -0.46, 0.3, 0.07, -0.045], [0.66, 0.08, 0.24, 0.06, 0.28, 0.06, 0.03], [0.76, 0.05, 0.1, 0.02, 0.14, 0.04, 0.02], [0.88, 0.2, 0.1, 0.16, 0.12, 0.035, 0.035], still(1)],
     magazine: { out: 0.16, stow: 0.42, draw: 0.5, seat: 0.74 }
   },

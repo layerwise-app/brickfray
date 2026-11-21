@@ -53,6 +53,22 @@ describe('Turntable', () => {
     expect(table.angle - thrown - early).toBeLessThan(early);
   });
 
+  it('moves the figure on every frame under a slow drag whose events come at 20 Hz', () => {
+    const table = new Turntable();
+    table.grab();
+    let last = table.turn;
+    const steps: number[] = [];
+    for (let i = 0; i < 60; i++) {
+      if (i % 3 === 0) table.drag(0.06, 0.05);
+      table.update(STEP);
+      steps.push(table.turn - last);
+      last = table.turn;
+    }
+    const tail = steps.slice(20);
+    expect(Math.min(...tail)).toBeGreaterThan(0.005);
+    expect(Math.max(...tail) / Math.min(...tail)).toBeLessThan(1.5);
+  });
+
   it('does not throw when the pointer rested before letting go', () => {
     const table = new Turntable();
     table.grab();
@@ -111,6 +127,8 @@ describe('Turntable', () => {
       step -= Math.round(step / (Math.PI * 2)) * Math.PI * 2;
       const now = Math.abs(step) / STEP;
       last = table.turn;
+      // The shown turn closes on the hand's over a few frames after the release before it only slows.
+      if (t < 0.15) continue;
       if (stopped < 0) {
         expect(now).toBeLessThanOrEqual(speed + 1e-6);
         speed = now;
@@ -139,7 +157,8 @@ describe('Turntable', () => {
     for (let i = 0; i < 30; i++) tick(1e-9);
     table.drag(0.4, 0.2);
     last = table.turn;
-    for (let i = 0; i < 20; i++) tick(1e-9);
+    for (let i = 0; i < 20; i++) tick(0.4 * 0.32);
+    expect(table.turn).toBeGreaterThan(table.angle - 0.002);
     table.release();
     for (let i = 0; i < 8 / STEP; i++) tick(0.02);
     expect(table.engaged).toBe(false);

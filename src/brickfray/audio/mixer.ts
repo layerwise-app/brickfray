@@ -4,15 +4,20 @@ import type { AudioMix } from './types';
 /** A safety net: single events peak below the threshold and pass untouched; only stacked ones reach it. */
 export const LIMIT = { threshold: -1.5, knee: 0, ratio: 20, attack: 0.002, release: 0.12 };
 
-/** Lowest cutoff of the low-health muffle: the world dulls, speech-band detail (and every cue) survives. */
-export const MUFFLE_FLOOR = 1500;
+/** Lowest cutoff of the low-health muffle: the world dulls, speech-band detail survives. */
+export const MUFFLE_FLOOR = 1000;
+/**
+ * At full muffle (1 HP) the world also dips by `dip` and the player's own gun, body and handling lose `dull` dB above
+ * `shelf` Hz: darker but still crisp and on top. Hit and kill markers stay as they are.
+ */
+export const LOW_HEALTH = { dip: 0.5, dull: -7, shelf: 2500 };
 const ROOM_FADE = 0.25;
 
-export type Bus = 'effects' | 'feedback' | 'ui';
+export type Bus = 'effects' | 'feedback' | 'marker' | 'ui';
 
 /**
- * Buses: effects (the world: muffle low-pass, map reverb) / feedback (hit markers, kill, the player's own body,
- * weapon and handling: never muffled) / music / ui → master → limiter → output. Reverb sends go to `reverb`, which
+ * Buses: effects (the world: muffle low-pass, map reverb) / feedback (the player's own body, weapon and handling:
+ * never muffled, only dulled at low health) / marker (hit, kill: as they are) / music / ui → master → limiter → output. Reverb sends go to `reverb`, which
  * feeds the map's outdoor space and an indoor room, cross-faded by `setRoom`; the player's own sounds also send to
  * `near`, the close reflections that give them width before the reverb arrives.
  */
@@ -24,6 +29,8 @@ export interface Mixer {
   muffle: BiquadFilterNode;
   effects: GainNode;
   feedback: GainNode;
+  /** The feedback bus's input: the low-health shelf. */
+  body: BiquadFilterNode;
   music: GainNode;
   ui: GainNode;
   /** Shared reverb send. */
@@ -64,6 +71,11 @@ export function createMixer(ctx: BaseAudioContext): Mixer {
   effectsIn.connect(muffle);
   const feedback = ctx.createGain();
   feedback.connect(master);
+  const body = ctx.createBiquadFilter();
+  body.type = 'highshelf';
+  body.frequency.value = LOW_HEALTH.shelf;
+  body.gain.value = 0;
+  body.connect(feedback);
   const reverb = ctx.createGain();
   const space = ctx.createConvolver();
   space.normalize = false;
@@ -78,38 +90,40 @@ export function createMixer(ctx: BaseAudioContext): Mixer {
   const near = ctx.createConvolver();
   near.normalize = false;
   near.buffer = nearSpace(ctx);
-  near.connect(feedback);
+  near.connect(body);
   const music = ctx.createGain();
   music.connect(master);
   const ui = ctx.createGain();
   ui.connect(master);
-  return { master, meter, effectsIn, muffle, effects, feedback, music, ui, reverb, space, room, outdoor, indoor, near };
+  return { master, meter, effectsIn, muffle, effects, feedback, body, music, ui, reverb, space, room, outdoor, indoor, near };
 }
 
 /** Where a voice of the given bus connects. */
 export function busInput(m: Mixer, bus: Bus): AudioNode {
-  return bus === 'ui' ? m.ui : bus === 'feedback' ? m.feedback : m.effectsIn;
+  return bus === 'ui' ? m.ui : bus === 'marker' ? m.feedback : bus === 'feedback' ? m.body : m.effectsIn;
 }
 
-/** Smoothly applies bus levels; muffle darkens and dips the world (low health), not the feedback bus. */
+/** Smoothly applies bus levels; muffle (low health) darkens and dips the world and dulls the player's own sounds. */
 export function applyMix(ctx: BaseAudioContext, m: Mixer, mix: AudioMix, muffle: number): void {
   const t = ctx.currentTime;
   m.master.gain.setTargetAtTime(mix.master, t, 0.02);
-  m.effects.gain.setTargetAtTime(mix.effects * (1 - 0.3 * muffle), t, 0.05);
+  m.effects.gain.setTargetAtTime(mix.effects * (1 - LOW_HEALTH.dip * muffle), t, 0.05);
   m.feedback.gain.setTargetAtTime(mix.effects, t, 0.05);
   m.music.gain.setTargetAtTime(mix.music, t, 0.05);
   m.ui.gain.setTargetAtTime(mix.ui, t, 0.02);
   m.muffle.frequency.setTargetAtTime(muffleCutoff(muffle), t, 0.08);
+  m.body.gain.setTargetAtTime(LOW_HEALTH.dull * Math.min(Math.max(muffle, 0), 1), t, 0.08);
 }
 
 export function muffleCutoff(muffle: number): number {
   return 20000 * (MUFFLE_FLOOR / 20000) ** Math.min(Math.max(muffle, 0), 1);
 }
 
-/** Cross-fades the reverb send between the outdoor space (0) and the room (1). */
-export function setRoom(ctx: BaseAudioContext, m: Mixer, inside: number): void {
+/** Cross-fades the reverb send from the outdoor space (0) into the room (1), which still hears `outdoor` of the outdoor response. */
+export function setRoom(ctx: BaseAudioContext, m: Mixer, inside: number, outdoor = 0): void {
   const t = ctx.currentTime;
-  m.outdoor.gain.setTargetAtTime(Math.cos((inside * Math.PI) / 2), t, ROOM_FADE / 3);
+  const out = Math.cos((inside * Math.PI) / 2);
+  m.outdoor.gain.setTargetAtTime(out + outdoor * (1 - out), t, ROOM_FADE / 3);
   m.indoor.gain.setTargetAtTime(Math.sin((inside * Math.PI) / 2), t, ROOM_FADE / 3);
 }
 

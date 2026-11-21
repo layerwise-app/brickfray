@@ -8,12 +8,13 @@ import { BARREL, CRATE } from './props-harbor';
 import { BUSH, TREE } from './props-nature';
 import { STALL } from './props-plaza';
 import { FENCE } from './props-street';
+import { fortressLanes } from './fortress-lanes';
 
 const BLUE = ['#1f62c7', '#f2f2ee', '#17284f'];
 const RED = ['#c8231b', '#f6c624', '#7a1712'];
 
 /** Courtyard life: banners, torches, market, training yard, carts and cover. */
-export function fortressDressing(p: Plan) {
+export function fortressDressing(p: Plan, ground: { sand: string; market: string }) {
   const wallZ = C.inner;
   for (const s of [-1, 1] as const) {
     const colors = s < 0 ? BLUE : RED;
@@ -75,4 +76,5 @@ export function fortressDressing(p: Plan) {
   }
   for (const [x, z, kind] of [[-25.6, -22.4, 'oak'], [25.6, 22.4, 'oak'], [-9.2, 25.2, 'birch'], [9.2, -25.2, 'birch']] as const) p.add(TREE, { x, z, kind, size: 0.9 });
   for (const [x, z] of [[-27.6, -18.4], [27.6, 18.4], [5.6, 26.8], [-5.6, -26.8]] as const) p.add(BUSH, { x, z });
+  fortressLanes(p, ground.sand, ground.market);
 }

@@ -1,10 +1,12 @@
 import type * as THREE from 'three';
 import type { MapId } from '../world/types';
 import { Ambience } from './ambience';
-import { CATEGORIES, FALLOFF, inverseGain, type Category } from './catalog';
+import { CATEGORIES, inverseGain, type Category } from './catalog';
 import { applyMix, busInput, createMixer, outputPeak, setRoom, type Mixer } from './mixer';
 import { MusicPlayer } from './music-player';
+import { audibility, behind, OCCLUDED, place } from './positional';
 import { renderBank, yieldToMain } from './render';
+import { ROOMS } from './rooms';
 import { SOUNDS } from './sounds';
 import { loadSpace, neutralSpace, roomAt, roomSpace } from './space';
 import type { AudioEngine, AudioMix, MusicTrack, PlayOptions, SoundId } from './types';
@@ -44,17 +46,6 @@ const SPEED_OF_SOUND = 343;
 const MAX_DELAY = 0.35;
 /** Loud enough to be heard from far away, so they arrive late by their distance. */
 const TRAVELS: ReadonlySet<Category> = new Set<Category>(['gun', 'gunFar', 'boom']);
-/**
- * A positional sound estimated quieter than this at the listener (its loudness target after distance and occlusion,
- * LUFS-like) is not started: it would sit under the map's bed (~-38) and only hold a voice.
- */
-const AUDIBLE = -50;
-/** A fully occluded source: low-pass cutoff in Hz and gain. */
-const OCCLUDED = { cutoff: 1400, gain: 0.5 };
-/** Air absorption stand-in: the distance low-pass is at half of `top` at `half` metres (8 kHz at 50 m, 5 kHz at 100 m). */
-const AIR = { top: 20000, half: 35 };
-/** Low-pass cutoff at `tone` 0 (a soft knock); `tone` 1 leaves the sound as recorded. */
-const DULL = 1200;
 
 interface Voice {
   source: AudioBufferSourceNode;
@@ -87,6 +78,7 @@ export class WebAudioEngine implements AudioEngine {
   /** Which of the map's rooms the room reverb holds. */
   private roomIndex = 0;
   private readonly listener = { x: 0, y: 0, z: 0 };
+  private readonly forward = { x: 0, y: 0, z: -1 };
   private mix: AudioMix = { ...DEFAULT_MIX };
   private muffle = 0;
   private suspended = false;
@@ -154,15 +146,17 @@ export class WebAudioEngine implements AudioEngine {
     const occlusion = pos ? Math.min(Math.max(options.occlusion ?? 0, 0), 1) : 0;
     const volume = (options.volume ?? 1) * blend * (1 - (1 - OCCLUDED.gain) * occlusion);
     const offset = options.offset ?? 0;
-    if (pos && (SOUNDS[sound].loudness ?? cat.loudness) + 20 * Math.log10(Math.max(volume * inverseGain(cat.falloff, distance), 1e-6)) < AUDIBLE) return;
+    const fade = pos ? audibility((SOUNDS[sound].loudness ?? cat.loudness) + 20 * Math.log10(Math.max(volume * inverseGain(cat.falloff, distance), 1e-6))) : 1;
+    if (fade <= 0) return;
     const now = ctx.currentTime;
     const start = now + travel + Math.max(options.delay ?? 0, 0);
-    const buffer = buffers[this.variants.pick(sound, buffers.length)]!;
+    const buffer = buffers[options.variant === undefined ? this.variants.pick(sound, buffers.length) : Math.min(options.variant, buffers.length - 1)]!;
     if (offset >= buffer.duration) return;
     const rate = (options.rate ?? 1) * (1 + (Math.random() * 2 - 1) * cat.jitter);
     const level = 10 ** (((Math.random() * 2 - 1) * (cat.levelJitter ?? 0)) / 20);
     const key = options.source === undefined ? sound : `${sound}#${options.source}`;
-    const priority = options.priority ?? cat.priority;
+    // A fading voice yields to a full one up to two priorities below it.
+    const priority = (options.priority ?? cat.priority) - 2 * (1 - fade);
     const admission = this.pool.admit(key, priority, start, now, cat.burst);
     if (!admission) return;
     if (admission.evicted) this.stopVoice(admission.evicted, now);
@@ -171,20 +165,15 @@ export class WebAudioEngine implements AudioEngine {
     source.buffer = buffer;
     source.playbackRate.value = rate;
     const amp = ctx.createGain();
-    amp.gain.value = volume * admission.gain * level;
+    amp.gain.value = volume * fade * admission.gain * level;
     source.connect(amp);
     const nodes: AudioNode[] = [source, amp];
     let out: AudioNode = amp;
     if (pos) {
-      const lp = ctx.createBiquadFilter();
-      lp.type = 'lowpass';
-      lp.Q.value = -3;
       const tone = Math.min(Math.max(options.tone ?? 1, 0), 1);
-      lp.frequency.value = Math.min(AIR.top / (1 + distance / AIR.half), 20000 * (OCCLUDED.cutoff / 20000) ** occlusion, 20000 * (DULL / 20000) ** (1 - tone));
-      const panner = this.makePanner(ctx, cat.falloff, pos);
-      amp.connect(lp).connect(panner);
-      nodes.push(lp, panner);
-      out = panner;
+      const placed = place(ctx, amp, { pos, distance, occlusion, tone, rear: behind(this.listener, this.forward, pos), falloff: cat.falloff });
+      nodes.push(...placed);
+      out = placed[placed.length - 1]!;
     }
     const bus = pos ? 'effects' : cat.bus;
     out.connect(busInput(graph, bus));
@@ -213,6 +202,9 @@ export class WebAudioEngine implements AudioEngine {
     this.listener.x = position.x;
     this.listener.y = position.y;
     this.listener.z = position.z;
+    this.forward.x = forward.x;
+    this.forward.y = forward.y;
+    this.forward.z = forward.z;
     const { index, amount: room } = roomAt(this.scene, position.x, position.y, position.z);
     if (this.ctx && this.graph && this.scene && index >= 0 && index !== this.roomIndex) {
       this.roomIndex = index;
@@ -220,7 +212,9 @@ export class WebAudioEngine implements AudioEngine {
     }
     if (Math.abs(room - this.room) > 0.02 || (room !== this.room && (room === 0 || room === 1))) {
       this.room = room;
-      if (this.ctx && this.graph) setRoom(this.ctx, this.graph, room);
+      const def = this.scene ? ROOMS[this.scene][this.roomIndex] : undefined;
+      if (this.ctx && this.graph) setRoom(this.ctx, this.graph, room, def?.outdoor);
+      this.ambience?.setRoom(room, def?.bed);
     }
     const l = this.ctx?.listener;
     if (!l) return;
@@ -288,23 +282,6 @@ export class WebAudioEngine implements AudioEngine {
       renderMs: this.renderMs,
       outputPeak: this.graph ? outputPeak(this.graph) : 0
     };
-  }
-
-  private makePanner(ctx: AudioContext, falloff: keyof typeof FALLOFF, pos: { x: number; y: number; z: number }): PannerNode {
-    const p = ctx.createPanner();
-    p.panningModel = 'HRTF';
-    p.distanceModel = 'inverse';
-    p.refDistance = FALLOFF[falloff].ref;
-    p.rolloffFactor = FALLOFF[falloff].rolloff;
-    p.maxDistance = 10000;
-    if (p.positionX) {
-      p.positionX.value = pos.x;
-      p.positionY.value = pos.y;
-      p.positionZ.value = pos.z;
-    } else {
-      p.setPosition(pos.x, pos.y, pos.z);
-    }
-    return p;
   }
 
   private stopVoice(voice: Voice, now: number): void {

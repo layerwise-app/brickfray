@@ -126,15 +126,21 @@ void main() {
       float ember = (1.0 - smoothstep(0.0, 0.12, age)) * smoothstep(0.3, -0.9, sd.y);
       col = mix(col, ${lin('#ff8a3a')}, ember * 0.4);
     } else {
-      a = smoothstep(1.0, 0.55, edge);
-      float heat = clamp(1.2 - sr * 0.8 - age * 1.3 + (n - 0.5) * 1.1, 0.0, 1.0);
-      col = mix(${lin('#4b4541')}, ${lin('#b8340e')}, smoothstep(0.05, 0.3, heat));
-      col = mix(col, ${lin('#ff7518')}, smoothstep(0.22, 0.52, heat));
-      col = mix(col, ${lin('#ffc54a')}, smoothstep(0.48, 0.78, heat));
-      col = mix(col, ${lin('#fff5dc')}, smoothstep(0.8, 1.0, heat));
+      // Fire: each billow is shaded as a lump lit from above, in flat toon bands (white-hot, yellow, orange, deep
+      // red, then soot as it cools), so the cluster reads as one solid fireball that hides what is behind it.
+      a = smoothstep(1.0, 0.9, edge);
+      float body = sqrt(max(0.0, 1.0 - sr * sr));
+      float lit = dot(vec3(sd * 0.9, body), vec3(-0.36, 0.74, 0.57));
+      float n1 = texture2D(uNoise, nuv + vec2(0.0, age * 0.16)).r;
+      float heat = 1.22 - sr * 0.7 - age * 1.3 + (n1 - 0.5) * 0.7 + 0.3 * lit;
+      col = mix(${lin('#4d4642')}, ${lin('#6f6761')}, step(0.5, lit));
+      col = mix(col, ${lin('#a8240c')}, smoothstep(0.1, 0.13, heat));
+      col = mix(col, ${lin('#ff6a12')}, smoothstep(0.3, 0.33, heat));
+      col = mix(col, ${lin('#ffbf2e')}, smoothstep(0.52, 0.55, heat));
+      col = mix(col, ${lin('#fff7e2')}, smoothstep(0.76, 0.79, heat));
+      // A darker lip where one lump turns away, so lumps in front stand off the ones behind.
+      col *= 1.0 - 0.2 * smoothstep(0.72, 0.92, edge);
       col *= vColor.rgb;
-      // Hot fire mostly adds light; cooling flame turns to soot that covers what is behind.
-      cover = mix(0.85, 0.4, heat);
     }
   }
   a *= vColor.a;
@@ -295,6 +301,6 @@ export class SpritePool {
 /** Opacity over a sprite's life: smoke swells in and thins away, fire burns down to soot, the rest fade at the end. */
 function envelope(shape: number, age: number) {
   if (shape === SHAPES.smoke) return THREE.MathUtils.smoothstep(age, 0, 0.08) * (1 - THREE.MathUtils.smoothstep(age, 0.3, 1));
-  if (shape === SHAPES.fire) return THREE.MathUtils.smoothstep(age, 0, 0.04) * (1 - THREE.MathUtils.smoothstep(age, 0.55, 1));
+  if (shape === SHAPES.fire) return 1 - THREE.MathUtils.smoothstep(age, 0.6, 1);
   return Math.min(1, (1 - age) * 2.2);
 }

@@ -1,5 +1,5 @@
 import { buildBody } from '../body';
-import { lowBall, lowSection } from '../body-low';
+import { lowBall, kneePads, lowSection } from '../body-low';
 import type { PartSet } from '../parts';
 import type { Stance } from '../stance';
 import { antenna, arm, C, chestUnit, helmet, leg, pack, waist } from './nova-suit';
@@ -8,14 +8,14 @@ import { panels, visorDepth } from './nova-trim';
 const BULK = 1.08;
 const LIMBS = 1.13;
 
-/** A big wave with the open left hand, carbine angled up in the right, weight on the right leg and the left leg stretched out to the side. */
+/** A big wave with the open left hand, carbine angled up in the right, weight on the right leg and the left leg stretched out to the side on its toes. */
 export const stance: Stance = {
-  pelvis: { at: [0.06, 0.012, 0.01], rot: [0.08, 0, 0.1] },
+  pelvis: { at: [0.085, -0.035, 0], rot: [0.08, 0, 0.14] },
   chest: [-0.15, 0.05, -0.12],
   head: [-0.45, 0.1, -0.1],
   feet: {
-    R: { at: [0.19, 0, 0.035], heading: 0.32, knee: 0.04 },
-    L: { at: [-0.25, 0, -0.07], heading: -0.55, knee: -0.05 }
+    R: { at: [0.12, 0, 0.03], heading: 0.3, knee: 0.08 },
+    L: { at: [-0.24, 0, -0.14], heading: -0.6, knee: 0.14, pitch: -0.6 }
   },
   arms: {
     R: { wrist: [0.266, 0.05, -0.195], hand: [0.783, 0.933, -0.328], elbow: [0.044, -0.991, 0.124], space: 'chest', shape: 'grip' },
@@ -78,7 +78,7 @@ function plain(b: PartSet) {
   b.mirror((side) => {
     b.cyl(`upperArm${side}`, 0.07, 0.07, 0.03, C.purple, { at: [0, -0.02, 0], look: 'gloss' });
     b.cyl(`forearm${side}`, 0.058, 0.058, 0.03, C.purple, { at: [0, -0.2, 0], look: 'gloss' });
-    b.blob(`shin${side}`, [0.11, 0.1, 0.05], C.purple, { at: [0, -0.0, -0.06], look: 'gloss' });
     b.cyl(`foot${side}`, 0.075, 0.075, 0.03, C.purple, { at: [0, 0.07, 0], look: 'gloss' });
   });
+  kneePads(b, 1, C.purple, 'gloss');
 }

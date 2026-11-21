@@ -62,6 +62,9 @@ export function hashRandom(a: number, b: number, c: number): number {
   return (h >>> 0) / 4294967296;
 }
 
+/** The view racks the pump after an empty shotgun reload; no shot before it is done. */
+const RACK = 0.75;
+
 /** Shotgun reloads start with a short load-in before the first shell. */
 const LOAD_IN = 0.2;
 
@@ -224,8 +227,7 @@ export function stepArms(player: PlayerState, cmd: Command, dt: number, hooks: A
           hooks?.view?.({ type: 'reloadShell', index: arms.ammo[arms.weapon], duration: def.reload });
         } else {
           hooks?.view?.({ type: 'reloadEnd' });
-          // The view racks the pump after an empty reload.
-          arms.cooldown = Math.max(arms.cooldown, arms.reloadEmpty ? 0.75 : 0.3);
+          arms.cooldown = Math.max(arms.cooldown, arms.reloadEmpty ? RACK : 0.3);
         }
       } else {
         arms.ammo[arms.weapon] = def.mag;
@@ -253,6 +255,15 @@ export function stepArms(player: PlayerState, cmd: Command, dt: number, hooks: A
       startReload(arms, hooks);
     }
     arms.queuedFire = 0;
+    return;
+  }
+  if (shotgunInterrupt && arms.reloadEmpty) {
+    // Nothing is chambered after an empty reload: the shells loaded so far stay, the pump is racked, then the shot goes.
+    arms.reload = 0;
+    arms.reloadEmpty = false;
+    hooks?.view?.({ type: 'reloadEnd' });
+    arms.cooldown = Math.max(arms.cooldown, RACK);
+    arms.queuedFire = RACK + 0.1;
     return;
   }
   if (shotgunInterrupt) cancelReload(arms, hooks);

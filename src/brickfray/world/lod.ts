@@ -3,45 +3,65 @@ import * as THREE from 'three';
 /** `near`: detail shown up close and dissolved with distance; `far`: its cheap stand-in, shown where the detail is gone. */
 export type LodMode = 'near' | 'far';
 
-/** Metres over which a part dissolves; the stand-in fills in the pixels it leaves, so nothing pops. */
+/** Metres over which a part dissolves. */
 const BAND = 6;
+/** Metres over which a stand-in fades in, just before its detail starts to dissolve. */
+const FAR_BAND = 4;
 /** Visibility is re-checked after the camera moves this far. */
 const RECHECK = 1.5;
+
+/** Distances (from the camera) where a mode's fade runs from opaque to gone (`near`) or gone to opaque (`far`). */
+function fadeSpan(mode: LodMode, range: number) {
+  return mode === 'near' ? { from: range - BAND, to: range } : { from: range - BAND - FAR_BAND, to: range - BAND };
+}
 
 const VERTEX = /* glsl */ `#include <project_vertex>
 #ifdef USE_BATCHING
 {
   vec3 lodAt = (modelMatrix * batchingMatrix * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
-  vLodFade = clamp((uLodRange - distance(lodAt, cameraPosition)) / uLodBand, 0.0, 1.0);
+  float lodT = clamp((distance(lodAt, cameraPosition) - uLodFrom) / (uLodTo - uLodFrom), 0.0, 1.0);
+  #ifdef LOD_FAR
+  vLodAlpha = lodT;
+  #else
+  vLodAlpha = 1.0 - lodT;
+  #endif
 }
 #else
-vLodFade = 1.0;
+vLodAlpha = 1.0;
 #endif`;
 
-/** Ordered 4x4 dither: the detail keeps the pixels above its fade, the stand-in exactly the others. */
-const FRAGMENT = /* glsl */ `#include <clipping_planes_fragment>
-{
-  vec2 lodA = floor(gl_FragCoord.xy);
-  vec2 lodB = floor(lodA * 0.5);
-  float lodD = fract(dot(lodB, vec2(0.5, lodB.y * 0.75))) * 0.25 + fract(dot(lodA, vec2(0.5, lodA.y * 0.75))) + 1.0 / 32.0;
-  #ifdef LOD_FAR
-  if (vLodFade > lodD) discard;
-  #else
-  if (vLodFade <= lodD) discard;
-  #endif
-}`;
+/**
+ * In its band a part is alpha blended: only its nearest surface (laid down by a depth-only pass just before)
+ * blends over what is behind it, so it fades without a screen pattern or seeing through itself. A stand-in
+ * fades in over its detail first (it sits on or in front of it) and the detail dissolves after, so the two
+ * never leave a gap between them.
+ */
+const FRAGMENT = '#include <opaque_fragment>';
+const FRAGMENT_LOD = 'diffuseColor.a *= vLodAlpha;\n#include <opaque_fragment>';
+/** After glass (2), before smoke and sparks (3+). */
+const BLEND_ORDER = 2.5;
 
-function lodMaterial(base: THREE.Material, mode: LodMode, range: number) {
+function lodMaterial(base: THREE.Material, mode: LodMode, range: number, colorWrite: boolean) {
   const m = base.clone();
-  const uniforms = { uLodRange: { value: range }, uLodBand: { value: BAND } };
+  const span = fadeSpan(mode, range);
+  const uniforms = { uLodFrom: { value: span.from }, uLodTo: { value: span.to } };
+  m.transparent = true;
+  m.colorWrite = colorWrite;
+  m.depthWrite = !colorWrite;
+  if (mode === 'far') {
+    // Fully faded in while its detail dissolves: faces the two share go to the detail.
+    m.polygonOffset = true;
+    m.polygonOffsetFactor = 1;
+    m.polygonOffsetUnits = 1;
+  }
   m.onBeforeCompile = (shader, renderer) => {
     base.onBeforeCompile(shader, renderer);
     Object.assign(shader.uniforms, uniforms);
-    const pars = 'uniform float uLodRange;\nuniform float uLodBand;\nflat varying float vLodFade;';
-    shader.vertexShader = shader.vertexShader.replace('#include <common>', `#include <common>\n${pars}`).replace('#include <project_vertex>', VERTEX);
-    shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', `#include <common>\n${mode === 'far' ? '#define LOD_FAR\n' : ''}flat varying float vLodFade;`)
-      .replace('#include <clipping_planes_fragment>', FRAGMENT);
+    const pars = 'uniform float uLodFrom;\nuniform float uLodTo;\nflat varying float vLodAlpha;';
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', `#include <common>\n${mode === 'far' ? '#define LOD_FAR\n' : ''}${pars}`)
+      .replace('#include <project_vertex>', VERTEX);
+    shader.fragmentShader = shader.fragmentShader.replace('#include <common>', '#include <common>\nflat varying float vLodAlpha;').replace(FRAGMENT, FRAGMENT_LOD);
   };
   m.customProgramCacheKey = () => `${base.customProgramCacheKey()}|lod-${mode}`;
   m.userData.lodClone = true;
@@ -94,12 +114,16 @@ function twin(mesh: THREE.BatchedMesh, material: THREE.Material) {
 
 /**
  * Small detail instances of a batched mesh dissolve between `range - 6` and `range` metres from the camera
- * (`near`), or appear there as the detail goes (`far`). Instances inside that band draw from a twin batch with a
- * dithering material; the rest stay in `mesh` with its plain material (a shader that can discard costs the whole
- * draw its hidden-surface removal on tile-based GPUs) or are left out. Returns the twin, for the caller to add.
+ * (`near`); their stand-ins fade in just before that (`far`). Instances inside their band draw from twin batches
+ * (a depth pass, then a blended one); the rest stay in `mesh` with its plain material or are left out, so the
+ * blending costs only what is fading. Returns the twins, for the caller to add.
  */
 export function detailLod(mesh: THREE.BatchedMesh, range: number, mode: LodMode = 'near') {
-  const blend = twin(mesh, lodMaterial(mesh.material as THREE.Material, mode, range));
+  const base = mesh.material as THREE.Material;
+  const twins = [twin(mesh, lodMaterial(base, mode, range, true))];
+  if (!base.transparent) twins.unshift(twin(mesh, lodMaterial(base, mode, range, false)));
+  // Same z and order: the depth twin, created first, draws right before its blend twin.
+  for (const t of twins) t.renderOrder = BLEND_ORDER;
   const n = (mesh as unknown as BatchInternals)._instanceInfo.length;
   const origins = new Float32Array(n * 3);
   const m = new THREE.Matrix4();
@@ -108,8 +132,9 @@ export function detailLod(mesh: THREE.BatchedMesh, range: number, mode: LodMode 
     origins.set([m.elements[12]!, m.elements[13]!, m.elements[14]!], i * 3);
   }
   // Between re-checks the camera moves under RECHECK, so a plain instance never reaches the band unseen.
-  const bandIn = range - BAND - RECHECK;
-  const bandOut = range + RECHECK;
+  const span = fadeSpan(mode, range);
+  const bandIn = span.from - RECHECK;
+  const bandOut = span.to + RECHECK;
   const last = new THREE.Vector3(1e9, 0, 0);
   const cam = new THREE.Vector3();
   const recheck = (camera: THREE.Camera) => {
@@ -121,15 +146,15 @@ export function detailLod(mesh: THREE.BatchedMesh, range: number, mode: LodMode 
       const inBand = dist >= bandIn && dist < bandOut;
       const plain = mode === 'near' ? dist < bandIn : dist >= bandOut;
       if (mesh.getVisibleAt(i) !== plain) mesh.setVisibleAt(i, plain);
-      if (blend.getVisibleAt(i) !== inBand) blend.setVisibleAt(i, inBand);
+      for (const t of twins) if (t.getVisibleAt(i) !== inBand) t.setVisibleAt(i, inBand);
     }
   };
-  for (const target of [mesh, blend]) {
-    const base = target.onBeforeRender.bind(target);
+  for (const target of [mesh, ...twins]) {
+    const before = target.onBeforeRender.bind(target);
     target.onBeforeRender = (renderer, scene, camera, geometry, material, group) => {
       recheck(camera);
-      base(renderer, scene, camera, geometry, material, group);
+      before(renderer, scene, camera, geometry, material, group);
     };
   }
-  return blend;
+  return twins;
 }

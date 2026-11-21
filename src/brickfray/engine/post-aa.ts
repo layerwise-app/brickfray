@@ -38,8 +38,9 @@ float luma(vec2 uv) {
   return sqrt(dot(min(texture2D(tScene, uv).rgb * uExposure, 1.0), vec3(0.299, 0.587, 0.114)));
 }
 
-const int STEPS = 6;
-const float EDGE_GUESS = 8.0;
+// Long search: near-vertical poles and frames step once every few dozen pixels, past a short search's reach.
+const int STEPS = 10;
+const float EDGE_GUESS = 12.0;
 
 void main() {
   vec2 uv = vUv;
@@ -93,7 +94,7 @@ void main() {
   }
   float edgeL = (m + opposite) * 0.5;
   float threshold = gradient * 0.25;
-  float stepLen[6] = float[6](1.0, 1.5, 2.0, 2.0, 2.0, 4.0);
+  float stepLen[10] = float[10](1.0, 1.5, 2.0, 2.0, 2.0, 2.0, 4.0, 4.0, 8.0, 8.0);
 
   vec2 puv = uvEdge + edgeStep;
   float pDelta = luma(puv) - edgeL;
@@ -129,7 +130,7 @@ void main() {
 
 /**
  * Anti-aliasing for the tier that can't afford multisampling: the frame renders into a single-sample linear target
- * at full resolution, then one full-screen pass tone maps it onto the canvas with FXAA.
+ * at the resolution it is drawn at, then one full-screen pass tone maps it onto the canvas with FXAA.
  */
 export class PostAA {
   private target: THREE.WebGLRenderTarget | null = null;
@@ -154,10 +155,11 @@ export class PostAA {
     this.quad.frustumCulled = false;
   }
 
-  /** The target to draw the frame into, sized to the canvas. */
-  begin(renderer: THREE.WebGLRenderer) {
+  /** The target to draw the frame into, `scale` of the canvas's size; end() draws it into the current viewport. */
+  begin(renderer: THREE.WebGLRenderer, scale = 1) {
     renderer.getDrawingBufferSize(this.size);
-    const { x, y } = this.size;
+    const x = Math.max(1, Math.round(this.size.x * scale));
+    const y = Math.max(1, Math.round(this.size.y * scale));
     if (!this.target) {
       this.target = new THREE.WebGLRenderTarget(x, y, { type: THREE.HalfFloatType, depthBuffer: true, stencilBuffer: false });
     } else if (this.target.width !== x || this.target.height !== y) {

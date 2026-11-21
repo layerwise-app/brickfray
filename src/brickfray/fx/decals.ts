@@ -76,14 +76,15 @@ export class Decals {
 
   /**
    * `size` is the width of the mark in meters. Each mark gets its own turn, size (+-20%), slight stretch and
-   * mirroring, so a burst never reads as one stamp; a dent's baked shading stays lit from above, so it only leans.
+   * mirroring, so a burst never reads as one stamp; a dent's or stone chip's baked shading stays lit from above, so
+   * on a wall it only leans.
    */
   add(kind: DecalKind, point: THREE.Vector3, normal: THREE.Vector3, size: number, alpha = 1) {
     const cells = DECAL_CELLS[kind];
     const cell = cells[Math.floor(Math.random() * cells.length)]!;
     this.q.setFromUnitVectors(this.z, normal);
     let turn = Math.random() * Math.PI * 2;
-    if (kind === 'dent' && Math.abs(normal.y) < 0.9) {
+    if ((kind === 'dent' || kind === 'spall') && Math.abs(normal.y) < 0.9) {
       this.y0.set(0, 1, 0).applyQuaternion(this.q);
       this.up.set(0, 1, 0).addScaledVector(normal, -normal.y).normalize();
       turn = Math.atan2(normal.dot(this.y0.clone().cross(this.up)), this.y0.dot(this.up)) + (Math.random() - 0.5) * 0.6;

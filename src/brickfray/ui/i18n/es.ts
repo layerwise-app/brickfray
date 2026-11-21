@@ -106,6 +106,7 @@ export const es: Dictionary = {
   chatPlaceholder: 'Escribe algo…',
   scopeHint: 'Mantén Shift para estabilizar',
   headshot: 'Tiro a la cabeza',
+  eliminated: 'Eliminado',
 
   graphics: 'Gráficos',
   controls: 'Controles',
@@ -129,6 +130,8 @@ export const es: Dictionary = {
   crosshair: 'Mira',
   damageNumbers: 'Números de daño',
   showStats: 'Estadísticas de rendimiento',
+  autoResolution: 'Resolución automática',
+  autoResolutionHint: 'Dibuja menos píxeles cuando los fotogramas no siguen el ritmo de la pantalla, para que girar siga siendo fluido.',
   language: 'Idioma',
   done: 'Listo',
   keys: 'Teclas',

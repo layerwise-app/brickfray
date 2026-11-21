@@ -97,7 +97,7 @@ export function cowl(b: PartSet, color: string) {
     const out = rt * Math.cos(psi);
     return [Math.sin(al) * (0.11 + out), 0.245 - 0.04 * Math.cos(al) + rt * 1.15 * Math.sin(psi), -Math.cos(al) * (0.09 + out) + 0.004];
   };
-  b.add('chest', surface(loop(pick(b, 12, 18, 64)), samples(pick(b, 4, 5, 16)), f, true, true), color, { look: 'cloth' });
+  b.add('chest', surface(loop(pick(b, 12, 18, 48)), samples(pick(b, 4, 5, 12)), f, true, true), color, { look: 'cloth' });
 }
 
 /** Pointed dag k of n around a loop: 0 at the notches, 1 at the tip. */
@@ -116,7 +116,7 @@ export const mantleAt: Surface = (u, v) => {
 
 /** Short dagged cape over chest and back, on the chest bone; the shoulder caps carry it over the arms. */
 export function mantle(b: PartSet, color: string, lining: string) {
-  const piece = cloth(loop(10 * pick(b, 2, 4, 10)), samples(pick(b, 3, 4, 10), b.hero ? 0.06 : 0), mantleAt, 0.012, { closed: true, round: [1, 0.1], lined: [0.3, 1] });
+  const piece = cloth(loop(10 * pick(b, 2, 4, 8)), samples(pick(b, 3, 4, 8), b.hero ? 0.06 : 0), mantleAt, 0.012, { closed: true, round: [1, 0.1], lined: [0.3, 1] });
   b.add('chest', piece.outer, color, { look: 'cloth' });
   b.add('chest', piece.inner, lining, { look: 'cloth' });
 }
@@ -133,7 +133,7 @@ export function shoulderCap(b: PartSet, bone: 'upperArmL' | 'upperArmR', sign: n
     const r = 0.088 * Math.sin(ang) + 0.016 * skirt;
     return [Math.cos(al) * r + sign * 0.006, 0.008 + 0.082 * Math.cos(ang) - skirt * drop, Math.sin(al) * r * 1.08];
   };
-  const piece = cloth(loop(dags * pick(b, 2, 2, 6)), samples(pick(b, 4, 5, 11), b.hero ? 0.05 : 0), f, 0.011, { closed: true, round: [1, 0.08], lined: [0.4, 1] });
+  const piece = cloth(loop(dags * pick(b, 2, 2, 5)), samples(pick(b, 4, 5, 10), b.hero ? 0.05 : 0), f, 0.011, { closed: true, round: [1, 0.08], lined: [0.4, 1] });
   b.add(bone, piece.outer, color, { look: 'cloth' });
   b.add(bone, piece.inner, lining, { look: 'cloth' });
 }

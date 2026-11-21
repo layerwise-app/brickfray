@@ -1,4 +1,4 @@
-import type * as THREE from 'three';
+import * as THREE from 'three';
 import { BRICK, PITCH } from '../engine/geometry';
 import { Mesher, V } from './geo';
 import { Rng } from './util';
@@ -53,10 +53,13 @@ function subtract(rects: FaceRect[], hole: FaceRect): FaceRect[] {
   return out;
 }
 
-/** One brick front: a face with bevelled bed joints; head joints are plain gaps showing the core. */
-function brick(m: Mesher, r: FaceRect, depth: number) {
-  const u0 = r.u0 + HEAD;
-  const u1 = r.u1 - HEAD;
+/**
+ * One brick front: a face with bevelled bed joints; head joints are plain gaps showing the core. Bricks run flush to
+ * the face's ends: a gap there, where two blocks meet, showed slivers of the hidden side faces as a dotted seam.
+ */
+function brick(m: Mesher, r: FaceRect, depth: number, length: number) {
+  const u0 = r.u0 > 1e-4 ? r.u0 + HEAD : r.u0;
+  const u1 = r.u1 < length - 1e-4 ? r.u1 - HEAD : r.u1;
   const v0 = r.v0 + GAP;
   const v1 = r.v1 - GAP;
   const b = Math.min(depth, (v1 - v0) * 0.3);
@@ -131,12 +134,28 @@ export function brickFace(spec: FaceSpec): (THREE.BufferGeometry | null)[] {
       const group = (spec.groups > 1 && rng.chance(spec.variance) ? 1 + Math.floor(rng.next() * (spec.groups - 1)) : 0) + (spec.flat && odd ? spec.groups : 0);
       for (const r of rects) {
         if (spec.flat) run.add(r, group);
-        else if (r.u1 - r.u0 > 0.06 && r.v1 - r.v0 > 0.06) brick(meshers[group]!, r, spec.depth);
+        else if (r.u1 - r.u0 > 0.06 && r.v1 - r.v0 > 0.06) brick(meshers[group]!, r, spec.depth, spec.length);
       }
       pos = end;
     }
     run.flush();
     prev = joints;
   }
-  return meshers.map((m) => (m.pos.length ? m.build() : null));
+  return meshers.map((m) => (m.pos.length ? (spec.flat ? withCourses(m.build()) : m.build()) : null));
+}
+
+/**
+ * Flat bricks carry their height within the course in the `bevel` attribute as -1 (bottom) to -2 (top), so the low
+ * tier shader can draw the bed joints the seamless quads leave out (bevels use 0 or 1..2, so the ranges never meet).
+ */
+function withCourses(g: THREE.BufferGeometry) {
+  const pos = g.getAttribute('position');
+  const out = new Float32Array(pos.count);
+  for (let t = 0; t + 2 < pos.count; t += 3) {
+    const lo = Math.min(pos.getY(t), pos.getY(t + 1), pos.getY(t + 2));
+    const hi = Math.max(pos.getY(t), pos.getY(t + 1), pos.getY(t + 2));
+    for (let k = 0; k < 3; k++) out[t + k] = -1 - (pos.getY(t + k) - lo) / Math.max(hi - lo, 1e-6);
+  }
+  g.setAttribute('bevel', new THREE.BufferAttribute(out, 1));
+  return g;
 }

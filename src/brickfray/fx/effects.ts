@@ -81,7 +81,7 @@ export class Effects {
 
   constructor(
     kit: Kit,
-    private readonly world: CollisionWorld | null
+    readonly world: CollisionWorld | null
   ) {
     this.level = kit.profile.level;
     this.debris = new Debris(kit, world);
@@ -103,6 +103,7 @@ export class Effects {
       if (world) this.root.add(buildGroundContact(world));
     }
     this.root.name = 'effects';
+    this.root.userData.effects = this;
     this.tracers.weaponAt = (p) => this.gunAt(p)?.weapon ?? this.ownWeapon(p);
   }
 

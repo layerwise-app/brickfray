@@ -25,15 +25,14 @@ export const PIER: Element<PierParams> = {
     const wid = alongX ? p.z1 - p.z0 : p.x1 - p.x0;
     const cx = (p.x0 + p.x1) / 2;
     const cz = (p.z0 + p.z1) / 2;
-    if (d.detail === 0) t.span(p.x0, -0.2, p.z0, p.x1, 0, p.z1, PLANK, undefined, 0);
-    else {
-      const n = Math.round(len / 0.4);
-      for (let i = 0; i < n; i++) {
-        const u = (alongX ? p.x0 : p.z0) + (i + 0.5) * (len / n);
-        const c = i % 3 === 0 ? shade(PLANK, -0.08) : i % 3 === 1 ? PLANK : shade(PLANK, 0.06);
-        if (alongX) t.box(u, -0.14, cz, len / n - 0.03, 0.14, wid, c, undefined, 0.01);
-        else t.box(cx, -0.14, u, wid, 0.14, len / n - 0.03, c, undefined, 0.01);
-      }
+    // Without multisampling the gaps between boards would break into dashes: low butts them and keeps the tones.
+    const n = Math.round(len / 0.4);
+    const gap = d.detail === 0 ? 0 : 0.03;
+    for (let i = 0; i < n; i++) {
+      const u = (alongX ? p.x0 : p.z0) + (i + 0.5) * (len / n);
+      const c = i % 3 === 0 ? shade(PLANK, -0.08) : i % 3 === 1 ? PLANK : shade(PLANK, 0.06);
+      if (alongX) t.box(u, -0.14, cz, len / n - gap, 0.14, wid, c, undefined, 0.01);
+      else t.box(cx, -0.14, u, wid, 0.14, len / n - gap, c, undefined, 0.01);
     }
     for (const s of [-1, 1]) {
       const o = s * (wid / 2 - 0.15);

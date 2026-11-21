@@ -19,6 +19,21 @@ function setup(clear: (ax: number, ay: number, az: number, bx: number, by: numbe
 }
 
 describe('MatchAudio', () => {
+  it('thumps the first bullet of a burst in full and merges the rest into a few ducked ones', () => {
+    const { sound, played, run } = setup();
+    for (let i = 0; i < 9; i++) {
+      sound.hurt();
+      run(0.1);
+    }
+    const hurts = played.filter((p) => p.id === 'hurt').map((p) => p.options?.volume);
+    expect(hurts[0]).toBe(0.8);
+    expect(hurts.length).toBeLessThanOrEqual(5);
+    expect(hurts.slice(1).every((v) => v !== undefined && v <= 0.3)).toBe(true);
+    run(0.3);
+    sound.hurt();
+    expect(played.at(-1)?.options?.volume).toBe(0.8);
+  });
+
   it('drops one case per shot after the fall, and thins them out under automatic fire', () => {
     const { sound, ids, run } = setup();
     sound.action({ type: 'fire', empty: false }, 'pistol');
@@ -97,6 +112,7 @@ describe('MatchAudio', () => {
     expect(rates[0]).toBe(1);
     expect(rates[1]! / rates[0]!).toBeCloseTo(2 ** (1 / 12), 4);
     expect(rates[2]! / rates[1]!).toBeCloseTo(2 ** (1 / 12), 4);
+    expect(played.filter((p) => p.id === 'countdown').map((p) => p.options?.variant)).toEqual([0, 1, 2]);
   });
 
   it('beats faster as health runs out and stays silent above the threshold', () => {

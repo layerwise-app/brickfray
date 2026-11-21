@@ -75,7 +75,8 @@ export function limbs(b: PartSet) {
     // Elbow: doubled canvas with a chafing patch behind it; in the showroom the sleeve simply bends over the joint.
     if (b.hero) orb(b, fa, 0.057, 18, SUIT, { at: [0, 0.002, 0.002], scale: [1.02, 1, 1.06], ...CANVAS });
     else b.cyl(fa, 0.052, 0.052, 0.112, q === 1 ? SUIT : PATCH, { rot: ACROSS, ...CANVAS, seg: hinge });
-    b.add(fa, S.blob(0.1, 0.112, 0.056, 0.62, round, 0), PATCH, { at: [0, -0.01, 0.03], ...CANVAS });
+    // The showroom's elbow patch lies on the forearm's canvas (coral-canvas).
+    if (!b.hero) b.add(fa, S.blob(0.1, 0.112, 0.056, 0.62, round, 0), PATCH, { at: [0, -0.01, 0.03], ...CANVAS });
     b.add(fa, skin(arm(FOREARM), 'forearm', 0.006, 0.02), SUIT, CANVAS);
     cuff(b, fa, sign);
 

@@ -147,10 +147,11 @@ function pockets(b: PartSet) {
 /** Shirt collar, pen pocket, name badge and the radio on the shoulder strap. */
 function chestKit(b: PartSet) {
   const hero = b.hero;
-  // Polo collar spread over the vest, and the shirt's placket.
+  // Polo collar spread over the vest, and the shirt's placket. It lies over the shoulder tape: finely cut and lifted
+  // clear of it, or the tape's corners poke through its flat facets.
   b.mirror((_, sign) => {
     const wing = (y: number): [number, number] => [CHEST.front(y, sign * (neckX(y) - 0.004)), CHEST.front(y, sign * (neckX(y) + lerp(0.003, 0.036, (y - 0.168) / (TOP - 0.168))))];
-    b.add('chest', CHEST.panel({ ...span(0.168, TOP, wing), lift: ON + 0.0034, thick: 0.004, seg: [tier(b, 1, 2, 3), tier(b, 2, 2, 4)] }), C.collar, { look: 'cloth' });
+    b.add('chest', CHEST.panel({ ...span(0.168, TOP, wing), lift: ON + (hero ? 0.0048 : 0.0034), thick: 0.004, seg: [tier(b, 1, 2, 6), tier(b, 2, 2, 8)] }), C.collar, { look: 'cloth' });
   });
   if (hero) for (const y of [0.15, 0.186]) b.cyl('chest', 0.0055, 0.0055, 0.004, '#c9d2dc', { at: [0, y, -0.107], rot: [Math.PI / 2, 0, 0], look: 'gloss', seg: 8 });
 

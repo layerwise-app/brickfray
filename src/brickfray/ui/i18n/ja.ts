@@ -106,6 +106,7 @@ export const ja: Dictionary = {
   chatPlaceholder: 'メッセージを入力…',
   scopeHint: 'Shift 長押しで息を止める',
   headshot: 'ヘッドショット',
+  eliminated: '撃破',
 
   graphics: 'グラフィック',
   controls: '操作',
@@ -129,6 +130,8 @@ export const ja: Dictionary = {
   crosshair: 'クロスヘア',
   damageNumbers: 'ダメージ表示',
   showStats: 'パフォーマンス表示',
+  autoResolution: '解像度の自動調整',
+  autoResolutionHint: '描画が画面の更新に間に合わないときは描画ピクセルを減らし、視点移動を滑らかに保ちます。',
   language: '言語',
   done: '完了',
   keys: 'キー設定',

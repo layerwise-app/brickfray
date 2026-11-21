@@ -23,10 +23,10 @@ interface Beat {
   back: number;
 }
 
-/** Light: a quick flick and straight back. Heavy: a long hang at the top, a dead stop in the target, and a slow drag out. */
+/** Light: a quick flick and straight back. Heavy: a long hang at the top, a dead stop in the target for a couple of frames (its stop pose is the hit pose), then driven on through and out of the frame. */
 const LIGHT: Beat = { fetch: 0.044, hang: 0.01, load: 0.12, swing: 0.024, bite: 0.018, follow: 0.04, stow: 0.03, back: 0.08 };
 const MEDIUM: Beat = { fetch: 0.049, hang: 0.017, load: 0.12, swing: 0.025, bite: 0.03, follow: 0.06, stow: 0.04, back: 0.1 };
-const HEAVY: Beat = { fetch: 0.05, hang: 0.028, load: 0.15, swing: 0.024, bite: 0.045, follow: 0.12, stow: 0.045, back: 0.11 };
+const HEAVY: Beat = { fetch: 0.05, hang: 0.028, load: 0.15, swing: 0.024, bite: 0.04, follow: 0.05, stow: 0.06, back: 0.11 };
 /** Shares of the lift at which the weapon, still hanging head down, clears the bottom of the frame, and at which it is half turned over. */
 const PULLED = 0.2;
 const TURNED = 0.62;
@@ -84,9 +84,9 @@ const SWINGS: Record<MeleeId, Swing> = {
     rise: [[-0.11, -0.2, -0.4], [-0.55, 0.3, -0.78], [0.75, 0.2, -0.6]],
     wind: [[-0.13, -0.07, -0.42], [-0.5, 0.86, 0.0], [0.45, 0.2, -0.87]],
     hit: [[-0.036, -0.187, -0.508], [0.12, 0.62, -0.77], [0, -0.77, -0.62]],
-    stop: [[-0.035, -0.2, -0.505], [0.12, 0.54, -0.83], [0, -0.83, -0.54]],
-    through: [[-0.05, -0.33, -0.42], [0.1, -0.5, -0.86], [0, -0.86, 0.5]],
-    recover: [[-0.07, -0.35, -0.42], [0.15, -0.7, -0.7], [0.1, -0.7, 0.7]],
+    stop: [[-0.036, -0.187, -0.508], [0.12, 0.62, -0.77], [0, -0.77, -0.62]],
+    through: [[-0.05, -0.36, -0.43], [0.1, -0.55, -0.83], [0, -0.83, 0.55]],
+    recover: [[-0.07, -0.38, -0.42], [0.15, -0.7, -0.7], [0.1, -0.7, 0.7]],
     beat: HEAVY,
     weight: 1.3,
     dip: DIP
@@ -104,15 +104,15 @@ const SWINGS: Record<MeleeId, Swing> = {
     weight: 0.6,
     dip: DIP
   },
-  // A flick: up out of the hip, the blade flipped over in the fist, and a forehand slash at chest height, broadside to the eye, on down out of the frame.
+  // A stab: up out of the hip with the blade turning forward, edge down, drawn back low beside the chest, and thrust straight out with the point on the crosshair, then pulled back down out of the frame.
   knife: {
     draw: HIP,
-    rise: [[-0.17, -0.19, -0.4], [-0.9, 0.05, -0.43], [0.4, 0.5, -0.77]],
-    wind: [[-0.2, -0.1, -0.4], [-0.45, 0.75, -0.5], [0.75, 0.35, -0.55]],
-    hit: [[-0.06, -0.106, -0.501], [0.35, 0.62, -0.7], [0.9, -0.3, 0.2]],
-    stop: [[0, -0.115, -0.49], [0.6, 0.5, -0.62], [0.75, -0.6, 0.2]],
-    through: [[0.07, -0.3, -0.42], [0.5, -0.5, -0.7], [0.45, -0.85, 0.3]],
-    recover: [[0.04, -0.34, -0.4], [0.4, -0.6, -0.7], [0.5, -0.8, 0.3]],
+    rise: [[-0.2, -0.28, -0.4], [0.1, 0.25, -0.96], [0.1, -0.95, -0.25]],
+    wind: [[-0.19, -0.22, -0.37], [0.3, 0.32, -0.9], [0.05, -0.95, -0.3]],
+    hit: [[-0.06, -0.09, -0.46], [0.19, 0.285, -0.94], [0.05, -0.95, -0.3]],
+    stop: [[-0.058, -0.087, -0.47], [0.19, 0.285, -0.94], [0.05, -0.95, -0.3]],
+    through: [[-0.1, -0.33, -0.36], [0.2, -0.3, -0.93], [0, -0.95, 0.3]],
+    recover: [[-0.06, -0.36, -0.38], [0.2, -0.6, -0.77], [0, -0.8, 0.6]],
     beat: LIGHT,
     weight: 0.4,
     dip: DIP
@@ -123,9 +123,9 @@ const SWINGS: Record<MeleeId, Swing> = {
     rise: [[-0.13, -0.2, -0.41], [-0.75, -0.55, -0.4], [0.6, -0.3, -0.75]],
     wind: [[-0.19, -0.17, -0.42], [-0.62, 0.12, -0.78], [0.5, 0.5, -0.7]],
     hit: [[-0.058, -0.174, -0.541], [0.25, 0.75, -0.6], [0.95, 0.1, 0.25]],
-    stop: [[-0.02, -0.15, -0.53], [0.45, 0.72, -0.52], [0.85, -0.25, 0.4]],
-    through: [[0.04, -0.19, -0.47], [0.8, 0.4, -0.45], [0.2, -0.45, 0.85]],
-    recover: [[0.0, -0.38, -0.41], [0.55, -0.65, -0.52], [0.1, -0.55, 0.8]],
+    stop: [[-0.058, -0.174, -0.541], [0.25, 0.75, -0.6], [0.95, 0.1, 0.25]],
+    through: [[0.07, -0.32, -0.45], [0.85, -0.15, -0.5], [0.2, -0.6, 0.75]],
+    recover: [[0.02, -0.4, -0.41], [0.55, -0.65, -0.52], [0.1, -0.55, 0.8]],
     beat: HEAVY,
     weight: 1.4,
     dip: HEAVY_DIP
@@ -143,14 +143,14 @@ const SWINGS: Record<MeleeId, Swing> = {
     weight: 0.9,
     dip: DIP
   },
-  // Cross swing, left to right, the jaw through the crosshair and on down out of the lower right.
+  // A short hook: cocked out at the left, head level with the crosshair and pointing away, the forearm swings it flat across so the jaw comes round level into the crosshair, and it carries on round to the right and drops out of the frame.
   wrench: {
     draw: HIP,
-    rise: [[-0.16, -0.22, -0.44], [-0.85, 0.2, -0.5], [0.45, 0.5, -0.74]],
-    wind: [[-0.26, -0.09, -0.43], [-0.6, 0.76, -0.25], [0.5, 0.4, -0.75]],
-    hit: [[-0.152, -0.168, -0.516], [0.5, 0.55, -0.67], [0.85, -0.45, 0.25]],
-    stop: [[-0.11, -0.18, -0.5], [0.68, 0.42, -0.6], [0.7, -0.65, 0.2]],
-    through: [[0.05, -0.3, -0.42], [0.8, -0.15, -0.58], [0.3, -0.95, 0.1]],
+    rise: [[-0.19, -0.24, -0.4], [-0.45, 0.55, -0.7], [0.85, 0.1, -0.5]],
+    wind: [[-0.17, -0.13, -0.42], [-0.55, 0.35, -0.75], [0.89, 0, -0.46]],
+    hit: [[-0.12, -0.105, -0.45], [0.45, 0.35, -0.82], [0.85, -0.2, 0.45]],
+    stop: [[-0.09, -0.11, -0.45], [0.62, 0.28, -0.73], [0.75, -0.3, 0.6]],
+    through: [[0.03, -0.3, -0.42], [0.85, -0.2, -0.48], [0.3, -0.7, 0.65]],
     recover: [[0.04, -0.35, -0.42], [0.6, -0.5, -0.62], [0.4, -0.85, 0.3]],
     beat: MEDIUM,
     weight: 1,

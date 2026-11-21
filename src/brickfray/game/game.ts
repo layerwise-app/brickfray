@@ -59,6 +59,7 @@ export class Game {
     public settings: Settings
   ) {
     this.renderer = new GameRenderer(canvas, settings.quality);
+    this.renderer.autoScale = settings.autoResolution;
     this.kit = { profile: this.renderer.profile, materials: this.renderer.materials };
     this.audio = createAudioEngine();
     this.cues = new CueSounds(this.audio);
@@ -164,6 +165,7 @@ export class Game {
     saveSettings(next);
     this.input.settings = next.input;
     this.audio.setMix(next.mix);
+    this.renderer.autoScale = next.autoResolution;
     if (this.match) this.match.fp.baseFov = next.fov;
     if (qualityChanged) this.rebuildForQuality();
   }

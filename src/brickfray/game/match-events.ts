@@ -88,7 +88,7 @@ export class MatchEvents {
             mv.hud.pulse({ type: 'hurt', angle: -rel, amount: e.amount });
             mv.fp.hurt(e.amount, -Math.sin(rel));
             mv.view.act({ type: 'hurt', strength: Math.min(1, e.amount / 50) });
-            if (e.attacker !== me) mv.play('hurt', null, 0.8, 8);
+            if (e.attacker !== me) mv.sound.hurt();
           } else {
             mv.remotes.hurt(e.victim, e.from);
             if (e.attacker === me && !e.fatal) {

@@ -114,7 +114,8 @@ export const FORTRESS = defineMap({
     sunColor: '#ffd8a0',
     sunIntensity: 2.7,
     sunDirection: new THREE.Vector3(-0.55, 0.5, 0.45).normalize(),
-    fogNear: 80
+    fogNear: 80,
+    clouds: { count: 10, seed: 8 }
   },
   bounds: { min: [-34, -6, -34], max: [34, 40, 34] },
   killY: -0.8,
@@ -124,7 +125,7 @@ export const FORTRESS = defineMap({
     ground(p);
     walls(p);
     center(p);
-    fortressDressing(p);
+    fortressDressing(p, { sand: SAND, market: MARKET });
     spawns(p);
     return p;
   },

@@ -186,46 +186,38 @@ export type Outline = readonly (readonly [number, number])[];
 /**
  * A side profile extruded across X (centered). Outline points are [z, y] in
  * model space; `round` rounds every corner (or per corner) by that distance.
+ * `chamfer` cuts every edge of both faces at 45° by at least that much (the tier's bevel otherwise).
  */
-export function slab(outline: Outline, width: number, lod: Lod, round: number | readonly number[] = 0, holes: Outline[] = []): THREE.BufferGeometry {
-  const key = `slab:${width}:${lod.bevel}:${lod.curve}:${JSON.stringify(round)}:${JSON.stringify(outline)}:${JSON.stringify(holes)}`;
+export function slab(outline: Outline, width: number, lod: Lod, round: number | readonly number[] = 0, holes: Outline[] = [], chamfer = 0): THREE.BufferGeometry {
+  const key = `slab:${width}:${lod.bevel}:${lod.curve}:${chamfer}:${JSON.stringify(round)}:${JSON.stringify(outline)}:${JSON.stringify(holes)}`;
   return cached(key, () => {
-    const shape = roundedShape(outline, lod.curve <= 1 ? 0 : round);
-    for (const hole of holes) shape.holes.push(roundedShape(hole, lod.curve <= 1 ? 0 : round));
-    const b = Math.min(lod.bevel, width * 0.3);
-    const g = new THREE.ExtrudeGeometry(shape, {
-      depth: width - b * 2,
-      bevelEnabled: b > 0,
-      bevelThickness: b,
-      bevelSize: b,
-      bevelOffset: -b,
-      bevelSegments: 1,
-      curveSegments: Math.max(1, lod.curve)
-    });
-    g.translate(0, 0, -(width - b * 2) / 2);
+    const g = extrude(outline, width, lod, round, holes, chamfer);
     g.rotateY(-Math.PI / 2);
     return toCreasedNormals(g, lod.curve >= 6 ? 0.36 : 0.44);
   });
 }
 
 /** Same as `slab` but extruded along Z (a front cross-section [x, y]). */
-export function prism(outline: Outline, length: number, lod: Lod, round: number | readonly number[] = 0): THREE.BufferGeometry {
-  const key = `prism:${length}:${lod.bevel}:${lod.curve}:${JSON.stringify(round)}:${JSON.stringify(outline)}`;
-  return cached(key, () => {
-    const shape = roundedShape(outline, lod.curve <= 1 ? 0 : round);
-    const b = Math.min(lod.bevel, length * 0.3);
-    const g = new THREE.ExtrudeGeometry(shape, {
-      depth: length - b * 2,
-      bevelEnabled: b > 0,
-      bevelThickness: b,
-      bevelSize: b,
-      bevelOffset: -b,
-      bevelSegments: 1,
-      curveSegments: Math.max(1, lod.curve)
-    });
-    g.translate(0, 0, -(length - b * 2) / 2);
-    return toCreasedNormals(g, lod.curve >= 6 ? 0.36 : 0.44);
+export function prism(outline: Outline, length: number, lod: Lod, round: number | readonly number[] = 0, holes: Outline[] = [], chamfer = 0): THREE.BufferGeometry {
+  const key = `prism:${length}:${lod.bevel}:${lod.curve}:${chamfer}:${JSON.stringify(round)}:${JSON.stringify(outline)}:${JSON.stringify(holes)}`;
+  return cached(key, () => toCreasedNormals(extrude(outline, length, lod, round, holes, chamfer), lod.curve >= 6 ? 0.36 : 0.44));
+}
+
+function extrude(outline: Outline, depth: number, lod: Lod, round: number | readonly number[], holes: Outline[], chamfer: number) {
+  const shape = roundedShape(outline, lod.curve <= 1 ? 0 : round);
+  for (const hole of holes) shape.holes.push(roundedShape(hole, lod.curve <= 1 ? 0 : round));
+  const b = Math.min(Math.max(lod.bevel, chamfer), depth * 0.3);
+  const g = new THREE.ExtrudeGeometry(shape, {
+    depth: depth - b * 2,
+    bevelEnabled: b > 0,
+    bevelThickness: b,
+    bevelSize: b,
+    bevelOffset: -b,
+    bevelSegments: 1,
+    curveSegments: Math.max(1, lod.curve)
   });
+  g.translate(0, 0, -(depth - b * 2) / 2);
+  return g;
 }
 
 function roundedShape(points: Outline, round: number | readonly number[]) {

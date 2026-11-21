@@ -6,6 +6,7 @@ import { revolverGoals } from './clips-revolver';
 import type { FlashStyle } from './flash';
 import type { CasingKind } from './fx';
 import { goal, gripQuat, type Goal, type V3 } from './goals';
+import { SHELL_HOLD } from './held';
 import { TUNING, type Tuning } from './tuning';
 
 /** A first-person gun with everything the view model animates. */
@@ -51,6 +52,11 @@ const CHARGE_GRIP = { pos: [-0.045, 0, -0.004], back: [-0.25, 0.45, 0.85], axis:
 
 const SLIDE_GRIP: V3 = [0, 0.008, 0.015];
 
+/** A loaded shell's center from the loading port node: under the opening, through it, and in the tube. */
+const SHELL_MOUTH: V3 = [0, -0.0115, 0.002];
+const SHELL_UP: V3 = [0, 0.012, -0.004];
+const SHELL_INSIDE: V3 = [0, 0.029, -0.04];
+
 export function buildGunRig(id: WeaponId, kit: Kit): GunRig {
   const rigged = createRiggedModel(id, kit, 'first');
   const tuning = TUNING[id];
@@ -74,7 +80,7 @@ export function buildGunRig(id: WeaponId, kit: Kit): GunRig {
   };
   const L = (back: V3, axis: V3) => gripQuat(back, axis, -1);
   const goals: Record<string, Goal> = {
-    rightRest: goal(node('grip'), tuning.right, gripQuat([1, 0, 0], [0, 1, 0], 1)),
+    rightRest: goal(node('grip'), tuning.right, gripQuat(tuning.rightBack ?? [1, 0, 0], [0, 1, 0], 1)),
     leftRest: goal(node('support'), tuning.left.pos, L(tuning.left.back, tuning.left.axis)),
     // Let go of and slid down off the support, riding the gun: where a melee strike's hand leaves it, under the frame.
     leftOff: goal(node('support'), [tuning.left.pos[0] - 0.015, tuning.left.pos[1] - 0.075, tuning.left.pos[2] + 0.02], L(tuning.left.back, tuning.left.axis)),
@@ -108,11 +114,20 @@ export function buildGunRig(id: WeaponId, kit: Kit): GunRig {
     goals.slideBack = goal(anchor('slideRear', [0, 0, 0.036]), SLIDE_GRIP, q);
   }
   if (rigged.nodes.has('port')) {
-    // From below, palm toward the camera side, index along the tube: the shell at the fingertips leads into the port.
+    // The shell's way in, in the port's frame: lying under the opening, pushed up through it, and on forward into the tube (hidden by the receiver).
+    const port = node('port');
+    const flat = new THREE.Quaternion();
+    goals.shellMouth = goal(port, SHELL_MOUTH, flat);
+    goals.shellUp = goal(port, SHELL_UP, flat);
+    goals.shellInside = goal(port, SHELL_INSIDE, flat);
+    // From below, palm toward the camera side, index along the tube, placed so the shell in its fingers lies right under the port; the thumb then follows it up.
     const q = L([1, 0, 0], [0, 0.15, -1]);
-    goals.port = goal(node('port'), [-0.015, -0.056, 0.01], q);
-    goals.portNear = goal(node('port'), [-0.019, -0.11, 0.04], q);
-    goals.portIn = goal(node('port'), [-0.013, -0.037, -0.02], q);
+    const reach = SHELL_HOLD.pos.clone().applyQuaternion(q);
+    const at = (shell: V3, k = 1): V3 => [shell[0] - reach.x * k, shell[1] - reach.y * k, shell[2] - reach.z * k];
+    const mouth = at(SHELL_MOUTH);
+    goals.port = goal(port, mouth, q);
+    goals.portNear = goal(port, [mouth[0] - 0.004, mouth[1] - 0.054, mouth[2] + 0.03], q);
+    goals.portIn = goal(port, [mouth[0] + (SHELL_UP[0] - SHELL_MOUTH[0]) * 0.8, mouth[1] + (SHELL_UP[1] - SHELL_MOUTH[1]) * 0.8, mouth[2] + (SHELL_UP[2] - SHELL_MOUTH[2]) * 0.8], q);
   }
   if (rigged.nodes.has('spearHold')) {
     // Underhand on the shaft, wrist below and to the left, index toward the tip.

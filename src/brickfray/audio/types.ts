@@ -118,6 +118,8 @@ export interface PlayOptions {
   source?: number;
   /** Brightness of a positional sound, 0 (a dull knock) … 1 (as recorded, the default). */
   tone?: number;
+  /** Play this recorded take instead of a random one: a sequence whose steps are takes of one sound. */
+  variant?: number;
 }
 
 export interface AudioMix {

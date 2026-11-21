@@ -234,7 +234,7 @@ export function mantleStitches(b: PartSet) {
     const [px, py, pz] = mantleAt(u, 0.84);
     return [px * 1.014, py + 0.0035, pz * 1.014];
   };
-  for (let i = 0; i < 70; i++) stitches(b, 'chest', at((i + 0.2) / 70), at((i + 0.75) / 70), 1);
+  for (let i = 0; i < 52; i++) stitches(b, 'chest', at((i + 0.2) / 52), at((i + 0.75) / 52), 1);
 }
 
 /** Sewn-on leaves down the cloak's pleats. */

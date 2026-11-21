@@ -36,6 +36,9 @@ export class Frame {
   show = { mallet: 0, grenade: 0, shell: 0, pin: true };
   /** The pin: how far its ring has come off the bomb onto the gun hand's thumb (0…1), and seconds since it was flicked away (negative until then). */
   pin = { hook: 0, fly: -1 };
+  /** A shell going into the loading port: its seat on the gun this frame, and how far it has left the fingers for it (0…1). */
+  shellSeat: Goal | null = null;
+  shellIn = 0;
   /** 0…1: how much the clip overrides aiming and sprint posing. */
   busy = 0;
 
@@ -49,6 +52,8 @@ export class Frame {
     this.show.pin = true;
     this.pin.hook = 0;
     this.pin.fly = -1;
+    this.shellSeat = null;
+    this.shellIn = 0;
     this.busy = 0;
   }
 

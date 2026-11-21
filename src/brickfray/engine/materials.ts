@@ -20,7 +20,7 @@ export class Materials {
       glow: this.make('glow', '#ffffff'),
       chrome: this.make('chrome', '#ffffff')
     };
-    if (!profile.shadows) for (const f of ['plastic', 'rubber', 'metal', 'chrome'] as const) contactShade(this.batch[f]);
+    if (!profile.shadows) for (const f of ['plastic', 'rubber', 'metal', 'chrome'] as const) contactShade(this.batch[f], profile.detail === 0);
     if (profile.pbr && profile.bevel > 0) for (const f of ['plastic', 'rubber', 'metal', 'chrome'] as const) bevelAA(this.batch[f]);
   }
 
@@ -107,18 +107,37 @@ contactP = instanceMatrix * contactP;
 #endif
 vContactY = ( modelMatrix * contactP ).y;`;
 
+// Below ground level (moat banks, quay walls) only a narrow band under the rim darkens, as under a coping.
+const CONTACT_FRAGMENT = /* glsl */ `
+diffuseColor.rgb *= vContactY >= 0.0 ? mix( 0.5, 1.0, smoothstep( 0.0, 1.1, vContactY ) ) : mix( 0.72, 1.0, smoothstep( 0.0, 0.3, -vContactY ) );`;
+
+/**
+ * Bed joints of the seamless low-tier masonry (see withCourses): a dark line at the bottom of each course, 4.5% of
+ * its height, drawn at least 1.25 px wide and dimmed by its pixel coverage so far walls keep their tone instead of
+ * breaking into dashes.
+ */
+const COURSE_FRAGMENT = /* glsl */ `
+if (vCourse > -0.5) {
+  float courseFw = max(fwidth(vCourse), 1e-5);
+  float courseW = max(0.045, 1.25 * courseFw);
+  float courseLine = 1.0 - smoothstep(courseW - courseFw, courseW, vCourse);
+  diffuseColor.rgb *= 1.0 - 0.6 * courseLine * (0.045 / courseW);
+}`;
+
 /**
  * Without shadow maps scenery floats on the ground; darkening its lowest metre and a bit stands in for contact
- * shadow and ambient occlusion, so walls, props and ground separate.
+ * shadow and ambient occlusion, so walls, props and ground separate. `courses` adds the flat masonry's bed joints.
  */
-function contactShade(m: THREE.Material) {
+function contactShade(m: THREE.Material, courses: boolean) {
   m.onBeforeCompile = (shader) => {
-    shader.vertexShader = shader.vertexShader.replace('#include <common>', '#include <common>\nvarying float vContactY;').replace('#include <project_vertex>', CONTACT_VERTEX);
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', `#include <common>\nvarying float vContactY;${courses ? '\nattribute float bevel;\nvarying float vCourse;' : ''}`)
+      .replace('#include <project_vertex>', `${CONTACT_VERTEX}${courses ? '\nvCourse = bevel < -0.5 ? -bevel - 1.0 : -1.0;' : ''}`);
     shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', '#include <common>\nvarying float vContactY;')
-      .replace('#include <color_fragment>', '#include <color_fragment>\ndiffuseColor.rgb *= mix( 0.5, 1.0, smoothstep( 0.0, 1.1, vContactY ) );');
+      .replace('#include <common>', `#include <common>\nvarying float vContactY;${courses ? '\nvarying float vCourse;' : ''}`)
+      .replace('#include <color_fragment>', `#include <color_fragment>\n${CONTACT_FRAGMENT}${courses ? COURSE_FRAGMENT : ''}`);
   };
-  m.customProgramCacheKey = () => 'contact-shade';
+  m.customProgramCacheKey = () => (courses ? 'contact-shade-courses' : 'contact-shade');
 }
 
 const BEVEL_VERTEX = /* glsl */ `#include <defaultnormal_vertex>
@@ -148,17 +167,46 @@ if (bevel > 0.5) {
 }`;
 
 const BEVEL_FRAGMENT = /* glsl */ `#include <normal_fragment_begin>
+float bevelEnv = 1.0;
+vec3 bevelAmbN = normal;
 {
   float bevelPx = 1.0 / max(fwidth(vBevelS), 1e-4);
   float bevelK = vBevelOn * (1.0 - smoothstep(1.2, 3.0, bevelPx));
-  if (bevelK > 0.0) {
+  float bevelSeen = vBevelOn * (1.0 - bevelK);
+  if (vBevelOn > 0.0) {
     vec3 toEye = normalize(vViewPosition);
     vec3 bevelFa = normalize(vBevelA);
     vec3 bevelFb = normalize(vBevelB);
-    normal = normalize(mix(normal, dot(bevelFa, toEye) >= dot(bevelFb, toEye) ? bevelFa : bevelFb, bevelK));
+    vec3 bevelFace = dot(bevelFa, toEye) >= dot(bevelFb, toEye) ? bevelFa : bevelFb;
+    vec3 bevelUp = (viewMatrix * vec4(0.0, 1.0, 0.0, 0.0)).xyz;
+    bevelAmbN = normalize(mix(normal, abs(dot(bevelFa, bevelUp)) <= abs(dot(bevelFb, bevelUp)) ? bevelFa : bevelFb, 0.75 * bevelSeen));
+    bevelEnv = 1.0 - 0.5 * bevelSeen;
+    normal = normalize(mix(normal, bevelFace, bevelK));
     nonPerturbedNormal = normal;
+    bevelAmbN = normalize(mix(bevelAmbN, normal, bevelK));
   }
 }`;
+
+/**
+ * A bevel tilts toward the sky: lit by it like a face of its own it drew every course joint as a pale-blue line. It
+ * takes most of the sky light of the wall face it rounds off (direct sun still models it) and half its sky reflection.
+ */
+const BEVEL_ENV = /* glsl */ `
+#if defined( RE_IndirectSpecular )
+radiance *= bevelEnv;
+#ifdef USE_CLEARCOAT
+clearcoatRadiance *= bevelEnv;
+#endif
+#endif`;
+
+const BEVEL_AMBIENT_BEGIN = THREE.ShaderChunk.lights_fragment_begin.replace(
+  'getHemisphereLightIrradiance( hemisphereLights[ i ], geometryNormal )',
+  'getHemisphereLightIrradiance( hemisphereLights[ i ], bevelAmbN )'
+);
+const BEVEL_AMBIENT_MAPS = THREE.ShaderChunk.lights_fragment_maps.replace('getIBLIrradiance( geometryNormal )', 'getIBLIrradiance( bevelAmbN )');
+if (BEVEL_AMBIENT_BEGIN === THREE.ShaderChunk.lights_fragment_begin || BEVEL_AMBIENT_MAPS === THREE.ShaderChunk.lights_fragment_maps) {
+  throw new Error('three light chunks changed: bevel ambient not patched');
+}
 
 /**
  * A bevel thinner than a couple of pixels lands on scattered MSAA samples and its highlight breaks into dashes
@@ -173,7 +221,9 @@ function bevelAA(m: THREE.Material) {
       .replace('#include <defaultnormal_vertex>', BEVEL_VERTEX);
     shader.fragmentShader = shader.fragmentShader
       .replace('#include <common>', '#include <common>\nvarying float vBevelS;\nflat varying float vBevelOn;\nvarying vec3 vBevelA;\nvarying vec3 vBevelB;')
-      .replace('#include <normal_fragment_begin>', BEVEL_FRAGMENT);
+      .replace('#include <normal_fragment_begin>', BEVEL_FRAGMENT)
+      .replace('#include <lights_fragment_begin>', BEVEL_AMBIENT_BEGIN)
+      .replace('#include <lights_fragment_maps>', `${BEVEL_AMBIENT_MAPS}\n${BEVEL_ENV}`);
   };
   m.customProgramCacheKey = () => 'bevel-aa';
 }

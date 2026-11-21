@@ -106,6 +106,7 @@ export const de: Dictionary = {
   chatPlaceholder: 'Schreib etwas …',
   scopeHint: 'Umschalt halten zum Stabilisieren',
   headshot: 'Kopfschuss',
+  eliminated: 'Ausgeschaltet',
 
   graphics: 'Grafik',
   controls: 'Steuerung',
@@ -129,6 +130,8 @@ export const de: Dictionary = {
   crosshair: 'Fadenkreuz',
   damageNumbers: 'Schadenszahlen',
   showStats: 'Leistungsanzeige',
+  autoResolution: 'Automatische Auflösung',
+  autoResolutionHint: 'Zeichnet weniger Pixel, wenn die Bilder mit dem Display nicht mithalten, damit Drehen flüssig bleibt.',
   language: 'Sprache',
   done: 'Fertig',
   keys: 'Tastenbelegung',

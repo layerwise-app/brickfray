@@ -15,7 +15,7 @@ export const SURFACES: Record<Surface, readonly [number, number, number, number]
   metal: [0.36, 0.85, 0, 0.1],
   chrome: [0.14, 1, 0, 0],
   glow: [0.9, 0, 2.4, 0],
-  /** Recesses and bores: dull, no coat, so they read as depth. */
+  /** Recesses and bores: dull, no coat, so they read as depth. Also painted polymer, which then keeps its colour under a raking light or a bright surround. */
   dark: [0.75, 0, 0, 0]
 };
 
@@ -64,6 +64,32 @@ export function surfaceMaterial(materials: Materials): THREE.Material {
   }
   cache.set(materials, material);
   return material;
+}
+
+/** Lens opacity at the hip (a mild tinted sheen) and once aimed (clear: reflections fade with it). */
+const LENS_HIP = { pbr: 0.3, phong: 0.38 };
+const LENS_AIMED = 0.035;
+const lensCache = new WeakMap<Materials, Map<string, THREE.MeshStandardMaterial | THREE.MeshPhongMaterial>>();
+
+/** First-person lens glass of one tint on this tier; `aimLenses` clears every lens as the sight comes up. */
+export function lensMaterial(materials: Materials, color: string): THREE.Material {
+  let lenses = lensCache.get(materials);
+  if (!lenses) lensCache.set(materials, (lenses = new Map()));
+  let material = lenses.get(color);
+  if (!material) {
+    const base = { color, transparent: true, depthWrite: false };
+    material = materials.profile.pbr
+      ? new THREE.MeshStandardMaterial({ ...base, roughness: 0.08, metalness: 0, opacity: LENS_HIP.pbr, envMapIntensity: 1 })
+      : new THREE.MeshPhongMaterial({ ...base, specular: 0x555555, shininess: 90, opacity: LENS_HIP.phong });
+    lenses.set(color, material);
+  }
+  return material;
+}
+
+/** Fade every lens of this tier from its hip sheen (`aim` 0) to clear glass (1). */
+export function aimLenses(materials: Materials, aim: number) {
+  const hip = materials.profile.pbr ? LENS_HIP.pbr : LENS_HIP.phong;
+  for (const material of lensCache.get(materials)?.values() ?? []) material.opacity = hip + (LENS_AIMED - hip) * aim;
 }
 
 function injectVertex(shader: THREE.WebGLProgramParametersWithUniforms) {

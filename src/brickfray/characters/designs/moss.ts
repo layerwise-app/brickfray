@@ -4,7 +4,7 @@ import type { PartSet } from '../parts';
 import { loftFrontZ } from '../shapes';
 import type { V3 } from '../skeleton';
 import type { Stance } from '../stance';
-import { lowBeard, lowBlob, lowTaper } from '../body-low';
+import { lowBeard, lowBlob, kneePads, lowTaper } from '../body-low';
 import { heroDrape } from '../hero-assets';
 import { cloak, cowl, hood, mantle, shoulderCap, skirt } from './moss-cloth';
 import { bandolier, bedroll, bracer, C, clasp, HIDE, cloakLeaves, hatchetOnPack, hoodSprig, legWraps, mantleStitches, pouches, satchel } from './moss-gear';
@@ -12,18 +12,18 @@ import { sweep } from './plate-fittings';
 import { lump, pick } from './sheet';
 import { sleevesAndLegs, tunic } from './moss-tunic';
 
-/** Bladed off behind the long rifle, stock in the shoulder and cheek to the scope, feet spread to either side of the line of fire. */
+/** Half turned to the viewer behind the long rifle, stock in the shoulder and cheek to the scope, chest turned with the head so the neck is not wrung, feet spread wide along the line of fire. */
 export const stance: Stance = {
-  pelvis: { at: [0.019, -0.06, 0.007], rot: [1.2, 0, 0] },
-  chest: [1.43, -0.06, 0],
-  head: [0.08, -0.24, -0.2],
+  pelvis: { at: [0.02, -0.09, 0], rot: [0.65, 0, 0] },
+  chest: [0.55, -0.06, 0],
+  head: [-0.12, -0.22, -0.15],
   feet: {
-    R: { at: [0.219, 0, 0.187], heading: 1.55 },
-    L: { at: [-0.119, 0, -0.256], heading: 0.3 }
+    R: { at: [0.378, 0, 0.141], heading: 1.2 },
+    L: { at: [-0.279, 0, -0.28], heading: -0.05, knee: 0.1 }
   },
   arms: {
-    R: { wrist: [-0.261, 0.181, -0.218], hand: [-1.23, 0, 0.15], elbow: [0.34, 0, 0.94], space: 'chest', shape: 'grip' },
-    L: { wrist: [-0.588, 0.22, -0.247], hand: [-0.281, 0.246, 1.744], elbow: [-0.72, -0.64, -0.26], space: 'chest', shape: 'hold' }
+    R: { wrist: [-0.11, 0.187, -0.318], hand: [-0.701, 0.026, 0.132], elbow: [0.642, 0, 0.766], space: 'chest', shape: 'grip' },
+    L: { wrist: [-0.373, 0.237, -0.535], hand: [0.39, 0.398, 1.744], elbow: [-0.766, -0.64, 0.003], space: 'chest', shape: 'hold' }
   },
   life: { breath: 0.6, sway: 0.3, look: 0 }
 };
@@ -36,7 +36,7 @@ export function moss(b: PartSet) {
     sleeve: C.tunic,
     glove: '#5b4630',
     gloveLook: 'cloth',
-    fore: { half: [0.017, 0.025], corner: 0.01, yaw: 0.6, roll: 0.15, over: { r: 0.0128, at: 0.023 }, seat: 0.03 },
+    fore: { half: [0.017, 0.025], corner: 0.01, yaw: 0.45, roll: 0.3, over: { r: 0.0128, at: 0.023 }, seat: 0.004, sink: 0.004 },
     pants: '#3f4a35',
     boot: '#5b4630',
     bootLook: b.detail === 0 ? 'rubber' : HIDE,
@@ -79,7 +79,7 @@ export function moss(b: PartSet) {
     legWraps(b, side);
     sleevesAndLegs(b, side, sign);
   });
-  if (!hi) return;
+  if (!hi) return kneePads(b, 1, C.leather, HIDE);
   pouches(b);
   bedroll(b);
   clasp(b);
@@ -141,4 +141,5 @@ function plain(b: PartSet) {
   b.box('pelvis', [0.07, 0.15, 0.19], C.leather, { at: [-0.2, -0.03, 0.0], look: 'rubber' });
   for (const z of [-0.118, 0.118]) b.box('chest', [0.035, 0.46, 0.014], C.leather, { at: [0, 0.07, z], rot: [0, 0, z < 0 ? -0.62 : 0.62], look: 'rubber' });
   b.mirror((side) => b.cyl(`shin${side}`, 0.056, 0.054, 0.022, C.tan, { at: [0, -0.27, 0], rot: [0.12, 0, 0], look: 'cloth' }));
+  kneePads(b, 1, C.leather, 'cloth');
 }

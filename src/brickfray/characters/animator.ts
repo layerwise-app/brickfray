@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { RELOAD_FAMILY, reloadBody, throwLegs, type Carried, type MagazineState, type ReloadFamily } from './actions';
+import { actionLegs, emptyLegs, RELOAD_FAMILY, reloadBody, type Carried, type MagazineState, type ReloadFamily } from './actions';
 import { Dangle } from './dangles';
 import { AIR_FALL, AIR_PITCH, AIR_PUSH, AIR_TUCK, ballPivot, crouchFoot, crouchPose, Gait, IDLE, type FootPose } from './gait';
 import { clamp, damp, hprQuat, lerp, smooth, twoBoneIK } from './ik';
@@ -20,7 +20,7 @@ const reached = new THREE.Vector3();
 const X = new THREE.Vector3(1, 0, 0);
 const body = [0, 0, 0, 0, 0, 0];
 const feet: FootPose[] = [0, 1].map(() => ({ pos: new THREE.Vector3(), heading: 0, pitch: 0, toe: 0, planted: 1, stance: 0 }));
-const legs = { stride: 0, lift: 0, coil: 0, lunge: 0 };
+const legs = emptyLegs();
 
 /** Procedural animation for one character: gait, jump/land, aim, hands on the gun, actions, fidgets, secondary motion. */
 export class Animator {
@@ -148,10 +148,7 @@ export class Animator {
     // Feet: idle stance blended with the gait, then with air poses.
     const rising = smooth(s.verticalVelocity, -3, 1);
     const planted = (1 - moving) * (1 - crouch);
-    throwLegs(this.nade, legs);
-    const lunge = legs.lunge * planted;
-    const stride = legs.stride * planted;
-    const coil = legs.coil * planted;
+    actionLegs(this.nade, this.nade < 0 ? s.melee : -1, legs);
     const push = smooth(s.verticalVelocity, 0.5, 2.5) * (1 - smooth(this.airTime, 0.04, 0.18));
     for (let i = 0; i < 2; i++) {
       const f = feet[i]!;
@@ -159,13 +156,10 @@ export class Animator {
       const idle = IDLE[i]!;
       const cr = crouchFoot(i, st, crouchPose);
       const side = i === 0 ? -1 : 1;
-      f.heading = lerp(idle.heading, cr.heading, crouch) + side * st.toeOut * 0.5;
-      // A left-handed throw steps out with the right foot and pushes off the left.
-      const heelUp = cr.pitch * crouch - 0.45 * F.heel * (1 - moving) - (i === 0 ? 0.6 * lunge : 0);
-      const reach = i === 1 ? 0.36 * stride : -0.03 * lunge;
-      if (i === 1) f.heading -= 0.3 * stride;
-      ballPivot(heelUp, f.heading, f.pos.set(lerp(idle.pos[0] * st.stance, cr.pos[0], crouch) - (i === 1 ? 0.03 * stride : 0), 0, lerp(idle.pos[2], cr.pos[2], crouch) - reach));
-      if (i === 1) f.pos.y += 0.07 * legs.lift * planted;
+      f.heading = lerp(idle.heading, cr.heading, crouch) + side * st.toeOut * 0.5 + legs.turn[i]! * planted;
+      const heelUp = cr.pitch * crouch - 0.45 * F.heel * (1 - moving) - legs.heel[i]! * planted;
+      ballPivot(heelUp, f.heading, f.pos.set(lerp(idle.pos[0] * st.stance, cr.pos[0], crouch) + legs.side[i]! * planted, 0, lerp(idle.pos[2], cr.pos[2], crouch) - legs.reach[i]! * planted));
+      f.pos.y += legs.lift[i]! * planted;
       f.pitch = heelUp;
       f.toe = -heelUp;
       f.pos.lerp(g.pos, moving);
@@ -198,9 +192,10 @@ export class Animator {
     const pp = pose.p[BONE.pelvis]!;
     pp.set(0.02 * (1 - moving) * (1 - crouch) + shift, baseY + this.gait.pelvis.y * moving + this.landX + F.pelvisY * (1 - moving) + 0.004 * breath * (1 - moving), 0);
     pp.x += this.gait.pelvis.x * moving;
-    pp.z += this.gait.pelvis.z * moving + lerp(0.02, 0.06, moving) * crouch - 0.12 * lunge - 0.06 * stride + 0.05 * coil;
-    pp.x += 0.03 * lunge - 0.02 * coil;
-    pp.y -= 0.06 * lunge + 0.025 * stride;
+    const hip = legs.hip;
+    pp.z += this.gait.pelvis.z * moving + lerp(0.02, 0.06, moving) * crouch + hip[2]! * planted;
+    pp.x += hip[0]! * planted;
+    pp.y += hip[1]! * planted;
     // Reloading on the spot, the knees give and the weight rocks onto the side the hands work on.
     const reloadW = this.reload.blend * (1 - moving) * (1 - crouch);
     if (reloadW > 0.004) {
@@ -208,11 +203,11 @@ export class Animator {
       pp.y -= body[4]! * reloadW;
       pp.x += body[5]! * reloadW;
     } else body.fill(0);
-    const idleHeading = -0.22 - 0.06 * crouch + 0.3 * body[0]! * reloadW - 0.28 * coil + 0.22 * lunge;
+    const idleHeading = -0.22 - 0.06 * crouch + 0.3 * body[0]! * reloadW + hip[3]! * planted;
     const heading = lerp(idleHeading, pelvisHeading, moving) + this.gait.yaw * moving;
     const roll = this.gait.roll * moving + shift * 1.5;
     const airPitch = this.air * lerp(0.06, -0.1, rising);
-    const pitch = -lerp(0.14, 0.3, moving) * crouch - (0.04 + 0.08 * P.run) * moving * (this.gait.backward ? -0.5 : 1) - 0.5 * this.landX + airPitch - 0.12 * lunge + 0.04 * coil;
+    const pitch = -lerp(0.14, 0.3, moving) * crouch - (0.04 + 0.08 * P.run) * moving * (this.gait.backward ? -0.5 : 1) - 0.5 * this.landX + airPitch + hip[4]! * planted;
     hprQuat(heading, pitch, roll, pose.q[BONE.pelvis]!);
     pose.solve(BONE.pelvis);
 

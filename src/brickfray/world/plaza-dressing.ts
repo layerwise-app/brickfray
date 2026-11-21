@@ -84,5 +84,5 @@ function roadworks(p: Plan) {
   for (const [x, z] of [[23.2, 15.6], [24.4, 17.2], [25.6, 15.6], [23.2, -16.4], [-23.6, -16.4], [-24.8, -17.6]] as const) p.add(CONE, { x, z });
   p.add(BARRIER, { x: 24.4, z: 18.8 });
   p.add(BARRIER, { x: -24.0, z: -18.8, turns: 0, colors: ['#f58a1f', '#f2f2ee'] });
-  p.add(DECAL, { x0: 23.6, z0: 16.0, x1: 25.2, z1: 17.6, y: 0.004, color: '#2f363d', surface: 'metal', smooth: true });
+  p.add(DECAL, { x0: 23.6, z0: 16.0, x1: 25.2, z1: 17.6, y: 0.008, color: '#2f363d', surface: 'metal', smooth: true });
 }

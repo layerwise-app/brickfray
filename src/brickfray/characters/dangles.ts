@@ -21,16 +21,31 @@ const CLEAR: Partial<Record<number, { toward: number; away: number; side: number
   [BONE.dangleHip]: { toward: 0.12, away: 0.12, side: 0.3 }
 };
 
+interface Turned {
+  toward: number;
+  away: number;
+  side: number;
+  lag: number;
+  twist: number;
+  /** Where the part's weight sits in the bone's frame, when it is not straight below the anchor. */
+  weight?: [number, number, number];
+  /** Swing per unit of the turn's pull, for cloth lighter than its size (1 by default). */
+  gain?: number;
+}
+
 /**
  * A held stance on the turntable, per hanging bone: how far it swings away from the body and sideways (a cloak lifts
  * like cloth, it never planes out), how long it takes to follow the pull (s), and how far it twists about its own
  * length to trail the turn. A swing past the range is caught by a soft stop and keeps its follow-through.
  */
-const TURNED: Partial<Record<number, { toward: number; away: number; side: number; lag: number; twist: number }>> = {
-  [BONE.dangleBack]: { toward: 0.12, away: 0.38, side: 0.18, lag: 0.07, twist: 0.08 },
+const TURNED: Partial<Record<number, Turned>> = {
+  // The cape shader bends a swing away from the back into a curve; a sideways swing stays rigid, so it is kept small.
+  [BONE.dangleBack]: { toward: 0.12, away: 0.46, side: 0.08, lag: 0.1, twist: 0.05 },
   [BONE.dangleHead]: { toward: 0.16, away: 1.1, side: 0.75, lag: 0.04, twist: 0 },
-  // The tabard's panels hang a few centimetres in front of and behind the thighs: they trail a turn by twisting, barely swinging.
-  [BONE.dangleHip]: { toward: 0.05, away: 0.05, side: 0.12, lag: 0.08, twist: 0.13 }
+  // The tabard's panels hang a few centimetres in front of and behind the thighs and share one bone: a twist past a
+  // little swings their edges into the thighs, so they trail a turn mostly by swinging sideways in their own planes,
+  // the way the front panel (`weight`) is pulled, and swing back past the rest when it stops.
+  [BONE.dangleHip]: { toward: 0.05, away: 0.05, side: 0.3, lag: 0.1, twist: 0.14, weight: [0, -0.2, -0.13], gain: 2 }
 };
 /** Twist toward the trailing side per radian per second of turn. */
 const TWIST_GAIN = 0.05;
@@ -88,7 +103,7 @@ export class Dangle {
     this.turned = spec.up ? undefined : TURNED[bone];
   }
 
-  private readonly turned: { toward: number; away: number; side: number; lag: number; twist: number } | undefined;
+  private readonly turned: Turned | undefined;
 
   reset() {
     this.pitch = this.lagged.pitch = this.spec.rest[0];
@@ -123,9 +138,16 @@ export class Dangle {
     down.set(0, -GRAVITY, 0);
     if (spin !== 0 || this.lastSpin !== 0) {
       const spinAcc = (spin - this.lastSpin) / h;
-      reach.set(0, S.up ? 1 : -1, 0).applyQuaternion(pose.mq[this.bone]!).multiplyScalar(S.up ? REACH.up : REACH.hang).add(anchor);
-      pull.set(-spin * spin * reach.x + spinAcc * reach.z, 0, -spin * spin * reach.z - spinAcc * reach.x).multiplyScalar(SWING).clampLength(0, 40);
-      const air = S.drag * GRAVITY * AIR;
+      const weight = shown?.weight;
+      // Measured from the anchor, not the stand's axis: the hips sit off the axis, and a pull from there would swing
+      // the panels to one side whichever way the figure turns.
+      if (weight) reach.set(...weight).applyQuaternion(pose.mq[this.parent]!);
+      else reach.set(0, S.up ? 1 : -1, 0).applyQuaternion(pose.mq[this.bone]!).multiplyScalar(S.up ? REACH.up : REACH.hang).add(anchor);
+      // Panels on both sides of one bone cannot both flare out: they are left only the turn's drag and change of pace.
+      const fling = weight ? 0 : spin * spin;
+      const gain = shown?.gain ?? 1;
+      pull.set(-fling * reach.x + spinAcc * reach.z, 0, -fling * reach.z - spinAcc * reach.x).multiplyScalar(SWING * gain).clampLength(0, 40);
+      const air = S.drag * GRAVITY * AIR * gain;
       down.x -= pull.x + air * spin * reach.z;
       down.z -= pull.z - air * spin * reach.x;
     }

@@ -186,9 +186,10 @@ export function chestUnit(b: PartSet) {
       [sign * 0.12, 0.262, 0.105],
       [sign * 0.11, 0.22, 0.135]
     ];
-    const along = pick(b, 10, 16, 44);
-    const ribs = b.hero ? (t: number) => 0.0125 + 0.0022 * Math.sin(t * 70) : () => 0.0125;
-    b.add('chest', sweep(path, ribs, along, pick(b, 6, 6, 10)), sign < 0 ? C.purple : C.joint, { look: 'rubber' });
+    // Corrugated: round between narrow grooves, sampled finely enough that the ribs do not turn into lumps.
+    const along = pick(b, 10, 16, 132);
+    const ribs = b.hero ? (t: number) => 0.0136 - 0.0018 * Math.max(0, Math.cos(t * 70)) ** 4 : () => 0.0125;
+    b.add('chest', sweep(path, ribs, along, pick(b, 6, 6, 16)), sign < 0 ? C.purple : C.joint, { look: 'rubber' });
     b.cyl('chest', 0.017, 0.017, 0.022, C.chrome, { at: [sign * 0.076, 0.136, -0.132], rot: [0, 0, -sign * 0.3], look: SHINE, seg: knob });
   });
   if (!b.hero) return;
