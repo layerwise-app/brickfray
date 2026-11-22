@@ -25,19 +25,26 @@ export const CAMP_SPAWNS: [number, number][] = [
   [10.4, -37.6],
   [15.2, -40.0],
   [20.0, -37.6],
-  [24.8, -39.2]
+  [24.8, -39.2],
+  [-34.4, -32.8],
+  [34.4, -32.8],
+  [-35.2, -24.0],
+  [35.2, -24.0]
 ];
 
-/** Free-for-all spawns (north half; mirrored), on the ground in every district and out of the galleries' sight. */
-export const FFA_SPAWNS: [number, number, number][] = [
-  [-12.8, 0, -38.4],
-  [17.6, 0, -39.6],
-  [-34.4, 0, -20.0],
-  [-20.8, 0, -27.2],
-  [20.0, 0, -9.6],
-  [17.6, 0, -18.4],
-  [22.4, 0, 4.0],
-  [9.6, 0, 4.8],
-  [8.0, 0, -14.4],
-  [34.4, 0, -15.2]
+/**
+ * Free-for-all spawns on the ground in every district and out of the galleries' sight, each with the point it faces:
+ * [x, z, faceX, faceZ] (the half turn adds the other half).
+ */
+export const FFA_SPAWNS: [number, number, number, number][] = [
+  [-12.8, -38.4, 0, 0],
+  [17.6, -39.6, 0, 0],
+  [-34.4, -20.0, 0, 0],
+  [-20.8, -27.2, 0, 0],
+  [20.0, -9.6, 0, 0],
+  [17.6, -18.4, 0, 0],
+  [22.4, 4.0, 0, 0],
+  [8.0, 16.8, 0, 0],
+  [7.2, -1.6, 0, 0],
+  [34.4, -15.2, 0, 0]
 ];

@@ -40,6 +40,12 @@ export function eastStrip(): Piece[] {
  * The four edges, each its own kind and each open to the world beyond: boulders and balustrade over the waterfall
  * stream at the cliff foot (north), the gorge rim (west), village fronts (east), the river terrace over the ghats (south).
  */
+/**
+ * The village's house blocks along the east edge (front houses here, the blocks behind them in temple-village.ts); the
+ * gaps between them are lanes running east behind bamboo fences, two of them wide enough to read as village streets.
+ */
+export const VILLAGE_BLOCKS: [number, number][] = [[-35.2, -28.0], [-25.6, -18.4], [-13.6, -8.8], [-6.4, 1.6], [4.0, 11.2], [16.0, 20.8], [23.2, 35.2]];
+
 export function edges(): Piece[] {
   const p: Piece[] = [];
   const Zs = T.edge;
@@ -53,8 +59,8 @@ export function edges(): Piece[] {
   }
   p.push(box('rail', -E - 0.4, 0, -35.2, -E, T.parapet, 35.2));
   p.push(box('rail', -31.2, 0, Zs, 31.2, T.parapet, Zs + 0.4));
-  const houses: [number, number][] = [[-35.2, -28.0], [-25.6, -18.4], [-16.0, -8.8], [-6.4, 1.6], [4.0, 11.2], [13.6, 20.8], [23.2, 35.2]];
-  let z = -35.2;
+  const houses = VILLAGE_BLOCKS;
+  let z = houses[0]![0];
   for (const [z0, z1] of houses) {
     if (z0 > z) p.push(box('fence', E, 0, z, E + 0.2, 2.4, z0, { surface: 'wood', bulletsPass: true }));
     p.push(box('house', E, 0, z0, E + 7.2, 6.4, z1));

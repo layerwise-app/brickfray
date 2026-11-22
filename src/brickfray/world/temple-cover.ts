@@ -12,12 +12,12 @@ export function both<P extends At>(p: Plan, el: Element<P>, at: P) {
 function court(p: Plan) {
   both(p, LOTUS_POOL, { x: 16.0, z: -7.2 });
   both(p, LANTERN, { x: 16.0, z: -14.4 });
-  both(p, FALLEN_COLUMN, { x: 23.6, z: -15.2, turns: 1 });
+  both(p, FALLEN_COLUMN, { x: 20.8, z: -15.6 });
   both(p, RUBBLE, { x: 19.6, z: 8.0 });
-  both(p, FALLEN_COLUMN, { x: 15.2, z: 7.2, turns: 1 });
-  both(p, BRAZIER, { x: 21.6, z: 16.8 });
+  both(p, FALLEN_COLUMN, { x: 15.2, z: 7.2 });
+  both(p, LANTERN, { x: 22.4, z: 17.2 });
   both(p, URN, { x: 14.0, z: -19.6, color: '#2f7a8a' });
-  both(p, URN, { x: 24.4, z: 19.6, color: '#b8402c' });
+  both(p, URN, { x: 24.8, z: 20.8, color: '#b8402c' });
 }
 
 /** Nave furniture beside the axis: braziers and a fallen column, waist high, every 6-8 m. */

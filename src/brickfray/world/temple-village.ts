@@ -1,14 +1,15 @@
 import { slab } from './blocks';
 import type { Drawer } from './plan';
 import { Pen } from './props-kit';
+import { VILLAGE_BLOCKS } from './temple-lanes';
 import { T } from './temple-layout';
 import { HAZE, palm, stupa } from './temple-scenery';
 import { Frame, mix, Rng } from './util';
 
 const WALLS = ['#ece4d2', '#e8c89a', '#d9a89a', '#cfe0d0', '#e3d9c4', '#f0dcb8'];
 const ROOFS = ['#8a3f22', '#5f6a70', '#b5562e', '#6a4a3a'];
-/** The village's blocks along z, matching the front houses (temple-lanes.ts); the lanes between them run east. */
-const BLOCKS: [number, number][] = [[-35.2, -28.0], [-25.6, -18.4], [-16.0, -8.8], [-6.4, 1.6], [4.0, 11.2], [13.6, 20.8], [23.2, 35.2]];
+/** The village's blocks along z, matching the front houses; the lanes between them run east. */
+const BLOCKS = VILLAGE_BLOCKS;
 
 const fade = (x: number, z: number) => Math.min(0.55, Math.max(0, (Math.hypot(x, z) - 50) / 120));
 

@@ -72,14 +72,19 @@ export const RUBBLE: Element<At & { seed?: number }> = {
   }
 };
 
-/** Column drums lying where they fell, with the capital at one end. */
+/**
+ * Column drums fallen onto the broken stylobate, with the capital at one end. Taller than a jump (1.28 m), so bot
+ * routes go round it instead of over; a crouching player is hidden behind it.
+ */
 export const FALLEN_COLUMN: Element<At> = {
-  colliders: (p) => [frameOf(p).box([-1.5, 0, -0.45], [1.5, 0.86, 0.45], 'stone')],
+  colliders: (p) => [frameOf(p).box([-1.5, 0, -0.45], [1.5, 1.28, 0.45], 'stone')],
   draw(d, p) {
     const t = pen(d, p);
-    for (const [x, len] of [[-1.45, 1.0], [-0.4, 1.0], [0.65, 0.7]] as const) t.cylX(x, 0.42, 0, 0.42, len - 0.04, '#b8402c', undefined, 0.02);
-    t.box(1.15, 0, 0, 0.7, 0.86, 0.9, '#d8c9a3', undefined, 0.04);
-    if (d.detail > 0) for (const x of [-0.45, 0.6]) t.cylX(x, 0.42, 0, 0.45, 0.1, GOLD, 'metal');
+    t.box(0, 0, 0, 3.0, 0.42, 0.9, '#cbbb93', undefined, 0.04);
+    if (d.detail > 0) t.box(-0.6, 0.38, 0.47, 1.4, 0.06, 0.04, '#a08860', undefined, 0);
+    for (const [x, len] of [[-1.45, 1.0], [-0.4, 1.0], [0.65, 0.7]] as const) t.cylX(x, 0.84, 0, 0.42, len - 0.04, '#b8402c', undefined, 0.02);
+    t.box(1.15, 0.42, 0, 0.7, 0.86, 0.9, '#d8c9a3', undefined, 0.04);
+    if (d.detail > 0) for (const x of [-0.45, 0.6]) t.cylX(x, 0.84, 0, 0.45, 0.1, GOLD, 'metal');
   }
 };
 

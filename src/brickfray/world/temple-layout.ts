@@ -55,6 +55,7 @@ export type Kind =
   | 'parapet'
   | 'rail'
   | 'screen'
+  | 'banner'
   | 'statue'
   | 'burner'
   | 'kiosk'

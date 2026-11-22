@@ -2,8 +2,11 @@ import { PLATE } from '../engine/geometry';
 import { drawBlock, plates, slab, STAIRS, type Masonry, type StairParams } from './blocks';
 import type { Drawer, Element, Plan } from './plan';
 import { Pen } from './props-kit';
-import { burner, fence, greatStatue, guardians, house, kiosk, rail, ruin, screen, stack, stele } from './temple-art';
+import { burner, fence, greatStatue, guardians, house, kiosk, rail, ruin, stack, stele } from './temple-art';
+import { board, floorJoists, galleryRafters, naveCeiling } from './temple-interior';
+import { marketShed, storehouse, villageLoad } from './temple-landmarks';
 import { clerestory, ROOF_CLAY, ROOF_JADE, tiledRoof } from './temple-ornament';
+import { screen } from './temple-screens';
 import { templeGeometry } from './temple-geometry';
 import { T, type Kind, type Piece } from './temple-layout';
 import { box, Frame, Rng, shade, type Face } from './util';
@@ -174,8 +177,12 @@ function roof(d: Drawer, q: Piece) {
   const [x1, y1, z1] = q.max;
   slab(d, [x0, y0, z0], [x1, y1 - 0.24, z1], CEILING);
   if (x1 <= 0.01 && x0 > -7) return;
-  if (x0 >= -0.01 && x1 < 7) return tiledRoof(d, -x1, z0, x1, z1, y1, ROOF_JADE);
+  if (x0 >= -0.01 && x1 < 7) {
+    naveCeiling(d);
+    return tiledRoof(d, -x1, z0, x1, z1, y1, ROOF_JADE);
+  }
   if (y0 > T.roofTop - 0.1 && y0 < T.hallTop - 0.1) {
+    galleryRafters(d, q);
     const east = x0 > 0;
     tiledRoof(d, x0, z0, x1, z1, y1, ROOF_JADE, east ? 1 : -1);
     const cx = east ? T.col - 0.12 : -T.col + 0.12;
@@ -185,11 +192,14 @@ function roof(d: Drawer, q: Piece) {
 }
 
 let houses = 0;
+/** A piece standing in the east (village) strip, drawn as the village's own things instead of the gorge's ruins. */
+const village = (q: Piece) => q.min[0] >= T.courtOut - 0.01 && q.max[0] <= T.edgeX + 0.01 && Math.abs(q.min[2] + q.max[2]) / 2 < T.edge - 2;
+
 const DRAW: Record<Kind, (d: Drawer, q: Piece, e: Exposure) => void> = {
   cliff: rock,
-  rock,
+  rock: (d, q, e) => (village(q) ? storehouse(d, q) : rock(d, q, e)),
   spur: rock,
-  boulder: rock,
+  boulder: (d, q, e) => (village(q) ? villageLoad(d, q) : rock(d, q, e)),
   pillar,
   pier: (d, q, e) => stone(d, q, e, HALL_RED),
   roof,
@@ -202,13 +212,15 @@ const DRAW: Record<Kind, (d: Drawer, q: Piece, e: Exposure) => void> = {
   slab: (d, q, e) => {
     drawBlock(d, { min: q.min, max: [q.max[0], q.max[1] - PLATE, q.max[2]], surface: 'stone', style: SANDSTONE, faces: e.faces, top: 'none' });
     ceiling(d, q);
+    floorJoists(d, q);
     if (e.top) plates(d, q.min[0], q.min[2], q.max[0], q.max[2], q.max[1] - PLATE, '#c08a58', false);
     if (e.top && d.detail > 0) boards(d, q);
   },
   parapet: post,
   rail: (d, q) => rail(d, q),
   fence: (d, q) => fence(d, q),
-  screen: (d, q) => screen(d, q, inRange(q)),
+  screen: (d, q) => screen(d, q),
+  banner: (d, q) => board(d, q),
   statue: (d, q) => (Math.abs(q.min[2]) < 3 ? greatStatue(d, q) : guardians(d, q)),
   dais: (d, q, e) => {
     stone(d, q, e, SANDSTONE, false);
@@ -216,14 +228,14 @@ const DRAW: Record<Kind, (d: Drawer, q: Piece, e: Exposure) => void> = {
   },
   burner: (d, q) => burner(d, q),
   stele: (d, q) => stele(d, q, Math.abs(q.min[0]) > T.courtOut || Math.abs(q.max[0]) > T.courtOut),
-  ruin: (d, q) => ruin(d, q),
+  ruin: (d, q) => (!village(q) ? ruin(d, q) : q.max[1] > 2.2 && Math.abs(q.min[2] + q.max[2]) < 12 ? marketShed(d, q) : villageLoad(d, q)),
   stall: (d, q, e) => stone(d, q, e, SANDSTONE, false),
   stack: (d, q) => stack(d, q),
   planter: (d, q, e) => stone(d, q, e, SANDSTONE, false)
 };
 
 export const TEMPLE: Element<{ pieces: Piece[] }> = {
-  colliders: (p) => p.pieces.map((q) => box(q.min, q.max, q.surface ?? 'stone', { walk: q.walk })),
+  colliders: (p) => p.pieces.map((q) => box(q.min, q.max, q.surface ?? 'stone', { walk: q.walk, bulletsPass: q.bulletsPass })),
   draw(d, p) {
     houses = 0;
     for (const q of p.pieces) DRAW[q.kind](d, q, exposure(q, p.pieces));

@@ -2,6 +2,7 @@ import { slab } from './blocks';
 import { BUILDING } from './facade';
 import type { Drawer } from './plan';
 import { Pen } from './props-kit';
+import { bellTower, riverShrine, ROOF_BLUE } from './temple-landmarks';
 import { pavilionRoof, ROOF_CLAY, ROOF_JADE } from './temple-ornament';
 import { GUARDIAN } from './temple-props';
 import type { Piece } from './temple-layout';
@@ -85,33 +86,15 @@ export function stele(d: Drawer, q: Piece, strip: boolean) {
   const t = new Pen(d, new Frame(cx, 0, cz, along ? 0 : 1));
   const L = Math.max(w, dd);
   const D = Math.min(w, dd);
-  const stone = strip ? '#9a9d8e' : SAND;
+  // Under the cliff the steles are capped in red lacquer, on the river terrace in blue-grey slate.
+  const south = cz > 0;
+  const stone = strip ? '#9a9d8e' : south ? '#e4e0d4' : SAND;
   t.box(0, 0, 0, L, 0.5, D, shade(stone, -0.12), undefined, 0.06);
   t.box(0, 0.5, 0, L - 0.3, h - 1.1, Math.max(0.3, D - 0.3), stone, undefined, 0.04);
-  t.box(0, h - 0.6, 0, L, 0.6, D + 0.1, strip ? '#7f8577' : RED, undefined, 0.08);
+  t.box(0, h - 0.6, 0, L, 0.6, D + 0.1, strip ? '#7f8577' : south ? '#3f5f78' : RED, undefined, 0.08);
   if (d.detail > 0) {
-    for (const s of [-1, 1]) t.box(0, 0.9, s * (D / 2 - 0.13), L - 0.9, h - 2.0, 0.04, strip ? '#6a7064' : '#8a3f22', undefined, 0);
+    for (const s of [-1, 1]) t.box(0, 0.9, s * (D / 2 - 0.13), L - 0.9, h - 2.0, 0.04, strip ? '#6a7064' : south ? '#2f4f6a' : '#8a3f22', undefined, 0);
     if (strip) for (let i = 0; i < 3; i++) t.box(-L / 2 + 0.4 + i * (L / 3), h - 0.1, 0, 0.6, 0.12, D + 0.12, '#4f8a3a', undefined, 0.02);
-  }
-}
-
-/** Spirit screen: a red wall on a sandstone base with a tiled cap and a painted panel (lattice in the halls). */
-export function screen(d: Drawer, q: Piece, inside: boolean) {
-  const [x0, y0, z0] = q.min;
-  const [x1, y1, z1] = q.max;
-  const along = x1 - x0 >= z1 - z0;
-  slab(d, [x0, y0, z0], [x1, 0.6, z1], shade(SAND, -0.1));
-  slab(d, [x0 + 0.02, 0.6, z0 + 0.02], [x1 - 0.02, y1 - 0.3, z1 - 0.02], inside ? TIMBER : RED);
-  slab(d, [x0 - 0.12, y1 - 0.3, z0 - 0.12], [x1 + 0.12, y1, z1 + 0.12], ROOF_JADE.tile);
-  if (d.detail === 0) return;
-  const len = along ? x1 - x0 : z1 - z0;
-  const panel = inside ? '#c99446' : '#2f8a7a';
-  const n = inside ? Math.floor(len / 0.8) : 1;
-  for (let i = 0; i < n; i++) {
-    const a = (along ? x0 : z0) + (inside ? (i + 0.5) * (len / n) : len / 2);
-    const half = inside ? 0.28 : len / 2 - 0.6;
-    if (along) for (const z of [z0 - 0.02, z1]) slab(d, [a - half, 1.0, z], [a + half, y1 - 0.7, z + 0.02], panel);
-    else for (const x of [x0 - 0.02, x1]) slab(d, [x, 1.0, a - half], [x + 0.02, y1 - 0.7, a + half], panel);
   }
 }
 
@@ -122,6 +105,8 @@ export function kiosk(d: Drawer, q: Piece) {
   const [x0, , z0] = q.min;
   const [x1, , z1] = q.max;
   const grotto = Math.abs(cx) < 0.1;
+  if (grotto && cz > 0) return riverShrine(d, q);
+  if (h > 5 && cx > 0) return bellTower(d, q);
   if (grotto) {
     slab(d, [x0, 0, z0], [x1, h, z1], '#6f7469');
     slab(d, [x0 + 0.6, 0, z1 - 0.3], [x1 - 0.6, h - 1.2, z1 + 0.02], '#2c2f2a');
@@ -134,7 +119,11 @@ export function kiosk(d: Drawer, q: Piece) {
   const tower = h > 5;
   const base = tower ? 2.4 : 1.0;
   slab(d, [x0, 0, z0], [x1, base, z1], shade(SAND, -0.08));
-  slab(d, [x0 + 0.1, base, z0 + 0.1], [x1 - 0.1, h, z1 - 0.1], tower ? RED : Math.abs(cz) > 37 ? '#c99446' : RED);
+  // The camp watch shrines take their team's colour; the west court's shrine is whitewashed under blue tiles.
+  const camp = Math.abs(cz) > 37;
+  const westShrine = !tower && !camp && cx < 0;
+  const body = tower ? RED : camp ? (cz < 0 ? '#d0622c' : '#3f6f9a') : westShrine ? '#efe8d8' : RED;
+  slab(d, [x0 + 0.1, base, z0 + 0.1], [x1 - 0.1, h, z1 - 0.1], body);
   slab(d, [x0, h - 0.3, z0], [x1, h, z1], GOLD, 'metal');
   if (d.detail > 0) {
     const t = new Pen(d, new Frame(cx, 0, cz));
@@ -142,7 +131,7 @@ export function kiosk(d: Drawer, q: Piece) {
     if (tower) for (const s of [-1, 1]) t.cylX(s * (w / 2 + 0.05), base + 1.8, 0, 0.7, 0.3, '#c8231b', undefined, 0.04);
     t.box(0, base + 0.6, 0, w + 0.06, 0.9, 0.9, '#2f5f48', undefined, 0);
   }
-  pavilionRoof(d, cx, h, cz, w, dd, tower || Math.abs(cz) > 37 ? ROOF_CLAY : ROOF_JADE, tower ? 2 : 1);
+  pavilionRoof(d, cx, h, cz, w, dd, westShrine || (camp && cz > 0) ? ROOF_BLUE : tower || camp ? ROOF_CLAY : ROOF_JADE, tower ? 2 : 1);
 }
 
 /** Camp supply stack in the team's colour: crates under a tarp, a barrel and a coil of rope. */

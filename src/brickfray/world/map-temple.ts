@@ -13,9 +13,9 @@ import { yawToward } from './util';
 function spawns(p: Plan) {
   for (const [x, z] of CAMP_SPAWNS) p.spawn(x, 0, z, Math.PI, 1);
   for (const [x, z] of CAMP_SPAWNS) p.spawn(-x, 0, -z, 0, 0);
-  for (const [x, y, z] of FFA_SPAWNS) {
-    p.spawn(x, y, z, yawToward([x, z], [0, 0]));
-    p.spawn(-x, y, -z, yawToward([-x, -z], [0, 0]));
+  for (const [x, z, fx, fz] of FFA_SPAWNS) {
+    p.spawn(x, 0, z, yawToward([x, z], [fx, fz]));
+    p.spawn(-x, 0, -z, yawToward([-x, -z], [-fx, -fz]));
   }
 }
 
@@ -54,7 +54,8 @@ export const TEMPLE = defineMap({
     sunColor: '#ffe4b0',
     sunIntensity: 2.9,
     sunDirection: new THREE.Vector3(0.5, 0.6, 0.62).normalize(),
-    fogNear: 80,
+    // Clear out to 100 m so the rim cliffs read from the far camp even on low, where the fog ends at 140 m.
+    fogNear: 100,
     clouds: { count: 9, seed: 5 }
   },
   bounds: { min: [-T.edgeX - 0.4, -12, -T.edge - 0.4], max: [T.edgeX + 0.4, 40, T.edge + 0.4] },

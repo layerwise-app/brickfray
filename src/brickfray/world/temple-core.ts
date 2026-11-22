@@ -13,6 +13,8 @@ const ZO = Z + 0.8;
 
 /** Column and arcade bays along the hall: piers every 4.8 m, the middle bay facing the statue. */
 export const BAYS = [-16.8, -12.0, -7.2, -2.4, 2.4, 7.2, 12.0, 16.8];
+/** Hanging boards on this side of the nave: [north end of the bay, distance off the axis] (in from the nave stair). */
+const BOARDS: [number, number][] = [[-20.8, 5.0], [-12.0, 5.0], [2.4, 5.0], [12.0, 4.0]];
 
 function hall(p: Piece[], f: Flight[]) {
   // End walls: a door into each aisle, and the nave's door from the gate hall with a spirit screen inside it, so no
@@ -25,7 +27,7 @@ function hall(p: Piece[], f: Flight[]) {
   // The end bays of the arcade are walled: the aisle's door end is seen from the court only through the gate.
   for (const s of [-1, 1]) p.push(box('pier', T.galleryOut, 0, s * 17.2, T.arcade, LOW, s * Z));
   for (const z of BAYS) {
-    p.push(box('pier', T.galleryOut, 0, z - 0.4, T.arcade, LOW, z + 0.4));
+    p.push(box('pier', T.galleryOut, 0, z - (z === -7.2 ? 1.6 : 0.4), T.arcade, LOW, z + 0.4));
     p.push(box('pillar', 6.12, 0, z - 0.28, 6.68, T.hallTop, z + 0.28));
   }
   // The gallery's back wall stands on the arcade; the architrave under the gallery cuts its view into the far aisle.
@@ -60,6 +62,9 @@ function nave(p: Piece[]) {
   p.push(box('statue', 0, 0.48, -2.8, 2.8, 4.8, 2.8));
   p.push(box('burner', -1.2, 0, -10.4, 1.2, 3.2, -7.2));
   p.push(box('stele', -1.2, 0, -6.4, 1.2, 3.2, -4.0));
+  // Painted boards hung from the roof beams over every other bay on this side of the nave (the half turn hangs the
+  // other side's over the bays between): a gallery sees the far side of the nave only through the bays left open.
+  for (const [z, x] of BOARDS) p.push(box('banner', x - 0.06, 3.2, z + 0.4, x + 0.06, 6.4, z + 4.4));
 }
 
 /** East court: cloister walls with a gate at each end and two to the strip, a screen inside each gate, cover. */
@@ -67,11 +72,12 @@ function court(p: Piece[]) {
   const top = T.courtWall;
   p.push(...run('cloister', true, T.arcade, T.courtOut, -ZO, -Z, 0, top, [[20.8, 24.0, 2.88]]));
   p.push(...run('cloister', true, T.arcade, T.courtOut, Z, ZO, 0, top, [[14.4, 17.6, 2.88]]));
-  p.push(...run('cloister', false, -ZO, ZO, T.court, T.courtOut, 0, top, [[-12.8, -9.6, 2.88], [6.4, 9.6, 2.88]]));
+  p.push(...run('cloister', false, -ZO, ZO, T.court, T.courtOut, 0, top, [[-12.8, -9.6, 2.88], [-1.6, 1.6, 2.88], [6.4, 9.6, 2.88]]));
   p.push(box('screen', 19.2, 0, -18.4, T.court, 2.88, -17.6));
   p.push(box('screen', T.arcade, 0, 17.6, 18.4, 2.88, 18.4));
   p.push(box('screen', 22.4, 0, -14.4, 23.2, 2.88, -8.0));
   p.push(box('screen', 22.4, 0, 4.8, 23.2, 2.88, 11.2));
+  p.push(box('screen', 22.4, 0, -3.2, 23.2, 2.88, 3.2));
   // A shrine pavilion at the middle. It stays solid: any opening through it, even a passage along the court, reopens
   // the diagonals from the aisle door through the court gate to the far strip (up to 67 m).
   p.push(box('kiosk', 17.6, 0, -2.4, 21.6, 3.2, 2.4));
@@ -91,8 +97,8 @@ function northEnd(p: Piece[]) {
   // A porch before each aisle door: a guardian plinth across it and a wing to the court wall, open only toward the
   // gate hall, so the aisle's lines end in the porch.
   for (const s of [-1, 1]) {
-    p.push(box('statue', s * 6.0, 0, -26.4, s * T.arcade, 2.88, -24.8));
-    p.push(box('cloister', s * T.arcade, 0, -24.8, s * (T.arcade + 0.8), T.courtWall, -T.row));
+    p.push(box('statue', s * 6.0, 0, -25.9, s * T.arcade, 2.88, -24.3));
+    p.push(box('cloister', s * T.arcade, 0, -24.3, s * (T.arcade + 0.8), T.courtWall, -T.row));
   }
   p.push(box('burner', 12.0, 0, -32.0, 14.4, 3.2, -28.8));
   p.push(box('burner', -16.0, 0, -29.6, -13.6, 3.2, -25.6));
