@@ -12,9 +12,10 @@ varying vec3 vRibT;`;
 
 const VERTEX = /* glsl */ `
 vRib = rib;
-vRibT = normalize(normalMatrix * vec3(-objectNormal.z, 0.0, objectNormal.x));`;
+vRibT = normalMatrix * vec3(-objectNormal.z, 0.0, objectNormal.x);`;
 
 /**
+ * vRibT stays unnormalized: on a lid it is zero, and normalizing it would turn the lid's normal to NaN (black).
  * Sine corrugation: the normal swings across each rib and crests catch a little more light. It fades to the flat
  * sheet while a rib is still several pixels wide, so a long wall seen edge-on shows no interference bands.
  */
@@ -22,7 +23,7 @@ const FRAGMENT = /* glsl */ `
 float ribU = vRib.x / ${RIB_PITCH.toFixed(2)};
 float ribK = vRib.y * (1.0 - smoothstep(0.06, 0.3, fwidth(ribU)));
 float ribA = 6.2831853 * ribU;
-normal = normalize(normal + normalize(vRibT) * (sin(ribA) * 0.55 * ribK));
+normal = normalize(normal + vRibT * (sin(ribA) * 0.55 * ribK));
 diffuseColor.rgb *= 1.0 + 0.1 * ribK * cos(ribA);`;
 
 /**

@@ -54,7 +54,7 @@ export const GANGWAY: Element<{ x: number; z: number }> = {
   colliders(p) {
     const out: PlanCollider[] = METAL_STAIRS.colliders!(stair(p));
     out.push(box([p.x - 0.6, 0.8, p.z + 1.6], [p.x + 0.6, 0.96, p.z + 2.6], 'metal', { walk: true }));
-    for (const s of [-1, 1]) out.push(box([p.x + s * 0.6 - 0.05, 0.96, p.z + 0.8], [p.x + s * 0.6 + 0.05, 1.96, p.z + 2.4], 'metal', { bulletsPass: true }));
+    for (const s of [-1, 1]) out.push(box([p.x + s * 0.6 - 0.05, 0.96, p.z + 0.8], [p.x + s * 0.6 + 0.05, 0.96 + RAIL_H, p.z + 2.4], 'metal', { bulletsPass: true }));
     return out;
   },
   nav: (p) => [[p.x, 0, p.z - 0.8], [p.x, 0.96, p.z + 2.2]],
@@ -63,8 +63,8 @@ export const GANGWAY: Element<{ x: number; z: number }> = {
     const t = new Pen(d, new Frame(p.x, 0, p.z));
     t.box(0, 0.82, 2.1, 1.2, 0.14, 1.0, '#8a9096', 'metal', 0);
     for (const s of [-1, 1]) {
-      t.box(s * 0.6, 1.9, 1.6, 0.06, 0.06, 1.6, '#f6c624', 'metal', 0);
-      for (const z of [0.8, 1.6, 2.4]) t.box(s * 0.6, z < 1.6 ? 0.48 : 0.96, z, 0.06, z < 1.6 ? 1.48 : 1.0, 0.06, '#f6c624', 'metal', 0);
+      t.box(s * 0.6, 0.9 + RAIL_H, 1.6, 0.06, 0.06, 1.6, '#f6c624', 'metal', 0);
+      for (const z of [0.8, 1.6, 2.4]) t.box(s * 0.6, z < 1.6 ? 0.48 : 0.96, z, 0.06, (z < 1.6 ? 0.48 : 0) + RAIL_H, 0.06, '#f6c624', 'metal', 0);
     }
   }
 };
@@ -100,6 +100,34 @@ export const QUAY_WALL: Element<{ x0: number; x1: number; z: number; gaps: [numb
       t.box(x, WATER_Y - 0.6, p.z + 0.12, 0.5, 1.5, 0.24, '#22272c', 'rubber', 0.04);
     }
     t.span(p.x0, WATER_Y - 0.1, p.z, p.x1, WATER_Y + 0.12, p.z + 0.01, '#5d6b4f', undefined, 0);
+  }
+};
+
+/** Higher than a jump (MOVE.jump), so the rail top is no foothold for stepping out over the water. */
+export const RAIL_H = 1.25;
+
+/**
+ * Quay-side safety rail along x or z (the longer side of the box): steel posts, a yellow top tube and a mid chain.
+ * `height` defaults to RAIL_H.
+ */
+export const EDGE_RAIL: Element<{ x0: number; z0: number; x1: number; z1: number; height?: number }> = {
+  colliders: (p) => [box([p.x0, 0, p.z0], [p.x1, p.height ?? RAIL_H, p.z1], 'metal', { bulletsPass: true })],
+  draw(d, p) {
+    const t = new Pen(d, new Frame(0, 0, 0));
+    const alongX = p.x1 - p.x0 > p.z1 - p.z0;
+    const len = alongX ? p.x1 - p.x0 : p.z1 - p.z0;
+    const cx = (p.x0 + p.x1) / 2;
+    const cz = (p.z0 + p.z1) / 2;
+    const h = p.height ?? RAIL_H;
+    const n = Math.max(1, Math.round(len / (d.detail === 0 ? 3.2 : 1.6)));
+    for (let i = 0; i <= n; i++) {
+      const u = (alongX ? p.x0 : p.z0) + (i * len) / n;
+      t.box(alongX ? u : cx, 0, alongX ? cz : u, 0.08, h, 0.08, '#545c63', 'metal', 0);
+    }
+    const span = (y: number, sh: number, w: number, color: string) =>
+      t.box(cx, y, cz, alongX ? len : w, sh, alongX ? w : len, color, 'metal', 0);
+    span(h - 0.07, 0.07, 0.07, '#f6c624');
+    for (const y of h > RAIL_H ? [0.5, 1.0] : [0.6]) span(y, 0.05, 0.05, '#2f363d');
   }
 };
 

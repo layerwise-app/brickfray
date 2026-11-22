@@ -4,8 +4,8 @@ import { frameOf, pen, type At } from './props-kit';
 import { CONTAINER, CONTAINER_SIZE } from './props-harbor';
 import { shade } from './util';
 
-/** Gunwale height above the quay: more than a jump, so the moored barge is plainly out of reach. */
-const SIDE = 1.7;
+/** Gunwale height above the quay: out of reach of a jump from the quay and of a hop off the quay rail. */
+const SIDE = 1.8;
 const LEN = 9.6;
 const BEAM = 4.4;
 const HOLD = SIDE - 0.2;

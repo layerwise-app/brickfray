@@ -11,7 +11,15 @@ import { box, Frame, shade, type Vec3 } from './util';
 export const WH = { x0: -14.4, x1: 14.4, z0: -28.0, z1: -14.4, wall: 0.4, height: 7.2, deck: 3.36 } as const;
 const DOOR_Z: [number, number] = [-20.0, -15.6];
 const SOUTH_DOORS: [number, number][] = [[-9.6, -6.4], [6.4, 9.6]];
+/**
+ * Doors no taller than a loading door needs: with the lobby racks inside, the yard doors show the quay no hall depth,
+ * and the end doors pass no line between the gallery and the yard outside.
+ */
+const DOOR_H = 2.64;
 const WINDOWS = [-11.2, -7.2, -3.2, 3.2, 7.2, 11.2];
+/** Clerestory band over the gallery: its sill is above a standing eye on the deck, so the gallery is no perch over the yard. */
+const SILL = 1.9;
+const LINTEL = 2.7;
 const BASE: Masonry = { colors: ['#9a5a43', '#8a4f3a', '#a8664c'], variance: 0.3 };
 const SIDING = '#2f7f7a';
 const RAIL = '#f6c624';
@@ -40,13 +48,14 @@ function parts(): Part[] {
   w([x0, 0, z0], [x1, H, z0 + t]);
   for (const x of [x0, x1 - t]) {
     for (const [a, b] of wallSpans(z0 + t, z1, [DOOR_Z])) w([x, 0, a], [x + t, H, b]);
-    w([x, 4.4, DOOR_Z[0]], [x + t, H, DOOR_Z[1]]);
+    w([x, DOOR_H, DOOR_Z[0]], [x + t, H, DOOR_Z[1]]);
   }
   const wins = WINDOWS.map((c) => [c - 0.8, c + 0.8] as [number, number]);
   for (const [a, b] of wallSpans(x0 + t, x1 - t, SOUTH_DOORS)) w([a, 0, z1 - t], [b, deck + 0.64, z1]);
-  for (const [a, b] of SOUTH_DOORS) w([a, 3.6, z1 - t], [b, deck + 0.64, z1]);
-  for (const [a, b] of wallSpans(x0 + t, x1 - t, wins)) w([a, deck + 0.64, z1 - t], [b, deck + 2.24, z1]);
-  w([x0 + t, deck + 2.24, z1 - t], [x1 - t, H, z1]);
+  for (const [a, b] of SOUTH_DOORS) w([a, DOOR_H, z1 - t], [b, deck + 0.64, z1]);
+  w([x0 + t, deck + 0.64, z1 - t], [x1 - t, deck + SILL, z1]);
+  for (const [a, b] of wallSpans(x0 + t, x1 - t, wins)) w([a, deck + SILL, z1 - t], [b, deck + LINTEL, z1]);
+  w([x0 + t, deck + LINTEL, z1 - t], [x1 - t, H, z1]);
   const d = (min: Vec3, max: Vec3) => out.push({ min, max, kind: 'deck' });
   d([x0 + t, deck - 0.16, z0 + t], [x1 - t, deck, -25.2]);
   d([-1.2, deck - 0.16, -25.2], [1.2, deck, -16.4]);
@@ -103,20 +112,23 @@ function lamps(d: Drawer) {
   }
 }
 
-/** Pallet rack along local x: uprights, beams and loaded shelves; solid to bullets. */
-export const RACK: Element<{ x: number; z: number; length: number; turns?: number }> = {
-  colliders: (p) => [new Frame(p.x, 0, p.z, p.turns ?? 0).box([-p.length / 2, 0, -0.55], [p.length / 2, 2.6, 0.55], 'metal')],
+/** Pallet rack along local x: uprights, beams and loaded shelves every 1.2 m; solid to bullets. `height` defaults to 2.6. */
+export const RACK: Element<{ x: number; z: number; length: number; turns?: number; height?: number }> = {
+  colliders: (p) => [new Frame(p.x, 0, p.z, p.turns ?? 0).box([-p.length / 2, 0, -0.55], [p.length / 2, p.height ?? 2.6, 0.55], 'metal')],
   draw(d, p) {
     const t = new Pen(d, new Frame(p.x, 0, p.z, p.turns ?? 0));
+    const h = p.height ?? 2.6;
     const bays = Math.max(1, Math.round(p.length / 2.4));
     const bw = p.length / bays;
-    for (let i = 0; i <= bays; i++) for (const z of [-0.5, 0.5]) t.box(-p.length / 2 + i * bw, 0, z, 0.1, 2.6, 0.1, '#2f6fb5', 'metal', 0);
-    for (const y of [0.1, 1.3, 2.45]) for (const z of [-0.5, 0.5]) t.box(0, y, z, p.length, 0.12, 0.08, '#f05a1a', 'metal', 0);
+    const shelves = Math.max(2, Math.round((h - 0.2) / 1.2));
+    for (let i = 0; i <= bays; i++) for (const z of [-0.5, 0.5]) t.box(-p.length / 2 + i * bw, 0, z, 0.1, h, 0.1, '#2f6fb5', 'metal', 0);
+    for (let k = 0; k <= shelves; k++) for (const z of [-0.5, 0.5]) t.box(0, k === shelves ? h - 0.15 : 0.1 + k * 1.2, z, p.length, 0.12, 0.08, '#f05a1a', 'metal', 0);
     const boxes = ['#c9a26e', '#d6b07a', '#b98a5a', '#e3d3a8'];
     for (let i = 0; i < bays; i++) {
-      for (const [k, y] of [[0, 0.22], [1, 1.42]] as const) {
+      for (let k = 0; k < shelves; k++) {
         if ((i + k) % 3 === 2) continue;
         const x = -p.length / 2 + (i + 0.5) * bw;
+        const y = 0.22 + k * 1.2;
         t.box(x, y - 0.1, 0, bw - 0.3, 0.1, 0.9, '#a67c52', undefined, 0);
         t.box(x, y, 0, bw - 0.5, d.detail === 0 ? 0.8 : 0.5 + ((i * 7 + k * 3) % 4) * 0.1, 0.8, boxes[(i + k) % 4]!, undefined, 0.02);
       }

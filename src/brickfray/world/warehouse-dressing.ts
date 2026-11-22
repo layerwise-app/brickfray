@@ -38,19 +38,32 @@ export function warehouseDressing(p: Plan) {
       t.cyl(s * (SIDE - 0.14), 0.9, -21.2, 0.09, 0.5, '#c8231b', 'metal', 0.02, 8);
     }
     hazardPosts(t);
+    doorSigns(d);
     ceiling(t, d);
     pools(d);
   });
 }
 
 function bayBoard(t: Pen, x: number, n: number) {
-  const z = BACK + 0.03;
-  t.box(x, 4.2, z, 1.0, 1.4, 0.06, '#1f4f8f', undefined, 0.01);
-  const w = 0.5;
-  const h = 0.9;
-  const s = 0.12;
-  const y0 = 4.45;
-  const zz = BACK + 0.07;
+  t.box(x, 4.2, BACK + 0.03, 1.0, 1.4, 0.06, '#1f4f8f', undefined, 0.01);
+  digit(t, x, 4.45, BACK + 0.07, 0.9, n);
+}
+
+/** Door numbers outside, in each half's yard colour (1 west, 2 east): over the yard door and over the end door. */
+function doorSigns(d: Drawer) {
+  for (const s of [-1, 1]) {
+    for (const [x, z, turns] of [[s * (WH.x1 + 0.03), -17.8, s < 0 ? 3 : 1], [s * 8.0, WH.z1 + 0.03, 0]] as const) {
+      const t = new Pen(d, new Frame(x, 0, z, turns));
+      t.box(0, 2.9, 0, 1.6, 1.5, 0.06, s < 0 ? '#c0392b' : '#2f7fbf', undefined, 0.01);
+      digit(t, 0, 3.1, 0.04, 1.1, s < 0 ? 1 : 2);
+    }
+  }
+}
+
+/** Seven-segment numeral `h` tall with its foot at y0, on a board face at z. */
+function digit(t: Pen, x: number, y0: number, zz: number, h: number, n: number) {
+  const w = (h * 5) / 9;
+  const s = (h * 2) / 15;
   const seg: Record<string, [number, number, number, number]> = {
     a: [x, y0 + h - s, w, s],
     d: [x, y0, w, s],
