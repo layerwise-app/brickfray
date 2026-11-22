@@ -1,0 +1,33 @@
+import type { touchEn } from './en';
+
+export const touchKo: Record<keyof typeof touchEn, string> = {
+  'touch.tapToPlay': '탭해서 플레이',
+  'touch.pickHint': '카드를 탭하세요',
+  'touch.scopeHint': '숨 참기 버튼을 누르고 있으면 조준이 안정됩니다',
+  'touch.rotate': '휴대폰을 가로로 돌려 주세요',
+  'touch.rotateHint': '대전은 가로 화면으로 진행됩니다.',
+  'touch.coach.move': '이동. 링 밖까지 밀면 달리기',
+  'touch.coach.look': '여기를 드래그해 시점 이동',
+  'touch.coach.fire': '사격. 그대로 드래그해 조준',
+  'touch.coach.grenade': '누르고 있다가 놓으면 투척',
+  'touch.section': '터치',
+  'touch.sensitivity': '시점 감도',
+  'touch.buttonSize': '버튼 크기',
+  'touch.leftHanded': '왼손잡이 배치',
+  'touch.leftHandedHint': '오른손 엄지로 이동하고 왼손으로 조준하고 쏩니다.',
+  'touch.autoFire': '자동 사격',
+  'touch.autoFireHint': '조준점이 적에게 있는 동안 자동으로 쏩니다.',
+  'touch.haptics': '진동',
+  'touch.hapticsHint': '사격, 명중, 피격 때 진동합니다.',
+  'touch.button.fire': '사격',
+  'touch.button.ads': '조준',
+  'touch.button.jump': '점프',
+  'touch.button.crouch': '앉기 / 슬라이딩',
+  'touch.button.reload': '재장전',
+  'touch.button.grenade': '수류탄',
+  'touch.button.melee': '근접 공격',
+  'touch.button.swap': '무기 교체',
+  'touch.button.steady': '숨 참기',
+  'touch.button.pause': '일시 정지',
+  'touch.button.scoreboard': '점수판'
+};

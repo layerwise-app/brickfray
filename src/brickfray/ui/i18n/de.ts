@@ -1,8 +1,12 @@
 import { boardDe } from './board/de';
+import { touchDe } from './touch/de';
+import { hudDe } from './hud/de';
 import type { Dictionary } from './en';
 
 export const de: Dictionary = {
   ...boardDe,
+  ...touchDe,
+  ...hudDe,
   play: 'Spielen',
   playCaption: 'Online-Match',
   solo: 'Solo',
@@ -54,9 +58,9 @@ export const de: Dictionary = {
   'difficulty.easy': 'Leicht',
   'difficulty.normal': 'Normal',
   'difficulty.hard': 'Schwer',
-  'difficultyHint.easy': 'Weniger, langsamere Snapbots. Volle Heilung und ein Upgrade zwischen den Wellen.',
-  'difficultyHint.normal': 'Der klassische Anstieg. Volle Heilung und ein Upgrade zwischen den Wellen.',
-  'difficultyHint.hard': 'Präziser, größere Wellen. Halbe Heilung und ein Upgrade zwischen den Wellen.',
+  'difficultyHint.easy': 'Für die ersten Läufe: weniger Snapbots, die langsam zielen und schwächer treffen. Volle Gesundheit zwischen den Wellen.',
+  'difficultyHint.normal': 'Die echte Herausforderung: Druck, der mit jeder Welle wächst, alle paar Wellen ein Megabot. Volle Gesundheit zwischen den Wellen.',
+  'difficultyHint.hard': 'Für Profis: präzises Zielen, größere Wellen und nur halbe Gesundheit zwischen den Wellen.',
   'map.plaza': 'Marktplatz',
   'map.fortress': 'Festung',
   'map.docks': 'Hafen',

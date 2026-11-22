@@ -1,0 +1,19 @@
+/* Solo HUD callouts that move: a new snapbot kind's card slides in from the left edge and out again. */
+.bf-kind-intro {
+  animation: bf-kind-in 6s cubic-bezier(0.2, 1.2, 0.4, 1) both;
+}
+@keyframes bf-kind-in {
+  0% {
+    opacity: 0;
+    transform: translateX(-60px);
+  }
+  7%,
+  90% {
+    opacity: 1;
+    transform: none;
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(-30px);
+  }
+}

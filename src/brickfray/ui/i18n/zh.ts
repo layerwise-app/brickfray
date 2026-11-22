@@ -1,8 +1,12 @@
 import { boardZh } from './board/zh';
+import { touchZh } from './touch/zh';
+import { hudZh } from './hud/zh';
 import type { Dictionary } from './en';
 
 export const zh: Dictionary = {
   ...boardZh,
+  ...touchZh,
+  ...hudZh,
   play: '开战',
   playCaption: '在线对战',
   solo: '单人',
@@ -54,9 +58,9 @@ export const zh: Dictionary = {
   'difficulty.easy': '简单',
   'difficulty.normal': '普通',
   'difficulty.hard': '困难',
-  'difficultyHint.easy': '机器人更少、反应更慢，每波之间回满血并选一项强化。',
-  'difficultyHint.normal': '标准节奏，每波之间回满血并选一项强化。',
-  'difficultyHint.hard': '枪法更准、波次更大，每波之间回一半血并选一项强化。',
+  'difficultyHint.easy': '适合新手：机器人更少、瞄得更慢、打得更轻。每波之间回满血。',
+  'difficultyHint.normal': '正经挑战：压力每波递增，每隔几波来一个 Megabot。每波之间回满血。',
+  'difficultyHint.hard': '老手专用：机器人枪法准、波次大，每波之间只回一半血。',
   'map.plaza': '广场',
   'map.fortress': '城堡',
   'map.docks': '码头',

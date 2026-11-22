@@ -1,0 +1,33 @@
+import type { touchEn } from './en';
+
+export const touchZh: Record<keyof typeof touchEn, string> = {
+  'touch.tapToPlay': '轻触继续',
+  'touch.pickHint': '点一张卡',
+  'touch.scopeHint': '按住屏息键稳住准星',
+  'touch.rotate': '请把手机横过来',
+  'touch.rotateHint': '对局需要横屏进行。',
+  'touch.coach.move': '移动，推出外圈可锁定奔跑',
+  'touch.coach.look': '在这里拖动转视角',
+  'touch.coach.fire': '开火，按住拖动可瞄准',
+  'touch.coach.grenade': '按住捏雷，松手投掷',
+  'touch.section': '触屏',
+  'touch.sensitivity': '视角灵敏度',
+  'touch.buttonSize': '按键大小',
+  'touch.leftHanded': '左手模式',
+  'touch.leftHandedHint': '右手拇指移动，左手瞄准和开火。',
+  'touch.autoFire': '自动开火',
+  'touch.autoFireHint': '准星对准敌人时自动射击。',
+  'touch.haptics': '振动',
+  'touch.hapticsHint': '开火、命中和受伤时振动。',
+  'touch.button.fire': '开火',
+  'touch.button.ads': '瞄准',
+  'touch.button.jump': '跳跃',
+  'touch.button.crouch': '下蹲 / 滑铲',
+  'touch.button.reload': '换弹',
+  'touch.button.grenade': '手雷',
+  'touch.button.melee': '近战',
+  'touch.button.swap': '切换武器',
+  'touch.button.steady': '屏息',
+  'touch.button.pause': '暂停',
+  'touch.button.scoreboard': '计分板'
+};

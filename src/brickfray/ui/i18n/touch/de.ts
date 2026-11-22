@@ -1,0 +1,33 @@
+import type { touchEn } from './en';
+
+export const touchDe: Record<keyof typeof touchEn, string> = {
+  'touch.tapToPlay': 'Zum Spielen tippen',
+  'touch.pickHint': 'Tippe eine Karte an',
+  'touch.scopeHint': 'Atem-Taste halten zum Stabilisieren',
+  'touch.rotate': 'Dreh dein Handy quer',
+  'touch.rotateHint': 'Matches laufen im Querformat.',
+  'touch.coach.move': 'Bewegen. Über den Ring hinaus schieben zum Sprinten.',
+  'touch.coach.look': 'Hier ziehen zum Umsehen',
+  'touch.coach.fire': 'Feuern. Weiterziehen zum Zielen.',
+  'touch.coach.grenade': 'Halten zum Kochen, loslassen zum Werfen',
+  'touch.section': 'Touch',
+  'touch.sensitivity': 'Blickempfindlichkeit',
+  'touch.buttonSize': 'Tastengröße',
+  'touch.leftHanded': 'Linkshänder-Layout',
+  'touch.leftHandedHint': 'Mit dem rechten Daumen bewegen, mit dem linken zielen und schießen.',
+  'touch.autoFire': 'Automatisch feuern',
+  'touch.autoFireHint': 'Schießt, solange dein Visier auf einem Gegner liegt.',
+  'touch.haptics': 'Vibration',
+  'touch.hapticsHint': 'Vibriert beim Feuern, bei Treffern und wenn du getroffen wirst.',
+  'touch.button.fire': 'Feuern',
+  'touch.button.ads': 'Zielen',
+  'touch.button.jump': 'Springen',
+  'touch.button.crouch': 'Ducken oder rutschen',
+  'touch.button.reload': 'Nachladen',
+  'touch.button.grenade': 'Granate',
+  'touch.button.melee': 'Nahkampf',
+  'touch.button.swap': 'Waffe wechseln',
+  'touch.button.steady': 'Atem anhalten',
+  'touch.button.pause': 'Pause',
+  'touch.button.scoreboard': 'Punktetafel'
+};

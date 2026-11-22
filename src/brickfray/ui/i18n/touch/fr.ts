@@ -1,0 +1,33 @@
+import type { touchEn } from './en';
+
+export const touchFr: Record<keyof typeof touchEn, string> = {
+  'touch.tapToPlay': 'Touche pour jouer',
+  'touch.pickHint': 'Touche une carte',
+  'touch.scopeHint': 'Maintiens le bouton de respiration pour stabiliser',
+  'touch.rotate': 'Tourne ton téléphone',
+  'touch.rotateHint': 'Les parties se jouent à l’horizontale.',
+  'touch.coach.move': 'Avance. Pousse au-delà de l’anneau pour courir.',
+  'touch.coach.look': 'Glisse ici pour regarder',
+  'touch.coach.fire': 'Tire. Continue de glisser pour viser.',
+  'touch.coach.grenade': 'Maintiens pour dégoupiller, relâche pour lancer',
+  'touch.section': 'Tactile',
+  'touch.sensitivity': 'Sensibilité de la vue',
+  'touch.buttonSize': 'Taille des boutons',
+  'touch.leftHanded': 'Disposition pour gaucher',
+  'touch.leftHandedHint': 'Déplace-toi avec le pouce droit, vise et tire avec le gauche.',
+  'touch.autoFire': 'Tir automatique',
+  'touch.autoFireHint': 'Tire tant que ton viseur est sur un ennemi.',
+  'touch.haptics': 'Vibrations',
+  'touch.hapticsHint': 'Vibre quand tu tires, touches ou es touché.',
+  'touch.button.fire': 'Tirer',
+  'touch.button.ads': 'Viser',
+  'touch.button.jump': 'Sauter',
+  'touch.button.crouch': 'S’accroupir ou glisser',
+  'touch.button.reload': 'Recharger',
+  'touch.button.grenade': 'Grenade',
+  'touch.button.melee': 'Corps à corps',
+  'touch.button.swap': 'Changer d’arme',
+  'touch.button.steady': 'Retenir son souffle',
+  'touch.button.pause': 'Pause',
+  'touch.button.scoreboard': 'Tableau des scores'
+};

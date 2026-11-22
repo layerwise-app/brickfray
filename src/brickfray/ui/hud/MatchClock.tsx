@@ -1,6 +1,7 @@
 import { TEAM_COLORS } from '../../game/remotes';
 import { useHud } from '../App';
 import { useT } from '../i18n';
+import { BossBars, NextWave } from './SoloHud';
 
 /** In the last minute of a timed match the clock turns yellow and grows; over the last ten seconds it turns red. */
 const LAST_MINUTE = 60;
@@ -21,13 +22,13 @@ export function TopBar() {
   const me = hud.rows.find((r) => r.me);
   const leader = hud.rows[0];
   // The wave banner announces the wave; the pill steps aside until it is gone so the number never shows twice.
-  const announcing = mode === 'solo' && !!hud.banner;
+  const announcing = mode === 'solo' && (!!hud.banner || (!!hud.offer && !hud.offer.picked));
   const timed = mode !== 'solo' && hud.phase === 'playing' && hud.phaseLeft > 0;
   const second = Math.ceil(hud.phaseLeft);
   const lastMinute = timed && second <= LAST_MINUTE;
   const final = timed && second <= FINAL;
   return (
-    <div className='absolute left-1/2 top-4 flex -translate-x-1/2 flex-col items-center gap-1'>
+    <div className='bf-topbar absolute left-1/2 top-4 flex -translate-x-1/2 flex-col items-center gap-1'>
       <style>{CLOCK_KEYFRAMES}</style>
       <div
         className='flex items-stretch overflow-hidden rounded-2xl bg-black/45 shadow-[0_4px_0_rgba(0,0,0,.3)] backdrop-blur-sm'
@@ -41,7 +42,7 @@ export function TopBar() {
             className={`bf-display bf-hud-text inline-block tabular-nums ${lastMinute ? 'text-4xl' : 'text-3xl'}`}
             style={{ color: final ? '#ff5a4a' : lastMinute ? 'var(--bf-yellow)' : undefined, animation: lastMinute ? 'bf-clock-tick .45s ease-out' : undefined }}
           >
-            {mode === 'solo' ? t('wave', { n: Math.max(1, hud.wave) }) : clock(hud.phase === 'playing' ? hud.phaseLeft : (hud.settings?.minutes ?? 10) * 60)}
+            {mode === 'solo' ? <SoloPill /> : clock(hud.phase === 'playing' ? hud.phaseLeft : (hud.settings?.minutes ?? 10) * 60)}
           </span>
         </div>
         {mode === 'tdm' && <Score value={hud.teamScore[1]} color={TEAM_COLORS[1]} highlight={hud.myTeam === 1} />}
@@ -61,10 +62,23 @@ export function TopBar() {
           </span>
         </div>
       )}
-      {hud.phase === 'intermission' && !hud.offer && (
-        <div className='bf-display bf-hud-text bf-pop mt-10 text-5xl text-[var(--bf-yellow)]'>{Math.ceil(hud.phaseLeft)}</div>
-      )}
+      {mode === 'solo' && <BossBars />}
+      {mode === 'solo' && hud.phase === 'intermission' && !hud.offer && <NextWave />}
     </div>
+  );
+}
+
+/** Solo: the wave and, while it is fought, the snapbots still to beat; between waves, the wave just cleared. */
+function SoloPill() {
+  const hud = useHud();
+  const { t } = useT();
+  const wave = Math.max(1, hud.wave);
+  if (hud.phase === 'intermission') return <>{t('upgrade.cleared', { n: wave })}</>;
+  return (
+    <>
+      {t('wave', { n: wave })}
+      {hud.phase === 'playing' && hud.waveLeft > 0 && <span className='ml-2 text-2xl text-white/75'>· {t('hud.left', { n: hud.waveLeft })}</span>}
+    </>
   );
 }
 

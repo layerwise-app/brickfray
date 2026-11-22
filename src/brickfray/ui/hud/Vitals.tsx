@@ -80,7 +80,7 @@ export function Health({ health, max, armor }: { health: number; max: number; ar
   const fill = low ? WARN_FILL : '#f4f6fb';
   const flash = low ? '#ffffff' : WARN_FILL;
   return (
-    <div className='absolute bottom-6 left-6 flex items-end gap-3' style={{ ['--bf-hp-flash' as string]: flash }}>
+    <div className='bf-hud-health absolute bottom-6 left-6 flex items-end gap-3' style={{ ['--bf-hp-flash' as string]: flash }}>
       <style>{FLASH_KEYFRAMES}</style>
       <div className={PLATE}>
         <span
@@ -145,7 +145,7 @@ export function Ammo() {
   const reloading = hud.reload >= 0;
   const lowAmmo = hud.ammo <= Math.ceil(hud.mag * 0.25);
   return (
-    <div className='absolute bottom-6 right-6 flex flex-col items-end gap-2'>
+    <div className='bf-hud-ammo absolute bottom-6 right-6 flex flex-col items-end gap-2'>
       <Grenades count={hud.grenades} max={hud.grenadeMax} timer={hud.grenadeTimer} refill={hud.grenadeRefill} />
       <div className='flex items-end gap-4'>
         <WeaponIcon weapon={hud.weapon} size={92} className='text-white/90 drop-shadow-[0_2px_0_rgba(0,0,0,.5)]' />
@@ -177,7 +177,7 @@ function Grenades({ count, max, timer, refill }: { count: number; max: number; t
   }
   const charging = timer > 0 && count < max;
   return (
-    <div className='flex items-end gap-1'>
+    <div className='bf-hud-grenades flex items-end gap-1'>
       {Array.from({ length: Math.max(max, count) }, (_, i) => {
         const arrived = i === count - 1 && arrivals > 0;
         return (

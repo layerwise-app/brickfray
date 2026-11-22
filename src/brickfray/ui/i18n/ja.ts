@@ -1,8 +1,12 @@
 import { boardJa } from './board/ja';
+import { touchJa } from './touch/ja';
+import { hudJa } from './hud/ja';
 import type { Dictionary } from './en';
 
 export const ja: Dictionary = {
   ...boardJa,
+  ...touchJa,
+  ...hudJa,
   play: 'プレイ',
   playCaption: 'オンライン対戦',
   solo: 'ソロ',
@@ -54,9 +58,9 @@ export const ja: Dictionary = {
   'difficulty.easy': 'イージー',
   'difficulty.normal': 'ノーマル',
   'difficulty.hard': 'ハード',
-  'difficultyHint.easy': 'スナップボットが少なく、動きも遅め。ウェーブ間で全回復し、アップグレードを1つ選択。',
-  'difficultyHint.normal': '標準のペース。ウェーブ間で全回復し、アップグレードを1つ選択。',
-  'difficultyHint.hard': '狙いが鋭く、ウェーブも大きい。ウェーブ間の回復は半分、アップグレードを1つ選択。',
+  'difficultyHint.easy': 'はじめての人向け：ボットが少なく、狙いが遅く、攻撃も弱め。ウェーブ間で全回復。',
+  'difficultyHint.normal': '本来の歯ごたえ：ウェーブごとに圧力が増し、数ウェーブごとにメガボット。ウェーブ間で全回復。',
+  'difficultyHint.hard': '上級者向け：狙いが鋭く、ウェーブも大きい。ウェーブ間の回復は半分だけ。',
   'map.plaza': 'プラザ',
   'map.fortress': 'フォートレス',
   'map.docks': 'ドック',

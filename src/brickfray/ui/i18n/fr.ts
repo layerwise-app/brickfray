@@ -1,8 +1,12 @@
 import { boardFr } from './board/fr';
+import { touchFr } from './touch/fr';
+import { hudFr } from './hud/fr';
 import type { Dictionary } from './en';
 
 export const fr: Dictionary = {
   ...boardFr,
+  ...touchFr,
+  ...hudFr,
   play: 'Jouer',
   playCaption: 'Partie en ligne',
   solo: 'Solo',
@@ -54,9 +58,9 @@ export const fr: Dictionary = {
   'difficulty.easy': 'Facile',
   'difficulty.normal': 'Normal',
   'difficulty.hard': 'Difficile',
-  'difficultyHint.easy': 'Moins de snapbots, plus lents. Soins complets et une amélioration entre les vagues.',
-  'difficultyHint.normal': 'La progression classique. Soins complets et une amélioration entre les vagues.',
-  'difficultyHint.hard': 'Visée plus précise, vagues plus grosses. Moitié des soins et une amélioration entre les vagues.',
+  'difficultyHint.easy': 'Pour vos premières parties : moins de snapbots, qui visent lentement et frappent moins fort. Santé pleine entre les vagues.',
+  'difficultyHint.normal': 'Le vrai défi : une pression qui monte à chaque vague, un Megabot de temps en temps. Santé pleine entre les vagues.',
+  'difficultyHint.hard': 'Pour les vétérans : visée précise, vagues plus grosses, et seulement la moitié de la santé entre les vagues.',
   'map.plaza': 'Place',
   'map.fortress': 'Forteresse',
   'map.docks': 'Docks',

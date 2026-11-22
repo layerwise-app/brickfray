@@ -19,6 +19,7 @@ import { HudStore } from './hud';
 import { Input } from './input';
 import { MatchView } from './match-view';
 import { MAP_IDS, saveSettings, type Settings } from './settings';
+import { enemyInSights } from './touch-aim';
 import { IDLE, Showroom } from './showroom';
 import { renderPortraits } from './portraits';
 import type { MatchReport } from '../../lib/board/contract';
@@ -291,6 +292,7 @@ export class Game {
   private createMatch(settings: MatchSettings) {
     const match = new MatchView(this.kit, this.renderer, this.client!, settings, this.audio, this.view, this.hud, this.tagLayer);
     match.fp.baseFov = this.settings.fov;
+    this.input.sights = () => enemyInSights(match);
     return match;
   }
 

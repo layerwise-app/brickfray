@@ -1,7 +1,11 @@
 import { boardEn } from './board/en';
+import { touchEn } from './touch/en';
+import { hudEn } from './hud/en';
 
 export const en = {
   ...boardEn,
+  ...touchEn,
+  ...hudEn,
   play: 'Play',
   playCaption: 'Online match',
   solo: 'Solo',
@@ -53,9 +57,9 @@ export const en = {
   'difficulty.easy': 'Easy',
   'difficulty.normal': 'Normal',
   'difficulty.hard': 'Hard',
-  'difficultyHint.easy': 'Fewer snapbots with slower aim. Full heal and an upgrade between waves.',
-  'difficultyHint.normal': 'The classic ramp. Full heal and an upgrade between waves.',
-  'difficultyHint.hard': 'Sharper aim, bigger waves. Half heal and an upgrade between waves.',
+  'difficultyHint.easy': 'For your first runs: fewer snapbots, slower to aim, softer hits. Full health back between waves.',
+  'difficultyHint.normal': 'The real challenge: steady pressure that grows every wave, a Megabot every few waves. Full health back between waves.',
+  'difficultyHint.hard': 'For veterans: sharp aim, bigger waves, and only half your health back between waves.',
   'map.plaza': 'Plaza',
   'map.fortress': 'Fortress',
   'map.docks': 'Docks',

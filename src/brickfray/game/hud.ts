@@ -89,6 +89,13 @@ export interface HudState {
   waveLeft: number;
   waveTheme: MatchState['theme'];
   soloCause: MatchState['cause'];
+  /** The local player's headshot kills, shots fired and shots that hit someone (host traces), and seconds played. */
+  headshots: number;
+  shots: number;
+  shotsHit: number;
+  playTime: number;
+  /** Solo: living Megabots and their health. */
+  bosses: { id: number; health: number; max: number }[];
 }
 
 export type HudPulse =
@@ -136,7 +143,12 @@ export function initialHud(): HudState {
     upgradesTaken: [],
     waveLeft: 0,
     waveTheme: null,
-    soloCause: null
+    soloCause: null,
+    headshots: 0,
+    shots: 0,
+    shotsHit: 0,
+    playTime: 0,
+    bosses: []
   };
 }
 

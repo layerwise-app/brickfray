@@ -2,12 +2,13 @@ import { ROSTER } from '../../characters/roster';
 import type { CharacterId } from '../../characters/types';
 import type { ScoreRow } from '../../game/hud';
 import { TEAM_COLORS } from '../../game/remotes';
-import { useGame, useHud } from '../App';
+import { useHud } from '../App';
+import { mapName } from '../board/format';
 import { useT } from '../i18n';
-import { BotIcon, CrownIcon, DoorIcon } from '../icons';
-import { UpgradeList } from './UpgradeList';
+import { BotIcon } from '../icons';
+import { RunStats } from './RunResult';
 
-function Swatch({ row }: { row: ScoreRow }) {
+export function Swatch({ row }: { row: ScoreRow }) {
   const info = ROSTER[row.character as CharacterId];
   if (!info) return <BotIcon size={22} className='shrink-0 opacity-75' />;
   return <span className='h-6 w-6 shrink-0 rounded-md shadow-[inset_0_-2px_0_rgba(0,0,0,.25)]' style={{ background: `linear-gradient(160deg, ${info.primary} 0 58%, ${info.secondary} 58%)` }} />;
@@ -15,10 +16,10 @@ function Swatch({ row }: { row: ScoreRow }) {
 
 const COLUMNS = '30px minmax(0,1fr) 46px 46px 46px 72px 52px';
 /** A toy brick plate: lit top lip, shaded bottom, a hard drop below. */
-const PLATE = 'inset 0 2px 0 rgba(255,255,255,.22), inset 0 -3px 0 rgba(0,0,0,.25), 0 3px 0 rgba(0,0,0,.35)';
+export const PLATE = 'inset 0 2px 0 rgba(255,255,255,.22), inset 0 -3px 0 rgba(0,0,0,.25), 0 3px 0 rgba(0,0,0,.35)';
 
 /** Each player is a brick plate in their team's colour (slate in free-for-all), the local player's plate yellow. */
-function plateColor(r: ScoreRow) {
+export function plateColor(r: ScoreRow) {
   if (r.me) return '#ffcd2e';
   return r.team !== -1 ? `color-mix(in srgb, ${TEAM_COLORS[r.team]} 52%, #101a30)` : '#2a3a5e';
 }
@@ -62,18 +63,30 @@ function Table({ rows }: { rows: ScoreRow[] }) {
   );
 }
 
+/** Held Tab: the room's table, or in solo the run so far (snapbots have no place on a table of players). */
 export function Scoreboard() {
   const hud = useHud();
-  const { t } = useT();
+  const { t, lang } = useT();
   const mode = hud.settings?.mode;
   return (
-    <div className='absolute inset-0 grid place-items-center bg-black/30'>
-      <div className='bf-panel bf-studs bf-fade-in w-[min(760px,94vw)] p-5'>
-        <div className='mb-3 flex items-center justify-between'>
-          <span className='bf-display text-2xl'>{mode ? t(`mode.${mode}`) : ''}</span>
-          <span className='bf-display text-xl text-[var(--bf-muted)]'>{hud.settings ? t(`map.${hud.settings.map}`) : ''}</span>
+    <div className='bf-scoreboard absolute inset-0 grid place-items-center bg-black/30 p-3'>
+      <div className='bf-panel bf-studs bf-fade-in bf-scroll max-h-full w-[min(760px,94vw)] overflow-y-auto p-5'>
+        <div className='mb-3 flex items-center justify-between gap-3'>
+          <span className='bf-display text-2xl'>{mode === 'solo' ? t('run.title') : mode ? t(`mode.${mode}`) : ''}</span>
+          <span className='bf-display truncate text-xl text-[var(--bf-muted)]'>
+            {hud.settings && (mode === 'solo' ? `${t(`difficulty.${hud.settings.difficulty}`)} · ${mapName(lang, hud.settings.map)}` : mapName(lang, hud.settings.map))}
+          </span>
         </div>
-        {mode === 'tdm' ? (
+        {mode === 'solo' ? (
+          <>
+            {hud.phase === 'playing' && hud.waveLeft > 0 && (
+              <div className='mb-3 text-sm font-semibold text-white/80'>
+                {t('wave', { n: Math.max(1, hud.wave) })} · {t('run.left')} <span className='bf-display text-lg tabular-nums text-[var(--bf-yellow)]'>{hud.waveLeft}</span>
+              </div>
+            )}
+            <RunStats compact />
+          </>
+        ) : mode === 'tdm' ? (
           <div className='flex flex-col gap-4'>
             {([0, 1] as const).map((team) => (
               <div key={team}>
@@ -87,99 +100,6 @@ export function Scoreboard() {
         ) : (
           <Table rows={hud.rows} />
         )}
-        {mode === 'solo' && (
-          <div className='mt-4 border-t border-white/10 pt-3'>
-            <div className='mb-2 text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--bf-muted)]'>{t('upgrade.list')}</div>
-            <UpgradeList levels={hud.upgrades} />
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-/** The end of a solo run: how far it went, what it scored, and the upgrades it was built from. */
-function RunSummary() {
-  const hud = useHud();
-  const { t } = useT();
-  const me = hud.rows.find((r) => r.me);
-  return (
-    <div className='bf-panel bf-studs flex w-full flex-col gap-5 p-6'>
-      <div className='grid grid-cols-3 gap-3'>
-        <Stat label={t('run.wave')} value={Math.max(1, hud.wave)} accent />
-        <Stat label={t('score')} value={me?.score ?? 0} />
-        <Stat label={t('run.kills')} value={me?.kills ?? 0} />
-      </div>
-      <div>
-        <div className='mb-2 text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--bf-muted)]'>
-          {t('run.upgrades')} · {hud.upgradesTaken.length}
-        </div>
-        <UpgradeList levels={hud.upgrades} order={hud.upgradesTaken} />
-      </div>
-    </div>
-  );
-}
-
-function Stat({ label, value, accent }: { label: string; value: number; accent?: boolean }) {
-  return (
-    <div className='flex flex-col items-center rounded-[14px] bg-white/[.07] py-3' style={{ boxShadow: PLATE }}>
-      <span className={`bf-display text-5xl leading-none tabular-nums ${accent ? 'text-[var(--bf-yellow)]' : ''}`}>{value}</span>
-      <span className='mt-1.5 text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--bf-muted)]'>{label}</span>
-    </div>
-  );
-}
-
-export function Results() {
-  const hud = useHud();
-  const game = useGame();
-  const { t } = useT();
-  const mode = hud.settings?.mode;
-  const me = hud.rows.find((r) => r.me);
-  let title: string;
-  let good = false;
-  if (mode === 'solo') title = t('gameOver');
-  else if (mode === 'tdm') {
-    if (hud.winner === null) title = t('draw');
-    else {
-      good = hud.winner === hud.myTeam;
-      title = good ? t('victory') : t('defeat');
-    }
-  } else {
-    good = !!me && hud.winner === me.id;
-    const winner = hud.rows.find((r) => r.id === hud.winner);
-    title = good ? t('victory') : winner ? t('wins', { name: winner.name }) : t('draw');
-  }
-  return (
-    <div className='pointer-events-auto absolute inset-0 grid place-items-center bg-[#0b1222]/70 backdrop-blur-sm'>
-      <div className='bf-pop flex w-[min(760px,94vw)] flex-col items-center gap-5'>
-        <div className='flex items-center gap-3'>
-          {good && <CrownIcon size={44} className='text-[var(--bf-yellow)]' />}
-          <h2 className={`bf-display text-7xl ${good ? 'text-[var(--bf-yellow)]' : ''}`}>{title}</h2>
-        </div>
-        {mode === 'solo' && hud.settings && (
-          <div className='bf-display text-3xl text-white/85'>
-            {t('reachedWave', { n: Math.max(1, hud.wave) })} · {t(`difficulty.${hud.settings.difficulty}`)}
-          </div>
-        )}
-        {mode === 'solo' ? (
-          <RunSummary />
-        ) : (
-          <div className='bf-panel bf-studs w-full p-5'>
-            <Table rows={hud.rows} />
-          </div>
-        )}
-        <div className='flex items-center gap-4'>
-          {mode !== 'solo' && <span className='font-semibold text-white/75'>{t('backToLobby', { n: Math.ceil(hud.phaseLeft) })}</span>}
-          {mode === 'solo' && (
-            <button className='bf-btn bf-btn-primary' onClick={() => game.startMatch()}>
-              <span className='font-bold'>{t('playAgain')}</span>
-            </button>
-          )}
-          <button className='bf-btn bf-btn-red' onClick={() => game.leave()}>
-            <DoorIcon size={18} />
-            {t('leave')}
-          </button>
-        </div>
       </div>
     </div>
   );

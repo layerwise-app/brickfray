@@ -3,11 +3,13 @@ import type { ShatterPiece } from '../characters/types';
 import { PLASTIC } from '../engine/palette';
 import type { GameEvent, ShotTrace } from '../sim/types';
 import { magSize } from '../sim/arms';
+import { waveTuning } from '../sim/waves';
 import { WEAPONS } from '../weapons/defs';
 import type { FeedEntry, ScoreRow } from './hud';
 import type { MatchView } from './match-view';
 
 const FEED_LIFE = 6;
+const NO_BOSSES: { id: number; health: number; max: number }[] = [];
 let feedKey = 1;
 
 /** Headshot kills send the head (and hat) spinning up and away from the shot. */
@@ -27,6 +29,8 @@ export class MatchEvents {
   private bannerUntil = 0;
   private clock = 0;
   private hudTimer = 0;
+  /** The local player's own record of the match for the HUD: headshot kills, shots fired and landed, seconds played. */
+  private mine = { headshots: 0, shots: 0, hit: 0, time: 0 };
 
   constructor(private readonly mv: MatchView) {}
 
@@ -36,6 +40,7 @@ export class MatchEvents {
     this.bannerUntil = from.bannerUntil;
     this.clock = from.clock;
     this.offerUntil = from.offerUntil;
+    this.mine = from.mine;
   }
 
   private name(id: number) {
@@ -52,7 +57,11 @@ export class MatchEvents {
     const me = mv.session.you;
     const cam = mv.fp.camera.position;
     for (const t of list) {
-      if (t.shooter === me) continue;
+      if (t.shooter === me) {
+        this.mine.shots++;
+        if (t.ends.some((e) => e.hitPlayer && e.hitPlayer !== me)) this.mine.hit++;
+        continue;
+      }
       const remote = mv.remotes.map.get(t.shooter);
       const from = remote ? mv.remotes.muzzleOf(remote, new THREE.Vector3()) : new THREE.Vector3(...t.origin);
       const pellet = t.ends.length > 1;
@@ -124,6 +133,7 @@ export class MatchEvents {
             });
           }
           if (e.killer === me && e.victim !== me) {
+            if (e.headshot) this.mine.headshots++;
             mv.hud.pulse({ type: 'hit', kind: 'kill', amount: 0, at: null, headshot: e.headshot });
             mv.sound.kill(e.headshot);
           }
@@ -154,7 +164,6 @@ export class MatchEvents {
         case 'spawn':
           if (e.player === me) {
             mv.hud.set({ death: null });
-            mv.play('respawn', null, 0.7, 6);
           }
           break;
         case 'melee':
@@ -168,7 +177,6 @@ export class MatchEvents {
         case 'wave':
           mv.hud.set({ banner: { key: feedKey++, text: 'wave', sub: String(e.wave) }, wave: e.wave });
           this.bannerUntil = this.clock + 3;
-          mv.play('waveStart', null, 1, 8);
           break;
         case 'upgradeOffer':
           if (e.player === me) this.dealt(e);
@@ -187,7 +195,6 @@ export class MatchEvents {
   /** Solo: the upgrade cards after a cleared wave. */
   private dealt(e: Extract<GameEvent, { type: 'upgradeOffer' }>) {
     this.mv.hud.set({ offer: { key: feedKey++, wave: e.wave, options: e.options, levels: e.levels, picked: null } });
-    this.mv.play('respawn', null, 0.8, 8);
   }
 
   /** The pick landed: the cards hold the choice a moment, then leave. An idle player's card is picked with the same click. */
@@ -196,7 +203,6 @@ export class MatchEvents {
     const offer = hud.state.offer;
     hud.set({ offer: offer && { ...offer, picked: e.id }, upgrades: { ...hud.state.upgrades, [e.id]: e.level }, upgradesTaken: [...hud.state.upgradesTaken, e.id] });
     this.offerUntil = this.clock + 0.9;
-    if (e.auto) this.mv.play('uiClick', null, 1, 8);
   }
 
   private pushFeed() {
@@ -207,6 +213,8 @@ export class MatchEvents {
   frame(dt: number) {
     const mv = this.mv;
     this.clock += dt;
+    const phaseNow = mv.hud.state.phase;
+    if (phaseNow === 'playing' || phaseNow === 'intermission') this.mine.time += dt;
     const before = this.feed.length;
     this.feed = this.feed.filter((f) => this.clock - f.at < FEED_LIFE);
     if (this.feed.length !== before) this.pushFeed();
@@ -225,7 +233,9 @@ export class MatchEvents {
     const now = mv.session.hostNow();
     const match = board?.match;
     const phase = match?.phase ?? 'warmup';
-    mv.sound.setPhase(phase, match?.phaseEnds ? Math.max(0, match.phaseEnds - now) : 0);
+    const mode = mv.settings.mode;
+    const won = match?.winner === (mode === 'tdm' ? mv.myTeam : mv.session.you);
+    const outcome = phase !== 'ended' ? null : mode === 'solo' ? 'over' : won ? 'won' : 'lost';
     const info = mv.renderer.renderer.info.render;
     const self = mv.session.snapshots.at(-1)?.self;
     const weapon = p.arms.next ?? p.arms.weapon;
@@ -253,6 +263,11 @@ export class MatchEvents {
       waveLeft: match?.waveLeft ?? 0,
       waveTheme: match?.theme ?? null,
       soloCause: match?.cause ?? null,
+      headshots: this.mine.headshots,
+      shots: this.mine.shots,
+      shotsHit: this.mine.hit,
+      playTime: this.mine.time,
+      bosses: this.bosses(),
       winner: match?.winner ?? null,
       rows: this.rows(),
       ping: Math.round(mv.session.rtt * 1000),
@@ -285,6 +300,18 @@ export class MatchEvents {
     const fov = THREE.MathUtils.degToRad(this.mv.fp.currentFov);
     const width = this.mv.renderer.canvas.clientWidth;
     return (Math.tan(spread) / Math.tan(fov / 2)) * (width / 2) + Math.max(0, 0.15 - p.arms.sinceShot) * 40;
+  }
+
+  /** Solo: the Megabots alive now, with their health from the last snapshot. */
+  private bosses() {
+    const mv = this.mv;
+    const snapshot = mv.session.snapshots.at(-1);
+    if (mv.settings.mode !== 'solo' || !snapshot) return NO_BOSSES;
+    const max = waveTuning(mv.settings.difficulty, Math.max(1, mv.session.board?.match.wave ?? 1)).bossHealth;
+    const list = snapshot.players.filter((p) => p.alive && mv.session.roster.get(p.id)?.bot === 'boss').map((p) => ({ id: p.id, health: p.health, max }));
+    const last = this.mv.hud.state.bosses;
+    // The same numbers keep the same array, so the HUD does not redraw at 15 Hz for nothing.
+    return list.length === last.length && list.every((b, i) => b.id === last[i]!.id && b.health === last[i]!.health) ? last : list.length ? list : NO_BOSSES;
   }
 
   private rows(): ScoreRow[] {

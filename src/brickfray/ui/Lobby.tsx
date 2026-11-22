@@ -5,6 +5,7 @@ import { mapPreview } from './map-preview';
 import { useApp, useGame } from './App';
 import { useT } from './i18n';
 import { CopyIcon, CrownIcon, DoorIcon, PlayIcon } from './icons';
+import { SnapbotPrimer, SoloBrief } from './hud/SoloBrief';
 
 const MAPS = ['plaza', 'fortress', 'docks', 'temple'] as const;
 const MINUTES = [5, 10, 15];
@@ -87,6 +88,7 @@ export function Lobby() {
                 <p className='text-sm text-[var(--bf-muted)]'>{t(`difficultyHint.${s.difficulty}`)}</p>
               </Field>
             )}
+            {solo && <SnapbotPrimer />}
             {!solo && (
             <div className='grid gap-5 sm:grid-cols-2'>
               <Field label={t('timeLimit')}>
@@ -128,6 +130,7 @@ export function Lobby() {
                 </li>
               ))}
             </ul>
+            {solo && <SoloBrief settings={s} />}
             <div className='mt-auto pt-3'>
               {host ? (
                 <button className='bf-btn bf-btn-primary !h-16 w-full' onClick={() => game.startMatch()}>

@@ -4,7 +4,7 @@ import type { QualityLevel } from '../engine/quality';
 import type { Difficulty, MatchSettings } from '../sim/types';
 import type { MapId } from '../world/types';
 import { nameText } from '../../lib/board/names';
-import { DEFAULT_BINDINGS, type InputSettings } from './input';
+import { DEFAULT_BINDINGS, DEFAULT_TOUCH, type InputSettings } from './input';
 
 export const MAP_IDS: MapId[] = ['plaza', 'fortress', 'docks', 'temple'];
 
@@ -39,7 +39,8 @@ const KEY = 'brickfray.settings.v2';
 
 export function defaultQuality(): QualityLevel {
   if (typeof navigator === 'undefined') return 'medium';
-  const mobile = /Android|iPhone|iPad/i.test(navigator.userAgent);
+  // iPadOS reports a Mac user agent; its coarse primary pointer gives it away (touch laptops keep a fine one).
+  const mobile = /Android|iPhone|iPad/i.test(navigator.userAgent) || !!window.matchMedia?.('(pointer: coarse)').matches;
   const cores = navigator.hardwareConcurrency ?? 4;
   return mobile ? 'low' : cores >= 8 ? 'high' : 'medium';
 }
@@ -57,7 +58,8 @@ export function defaultSettings(): Settings {
       invertY: false,
       toggleAds: false,
       gamepadSensitivity: 1,
-      aimAssist: 0.5
+      aimAssist: 0.5,
+      touch: { ...DEFAULT_TOUCH }
     },
     mix: { master: 0.8, effects: 1, music: 0.5, ui: 0.7 },
     crosshair: { color: '#ffffff', size: 1, gap: 1, dot: true },
@@ -81,7 +83,7 @@ export function loadSettings(): Settings {
       ...saved,
       // A name saved before the name rule (spaces, emoji) is cleaned the way the board cleaned the profile's.
       name: typeof saved.name === 'string' ? nameText(saved.name) : base.name,
-      input: { ...base.input, ...saved.input, bindings: { ...base.input.bindings, ...saved.input?.bindings } },
+      input: { ...base.input, ...saved.input, bindings: { ...base.input.bindings, ...saved.input?.bindings }, touch: { ...base.input.touch, ...saved.input?.touch } },
       mix: { ...base.mix, ...saved.mix },
       crosshair: { ...base.crosshair, ...saved.crosshair },
       soloMap: MAP_IDS.includes(saved.soloMap as MapId) ? saved.soloMap! : base.soloMap,

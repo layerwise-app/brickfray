@@ -7,6 +7,7 @@ import { Hud } from './hud/Hud';
 import { Lobby } from './Lobby';
 import { MainMenu } from './MainMenu';
 import { PauseMenu } from './PauseMenu';
+import { RunSaved } from './hud/RunSaved';
 import { SettingsPanel } from './SettingsPanel';
 import './game.css';
 
@@ -87,6 +88,7 @@ function Screens({ openSettings }: { openSettings: () => void }) {
       {app.screen === 'lobby' && <Lobby />}
       {app.screen === 'match' && <Hud />}
       {app.screen === 'match' && app.paused && <PauseMenu openSettings={openSettings} />}
+      <RunSaved />
       {app.error && <ErrorBanner error={app.error} />}
     </>
   );

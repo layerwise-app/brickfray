@@ -1,0 +1,33 @@
+import type { touchEn } from './en';
+
+export const touchEs: Record<keyof typeof touchEn, string> = {
+  'touch.tapToPlay': 'Toca para jugar',
+  'touch.pickHint': 'Toca una carta',
+  'touch.scopeHint': 'Mantén el botón de respiración para estabilizar',
+  'touch.rotate': 'Gira el teléfono',
+  'touch.rotateHint': 'Las partidas se juegan en horizontal.',
+  'touch.coach.move': 'Muévete. Empuja más allá del aro para correr.',
+  'touch.coach.look': 'Arrastra aquí para mirar',
+  'touch.coach.fire': 'Dispara. Sigue arrastrando para apuntar.',
+  'touch.coach.grenade': 'Mantén para cocinarla, suelta para lanzar',
+  'touch.section': 'Táctil',
+  'touch.sensitivity': 'Sensibilidad de la vista',
+  'touch.buttonSize': 'Tamaño de los botones',
+  'touch.leftHanded': 'Diseño para zurdos',
+  'touch.leftHandedHint': 'Muévete con el pulgar derecho; apunta y dispara con el izquierdo.',
+  'touch.autoFire': 'Disparo automático',
+  'touch.autoFireHint': 'Dispara mientras la mira está sobre un enemigo.',
+  'touch.haptics': 'Vibración',
+  'touch.hapticsHint': 'Vibra al disparar, al acertar y al recibir daño.',
+  'touch.button.fire': 'Disparar',
+  'touch.button.ads': 'Apuntar',
+  'touch.button.jump': 'Saltar',
+  'touch.button.crouch': 'Agacharse o deslizarse',
+  'touch.button.reload': 'Recargar',
+  'touch.button.grenade': 'Granada',
+  'touch.button.melee': 'Cuerpo a cuerpo',
+  'touch.button.swap': 'Cambiar de arma',
+  'touch.button.steady': 'Contener la respiración',
+  'touch.button.pause': 'Pausa',
+  'touch.button.scoreboard': 'Marcador'
+};

@@ -1,0 +1,33 @@
+import type { touchEn } from './en';
+
+export const touchJa: Record<keyof typeof touchEn, string> = {
+  'touch.tapToPlay': 'タップでプレイ',
+  'touch.pickHint': 'カードをタップ',
+  'touch.scopeHint': '息止めボタン長押しで照準を安定',
+  'touch.rotate': 'スマホを横向きにしてください',
+  'touch.rotateHint': '対戦は横画面でプレイします。',
+  'touch.coach.move': '移動。リングの外まで押すとダッシュ',
+  'touch.coach.look': 'ここをドラッグして視点移動',
+  'touch.coach.fire': '射撃。そのままドラッグで照準',
+  'touch.coach.grenade': '長押しでタイミング調整、離して投げる',
+  'touch.section': 'タッチ',
+  'touch.sensitivity': '視点感度',
+  'touch.buttonSize': 'ボタンの大きさ',
+  'touch.leftHanded': '左利き配置',
+  'touch.leftHandedHint': '右の親指で移動し、左の親指で狙って撃ちます。',
+  'touch.autoFire': 'オート射撃',
+  'touch.autoFireHint': '照準が敵に重なっている間、自動で撃ちます。',
+  'touch.haptics': '振動',
+  'touch.hapticsHint': '射撃・命中・被弾のときに振動します。',
+  'touch.button.fire': '射撃',
+  'touch.button.ads': 'エイム',
+  'touch.button.jump': 'ジャンプ',
+  'touch.button.crouch': 'しゃがみ / スライディング',
+  'touch.button.reload': 'リロード',
+  'touch.button.grenade': 'グレネード',
+  'touch.button.melee': '近接攻撃',
+  'touch.button.swap': '武器切り替え',
+  'touch.button.steady': '息を止める',
+  'touch.button.pause': '一時停止',
+  'touch.button.scoreboard': 'スコアボード'
+};

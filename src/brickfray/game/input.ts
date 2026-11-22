@@ -1,4 +1,10 @@
 import { BUTTON } from '../sim/types';
+import { GamepadInput } from './gamepad-input';
+import { inputMode, onInputMode, watchInputMode } from './input-mode';
+import { TouchInput, type TouchSettings } from './touch-input';
+import { enterPlayScreen, leavePlayScreen } from './touch-screen';
+
+export { DEFAULT_TOUCH } from './touch-input';
 
 export type Action =
   | 'forward'
@@ -49,6 +55,7 @@ export interface InputSettings {
   toggleAds: boolean;
   gamepadSensitivity: number;
   aimAssist: number;
+  touch: TouchSettings;
 }
 
 export interface FrameInput {
@@ -65,6 +72,7 @@ export interface FrameInput {
 }
 
 const MOUSE_RADIANS = (0.022 * Math.PI) / 180;
+const noAssist = (yaw: number, pitch: number): [number, number] => [yaw, pitch];
 
 /** An on-screen choice (solo upgrade cards): while one is up, the captured mouse moves its pointer instead of the view. */
 export interface Picker {
@@ -72,6 +80,8 @@ export interface Picker {
   click(): void;
   choose(index: number): void;
   step(direction: number): void;
+  /** A tap on a card takes it at once. */
+  pick(index: number): void;
 }
 
 const PICK_KEYS: Record<string, number> = { Digit1: 0, Digit2: 1, Digit3: 2, Numpad1: 0, Numpad2: 1, Numpad3: 2 };
@@ -98,17 +108,27 @@ function takeCtrlHint() {
   }
 }
 
-/** Keyboard, pointer-locked mouse and gamepad, merged into per-frame intent. */
+/**
+ * Keyboard, pointer-locked mouse, gamepad and the on-screen touch controls, merged into per-frame intent. Touch play
+ * has no pointer lock: being engaged (in a match, no menu up) stands in for it, so `locked`, `lock` and `unlock` mean
+ * "the player is in control" either way.
+ */
 export class Input {
   settings: InputSettings;
-  locked = false;
+  readonly touch = new TouchInput();
+  /** For auto-fire: true while the sight is on an enemy. The game sets it for the running match. */
+  sights: (() => boolean) | null = null;
+  private pointerLocked = false;
+  private engaged = false;
+  private wantPlayScreen = false;
   private down = new Set<string>();
   private pressedOnce = new Set<string>();
   private dx = 0;
   private dy = 0;
   private wheel = 0;
   private adsToggled = false;
-  private padPrev: boolean[] = [];
+  private readonly pad = new GamepadInput();
+  private readonly frame: FrameInput = { lookYaw: 0, lookPitch: 0, forward: 0, right: 0, buttons: 0, slot: null, cycle: 0, scoreboard: false, usingGamepad: false };
   usingGamepad = false;
   onMenu: (() => void) | null = null;
   onChat: (() => void) | null = null;
@@ -138,15 +158,34 @@ export class Input {
     }, { passive: false });
     on(element, 'contextmenu', (e) => e.preventDefault());
     on(document, 'pointerlockchange', () => {
-      this.locked = document.pointerLockElement === this.element;
-      if (!this.locked) this.down.clear();
+      this.pointerLocked = document.pointerLockElement === this.element;
+      if (!this.pointerLocked) this.down.clear();
     });
     on(window, 'blur', () => this.down.clear());
+    this.cleanup.push(watchInputMode(), onInputMode(this.onMode));
   }
 
-  /** Must run inside a click: browsers only grant pointer lock to a user gesture. */
+  get touchMode() {
+    return inputMode() === 'touch';
+  }
+
+  /** The player is in control: the pointer is captured, or (touch) the match is being played. */
+  get locked() {
+    return this.touchMode ? this.engaged : this.pointerLocked;
+  }
+
+  get active() {
+    return this.enabled && this.locked;
+  }
+
+  /** Must run inside a click: browsers only grant pointer lock (and fullscreen) to a user gesture. */
   async lock() {
-    if (this.locked) return;
+    if (this.touchMode) {
+      if (!this.engaged) this.setEngaged(true);
+      this.wantPlayScreen = true;
+      return this.playScreen();
+    }
+    if (this.pointerLocked) return;
     try {
       await (this.element.requestPointerLock as (o?: { unadjustedMovement?: boolean }) => Promise<void>)({ unadjustedMovement: true });
     } catch {
@@ -160,11 +199,41 @@ export class Input {
 
   unlock() {
     if (document.pointerLockElement) document.exitPointerLock();
+    if (this.engaged) this.setEngaged(false);
+    if (!this.enabled) {
+      this.frame.slot = null;
+      this.frame.cycle = 0;
+      leavePlayScreen();
+    }
   }
 
-  get active() {
-    return this.enabled && this.locked;
+  /** Fullscreen and the landscape lock, from a tap when the match start came without one. */
+  async playScreen() {
+    if (!this.wantPlayScreen) return;
+    this.wantPlayScreen = false;
+    if (!(await enterPlayScreen())) this.wantPlayScreen = true;
   }
+
+  /** Game pauses and resumes on pointer lock changes; touch play has no lock and announces itself the same way. */
+  private setEngaged(on: boolean) {
+    this.engaged = on;
+    this.touch.reset();
+    this.down.clear();
+    document.dispatchEvent(new Event('pointerlockchange'));
+  }
+
+  private onMode = () => {
+    this.touch.reset();
+    if (!this.enabled) return;
+    if (this.touchMode && this.pointerLocked) {
+      // A touch on a game the trackpad had captured (tablet with a keyboard case) carries on by touch.
+      this.engaged = true;
+      document.exitPointerLock();
+    } else if (!this.touchMode && this.engaged) {
+      // A mouse taken up mid-match has to capture the pointer, from a click on the pause menu.
+      this.setEngaged(false);
+    }
+  };
 
   private matches(action: Action, code: string) {
     const b = this.settings.bindings[action];
@@ -175,7 +244,7 @@ export class Input {
     if (!this.enabled) return;
     const target = e.target as HTMLElement | null;
     if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) return;
-    if (down && e.code === 'Escape' && !this.locked) {
+    if (down && e.code === 'Escape' && !this.pointerLocked) {
       this.onMenu?.();
       return;
     }
@@ -207,10 +276,16 @@ export class Input {
     this.down.delete('Mouse0');
     this.down.delete('Mouse2');
     this.dx = this.dy = 0;
+    this.touch.reset();
+  }
+
+  /** A tap on upgrade card `index`. */
+  pick(index: number) {
+    if (this.active) this.picker?.pick(index);
   }
 
   private mouse(e: MouseEvent, down: boolean) {
-    if (!this.active) return;
+    if (!this.enabled || !this.pointerLocked) return;
     if (this.picker && down) {
       e.preventDefault();
       if (e.button === 0) this.picker.click();
@@ -226,7 +301,7 @@ export class Input {
   }
 
   private move(e: MouseEvent) {
-    if (!this.active) return;
+    if (!this.enabled || !this.pointerLocked) return;
     // Ignore the occasional giant jump some browsers emit when lock engages.
     if (Math.abs(e.movementX) > 600 || Math.abs(e.movementY) > 600) return;
     if (this.picker) return this.picker.move(e.movementX, e.movementY);
@@ -244,82 +319,46 @@ export class Input {
     return this.pressedOnce.has(a) || (b !== undefined && this.pressedOnce.has(b));
   }
 
-  /** Collect this frame's intent; `adsZoom` scales look speed while aiming. */
-  read(dt: number, adsZoom: number, assist: (yawRate: number, pitchRate: number) => [number, number] = (y, p) => [y, p]): FrameInput {
+  /**
+   * Collect this frame's intent; `adsZoom` scales look speed while aiming. The result is reused every frame. A slot
+   * change still on it was not taken (the frame ran no tick) and carries over to this one.
+   */
+  read(dt: number, adsZoom: number, assist: (yawRate: number, pitchRate: number) => [number, number] = noAssist): FrameInput {
     const s = this.settings;
+    const f = this.frame;
     const zoomScale = adsZoom > 1 ? (1 / adsZoom) * s.adsSensitivity : 1;
     const k = MOUSE_RADIANS * s.sensitivity * zoomScale;
-    let lookYaw = -this.dx * k;
-    let lookPitch = -this.dy * k * (s.invertY ? -1 : 1);
+    f.lookYaw = -this.dx * k;
+    f.lookPitch = -this.dy * k * (s.invertY ? -1 : 1);
     this.dx = 0;
     this.dy = 0;
-    let forward = (this.held('forward') ? 1 : 0) - (this.held('back') ? 1 : 0);
-    let right = (this.held('right') ? 1 : 0) - (this.held('left') ? 1 : 0);
-    let buttons = 0;
-    const set = (bit: number, on: boolean) => {
-      if (on) buttons |= bit;
-    };
-    set(BUTTON.fire, this.held('fire'));
-    set(BUTTON.ads, s.toggleAds ? this.adsToggled : this.held('ads'));
-    set(BUTTON.jump, this.held('jump'));
-    set(BUTTON.crouch, this.held('crouch'));
-    set(BUTTON.sprint, this.held('sprint'));
-    set(BUTTON.reload, this.held('reload'));
-    set(BUTTON.melee, this.held('melee'));
-    set(BUTTON.grenade, this.held('grenade'));
-    set(BUTTON.grenadeLow, this.held('grenade') && this.held('sprint'));
-    let slot: number | null = null;
-    (['weapon1', 'weapon2'] as const).forEach((a, i) => {
-      if (this.pressed(a)) slot = i;
-    });
-    let cycle = Math.sign(this.wheel);
+    f.forward = (this.held('forward') ? 1 : 0) - (this.held('back') ? 1 : 0);
+    f.right = (this.held('right') ? 1 : 0) - (this.held('left') ? 1 : 0);
+    let b = 0;
+    if (this.held('fire')) b |= BUTTON.fire;
+    if (s.toggleAds ? this.adsToggled : this.held('ads')) b |= BUTTON.ads;
+    if (this.held('jump')) b |= BUTTON.jump;
+    if (this.held('crouch')) b |= BUTTON.crouch;
+    if (this.held('sprint')) b |= BUTTON.sprint;
+    if (this.held('reload')) b |= BUTTON.reload;
+    if (this.held('melee')) b |= BUTTON.melee;
+    if (this.held('grenade')) b |= this.held('sprint') ? BUTTON.grenade | BUTTON.grenadeLow : BUTTON.grenade;
+    f.buttons = b;
+    if (this.pressed('weapon2')) f.slot = 1;
+    else if (this.pressed('weapon1')) f.slot = 0;
+    const wheel = Math.sign(this.wheel);
     this.wheel = 0;
-    let scoreboard = this.held('scoreboard');
-    if (forward || right || lookYaw || lookPitch || buttons) this.usingGamepad = false;
-
-    const pad = this.readGamepad();
-    if (pad) {
-      const dead = (v: number) => (Math.abs(v) < 0.14 ? 0 : (v - Math.sign(v) * 0.14) / 0.86);
-      const curve = (v: number) => Math.sign(v) * Math.abs(v) ** 1.8;
-      const lx = dead(pad.axes[0] ?? 0);
-      const ly = dead(pad.axes[1] ?? 0);
-      const rx = curve(dead(pad.axes[2] ?? 0));
-      const ry = curve(dead(pad.axes[3] ?? 0));
-      const b = (i: number) => pad.buttons[i]?.pressed ?? false;
-      const edge = (i: number) => b(i) && !this.padPrev[i];
-      if (lx || ly || rx || ry || pad.buttons.some((x) => x.pressed)) this.usingGamepad = true;
-      if (this.usingGamepad) {
-        forward = -ly;
-        right = lx;
-        const rate = 3.2 * s.gamepadSensitivity * zoomScale;
-        const [yawRate, pitchRate] = assist(-rx * rate, -ry * rate * (s.invertY ? -1 : 1));
-        lookYaw += yawRate * dt;
-        lookPitch += pitchRate * dt;
-        set(BUTTON.fire, (pad.buttons[7]?.value ?? 0) > 0.3);
-        set(BUTTON.ads, (pad.buttons[6]?.value ?? 0) > 0.3);
-        set(BUTTON.jump, b(0));
-        set(BUTTON.crouch, b(1));
-        set(BUTTON.reload, b(2));
-        set(BUTTON.grenade, b(5));
-        set(BUTTON.melee, b(11));
-        set(BUTTON.sprint, b(10) || (forward > 0.9 && b(10)));
-        if (edge(3)) cycle = 1;
-        if (edge(9)) this.onMenu?.();
-        if (this.picker && edge(14)) this.picker.step(-1);
-        if (this.picker && edge(15)) this.picker.step(1);
-        if (this.picker && edge(0)) this.picker.click();
-        scoreboard ||= b(8);
-      }
-      this.padPrev = pad.buttons.map((x) => x.pressed);
+    if (wheel) f.cycle = wheel;
+    f.scoreboard = this.held('scoreboard');
+    if (this.touchMode) {
+      const t = s.touch;
+      this.touch.apply(f, dt, performance.now(), t.sensitivity * zoomScale, s.invertY, dt > 0 ? assist : null, t.autoFire && this.active ? this.sights : null);
     }
+    f.usingGamepad = this.usingGamepad && !(f.forward || f.right || f.lookYaw || f.lookPitch || f.buttons);
+    this.pad.read(f, dt, zoomScale, s, assist, this.picker, this.onMenu);
+    this.usingGamepad = f.usingGamepad;
     this.pressedOnce.clear();
-    return { lookYaw, lookPitch, forward, right, buttons, slot, cycle, scoreboard, usingGamepad: this.usingGamepad };
-  }
-
-  private readGamepad(): Gamepad | null {
-    if (typeof navigator === 'undefined' || !navigator.getGamepads) return null;
-    for (const pad of navigator.getGamepads()) if (pad && pad.connected && pad.mapping === 'standard') return pad;
-    return null;
+    return f;
   }
 
   /** In fullscreen, Keyboard Lock lets Ctrl+W and Esc reach the game instead of the browser. */
@@ -334,6 +373,7 @@ export class Input {
 
   dispose() {
     for (const fn of this.cleanup) fn();
+    this.pad.dispose();
     this.unlock();
   }
 }

@@ -1,8 +1,12 @@
 import { boardEs } from './board/es';
+import { touchEs } from './touch/es';
+import { hudEs } from './hud/es';
 import type { Dictionary } from './en';
 
 export const es: Dictionary = {
   ...boardEs,
+  ...touchEs,
+  ...hudEs,
   play: 'Jugar',
   playCaption: 'Partida en línea',
   solo: 'Solo',
@@ -54,9 +58,9 @@ export const es: Dictionary = {
   'difficulty.easy': 'Fácil',
   'difficulty.normal': 'Normal',
   'difficulty.hard': 'Difícil',
-  'difficultyHint.easy': 'Menos snapbots y más lentos. Curación completa y una mejora entre oleadas.',
-  'difficultyHint.normal': 'El ritmo clásico. Curación completa y una mejora entre oleadas.',
-  'difficultyHint.hard': 'Mejor puntería y oleadas más grandes. Media curación y una mejora entre oleadas.',
+  'difficultyHint.easy': 'Para tus primeras partidas: menos snapbots, que apuntan despacio y pegan flojo. Recuperas toda la salud entre oleadas.',
+  'difficultyHint.normal': 'El reto de verdad: presión que crece cada oleada y un Megabot cada pocas oleadas. Recuperas toda la salud entre oleadas.',
+  'difficultyHint.hard': 'Para veteranos: puntería certera, oleadas más grandes y solo media salud entre oleadas.',
   'map.plaza': 'Plaza',
   'map.fortress': 'Fortaleza',
   'map.docks': 'Muelles',

@@ -6,6 +6,7 @@ import { maxLevel, UPGRADES, type UpgradeId } from '../../sim/upgrades';
 import { useGame, useHud } from '../App';
 import { useT } from '../i18n';
 import { WeaponIcon } from '../icons';
+import { useTouchMode } from '../touch/useInputMode';
 import { cardText, type DetailPart } from './upgrade-text';
 import { UPGRADE_LOOK, UpgradeIcon } from './UpgradeIcon';
 
@@ -27,7 +28,10 @@ function Cards({ offer }: { offer: UpgradeOffer }) {
   const game = useGame();
   const hud = useHud();
   const { t } = useT();
+  const touch = useTouchMode();
   const [hovered, setHovered] = useState<number | null>(null);
+  /** The card a number key marked: the same key again takes it. */
+  const [marked, setMarked] = useState<number | null>(null);
   const [chosen, setChosen] = useState<UpgradeId | null>(null);
   const cards = useRef<(HTMLDivElement | null)[]>([]);
   const pointer = useRef<HTMLDivElement>(null);
@@ -79,11 +83,17 @@ function Cards({ offer }: { offer: UpgradeOffer }) {
       // the cards come up must not pick.
       choose(i) {
         if (over === i) choose(i);
-        else if (offer.options[i]) goTo(i);
+        else if (offer.options[i]) {
+          goTo(i);
+          setMarked(i);
+        }
       },
       step(direction) {
         const n = offer.options.length;
         goTo(over === null ? (direction > 0 ? 0 : n - 1) : (over + direction + n) % n);
+      },
+      pick(i) {
+        choose(i);
       }
     };
     const goTo = (i: number) => {
@@ -102,7 +112,7 @@ function Cards({ offer }: { offer: UpgradeOffer }) {
 
   const waiting = !picked && hud.phase === 'intermission' && hud.phaseLeft > 0;
   return (
-    <div className='absolute inset-0 flex flex-col items-center justify-center gap-7' style={{ background: 'radial-gradient(ellipse 70% 60% at 50% 50%, rgba(6,10,22,.6), rgba(6,10,22,.15))' }}>
+    <div className='bf-pick absolute inset-0 flex flex-col items-center justify-center gap-7' style={{ background: 'radial-gradient(ellipse 70% 60% at 50% 50%, rgba(6,10,22,.6), rgba(6,10,22,.15))' }}>
       <style>{KEYFRAMES}</style>
       <div className='bf-pop flex flex-col items-center'>
         <span className='bf-display bf-hud-text text-5xl leading-none text-[var(--bf-yellow)]'>{t('upgrade.cleared', { n: offer.wave })}</span>
@@ -110,7 +120,7 @@ function Cards({ offer }: { offer: UpgradeOffer }) {
       </div>
       <div className='flex items-stretch gap-[clamp(12px,2.2vw,30px)]'>
         {offer.options.map((id, i) => (
-          <div key={id} style={{ animation: `bf-card-in .5s cubic-bezier(.2,1.4,.4,1) ${120 + i * 90}ms both` }}>
+          <div key={id} className={touch ? 'pointer-events-auto' : undefined} onClick={touch ? () => game.input.pick(i) : undefined} style={{ animation: `bf-card-in .5s cubic-bezier(.2,1.4,.4,1) ${120 + i * 90}ms both` }}>
             <Card
               id={id}
               index={i}
@@ -127,12 +137,16 @@ function Cards({ offer }: { offer: UpgradeOffer }) {
       </div>
       <div className='flex flex-col items-center gap-2' style={{ opacity: picked ? 0 : 1, transition: 'opacity .2s' }}>
         <div className='bf-hud-text flex items-center gap-2 text-base font-semibold text-white/85'>
-          {offer.options.map((_, i) => (
-            <span key={i} className='bf-display grid h-7 w-7 place-items-center rounded-md bg-white/15 text-lg leading-none shadow-[inset_0_-2px_0_rgba(0,0,0,.3)]'>
-              {i + 1}
-            </span>
-          ))}
-          <span className='ml-1'>{t('upgrade.hint')}</span>
+          {!touch &&
+            offer.options.map((_, i) => (
+              <span key={i} className='bf-display grid h-7 w-7 place-items-center rounded-md bg-white/15 text-lg leading-none shadow-[inset_0_-2px_0_rgba(0,0,0,.3)]'>
+                {i + 1}
+              </span>
+            ))}
+          <span className='ml-1'>{t(touch ? 'touch.pickHint' : 'upgrade.hint')}</span>
+        </div>
+        <div className='bf-hud-text bf-display text-2xl text-[var(--bf-yellow)]' style={{ visibility: !touch && marked !== null && marked === hovered ? 'visible' : 'hidden' }}>
+          {t('upgrade.again', { n: (marked ?? 0) + 1 })}
         </div>
         <div className='flex items-center gap-3 text-sm font-semibold text-white/70' style={{ visibility: waiting ? 'visible' : 'hidden' }}>
           <span className='bf-hud-text tabular-nums'>{t('upgrade.auto', { n: Math.ceil(hud.phaseLeft) })}</span>
@@ -141,7 +155,7 @@ function Cards({ offer }: { offer: UpgradeOffer }) {
           </span>
         </div>
       </div>
-      {!picked && <Pointer ref={pointer} />}
+      {!picked && !touch && <Pointer ref={pointer} />}
     </div>
   );
 }

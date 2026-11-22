@@ -1,8 +1,12 @@
 import { boardKo } from './board/ko';
+import { touchKo } from './touch/ko';
+import { hudKo } from './hud/ko';
 import type { Dictionary } from './en';
 
 export const ko: Dictionary = {
   ...boardKo,
+  ...touchKo,
+  ...hudKo,
   play: '플레이',
   playCaption: '온라인 대전',
   solo: '솔로',
@@ -54,9 +58,9 @@ export const ko: Dictionary = {
   'difficulty.easy': '쉬움',
   'difficulty.normal': '보통',
   'difficulty.hard': '어려움',
-  'difficultyHint.easy': '스냅봇이 적고 느립니다. 웨이브 사이에 체력을 모두 회복하고 업그레이드를 하나 고릅니다.',
-  'difficultyHint.normal': '기본 난이도. 웨이브 사이에 체력을 모두 회복하고 업그레이드를 하나 고릅니다.',
-  'difficultyHint.hard': '조준이 정확하고 웨이브가 큽니다. 웨이브 사이에 체력을 절반만 회복하고 업그레이드를 하나 고릅니다.',
+  'difficultyHint.easy': '처음 하는 분께: 스냅봇이 적고, 조준이 느리고, 약하게 때립니다. 웨이브 사이에 체력을 모두 회복합니다.',
+  'difficultyHint.normal': '제대로 된 도전: 웨이브마다 압박이 커지고, 몇 웨이브마다 메가봇이 나옵니다. 웨이브 사이에 체력을 모두 회복합니다.',
+  'difficultyHint.hard': '숙련자용: 조준이 정확하고 웨이브가 크며, 웨이브 사이에 체력을 절반만 회복합니다.',
   'map.plaza': '광장',
   'map.fortress': '요새',
   'map.docks': '부두',

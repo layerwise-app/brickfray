@@ -36,17 +36,17 @@ export function Death() {
         <span className='bf-display text-3xl'>{water ? t('fellInWater') : d.killer ? t('eliminatedBy', { name: d.killer }) : t('eliminatedSelf')}</span>
         <CauseIcon cause={d.weapon} size={56} className={water ? 'text-[#7cc8ff]' : 'text-white/80'} />
       </div>
-      {hud.settings?.mode !== 'solo' &&
-        (second > 0 ? (
-          <div className='flex flex-col items-center gap-1'>
-            <span className='text-sm font-semibold uppercase tracking-[0.25em] text-white/75'>{t('respawnIn')}</span>
-            <span key={second} className='bf-display bf-hud-text bf-pop text-6xl leading-none tabular-nums text-[var(--bf-yellow)]'>
+      {hud.settings?.mode !== 'solo' && (
+        // A solid plate: over a light wall a bare label disappears.
+        <div className='flex min-h-[64px] items-center gap-4 rounded-2xl bg-[#0b1222]/90 px-6 py-2 shadow-[inset_0_2px_0_rgba(255,255,255,.12),0_5px_0_rgba(0,0,0,.4)]'>
+          <span className='text-base font-bold uppercase tracking-[0.2em] text-white'>{second > 0 ? t('respawnIn') : t('respawning')}</span>
+          {second > 0 && (
+            <span key={second} className='bf-display bf-pop text-5xl leading-none tabular-nums text-[var(--bf-yellow)]'>
               {second}
             </span>
-          </div>
-        ) : (
-          <div className='text-sm font-semibold uppercase tracking-[0.25em] text-white/75'>{t('respawning')}</div>
-        ))}
+          )}
+        </div>
+      )}
     </div>
   );
 }

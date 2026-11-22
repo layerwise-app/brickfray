@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { WEAPONS } from '../../weapons/defs';
+import { waveTuning } from '../../sim/waves';
 import { TEAM_COLORS } from '../../game/remotes';
 import { useApp, useGame, useHud } from '../App';
 import { useT } from '../i18n';
@@ -8,15 +9,21 @@ import { Crosshair } from './Crosshair';
 import { CauseIcon, Death } from './Death';
 import { KillConfirm } from './KillConfirm';
 import { TopBar } from './MatchClock';
-import { Results, Scoreboard } from './Scoreboard';
+import { Results } from './Results';
+import { Scoreboard } from './Scoreboard';
+import { KindIntro, WaveBanner } from './SoloHud';
+import { WarmupTips } from './WarmupTips';
 import { UpgradePick } from './UpgradePick';
 import { Ammo, Health, LOW_HEALTH } from './Vitals';
+import { TouchLayer } from '../touch/TouchLayer';
+import { useTouchMode } from '../touch/useInputMode';
 
 export function Hud() {
   const hud = useHud();
   const app = useApp();
   const game = useGame();
   const { t } = useT();
+  const touch = useTouchMode();
   const playing = hud.phase === 'playing' || hud.phase === 'warmup' || hud.phase === 'intermission';
 
   return (
@@ -34,6 +41,8 @@ export function Hud() {
         </>
       )}
       <Banner />
+      <KindIntro />
+      <WarmupTips />
       <Chat />
       {hud.death && hud.phase !== 'ended' && <Death />}
       {hud.scoreboard && hud.phase !== 'ended' && <Scoreboard />}
@@ -42,12 +51,13 @@ export function Hud() {
       {hud.hint && (
         <div className='bf-pop absolute left-1/2 top-24 -translate-x-1/2 rounded-xl bg-black/70 px-4 py-2 text-sm font-medium'>{t('ctrlHint')}</div>
       )}
-      {hud.scoped && <div className='absolute bottom-[18%] left-1/2 -translate-x-1/2 text-sm font-semibold text-white/70'>{t('scopeHint')}</div>}
+      {hud.scoped && <div className='bf-scope-hint absolute bottom-[18%] left-1/2 -translate-x-1/2 text-sm font-semibold text-white/70'>{t(touch ? 'touch.scopeHint' : 'scopeHint')}</div>}
       {game.settings.showStats && hud.stats && (
-        <div className='absolute left-3 top-3 rounded-md bg-black/55 px-2 py-1 font-mono text-[11px] leading-4 text-white/85'>
+        <div className='bf-stats absolute left-3 top-3 rounded-md bg-black/55 px-2 py-1 font-mono text-[11px] leading-4 text-white/85'>
           {game.renderer.statsLine()} · {hud.stats.calls} calls · {(hud.stats.triangles / 1000).toFixed(0)}k tris · ping {hud.ping} ms
         </div>
       )}
+      <TouchLayer />
       {!app.paused && !game.input.active && hud.phase !== 'ended' && <ClickToPlay />}
     </div>
   );
@@ -56,9 +66,10 @@ export function Hud() {
 function ClickToPlay() {
   const game = useGame();
   const { t } = useT();
+  const touch = useTouchMode();
   return (
     <button className='pointer-events-auto absolute inset-0 grid place-items-center bg-black/25' onClick={() => game.resume()}>
-      <span className='bf-display bf-hud-text bf-pop rounded-2xl bg-black/40 px-6 py-3 text-3xl'>{t('clickToPlay')}</span>
+      <span className='bf-display bf-hud-text bf-pop rounded-2xl bg-black/40 px-6 py-3 text-3xl'>{t(touch ? 'touch.tapToPlay' : 'clickToPlay')}</span>
     </button>
   );
 }
@@ -102,7 +113,7 @@ function LowHealth({ level }: { level: number }) {
 function KillFeed() {
   const hud = useHud();
   return (
-    <div className='absolute right-4 top-4 flex flex-col items-end gap-1.5'>
+    <div className='bf-killfeed absolute right-4 top-4 flex flex-col items-end gap-1.5'>
       {hud.feed.map((f) => (
         <div
           key={f.key}
@@ -123,10 +134,12 @@ function KillFeed() {
 function Banner() {
   const hud = useHud();
   const { t } = useT();
-  if (!hud.banner) return null;
+  if (!hud.banner || hud.phase === 'ended') return null;
+  const wave = Number(hud.banner.sub);
+  const theme = hud.settings?.mode === 'solo' && wave > 0 ? waveTuning(hud.settings.difficulty, wave).theme : null;
   return (
-    <div key={hud.banner.key} className='bf-pop absolute left-1/2 top-[11%] -translate-x-1/2 text-center'>
-      <div className='bf-display bf-hud-text text-5xl text-[var(--bf-yellow)]'>{t('wave', { n: hud.banner.sub ?? '' })}</div>
+    <div key={hud.banner.key} className='bf-banner bf-pop absolute left-1/2 top-[11%] -translate-x-1/2 text-center'>
+      {theme ? <WaveBanner wave={hud.banner.sub ?? ''} theme={theme} /> : <div className='bf-display bf-hud-text text-5xl text-[var(--bf-yellow)]'>{t('wave', { n: hud.banner.sub ?? '' })}</div>}
     </div>
   );
 }
@@ -142,7 +155,7 @@ function Chat() {
     game.openChat();
   };
   return (
-    <div className='absolute bottom-28 left-6 flex w-80 flex-col gap-1'>
+    <div className='bf-chat absolute bottom-28 left-6 flex w-80 flex-col gap-1'>
       {hud.chat.map((c) => (
         <div key={c.key} className='bf-fade-in bf-hud-text text-sm'>
           <span className='font-bold' style={{ color: c.team !== -1 ? TEAM_COLORS[c.team] : '#ffcd2e' }}>
