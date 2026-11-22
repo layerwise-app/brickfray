@@ -8,14 +8,14 @@ import { panels, visorDepth } from './nova-trim';
 const BULK = 1.08;
 const LIMBS = 1.13;
 
-/** A big wave with the open left hand, carbine angled up in the right, weight on the right leg and the left leg stretched out to the side on its toes. */
+/** A big wave with the open left hand, carbine angled up in the right, boots planted apart with the knees eased: a hero's stance, not a dance step. */
 export const stance: Stance = {
-  pelvis: { at: [0.085, -0.035, 0], rot: [0.08, 0, 0.14] },
+  pelvis: { at: [0.05, -0.04, 0.01], rot: [0.12, 0, 0.08] },
   chest: [-0.15, 0.05, -0.12],
   head: [-0.45, 0.1, -0.1],
   feet: {
-    R: { at: [0.12, 0, 0.03], heading: 0.3, knee: 0.08 },
-    L: { at: [-0.24, 0, -0.14], heading: -0.6, knee: 0.14, pitch: -0.6 }
+    R: { at: [0.18, 0, 0.08], heading: 0.4, knee: 0.08 },
+    L: { at: [-0.2, 0, -0.1], heading: -0.4, knee: 0.14 }
   },
   arms: {
     R: { wrist: [0.31, 0.19, -0.2], hand: [0.6, 1.05, -0.05], elbow: [0.75, -0.62, 0.2], space: 'chest', shape: 'grip' },

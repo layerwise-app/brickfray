@@ -164,7 +164,7 @@ export function hand(b: PartSet, s: BodyStyle, side: 'L' | 'R', shape: HandShape
   const bare = s.fingers !== undefined;
   const gloved: Paint = [glove, gloveLook];
   const tips: Paint = bare ? [s.fingers!, 'skin'] : gloved;
-  const radial = b.hero ? 12 : 6;
+  const radial = b.hero ? 18 : 6;
   const mitt = !bare && FREE.has(shape);
   const puff = mitt ? Math.min(1.2, Math.max(1, 1 + ((s.limbs ?? 1) - 1) * 1.5)) : 1;
   const size = SIZE * puff;
@@ -223,6 +223,8 @@ export function hand(b: PartSet, s: BodyStyle, side: 'L' | 'R', shape: HandShape
       zAxis.crossVectors(axis, d);
       const [color, look] = paints[i]!;
       place(segment(length, r[i]! * girth, i === 2 || (simple && i === 1)), color, look, p, d, zAxis);
+      // Close up a knuckle fills the waist between two rounded segment ends, so a finger is one piece, not a row of beads.
+      if (b.hero && i > 0) place(S.sphere(r[i]! * girth * 0.97, 14, 9), color, look, p, d, zAxis);
       if (nail && i === 2) {
         const tip = p.clone().addScaledVector(d, length * 0.62).addScaledVector(zAxis, -r[i]! * 0.7);
         place(S.blob(r[i]! * 1.4, length * 0.62, 0.005, 0.8, 8, 0), tone(color, 1.22), 'gloss', tip, d, zAxis);
@@ -258,6 +260,13 @@ export function hand(b: PartSet, s: BodyStyle, side: 'L' | 'R', shape: HandShape
     forward,
     palmSide
   );
+  if (b.hero && (shape === 'open' || shape === 'relaxed')) {
+    // An open palm is cushioned: the pads under the thumb and the little finger and one across the finger roots.
+    const cushion = (w: number, l: number, depth: number, y: number, z: number) => place(S.blob(w, l, depth, 0.75, 16, 0), glove, gloveLook, new THREE.Vector3(-0.0115 * pad, y, z), forward, palmSide);
+    cushion(0.03, 0.044, 0.016 * pad, 0.013, -0.024);
+    cushion(0.026, 0.05, 0.013 * pad, -0.016, -0.03);
+    cushion(0.07, 0.022, 0.011 * pad, 0, -0.078);
+  }
   if (b.hero && shape !== 'open' && shape !== 'relaxed') {
     const knuckle = bare ? tone(glove, 0.88) : glove;
     FINGERS.forEach((f) => place(S.blob(f.r * 2.3, 0.024, 0.011 * pad, 0.88, 14, 0), knuckle, gloveLook, new THREE.Vector3(0.0105 * pad, f.at[1] * 0.97, f.at[2] + 0.011), forward, palmSide));

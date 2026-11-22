@@ -10,8 +10,9 @@ type Build = () => Cluster[];
  * What stands far behind each character, off to both sides: a few toy-brick builds that hint at its trade (a
  * builder's crane and brick pallets, a ranger's pines, a knight's towers…), lit softly from the key's side and the
  * wall's glow, darker at the foot, in the wall's own hues so they add depth without competing with the figure. A build
- * that far back stands with its foot almost at eye level, about 0.85 m up the screen from the stand's: the left set
- * stays under 0.8 m to clear the logo, the right one under 1.2 m to clear the buttons in the corner.
+ * that far back stands on ground rising toward the wall (`RISE`) with its foot about 0.95 m up the screen from the
+ * stand's, clear of the name column below it: the left set stays under 0.7 m to clear the logo, the right one under
+ * 1.1 m to clear the buttons in the corner.
  */
 const SETS: Record<CharacterId, Build> = {
   rivet: () => {
@@ -61,19 +62,22 @@ const SETS: Record<CharacterId, Build> = {
     peak(peaks, 0, 12, 5);
     peak(peaks, 0.52, 8, 4, -0.25);
     peak(peaks, -0.5, 4, 4, -0.12);
-    const camp = new Cluster(1.5, 21);
-    // A ridge tent, a flagpole with its pennant, a little fire.
-    camp.shadow(-0.12, 0.36).slope(-0.12, 0, 6, 3, 8, { z: 0.11 }).slope(-0.12, 0, 6, 3, 8, { z: -0.11, yaw: Math.PI });
+    const camp = new Cluster(1.25, 21);
+    // A ridge tent end-on to the lens, a flagpole with its pennant on the near side, a little fire.
+    const run = camp.pitch * 1.5;
+    camp.shadow(0.12, 0.36).slope(0.12 - run, 0, 6, 3, 8, { yaw: -Math.PI / 2 }).slope(0.12 + run, 0, 6, 3, 8, { yaw: Math.PI / 2 });
     let y = 0;
-    camp.shadow(0.36, 0.06);
+    camp.shadow(-0.2, 0.06);
     for (let i = 0; i < 9; i++) {
-      camp.round(0.36, y, 1, 3, { studs: i === 8 });
+      camp.round(-0.2, y, 1, 3, { studs: i === 8 });
       y += camp.plates(3);
     }
-    camp.brick(0.48, y - camp.plates(4), 3, 1, 3, { accent: true, studs: false });
-    camp.round(0.17, 0, 2, 1, { accent: true }).round(0.17, camp.plates(1), 1, 3, { top: 0.4, accent: true });
-    const ridge = new Cluster(2.25, 34, 0.068);
+    camp.brick(-0.08, y - camp.plates(4), 3, 1, 3, { accent: true, studs: false });
+    camp.round(0.42, 0, 2, 1, { accent: true }).round(0.42, camp.plates(1), 1, 3, { top: 0.4, accent: true });
+    // A mountain rising behind the camp, and a lesser one beside it running off the screen's edge.
+    const ridge = new Cluster(1.32, 40, 0.068);
     peak(ridge, 0, 8, 5);
+    peak(ridge, 0.6, 4, 4, -0.25);
     // A far range in the haze between the near peaks.
     const range = new Cluster(-1.05, 58, 0.075);
     peak(range, 0, 8, 4);
@@ -97,7 +101,7 @@ const SETS: Record<CharacterId, Build> = {
     for (let s = -12; s < 0; s += 3) wall.brick((s + 1) * P + 0.12, 4 * wall.plates(3), 2, 2, 3);
     tower(wall, 0.3, 4, 6, false);
     const keep = new Cluster(1.54, 24);
-    tower(keep, 0, 4, 8, true);
+    tower(keep, 0, 4, 6, true);
     // A far castle on its hill in the haze.
     const far = new Cluster(-1.15, 56, 0.08);
     far.shadow(0, 0.5).brick(0, 0, 12, 4, 3).brick(0, far.plates(3), 8, 4, 3);
@@ -205,6 +209,8 @@ const SETS: Record<CharacterId, Build> = {
   }
 };
 
+/** How high the far ground stands above the stand's floor, in meters: a near build's foot rises about 0.12 m on screen. */
+const RISE = 0.5;
 /** The far sets stand about 1.5 m to each side: the narrowest view, in meters across, that still shows enough of them. */
 const PROPS_SPAN = 2.9;
 /**
@@ -232,6 +238,10 @@ export class StageProps {
   private readonly look = setMaterial();
   private readonly sets = new Map<CharacterId, { group: THREE.Group; pieces: Piece[] }>();
   private shown: CharacterId | null = null;
+
+  constructor() {
+    this.group.position.y = RISE;
+  }
 
   /** Builds `id`'s set ahead of its first show, hidden until then: building is the slow part of a first pick. */
   prebuild(id: CharacterId) {

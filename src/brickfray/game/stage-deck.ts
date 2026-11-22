@@ -5,8 +5,10 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 export const TILE_RADIUS = 0.5;
 export const TILE_HEIGHT = 0.022;
 /** Rings of studs left bare round the tile, on the deck. */
-const STUD_RINGS = [0.548, 0.596];
-const STUD = { radius: 0.0165, height: 0.012, pitch: 0.05 };
+const STUD_RINGS = [0.546, 0.594];
+const STUD = { radius: 0.021, height: 0.016, pitch: 0.062 };
+/** A thin light ring set flush into the tile's top just inside its edge, in the studio's ring colour. */
+const INLAY = { inner: 0.462, outer: 0.471 };
 /** The baseplate floor round the stand: its stud pitch and how far out it is studded. */
 const FLOOR = { pitch: 0.12, radius: 0.036, height: 0.026, from: 0.76, to: 2.5 };
 const KEY = new THREE.Vector3(-0.5, 0.72, 0.48).normalize();
@@ -14,8 +16,14 @@ const KEY = new THREE.Vector3(-0.5, 0.72, 0.48).normalize();
 const TILE = { color: '#2c3446', tint: 0.17 };
 const STUDS = { color: '#283041', tint: 0.1 };
 
-/** A stud standing on the origin: open side and top cap, unindexed, position and normal only. */
-function stud(radius: number, height: number, segments: number) {
+/** A stud standing on the origin: open side and top cap, with a small chamfer round the top when `bevel` > 0; unindexed, position and normal only. */
+function stud(radius: number, height: number, segments: number, bevel = 0) {
+  if (bevel > 0) {
+    const profile = [[radius, 0], [radius, height - bevel], [radius - bevel * 0.35, height - bevel * 0.3], [radius - bevel, height], [0, height]].map(([x, y]) => new THREE.Vector2(x, y));
+    const lathe = new THREE.LatheGeometry(profile, segments).toNonIndexed();
+    lathe.deleteAttribute('uv');
+    return lathe;
+  }
   const side = new THREE.CylinderGeometry(radius, radius, height, segments, 1, true).toNonIndexed();
   side.translate(0, height / 2, 0);
   const cap = new THREE.CircleGeometry(radius, segments).toNonIndexed();
@@ -27,7 +35,7 @@ function stud(radius: number, height: number, segments: number) {
 
 /** One quarter of the tile's outer band, or (with `start` < 0) its round centre piece, with softly rounded top edges. */
 function tilePiece(inner: number, outer: number, start: number, gap: number) {
-  const bevel = 0.004;
+  const bevel = 0.006;
   const shape = new THREE.Shape();
   if (start < 0) shape.absarc(0, 0, outer - bevel, 0, Math.PI * 2, false);
   else {
@@ -47,30 +55,34 @@ function tilePiece(inner: number, outer: number, start: number, gap: number) {
 }
 
 /**
- * The stand's brick top and the studded floor round it. The top, a round tile made of four quarters round a centre
- * piece and ringed by bare studs, turns with the figure as a turntable does, so the feet never slide over it. The
+ * The stand's brick top and the studded floor round it. The top, a round tile made of two bands of quarters round a
+ * centre piece, edged with a light inlay and ringed by bare studs, turns with the figure as a turntable does, so the feet never slide over it. The
  * floor's studs take the floor's own colour, brighter in the ring's light near the stand, and fade into it outward.
  */
 export class StageDeck {
   /** Turn this with the figure. */
   readonly top = new THREE.Group();
   readonly floor: THREE.InstancedMesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>;
-  private readonly tile: THREE.MeshStandardMaterial;
+  private readonly tile: THREE.MeshPhysicalMaterial;
   private readonly studs: THREE.MeshStandardMaterial;
+  private readonly inlay = new THREE.MeshBasicMaterial({ toneMapped: false, fog: false });
   private readonly owned: { geometry: THREE.BufferGeometry; material: THREE.Material }[] = [];
   private readonly radii: number[] = [];
 
   /** `deck` is the height of the stand's deck the tile and studs sit on. */
   constructor(deck: number) {
-    const tile = (this.tile = new THREE.MeshStandardMaterial({ color: TILE.color, roughness: 0.4, metalness: 0.12, envMapIntensity: 0.5 }));
-    const pieces = [tilePiece(0, 0.15, -1, 0), ...[0, 1, 2, 3].map((i) => tilePiece(0.155, TILE_RADIUS, (i * Math.PI) / 2 + Math.PI / 4, 0.0025))];
+    // Plastic under a thin satin coat: the coat's broad sheen reads as a moulded part where a lone rough layer read as felt.
+    const tile = (this.tile = new THREE.MeshPhysicalMaterial({ color: TILE.color, roughness: 0.5, metalness: 0.05, clearcoat: 0.6, clearcoatRoughness: 0.32, envMapIntensity: 0.5 }));
+    // Two bands of quarters round the centre piece, their joints staggered the way a builder lays them.
+    const quarters = (inner: number, outer: number, turn: number) => [0, 1, 2, 3].map((i) => tilePiece(inner, outer, (i * Math.PI) / 2 + turn, 0.0025));
+    const pieces = [tilePiece(0, 0.15, -1, 0), ...quarters(0.155, 0.322, Math.PI / 4), ...quarters(0.327, TILE_RADIUS, 0)];
     const tiles = new THREE.Mesh(mergeGeometries(pieces)!, tile);
     for (const p of pieces) p.dispose();
     tiles.position.y = deck;
     tiles.receiveShadow = true;
     tiles.castShadow = true;
 
-    const one = stud(STUD.radius, STUD.height, 12);
+    const one = stud(STUD.radius, STUD.height, 16, 0.0035);
     const placed: THREE.BufferGeometry[] = [];
     for (const r of STUD_RINGS) {
       const count = Math.round((Math.PI * 2 * r) / STUD.pitch);
@@ -85,8 +97,11 @@ export class StageDeck {
     one.dispose();
     studs.position.y = deck;
     studs.receiveShadow = true;
-    this.top.add(tiles, studs);
-    this.owned.push({ geometry: tiles.geometry, material: tile }, { geometry: studs.geometry, material: studs.material });
+    const band = new THREE.RingGeometry(INLAY.inner, INLAY.outer, 160).rotateX(-Math.PI / 2);
+    const inlay = new THREE.Mesh(band, this.inlay);
+    inlay.position.y = deck + TILE_HEIGHT + 0.0008;
+    this.top.add(tiles, studs, inlay);
+    this.owned.push({ geometry: tiles.geometry, material: tile }, { geometry: studs.geometry, material: studs.material }, { geometry: band, material: this.inlay });
 
     // The floor's studs are shaded once, by their own normals, and coloured per stud by where they stand.
     const floorStud = stud(FLOOR.radius, FLOOR.height, 10);
@@ -130,12 +145,13 @@ export class StageDeck {
     const glow = new THREE.Color(ring);
     this.tile.color.set(TILE.color).lerp(glow, TILE.tint);
     this.studs.color.set(STUDS.color).lerp(glow, STUDS.tint);
+    this.inlay.color.copy(glow).multiplyScalar(0.85);
     const c = new THREE.Color();
     const lift = new THREE.Color();
     this.radii.forEach((r, i) => {
       const out = Math.max(0, r - base);
       c.copy(f).multiplyScalar((0.72 + 0.75 * Math.exp((-r * r) / 5)) * (1 - 0.55 * Math.exp(-out * 7)));
-      c.add(lift.copy(glow).multiplyScalar(0.25 * Math.exp(-out * 3.2)));
+      c.add(lift.copy(glow).multiplyScalar(0.25 * Math.exp(-out * 3.2) + 0.3 * Math.exp(-out * 12)));
       this.floor.setColorAt(i, c);
     });
     this.floor.instanceColor!.needsUpdate = true;

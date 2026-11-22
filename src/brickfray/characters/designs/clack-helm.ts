@@ -100,6 +100,18 @@ function nape(b: PartSet, stud: number) {
   b.add('head', mounted(SKULL.spots(at, 0.009), new THREE.CylinderGeometry(0.007, 0.009, 0.012, 12)), STEEL, { look: 'metal' });
   b.add('head', mounted(SKULL.spots(at, 0.016), new THREE.CylinderGeometry(0.028, 0.028, 0.005, 32)), GOLD, { look: 'gold' });
   b.add('head', rivets(SKULL.spots(at, 0.0185), 0.02, 24, 0.45), STEEL, { look: 'metal' });
+
+  // Fluting fanning down the back of the skull from beside the comb to the nape plate, each flute swelling out of the
+  // surface and sinking back in at its ends.
+  const [high, low] = [SKULL.tAt(0.214), SKULL.tAt(0.09)];
+  for (const k of [1, 2, 3]) {
+    for (const sign of [-1, 1]) {
+      const [a0, a1] = [Math.PI + sign * 0.2 * k, Math.PI + sign * 0.44 * k];
+      const mid = (a0 + a1) / 2;
+      const flute = SKULL.path([[a0, high], [a1, low]], 0, 10);
+      b.add('head', sweep(flute, (t) => [0.012 - 0.003 * t, 0.0034 * Math.sin(Math.PI * t) ** 0.9], { seg: 18, radial: 10, up: [Math.sin(mid), 0, -Math.cos(mid)] }), STEEL, { look: 'metal' });
+    }
+  }
 }
 
 const LOCK: V3[] = [

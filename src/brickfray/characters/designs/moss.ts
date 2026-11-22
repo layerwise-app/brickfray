@@ -7,23 +7,24 @@ import type { Stance } from '../stance';
 import { lowBeard, lowBlob, kneePads, lowTaper } from '../body-low';
 import { heroDrape } from '../hero-assets';
 import { cloak, cowl, hood, mantle, shoulderCap, skirt } from './moss-cloth';
-import { bandolier, bedroll, bracer, C, clasp, HIDE, cloakLeaves, hatchetOnPack, hoodSprig, legWraps, mantleStitches, pouches, satchel } from './moss-gear';
+import { bandolier, bedroll, bracer, C, clasp, HIDE, cloakLeaves, hatchetOnPack, hoodSprig, hoodStitches, legWraps, mantleStitches, pouches, satchel } from './moss-gear';
 import { sweep } from './plate-fittings';
+import { strand, tapering } from './tailor';
 import { lump, pick } from './sheet';
 import { sleevesAndLegs, tunic } from './moss-tunic';
 
-/** Half turned to the viewer behind the long rifle, stock in the shoulder and cheek to the scope, chest turned with the head so the neck is not wrung, feet spread wide along the line of fire. */
+/** Half turned to the viewer behind the long rifle, stock in the shoulder and the muzzle lifted, head up over the scope scanning ahead, chest turned with the head so the neck is not wrung, feet spread wide along the line of fire. */
 export const stance: Stance = {
   pelvis: { at: [0.02, -0.09, 0], rot: [0.65, 0, 0] },
   chest: [0.55, -0.06, 0],
-  head: [-0.12, -0.22, -0.15],
+  head: [-0.1, 0.02, -0.07],
   feet: {
     R: { at: [0.378, 0, 0.141], heading: 1.2 },
     L: { at: [-0.279, 0, -0.28], heading: -0.05, knee: 0.1 }
   },
   arms: {
-    R: { wrist: [-0.105, 0.186, -0.304], hand: [-0.701, 0.026, 0.132], elbow: [0.642, 0, 0.766], space: 'chest', shape: 'grip' },
-    L: { wrist: [-0.35, 0.235, -0.5], hand: [0.39, 0.398, 1.744], elbow: [-0.766, -0.64, 0.003], space: 'chest', shape: 'hold' }
+    R: { wrist: [-0.104, 0.235, -0.299], hand: [-0.706, 0.146, 0.132], elbow: [0.641, -0.102, 0.76], space: 'chest', shape: 'grip' },
+    L: { wrist: [-0.344, 0.32, -0.487], hand: [0.434, 0.451, 1.626], elbow: [-0.777, -0.622, -0.072], space: 'chest', shape: 'hold' }
   },
   life: { breath: 0.6, sway: 0.3, look: 0 }
 };
@@ -36,7 +37,7 @@ export function moss(b: PartSet) {
     sleeve: C.tunic,
     glove: '#5b4630',
     gloveLook: 'cloth',
-    fore: { half: [0.017, 0.025], corner: 0.01, yaw: 0.45, roll: 0.3, over: { r: 0.0128, at: 0.023 }, seat: 0.004, sink: 0.004, arch: 3.2, fan: 0.35 },
+    fore: { half: [0.017, 0.025], corner: 0.01, yaw: 0.45, roll: 0.3, over: { r: 0.0128, at: 0.023 }, seat: 0.004, sink: 0.011, arch: 3.2, fan: 0.35 },
     pants: '#3f4a35',
     boot: '#5b4630',
     bootLook: b.detail === 0 ? 'rubber' : HIDE,
@@ -86,6 +87,7 @@ export function moss(b: PartSet) {
   clasp(b);
   if (!b.hero) return;
   mantleStitches(b);
+  hoodStitches(b);
   if (!stance.melee) hatchetOnPack(b);
 }
 
@@ -117,13 +119,74 @@ function beard(b: PartSet) {
     lump(b, 'head', [0.13, 0.035, 0.04], C.beardLight, 8, { at: [0, 0.014, -0.132], look: 'cloth', e: 0.7 });
     return;
   }
+  if (b.hero) return beardLocks(b);
   [-0.07, -0.036, 0, 0.036, 0.07].forEach((x, i) => {
     const mid = 1 - Math.abs(x) / 0.07;
     lump(b, 'head', [0.054, 0.1 + 0.05 * mid, 0.054], i % 2 ? C.beard : C.beardLight, pick(b, 6, 6, 10), { at: [x, -0.088 - 0.03 * mid, -0.136 + 0.026 * (1 - mid)], rot: [0.2, 0, -x * 2.6], look: 'cloth', e: 0.85, taper: 0.6 });
   });
+  b.mirror((_, sign) => lump(b, 'head', [0.08, 0.036, 0.042], C.beardLight, pick(b, 6, 6, 12), { at: [sign * 0.034, 0.01, -0.134], rot: [0, sign * -0.25, sign * -0.38], look: 'cloth', e: 0.8 }));
+}
+
+/** The chin mass of beard() as a surface: around (a, 0 = front) and up (lat), lifted off it by `lift`. */
+function beardPoint(a: number, lat: number, lift: number): V3 {
+  const f = (v: number) => Math.sign(v) * Math.abs(v) ** 0.72;
+  const [vx, vy, vz] = [Math.cos(lat) * Math.sin(a), Math.sin(lat), -Math.cos(lat) * Math.cos(a)];
+  const tb = vy < 0 ? 1 - 0.45 * -vy : 1;
+  const q = [f(vx) * 0.1 * tb, f(vy) * 0.095, f(vz) * 0.0575];
+  const k = 1 + lift / Math.hypot(q[0]!, q[1]!, q[2]!);
+  return [q[0]! * k, -0.05 + q[1]! * k, -0.096 + q[2]! * k];
+}
+
+/** Close up the beard is combed into locks over the chin mass, each tapering to its own point, under a mustache of two swept strands. */
+function beardLocks(b: PartSet) {
+  // [around, top latitude, length past the bottom, radius]
+  const locks: [number, number, number, number][] = [
+    [-1.25, 0.62, 0.0, 0.017],
+    [-1.02, 0.5, 0.012, 0.019],
+    [-0.8, 0.36, 0.02, 0.02],
+    [-0.58, 0.26, 0.03, 0.021],
+    [-0.37, 0.18, 0.036, 0.022],
+    [-0.16, 0.14, 0.044, 0.022],
+    [0.05, 0.14, 0.048, 0.023],
+    [0.26, 0.16, 0.04, 0.022],
+    [0.47, 0.22, 0.034, 0.021],
+    [0.68, 0.32, 0.024, 0.02],
+    [0.9, 0.44, 0.014, 0.019],
+    [1.12, 0.56, 0.006, 0.018],
+    [1.32, 0.66, 0.0, 0.016]
+  ];
+  const tones = [C.beard, C.beardLight, C.beard, C.beard, C.beardLight, C.beard, C.beardLight, C.beard, C.beardLight, C.beard, C.beard, C.beardLight, C.beard];
+  locks.forEach(([a, top, past, r], i) => {
+    const drift = 0.06 * Math.sin(i * 1.7);
+    const path = [beardPoint(a, top, -0.002), beardPoint(a + drift * 0.3, top * 0.35 - 0.2, 0.002), beardPoint(a + drift * 0.7, -0.7, 0.003), beardPoint(a + drift, -1.05, 0.002)];
+    const [x, y, z] = path[3]!;
+    path.push([x * 0.85, y - past, z - 0.006]);
+    const relief = (t: number, phi: number) => 0.09 * Math.sin(phi * 3 + i) * Math.min(1, t * 5);
+    b.add('head', strand(path, tapering(r, 0.12, 0.25), { flat: 0.5, side: [Math.cos(a), 0, Math.sin(a)], seg: 14, radial: 14, relief }), tones[i]!, { look: 'cloth' });
+  });
+  // Locks combed down over each sideburn, so it reads as hair rather than a ball on the cheek.
   b.mirror((_, sign) => {
-    lump(b, 'head', [0.08, 0.036, 0.042], C.beardLight, pick(b, 6, 6, 12), { at: [sign * 0.034, 0.01, -0.134], rot: [0, sign * -0.25, sign * -0.38], look: 'cloth', e: 0.8 });
-    if (b.hero) lump(b, 'head', [0.03, 0.042, 0.032], C.beardLight, 8, { at: [sign * 0.072, -0.01, -0.125], rot: [0, 0, sign * -0.9], look: 'cloth', e: 0.9, taper: 0.5 });
+    for (const [k, [dz, r]] of ([[0, 0.017], [0.026, 0.016], [-0.022, 0.015]] as const).entries()) {
+      const path: V3[] = [
+        [sign * 0.098, 0.058, -0.068 + dz],
+        [sign * 0.111, 0.015, -0.074 + dz],
+        [sign * 0.108, -0.035, -0.086 + dz * 0.6],
+        [sign * 0.094, -0.075, -0.104 + dz * 0.3]
+      ];
+      const relief = (t: number, phi: number) => 0.09 * Math.sin(phi * 3 + k * 2 + sign) * Math.min(1, t * 5);
+      b.add('head', strand(path, tapering(r, 0.2, 0.25), { flat: 0.5, side: [0, 0, 1], seg: 12, radial: 14, relief }), k === 1 ? C.beardLight : C.beard, { look: 'cloth' });
+    }
+  });
+  b.mirror((_, sign) => {
+    const path: V3[] = [
+      [sign * 0.004, 0.022, -0.146],
+      [sign * 0.03, 0.016, -0.146],
+      [sign * 0.056, 0.0, -0.132],
+      [sign * 0.074, -0.026, -0.114],
+      [sign * 0.078, -0.05, -0.104]
+    ];
+    const relief = (_: number, phi: number) => 0.08 * Math.sin(phi * 3 + sign);
+    b.add('head', strand(path, tapering(0.019, 0.15, 0.3), { flat: 0.55, side: [0, 1, 0], seg: 16, radial: 14, relief }), C.beardLight, { look: 'cloth' });
   });
 }
 

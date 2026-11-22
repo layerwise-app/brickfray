@@ -82,18 +82,18 @@ function blocky(b: PartSet) {
   });
 }
 
-/** Harpoon gun raised in both hands with the spear tipped up, diver's boots planted wide, chest opened three-quarter to the viewer and the helmet turned the rest of the way. */
+/** Harpoon gun raised in both hands with the spear tipped up, diver's boots planted wide, turned so the menu camera sees the gun clear of the body, the helmet turned back toward the viewer. */
 export const stance: Stance = {
-  pelvis: { at: [0, -0.07, 0], rot: [0.3, 0.05, 0] },
-  chest: [0.05, 0.1, 0],
-  head: [-0.45, 0.08, -0.05],
+  pelvis: { at: [0, -0.07, 0], rot: [0.6, 0.05, 0] },
+  chest: [0.35, 0.1, 0],
+  head: [-0.3, 0.08, -0.05],
   feet: {
-    L: { at: [-0.27, 0, -0.1], heading: -0.3 },
-    R: { at: [0.25, 0, 0.15], heading: 0.75 }
+    L: { at: [-0.228, 0, -0.175], heading: 0 },
+    R: { at: [0.194, 0, 0.217], heading: 1.05 }
   },
   arms: {
-    R: { wrist: [0.3, -0.133, -0.098], hand: [-0.145, 0.5, 0.062], elbow: [0.134, -0.934, 0.331], space: 'chest', shape: 'grip' },
-    L: { wrist: [0.183, 0.095, -0.374], hand: [1.188, 0.194, 1.104], elbow: [-0.38, -0.64, -0.66], space: 'chest', shape: 'hold' }
+    R: { wrist: [0.3, -0.133, -0.098], hand: [-0.145, 0.5, 0.062], elbow: [0.03, -0.934, 0.356], space: 'chest', shape: 'grip' },
+    L: { wrist: [0.183, 0.095, -0.374], hand: [1.188, 0.194, 1.104], elbow: [-0.168, -0.64, -0.742], space: 'chest', shape: 'hold' }
   },
   life: { breath: 1, sway: 0.6, look: 0.6 }
 };

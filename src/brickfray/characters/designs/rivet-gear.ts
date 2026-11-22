@@ -328,6 +328,16 @@ export function armKit(b: PartSet) {
   b.mirror((side) => b.add(`upperArm${side}`, b.hero ? rolledCuff() : limbBand(b, 'upperArm', LIMBS, -0.237, -0.193, 0.006), C.collar, { look: 'cloth' }));
   if (!hi) return;
   if (b.hero) b.mirror((side, sign) => b.box(`forearm${side}`, [0.008, 0.034, 0.03], C.dark, { at: [sign * 0.0525, -0.232, 0], look: 'rubber', bevel: 0.002 }));
+  // Elbow pads to go with the knee pads: a foam cup and a hard shell over the back of each bare elbow, on a strap round
+  // the forearm, so up close the joint reads as gear instead of a ball between two tubes.
+  if (b.hero) {
+    b.mirror((side) => {
+      const fa = `forearm${side}` as const;
+      lump(b, fa, [0.1, 0.11, 0.082], 18, C.dark, { at: [0, 0.004, 0.012], look: 'rubber', e: 0.5 });
+      lump(b, fa, [0.07, 0.076, 0.03], 18, '#555c63', { at: [0, 0.004, 0.051], look: 'gloss', e: 0.6 });
+      b.add(fa, limbBand(b, 'forearm', LIMBS, -0.062, -0.046, 0.0035), C.dark, { look: 'rubber' });
+    });
+  }
   b.add('forearmL', limbBand(b, 'forearm', LIMBS, -0.195, -0.177, 0.003), C.dark, { look: 'rubber' });
   b.cyl('forearmL', 0.021, 0.021, 0.014, '#555c63', { at: [-0.047, -0.186, 0], rot: [0, 0, HALF], look: 'metal', seg: round });
   b.cyl('forearmL', 0.0165, 0.0165, 0.016, '#dff3ea', { at: [-0.0475, -0.186, 0], rot: [0, 0, HALF], look: 'gloss', seg: round });

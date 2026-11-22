@@ -69,12 +69,14 @@ function combLines(b: PartSet, line: (a: number) => number) {
  */
 function sideburn(b: PartSet, sign: number) {
   const tip = (v: number) => (v < 0.24 ? Math.sqrt(1 - (1 - v / 0.24) ** 2) : 1);
-  return surface(tier(b, 4, 6, 14), tier(b, 6, 8, 34), (u, v, out) => {
+  // Close up it is combed into a few locks running down to the jaw, so it reads as hair rather than a flat pad.
+  const combed = (across: number, v: number) => (b.hero ? 1 + 0.38 * Math.cos(across * Math.PI * 3.5 + 0.6 + v * 1.2) * (0.4 + 0.6 * smoothstep(v, 0.05, 0.5)) : 1);
+  return surface(tier(b, 4, 6, 30), tier(b, 6, 8, 34), (u, v, out) => {
     const front = HALF - 0.62 - 0.12 * (1 - smoothstep(v, 0.12, 0.6));
     const back = HALF - lerp(0.2, 0.12, v) + 0.55 * smoothstep(v, 0.55, 1);
     const across = (sign > 0 ? u : 1 - u) * 2 - 1;
     const a = (front + back) / 2 + (across * (back - front) * tip(v)) / 2;
     const swell = (1 - across * across) ** 0.7 * tip(v) ** 0.5 * (1 - 0.6 * smoothstep(v, 0.75, 1)) * (1.15 - 0.3 * v);
-    SKULL.point(lerp(0.034, 0.16, v), sign * a, 0.0008 + 0.009 * swell, out);
+    SKULL.point(lerp(0.034, 0.16, v), sign * a, 0.0008 + (b.hero ? 0.0105 : 0.009) * swell * combed(across, v), out);
   }, { inward: true });
 }

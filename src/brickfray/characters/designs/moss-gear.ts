@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import type { Look, PartSet } from '../parts';
 import * as S from '../shapes';
 import type { BoneName, V3 } from '../skeleton';
-import { cloakAt, hoodAt, leaf, mantleAt } from './moss-cloth';
+import { cloakAt, HOOD_SEAMS, hoodAt, leaf, mantleAt, SEAM_END } from './moss-cloth';
 import { buildHatchet } from '../../weapons/models/hatchet';
 import { sweep } from './plate-fittings';
 import { lump, pick } from './sheet';
@@ -235,6 +235,20 @@ export function mantleStitches(b: PartSet) {
     return [px * 1.014, py + 0.0035, pz * 1.014];
   };
   for (let i = 0; i < 52; i++) stitches(b, 'chest', at((i + 0.2) / 52), at((i + 0.75) / 52), 1);
+}
+
+/** Topstitching beside each of the hood's seams. */
+export function hoodStitches(b: PartSet) {
+  for (const [u0, from] of HOOD_SEAMS) {
+    for (const side of [-0.016, 0.016]) {
+      const at = (v: number): V3 => hoodAt(0.0012)((u0 + side + 1) % 1, v);
+      const n = Math.round((SEAM_END - 0.04 - from) * 40);
+      for (let i = 0; i < n; i++) {
+        const v = from + 0.03 + ((SEAM_END - 0.07 - from) * i) / n;
+        stitches(b, 'head', at(v), at(v + (SEAM_END - from) * 0.012), 1);
+      }
+    }
+  }
 }
 
 /** Sewn-on leaves down the cloak's pleats. */

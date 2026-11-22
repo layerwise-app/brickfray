@@ -28,23 +28,28 @@ def moss_cloak():
                 sheets=[dict(nu=36, nv=40, at=at, pin=2, thick=0.026, hem=(0.93, 0.985, 0.4), outer='outer', inner='lining', bands=[(0.9, 0.975, 'trim')])])
 
 def vega_scarf():
-    # characters/designs/vega-trim.ts LONG and SHORT: knitted tails that leave the knot gathered, widen, then narrow to a fringed end
-    # Both hang off to her left shoulder blade, clear of the ponytail down the middle of her back.
-    tails = [dict(x=(-0.03, -0.075), length=0.49, width=(0.05, 0.1, 0.092), twist=0.35, phase=0.4, outer='long', inner='longInner', bands=[(0.8, 0.835, 'stripe'), (0.87, 0.905, 'stripe')]),
-             dict(x=(-0.06, -0.12), length=0.31, width=(0.045, 0.084, 0.078), twist=-0.3, phase=2.3, outer='short', inner='shortInner', bands=[(0.86, 0.9, 'shortStripe')])]
+    # characters/designs/vega-trim.ts LONG and SHORT: knitted tails that leave the knot behind her left shoulder
+    # (vega-kit.ts scarf) gathered into creases, widen, then taper to a ribbed end. They hang down her left shoulder
+    # blade, clear of the ponytail down the middle of her back, the short one further out.
+    tails = [dict(x=(-0.045, -0.008), length=0.46, width=(0.04, 0.094, 0.052), twist=0.3, phase=0.4, creases=1.5, outer='long', inner='longInner', bands=[(0.8, 0.835, 'stripe'), (0.87, 0.905, 'stripe')]),
+             dict(x=(-0.085, -0.15), length=0.3, width=(0.036, 0.082, 0.046), twist=-0.35, phase=2.3, creases=1.25, outer='short', inner='shortInner', bands=[(0.84, 0.88, 'shortStripe')])]
     def sheet(t):
         def at(u, v):
             across = u - 0.5
             w0, w1, w2 = t['width']
-            width = lerp(w0, w1, smoothstep(v, 0, 0.35)) + (w2 - w1) * smoothstep(v, 0.45, 1)
-            turn = t['twist'] * smoothstep(v, 0.1, 0.9)
-            x = lerp(t['x'][0], t['x'][1], v) + 0.012 * math.sin(v * 5 + t['phase']) * v
-            z = lerp(-0.035, 0.04, smoothstep(v, 0, 0.14)) + 0.2 * v
-            trough = 0.03 * v * math.cos(across * math.pi * 2 + t['phase'])
-            return [x + across * width * math.cos(turn), 0.05 - t['length'] * v, z + trough + across * width * math.sin(turn)]
-        return dict(nu=9, nv=max(12, round(t['length'] / 0.012)), at=at, pin=2, thick=0.016, hem=(0.92, 0.99, 0.8), outer=t['outer'], inner=t['inner'], bands=t['bands'], outward=(0, 0, 1), reach=0.05)
+            width = lerp(w0, w1, smoothstep(v, 0, 0.3)) + (w2 - w1) * smoothstep(v, 0.4, 1)
+            turn = t['twist'] * smoothstep(v, 0.15, 0.95)
+            x = lerp(t['x'][0], t['x'][1], v) + 0.01 * math.sin(v * 5 + t['phase']) * v
+            z = lerp(-0.016, 0.03, smoothstep(v, 0, 0.12)) + 0.18 * v
+            # Creases the knot pressed in, deep where it gathers the tail and easing out toward the end; the knitted
+            # edges roll over a little.
+            crease = (0.004 + 0.016 * (1 - smoothstep(v, 0.04, 0.85))) * math.cos(across * math.pi * 2 * t['creases'] + t['phase'])
+            roll = 0.009 * (2 * across) ** 6
+            return [x + across * width * math.cos(turn), 0.012 - t['length'] * v, z + crease + roll + across * width * math.sin(turn)]
+        return dict(nu=10, nv=max(14, round(t['length'] / 0.012)), at=at, pin=2, thick=0.015, hem=(0.9, 0.98, 0.8), outer=t['outer'], inner=t['inner'], bands=t['bands'], outward=(0, 0, 1), reach=0.05)
     return dict(character='vega', bone='dangleBack', frames=160, sheets=[sheet(t) for t in tails],
-                cloth=dict(mass=0.15, bending=0.2, self=0.0025), gravity=(0.7, -9.7, 0.9))  # hanging down the back, leaning a little in a light breeze
+                cloth=dict(mass=0.15, bending=0.9, self=0.0015), gravity=(0.7, -9.7, 0.9))  # hanging down the back, leaning a little in a light breeze; self
+    # stays under the cell size where the tails gather at the knot (a larger one blows the sheet apart)
 
 def clack_tabard():
     # characters/designs/clack-armor.ts skirt(): s -1 front, 1 back
@@ -52,18 +57,20 @@ def clack_tabard():
         def at(u, v):
             x = u * 2 - 1
             hem = (-0.25 if s < 0 else -0.235) - 0.03 * (1 - abs(x))
-            gather = min(1, v * 5)
-            pleat = math.cos(x * math.pi * 5)  # five soft pleats, gathered flat under the belt
+            gather = 0.45 + 0.55 * min(1, v * 5)
+            # Heavy wool pleated into the belt, so it falls in folds from the waist to the hem: three broad ones with
+            # narrower ones between, deepening toward the hem; the panel is cut wider at the hem than it hangs.
+            pleat = 0.6 * math.cos(x * math.pi * 3 + 0.5 * s) + 0.4 * math.cos(x * math.pi * 5 + 1.2)
             if s > 0:
-                wide = x * (0.085 + 0.03 * v) + 0.006 * v * v
-                return [wide, lerp(0.03, hem, v), 0.13 + 0.02 * gather + (0.004 + 0.011 * v) * gather * pleat + 0.004 * v * math.sin(x * 2.2 + 0.6)]
-            wide = x * (0.1 + 0.035 * v)
+                wide = x * (0.085 + 0.045 * v) + 0.006 * v * v
+                return [wide, lerp(0.03, hem, v), 0.13 + 0.02 * gather + (0.011 + 0.02 * v) * gather * pleat + 0.004 * v * math.sin(x * 2.2 + 0.6)]
+            wide = x * (0.1 + 0.04 * v)
             rounded = (1 - (abs(x) * 0.5) ** 2.5) ** 0.4
-            reach = 0.136 + 0.02 * gather + 0.3 * v + 0.007 * gather * pleat
+            reach = 0.136 + 0.02 * gather + (0.012 + 0.02 * v) * gather * pleat
             return [wide, lerp(0.03, hem, v), s * reach * rounded]
-        if s > 0: return dict(nu=22, nv=26, at=at, pin=2, thick=0.016, hem=(0.88, 0.97, 0.5), outer='panel', inner='lining', bands=[(0.86, 1.01, 'hem')], outward=(0, 0, s), hang=0.16)
-        return dict(nu=22, nv=26, at=at, pin=2, thick=0.016, hem=(0.88, 0.97, 0.5), outer='panel', inner='lining', bands=[(0.86, 1.01, 'hem')], outward=(0, 0, s), rows=0.08)
-    return dict(character='clack', bone='dangleHip', frames=220, sheets=[sheet(-1), sheet(1)], cloth=dict(mass=0.35, bending=0.7, air=8, friction=2))
+        # Both shaped (`hang`): simulated, the heavy pleats crumple against the forward thigh.
+        return dict(nu=36, nv=26, at=at, pin=2, thick=0.02, hem=(0.86, 0.95, 0.4), outer='panel', inner='lining', bands=[(0.86, 1.01, 'hem')], outward=(0, 0, s), hang=0.16)
+    return dict(character='clack', bone='dangleHip', frames=10, sheets=[sheet(-1), sheet(1)])
 
 spec = {'moss-cloak': moss_cloak, 'vega-scarf': vega_scarf, 'clack-tabard': clack_tabard}[name]()
 if '--frames' in args: spec['frames'] = int(args[args.index('--frames') + 1])
@@ -261,10 +268,13 @@ cam = bpy.data.objects.new('cam', bpy.data.cameras.new('cam')); scene.collection
 cam.data.lens = 60
 P = np.array(bones['pelvis'], dtype='f8').reshape(4, 4).T
 back = math.atan2(P[0, 2], P[2, 2])  # the figure's own +Z (its back), as a heading in three's XZ plane
+# `--zoom <m>` frames the drape's own bone from that distance instead of the whole figure.
+zoom = float(args[args.index('--zoom') + 1]) if '--zoom' in args else None
+aim = Vector(to_b(M[:3, 3])) - Vector((0, 0, 0.12)) if zoom else Vector((0, 0, 0.95))
 for label, angle in (('back', 0), ('side', 80), ('front', 180), ('q', -45)):
     a = math.radians(angle) + back
     d = Vector((math.sin(a), -math.cos(a), 0))
-    cam.location = Vector((0, 0, 1.0)) + d * 4.2 + Vector((0, 0, 0.35))
-    cam.rotation_euler = (Vector((0, 0, 0.95)) - cam.location).to_track_quat('-Z', 'Y').to_euler()
+    cam.location = aim + d * zoom + Vector((0, 0, 0.1)) if zoom else Vector((0, 0, 1.0)) + d * 4.2 + Vector((0, 0, 0.35))
+    cam.rotation_euler = (aim - cam.location).to_track_quat('-Z', 'Y').to_euler()
     scene.render.filepath = f'{preview}/{name}-{label}.png'
     bpy.ops.render.render(write_still=True)

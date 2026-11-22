@@ -1,6 +1,9 @@
 import * as THREE from 'three';
 import { createCharacter, STANCES } from '../characters';
+import { ClothSwing, type ClothSwingSpec } from '../characters/dangles';
+import { clothSway, type ClothSway } from '../characters/material';
 import { Rig } from '../characters/rig';
+import { BONE } from '../characters/skeleton';
 import type { CharacterId, CharacterRig } from '../characters/types';
 import type { Kit } from '../engine/kit';
 import { Materials } from '../engine/materials';
@@ -17,6 +20,14 @@ import { aimed, blobTexture, KEY_DIRECTION, STUDIO_LIGHTS, studioEnvironment } f
 
 /** Seeds for each hero's own breathing and glancing rate (`Animator.vary`): Clack and Coral slow and heavy, Rivet quick. */
 const TEMPO: Record<CharacterId, number> = { rivet: 1, vega: 8, clack: 13, coral: 2, moss: 7, nova: 3 };
+
+/** How the cloth on a hero's back and hip bones bends on the turntable: Vega's scarf tails trail a turn, Clack's tabard panels trail it and flare out. */
+const CLOTH: Partial<Record<CharacterId, Partial<Record<'back' | 'hip', ClothSwingSpec>>>> = {
+  vega: { back: { trail: 0.075, fling: 0, max: 0.6, hz: 1.3, zeta: 0.22 } },
+  clack: { hip: { trail: 0.04, fling: 0.006, max: 0.45, hz: 1.5, zeta: 0.3 } }
+};
+const CLOTH_BONES = { back: BONE.dangleBack, hip: BONE.dangleHip } as const;
+const clothLengths = new WeakMap<THREE.BufferGeometry, Map<number, number>>();
 
 /** The stance each hero model is baked for; portraits ask for the same hands so they share the geometry. */
 export function heroHands(id: CharacterId) {
@@ -56,6 +67,7 @@ export class HeroDisplay {
   private retired: CharacterRig | null = null;
   private life: HeroLife | null = null;
   private lids: Eyelids | null = null;
+  private cloth: { uniforms: ClothSway; swings: [number, ClothSwing][] } | null = null;
   private gun: WeaponModel | null = null;
   private melee: WeaponModel | null = null;
   private flash = 0;
@@ -147,7 +159,8 @@ export class HeroDisplay {
       this.rig.animator.vary(TEMPO[id]);
       this.rig.animator.life = this.life;
       this.lids = Eyelids.fit(this.rig);
-    }
+      this.cloth = swingCloth(this.rig, CLOTH[id]);
+    } else this.cloth = null;
     this.flash = 1;
     this.frame = 0;
   }
@@ -176,6 +189,12 @@ export class HeroDisplay {
     if (this.rig instanceof Rig) this.rig.animator.spin = spin;
     this.life?.update(dt, this.figure.rotation.y);
     this.rig?.update(dt, IDLE_STATE);
+    if (this.cloth) {
+      for (const [k, swing] of this.cloth.swings) {
+        swing.update(dt, spin);
+        this.cloth.uniforms.sway.value[k]!.set(swing.lateral, swing.flare, 0, 0);
+      }
+    }
     this.lids?.set(this.life?.blink ?? 0);
     this.flash = Math.max(0, this.flash - dt * 1.8);
     const boost = 1 + this.flash ** 2 * 1.6;
@@ -202,4 +221,39 @@ export class HeroDisplay {
     this.kit.materials.dispose();
     this.envTarget.dispose();
   }
+}
+
+/** Turns on the turntable bend for a figure's back and hip cloth: each bone's bind position and the cloth's length below it. */
+function swingCloth(rig: Rig, spec: Partial<Record<'back' | 'hip', ClothSwingSpec>> | undefined) {
+  const uniforms = clothSway(rig.mesh.material as THREE.Material);
+  if (!spec || !uniforms) return null;
+  const swings: [number, ClothSwing][] = [];
+  (['back', 'hip'] as const).forEach((name, k) => {
+    const s = spec[name];
+    const bone = CLOTH_BONES[name];
+    const anchor = new THREE.Vector3().setFromMatrixPosition(new THREE.Matrix4().copy(rig.mesh.skeleton.boneInverses[bone]!).invert());
+    const length = s ? clothLength(rig.mesh, bone, anchor) : 0;
+    uniforms.anchor.value[k]!.set(anchor.x, anchor.y, anchor.z, length > 0.02 ? 1 / length : 0);
+    uniforms.sway.value[k]!.set(0, 0, 0, 0);
+    if (s && length > 0.02) swings.push([k, new ClothSwing(s)]);
+  });
+  uniforms.on.value = swings.length ? 1 : 0;
+  return { uniforms, swings };
+}
+
+/** How far a bone's parts hang below its bind position, in the bind pose. */
+function clothLength(mesh: THREE.SkinnedMesh, bone: number, anchor: THREE.Vector3) {
+  let known = clothLengths.get(mesh.geometry);
+  if (!known) clothLengths.set(mesh.geometry, (known = new Map()));
+  let length = known.get(bone);
+  if (length !== undefined) return length;
+  length = 0;
+  const index = mesh.geometry.getAttribute('skinIndex');
+  const position = mesh.geometry.getAttribute('position');
+  const p = new THREE.Vector3();
+  for (let i = 0; i < position.count; i++) {
+    if (index.getX(i) === bone) length = Math.max(length, anchor.y - p.fromBufferAttribute(position, i).applyMatrix4(mesh.bindMatrix).y);
+  }
+  known.set(bone, length);
+  return length;
 }

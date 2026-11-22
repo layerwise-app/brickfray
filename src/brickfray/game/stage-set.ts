@@ -82,7 +82,7 @@ void main() {
     float out_ = max( r - BASE, 0.0 );
     vec3 floor_ = uFloor * ( 0.72 + 0.75 * exp( -r * r / 5.0 ) );
     floor_ *= 1.0 - 0.55 * exp( -out_ * 7.0 );
-    floor_ += uRing * 0.42 * exp( -out_ * 3.2 ) * smoothstep( -0.04, 0.03, r - BASE );
+    floor_ += uRing * ( 0.42 * exp( -out_ * 3.2 ) + 0.5 * exp( -out_ * 12.0 ) ) * smoothstep( -0.04, 0.03, r - BASE );
     // 1 at the stand's own depth and nearer, 0 where the floor has finished curving up into the wall.
     float near = clamp( ( uEye.y - p.y ) / uEye.y, 0.0, 1.0 );
     col = mix( wall( vec2( p.x, uEye.y ) ), floor_, smoothstep( 0.0, 0.5, near ) );
@@ -97,13 +97,65 @@ void main() {
 /** Lens distance the far props were laid out for; they are stretched in depth to look the same from any other. */
 const DESIGN_DISTANCE = 6.5;
 
+const RING_VERTEX = /* glsl */ `
+varying float vT;
+void main() {
+  vT = position.y / ${RING.toFixed(3)};
+  gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
+}`;
+/** The light ring as a diffuser lit from inside: hottest, nearly white, along its middle and dimming toward both edges. */
+const RING_FRAGMENT = /* glsl */ `
+uniform vec3 uColor;
+varying float vT;
+void main() {
+  float c = 1.0 - abs( vT * 2.0 - 1.0 );
+  float core = c * c * ( 3.0 - 2.0 * c );
+  gl_FragColor = vec4( mix( uColor, vec3( 1.0 ), 0.4 * pow( core, 5.0 ) ) * ( 0.5 + 0.7 * core ), 1.0 );
+  #include <colorspace_fragment>
+}`;
+
+/** The glow's reach above and below the ring, in meters. */
+const HALO = 0.075;
+const HALO_VERTEX = /* glsl */ `
+varying float vY;
+varying float vFacing;
+void main() {
+  vY = position.y / ${HALO.toFixed(3)};
+  vec4 view = modelViewMatrix * vec4( position, 1.0 );
+  vFacing = abs( dot( normalize( normalMatrix * normal ), normalize( -view.xyz ) ) );
+  gl_Position = projectionMatrix * view;
+}`;
+/**
+ * The ring's light in the air round it, added over the foot and the deck: falling off away from the ring, and
+ * strongest where the lens looks along the shell at the stand's sides, as a glow thickens toward a lamp's outline.
+ */
+const HALO_FRAGMENT = /* glsl */ `
+uniform vec3 uColor; uniform float uGain;
+varying float vY;
+varying float vFacing;
+void main() {
+  float fall = exp( -abs( vY ) * ( vY < 0.0 ? 6.5 : 4.2 ) ) * ( 1.0 - smoothstep( 0.75, 1.0, abs( vY ) ) );
+  // The shell itself has no thickness: at its very outline the glow fades out instead of drawing a line.
+  float glow = fall * ( 0.45 + 0.55 * pow( 1.0 - vFacing, 2.0 ) ) * smoothstep( 0.03, 0.3, vFacing ) * uGain;
+  gl_FragColor = vec4( uColor * glow, 1.0 );
+  #include <colorspace_fragment>
+}`;
+
 /**
  * Everything on the menu's stage but the figure: a low round stand with a ring of light in the character's color,
  * a seamless studio wall and floor, and soft toy shapes far behind that set the character's scene.
  */
 export class StageSet {
   readonly group = new THREE.Group();
-  private readonly ring: THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>;
+  private readonly ring = new THREE.ShaderMaterial({ vertexShader: RING_VERTEX, fragmentShader: RING_FRAGMENT, uniforms: { uColor: { value: new THREE.Color() } } });
+  private readonly halo = new THREE.ShaderMaterial({
+    vertexShader: HALO_VERTEX,
+    fragmentShader: HALO_FRAGMENT,
+    uniforms: { uColor: { value: new THREE.Color() }, uGain: { value: 1 } },
+    blending: THREE.AdditiveBlending,
+    transparent: true,
+    depthWrite: false
+  });
   private readonly wall: THREE.Mesh<THREE.SphereGeometry, THREE.ShaderMaterial>;
   private readonly props = new StageProps();
   private readonly deck = new StageDeck(FOOT + RING + DECK);
@@ -122,9 +174,14 @@ export class StageSet {
     };
     // Satin, not glossy: at the lens's grazing angle a glossy deck mirrors the bright wall and turns into a grey puck.
     part(BASE_RADIUS, FOOT, 0, 0.012, new THREE.MeshStandardMaterial({ color: '#10141d', roughness: 0.42, metalness: 0.35, envMapIntensity: 0.55 }));
-    this.ring = part(BASE_RADIUS - 0.022, RING, FOOT, 0, new THREE.MeshBasicMaterial({ toneMapped: false, fog: false })) as typeof this.ring;
-    this.ring.receiveShadow = false;
+    part(BASE_RADIUS - 0.022, RING, FOOT, 0, this.ring).receiveShadow = false;
     part(STAND_RADIUS, DECK, FOOT + RING, 0.014, new THREE.MeshStandardMaterial({ color: '#2a3243', roughness: 0.56, metalness: 0.2, envMapIntensity: 0.45 }));
+    const shell = new THREE.CylinderGeometry(BASE_RADIUS + 0.004, BASE_RADIUS + 0.004, HALO * 2, 96, 1, true);
+    const halo = new THREE.Mesh(shell, this.halo);
+    halo.position.y = FOOT + RING / 2;
+    halo.renderOrder = 1;
+    this.owned.push({ geometry: shell, material: this.halo });
+    this.group.add(halo);
 
     this.wall = new THREE.Mesh(
       new THREE.SphereGeometry(200, 32, 16),
@@ -182,7 +239,9 @@ export class StageSet {
     this.deck.top.rotation.y = turn;
     const u = this.wall.material.uniforms;
     const lit = pulse ** 2;
-    this.ring.material.color.copy(this.ringColor).multiplyScalar(0.95 + lit * 1.5);
+    this.ring.uniforms.uColor!.value.copy(this.ringColor).multiplyScalar(0.95 + lit * 1.5);
+    this.halo.uniforms.uColor!.value.copy(this.ringColor);
+    this.halo.uniforms.uGain!.value = 0.55 + lit * 0.9;
     u.uRing!.value.copy(this.ringColor).multiplyScalar(0.6 + lit * 0.5);
     u.uGain!.value = 1 + lit * 0.35;
     u.uTime!.value = time;

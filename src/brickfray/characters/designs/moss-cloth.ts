@@ -69,11 +69,21 @@ export function hood(b: PartSet, color: string, lining: string, trim: string, pi
   // A dark band behind the hem that thins into the hood, so its back edge leaves no step.
   const band: Surface = (u, v) => hoodAt(0.0004 + 0.0032 * (1 - THREE.MathUtils.smoothstep(v, 0.03, 0.085)), ripple)(u, v);
   b.add('head', surface(us, [0.012, 0.03, 0.045, 0.06, 0.075, 0.085], band, true, true), trim, { look: 'cloth' });
-  // Seam along the crown.
-  // Seam along the crown: a flat piping that rises out of the hood and sinks back into it at both ends.
-  const seam = (u: number, v: number) => hoodAt((u ? 0.0008 : 0.0032) * Math.sin(Math.PI * Math.min(1, Math.max(0, (v - 0.1) / 0.7))) ** 0.5)(u, v);
-  b.add('head', surface([-0.009, 0, 0.009], samples(12).map((i) => 0.1 + i * 0.7), seam, false, true), trim, { look: 'cloth' });
+  // Seams: one along the crown and one down each side, meeting at the tail, so from behind the hood shows the panels
+  // it is sewn from. Each is a flat piping that rises out of the hood and sinks back into it at both ends.
+  for (const [u0, from] of HOOD_SEAMS) {
+    const seam = (u: number, v: number) => hoodAt((u === u0 ? 0.0036 : 0.0008) * Math.sin(Math.PI * Math.min(1, Math.max(0, (v - from) / (SEAM_END - from)))) ** 0.5)(u, v);
+    b.add('head', surface([u0 - 0.008, u0, u0 + 0.008], samples(16).map((i) => from + i * (SEAM_END - from)), seam, false, true), trim, { look: 'cloth' });
+  }
 }
+
+/** The hood's seams: where each runs round the opening (u) and where it starts back from the brim (v); all end at `SEAM_END`. */
+export const HOOD_SEAMS: [u: number, v: number][] = [
+  [0, 0.1],
+  [0.16, 0.38],
+  [0.84, 0.38]
+];
+export const SEAM_END = 0.97;
 
 /** A soft rolled hem of radius r round the open edge (v = 0) of a closed surface. */
 function hem(us: number[], at: Surface, r: number) {

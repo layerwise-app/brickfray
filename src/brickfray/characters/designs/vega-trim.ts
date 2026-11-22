@@ -13,7 +13,7 @@ const SEAM = tone(C.slate, 1.17);
 const SHIN = limbGarment('shin', L);
 
 interface Tail {
-  /** Where it leaves the neck and where its end hangs, across the back. */
+  /** Where it leaves the knot and where its end hangs, across the back. */
   x: [number, number];
   length: number;
   width: [number, number];
@@ -31,18 +31,20 @@ const tailAt =
     const across = u - 0.5;
     const free = Math.min(1, v * 2.5);
     const x = lerp(t.x[0], t.x[1], v) + 0.014 * Math.sin(v * 5 + t.phase) * v;
-    const z = lerp(-0.035, 0.022, smoothstep(v, 0, 0.16)) + 0.012 * v + t.kick * Math.max(0, v - 0.6) ** 2;
+    const z = lerp(-0.016, 0.022, smoothstep(v, 0, 0.16)) + 0.012 * v + t.kick * Math.max(0, v - 0.6) ** 2;
     const ripple = 0.012 * Math.sin(v * 10.5 + t.phase + across * 2.4) * free;
     const curl = 0.02 * (2 * across) ** 2 * (0.35 + 0.65 * v);
-    const half = across * lerp(t.width[0], t.width[1], v) * (1 - 0.1 * Math.sin(v * 10.5 + t.phase) * free);
+    // Gathered at the knot, widest a third of the way down, tapering to the end.
+    const wide = lerp(t.width[0], t.width[1], smoothstep(v, 0, 0.3)) * (1 - 0.4 * smoothstep(v, 0.45, 1));
+    const half = across * wide * (1 - 0.1 * Math.sin(v * 10.5 + t.phase) * free);
     const turn = t.twist * smoothstep(v, 0.4, 1);
-    return [x + half * Math.cos(turn), 0.05 - t.length * v, z + ripple + curl + lift + half * Math.sin(turn)];
+    return [x + half * Math.cos(turn), 0.012 - t.length * v, z + ripple + curl + lift + half * Math.sin(turn)];
   };
 
-const LONG: Tail = { x: [0.012, 0.062], length: 0.49, width: [0.07, 0.098], phase: 0.4, kick: 0.3, twist: 0.6 };
-const SHORT: Tail = { x: [-0.016, -0.07], length: 0.31, width: [0.06, 0.078], phase: 2.3, kick: 0.16, twist: -0.35 };
+const LONG: Tail = { x: [-0.05, -0.028], length: 0.46, width: [0.04, 0.1], phase: 0.4, kick: 0.3, twist: 0.6 };
+const SHORT: Tail = { x: [-0.078, -0.118], length: 0.3, width: [0.036, 0.085], phase: 2.3, kick: 0.16, twist: -0.35 };
 
-/** Two scarf tails down the back, the long one striped and fringed at its end. */
+/** Two scarf tails down the back from the knot behind her left shoulder, the long one striped and fringed at its end. */
 export function scarfTails(b: PartSet) {
   const hi = b.detail >= 2;
   const us = samples(tier(b, 2, 3, 6), b.hero ? 0.1 : 0);

@@ -44,8 +44,8 @@ function yoke(lower: (a: number) => number, upper: (a: number) => number, lift: 
 export function corselet(b: PartSet) {
   const q = tier(b);
   const cols = pick(b, 12, 20, 36);
-  // Satin and a deeper copper in the showroom: polished and light, its edge beside the arm clips to a pale pink band in the studio light.
-  b.add('chest', yoke(hem, () => TOP, 0, 0.014, cols, pick(b, 2, 3, 6)), b.hero ? tone(COPPER, 0.8) : COPPER, { look: b.hero ? 'metal' : shine(b) });
+  // Satin and a deeper copper in the showroom: polished and light, its shoulders clip to a pale pink band in the studio light.
+  b.add('chest', yoke(hem, () => TOP, 0, 0.014, cols, pick(b, 2, 3, 6)), b.hero ? tone(COPPER, 0.68) : COPPER, { look: b.hero ? 'metal' : shine(b) });
   b.add('chest', yoke(hem, (a) => hem(a) + 0.026, 0.006, 0.008, cols, 1), BRASS, { look: shine(b) });
   b.lathe(
     'chest',
@@ -136,7 +136,24 @@ function port(b: PartSet, r: number, bars: Bars, at: V3, rot: V3) {
   if (q >= 2 && bars !== 'upright') for (const x of xs) brass.push(bar(x, true));
   b.add('head', join(...brass), BRONZE, { at, rot, look: 'metal' });
   b.add('head', placed(S.cylinder(r, r, 0.02, seg), [0, 0.008, 0]), DARK, { at, rot, look: 'rubber' });
-  b.add('head', placed(S.cylinder(r, r, 0.004, seg), [0, 0.028, 0]), GLASS, { at, rot, look: 'glass' });
+  // The showroom's glass sits forward in the frame, leaving room for the eyes behind it.
+  b.add('head', placed(S.cylinder(r, r, 0.004, seg), [0, b.hero ? 0.031 : 0.028, 0]), GLASS, { at, rot, look: 'glass' });
+}
+
+/** Eyes glowing in the dark of the front port; close up each has an iris, a pupil and a catch-light, looking a little toward the viewer. */
+function eyes(b: PartSet) {
+  b.mirror((_, sign) => {
+    if (!b.hero) {
+      b.ball('head', 0.017, '#e9f3ff', { at: [sign * 0.031, 0.1, -0.173], scale: [1, 1.3, 0.5], look: 'glow' });
+      return;
+    }
+    const [x, y] = [sign * 0.031, 0.1];
+    b.ball('head', 0.017, '#dfe9f4', { at: [x, y, -0.1688], scale: [1, 1.28, 0.42], look: 'glow' });
+    const [px, py] = [x - sign * 0.0022, y - 0.0015];
+    b.cyl('head', 0.0092, 0.0092, 0.0008, '#1d8aa0', { at: [px, py, -0.1764], rot: [Math.PI / 2, 0, 0], scale: [1, 1, 1.18], look: 'glow', seg: 24 });
+    b.cyl('head', 0.0052, 0.0052, 0.0008, '#0c1118', { at: [px, py, -0.1772], rot: [Math.PI / 2, 0, 0], scale: [1, 1, 1.18], look: 'gloss', seg: 20 });
+    b.ball('head', 0.0024, '#ffffff', { at: [px + 0.0034, py + 0.0042, -0.1778], scale: [1, 1, 0.4], look: 'glow' });
+  });
 }
 
 /** Standard-dress helmet: brass bonnet on a neck ring, four ports, exhaust valve, crown fitting, a starfish stowaway. */
@@ -159,10 +176,8 @@ export function helmet(b: PartSet) {
   );
 
   port(b, 0.066, 'upright', [0, 0.095, -0.15], [-Math.PI / 2, 0, 0]);
-  b.mirror((_, sign) => {
-    b.ball('head', 0.017, '#e9f3ff', { at: [sign * 0.031, 0.1, -0.173], scale: [1, 1.3, 0.5], look: 'glow' });
-    port(b, 0.04, 'hash', [sign * 0.153, 0.1, -0.004], [0, 0, sign * -Math.PI / 2]);
-  });
+  eyes(b);
+  b.mirror((_, sign) => port(b, 0.04, 'hash', [sign * 0.153, 0.1, -0.004], [0, 0, sign * -Math.PI / 2]));
   if (q >= 2) port(b, 0.03, 'cross', [0, 0.1 + 0.752 * 0.156, -0.659 * 0.156], [-0.72, 0, 0]);
 
   // Crown fitting with a lifting eye.

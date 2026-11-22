@@ -1,1 +1,1 @@
-{"name": "vega-scarf", "vertices": 5168, "groups": [{"name": "long", "indices": 9576}, {"name": "stripe", "indices": 480}, {"name": "longInner", "indices": 8856}, {"name": "short", "indices": 6216}, {"name": "shortStripe", "indices": 240}, {"name": "shortInner", "indices": 5616}]}
+{"name": "vega-scarf", "vertices": 5376, "groups": [{"name": "long", "indices": 9480}, {"name": "stripe", "indices": 792}, {"name": "longInner", "indices": 9120}, {"name": "short", "indices": 6576}, {"name": "shortStripe", "indices": 264}, {"name": "shortInner", "indices": 6000}]}

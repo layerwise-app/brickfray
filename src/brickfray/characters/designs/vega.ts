@@ -60,14 +60,14 @@ export function vega(b: PartSet) {
   if (b.hero) freckles(b);
 }
 
-/** Rifle at a high ready in both hands, muzzle up past the right shoulder; feet planted wide, the weight on the straight back leg and the front knee eased, chin up to the viewer. */
+/** Rifle at a high ready in both hands, muzzle up past the right shoulder; feet planted wide on straight legs, the back foot turned out where the menu camera sees it, chin up to the viewer. */
 export const stance: Stance = {
-  pelvis: { at: [0.05, -0.05, 0.03], rot: [0.45, -0.04, 0.06] },
+  pelvis: { at: [0.06, -0.04, 0.06], rot: [0.45, -0.04, 0.06] },
   chest: [0.2, -0.06, -0.02],
   head: [-0.38, 0.14, 0.06],
   feet: {
-    L: { at: [-0.28, 0, -0.2], heading: -0.55, knee: 0.1 },
-    R: { at: [0.2, 0, 0.16], heading: 0.95, knee: 0.05 }
+    L: { at: [-0.21, 0, -0.14], heading: -0.55, knee: 0.15 },
+    R: { at: [0.29, 0, 0.27], heading: 0.85, knee: 0.1 }
   },
   arms: {
     R: { wrist: [0.17, 0.053, -0.184], hand: [0.298, 0.88, -0.446], elbow: [-0.037, -0.996, 0.079], space: 'chest', shape: 'grip' },
@@ -85,10 +85,10 @@ function blockCostume(b: PartSet, bulk: number) {
   b.cyl('chest', 0.075, 0.085, 0.07, TEAL, { at: [0, 0.255, 0.0], look: 'cloth' });
   lowTaper(b, 'spine', [0.29, 0.19], [0.29 * bulk + 0.02, 0.2], 0.05, TEAL, { at: [0, 0.0, 0], look: 'cloth' });
 
-  // Scarf knot at the throat and its tail on the swinging back bone.
+  // Scarf round the neck, its knot behind her left shoulder and its tail on the swinging back bone.
   b.torus('chest', 0.08, 0.03, SCARF, { at: [0, 0.245, 0], rot: [Math.PI / 2, 0, 0], look: 'cloth' });
-  b.blob('chest', [0.07, 0.06, 0.05], SCARF, { at: [-0.045, 0.22, -0.09], look: 'cloth' });
-  b.box('dangleBack', [0.08, 0.5, 0.02], SCARF, { at: [0.0, -0.23, 0.0], rot: [0.05, 0, 0.04], look: 'cloth' });
+  b.blob('chest', [0.06, 0.06, 0.05], SCARF, { at: [-0.07, 0.236, 0.1], look: 'cloth' });
+  b.box('dangleBack', [0.075, 0.46, 0.02], SCARF, { at: [-0.045, -0.215, 0.0], rot: [0.05, 0, 0.04], look: 'cloth' });
 
   // Hair cap, bangs and the high ponytail on the head's swinging bone.
   lowBlob(b, 'head', [0.255, 0.15, 0.27], HAIR, { at: [0, 0.176, 0.012], look: 'cloth', e: 0.72, seg: 8 });

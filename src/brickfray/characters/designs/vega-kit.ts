@@ -158,7 +158,7 @@ export function sleeves(b: PartSet) {
   });
 }
 
-/** Scarf: wraps around the neck, with a knot and a short end at her left collarbone; its tails are in vega-trim.ts. */
+/** Scarf: wraps around the neck and a knot behind her left shoulder; its tails are in vega-trim.ts. */
 export function scarf(b: PartSet) {
   const hi = b.detail >= 2;
   const hero = b.hero;
@@ -173,39 +173,27 @@ export function scarf(b: PartSet) {
       const a = lerp(from, to, i / n);
       pts.push([Math.sin(a) * rx, y + Math.cos(a) * tilt + Math.sin(a) * lean, 0.004 - Math.cos(a) * rz]);
     }
+    // Knitted and bunched: it gathers into soft ridges round the neck, and close up the band twists into diagonal folds.
     const gathers = (t: number) => r * (1 + (hero ? 0.1 * Math.sin(t * Math.PI * 2 * 5 + phase) + 0.05 * Math.sin(t * Math.PI * 2 * 9 + phase * 2) : 0));
-    return strand(pts, gathers, { flat, side: [0, 1, 0], seg, radial, closed });
+    const folds = (t: number, phi: number) => 0.2 * Math.sin(t * Math.PI * 2 * 10 + phi + phase) * (0.65 + 0.35 * Math.sin(t * Math.PI * 2 * 3 + phase * 2));
+    return strand(pts, gathers, { flat, side: [0, 1, 0], seg, radial, closed, relief: hero ? folds : undefined });
   };
-  b.add('chest', loop(0.25, 0.09, 0.084, 0.027, -0.014, 0.004, Math.PI, Math.PI * 3, 0.4, 0), C.scarf, { look: 'cloth' });
-  b.add('chest', loop(0.272, 0.085, 0.079, 0.024, 0.012, -0.006, Math.PI, Math.PI * 3, 0.42, 1.3), tone(C.scarf, 0.95), { look: 'cloth' });
+  b.add('chest', loop(0.25, 0.09, 0.084, 0.027, -0.014, -0.008, Math.PI, Math.PI * 3, 0.4, 0), C.scarf, { look: 'cloth' });
+  b.add('chest', loop(0.272, 0.085, 0.079, 0.024, 0.012, 0.012, Math.PI, Math.PI * 3, 0.42, 1.3), tone(C.scarf, 0.95), { look: 'cloth' });
   b.add('chest', loop(0.295, 0.074, 0.07, 0.02, 0.006, -0.008, Math.PI - 0.4, Math.PI * 3 - 0.1, 0.5, 2.1), C.scarfDark, { look: 'cloth' });
 
-  // Knot and the short end over her left collarbone; close up the knot is a puff gathered by a band wrapped round it.
-  const knot: V3 = [-0.058, 0.232, -0.088];
-  if (hero) {
-    lump(b, 'chest', [0.054, 0.07, 0.046], 18, C.scarf, { at: knot, rot: [0.2, 0.3, 0.3], look: 'cloth', e: 0.85 });
-    const band: V3[] = [];
-    for (let i = 0; i < 16; i++) {
-      const a = (i / 16) * Math.PI * 2;
-      band.push([knot[0] + Math.cos(a) * 0.026, knot[1] - 0.004 + Math.sin(a) * 0.006, knot[2] + Math.sin(a) * 0.022]);
-    }
-    b.add('chest', strand(band, 0.012, { flat: 0.55, side: [0, 1, 0], seg: 32, radial: 10, closed: true }), C.scarf, { look: 'cloth' });
-    b.add('chest', strand(band.map(([x, y, z]): V3 => [x, y - 0.0115, z]), 0.0018, { seg: 32, radial: 5, closed: true }), C.scarfDark, { look: 'cloth' });
-  } else lump(b, 'chest', [0.066, 0.06, 0.052], tier(b, 6, 8, 14), C.scarf, { at: knot, rot: [0.2, 0.3, 0.3], look: 'cloth', e: 0.8 });
-  const end = strand(
-    [
-      [-0.06, 0.226, -0.098],
-      [-0.076, 0.18, -0.126],
-      [-0.092, 0.125, -0.126],
-      [-0.092, 0.085, -0.12]
-    ],
-    (t) => 0.03 + t * 0.008,
-    { flat: 0.2, side: [1, 0, 0.25], seg: tier(b, 3, 4, 8), radial }
-  );
-  b.add('chest', end, C.scarf, { look: 'cloth' });
-  if (hi) b.box('chest', [0.076, 0.012, 0.014], C.scarfDark, { at: [-0.092, 0.104, -0.123], rot: [0.06, -0.3, 0.05], look: 'cloth', bevel: hero ? 0.003 : 0 });
-  if (hero) for (let i = 0; i < 6; i++) b.cyl('chest', 0.0035, 0.002, 0.024, C.scarfDark, { at: [-0.123 + i * 0.012, 0.067, -0.11 - i * 0.003], rot: [0.05, 0, 0.1 - i * 0.03], look: 'cloth', seg: 5 });
-
+  // Knot behind her left shoulder, where both tails hang from (the showroom drape or vega-trim.ts scarfTails): a
+  // gathered puff with a band of the scarf wrapped round its waist.
+  const knot: V3 = [-0.07, 0.238, 0.104];
+  lump(b, 'chest', [0.05, 0.056, 0.044], tier(b, 6, 8, 18), C.scarf, { at: knot, rot: [-0.35, -0.5, 0.25], look: 'cloth', e: hero ? 0.85 : 0.8 });
+  if (!hi) return;
+  const band: V3[] = [];
+  for (let i = 0; i < 16; i++) {
+    const a = (i / 16) * Math.PI * 2;
+    band.push([knot[0] + Math.cos(a) * 0.026, knot[1] - 0.006 + Math.sin(a) * 0.005, knot[2] + Math.sin(a) * 0.021]);
+  }
+  b.add('chest', strand(band, 0.011, { flat: 0.55, side: [0, 1, 0], seg: hero ? 32 : 12, radial: hero ? 10 : 5, closed: true }), tone(C.scarf, 0.92), { look: 'cloth' });
+  if (hero) b.add('chest', strand(band.map(([x, y, z]): V3 => [x, y - 0.0105, z]), 0.0018, { seg: 32, radial: 5, closed: true }), C.scarfDark, { look: 'cloth' });
 }
 
 /** Binoculars on a neck strap. */

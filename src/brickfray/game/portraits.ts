@@ -19,17 +19,28 @@ const TURN: Record<CharacterId, number> = { rivet: -0.3, vega: -0.12, clack: -0.
 const BELOW = 0.31;
 const ABOVE = 0.38;
 /**
+ * How much closer the lens comes for a face that reads small in that crop: Vega's, bare and narrow beside the helmets,
+ * and Moss's, deep in a hood.
+ */
+const ZOOM: Partial<Record<CharacterId, number>> = { vega: 1.2, moss: 1.1 };
+/** A soft light from the lens on the face, stronger where a hood shades it, so it reads on a tile of its own colour. */
+const FACE_LIGHT = { color: '#fff1e0', intensity: 0.5, hooded: { moss: 1.5 } as Partial<Record<CharacterId, number>> };
+/** How strongly each shot's colour is sharpened: drawn at twice a picker tile or more, it is scaled down and softened. */
+const SHARPEN = 0.7;
+/**
  * Room drawn over the tile for what rises past its top edge (Sir Clack's crest, Nova's antenna); each shot is then
  * trimmed to its own silhouette, so whatever rises above the tile stands out whole, by the same rule for all six.
  */
 const OVER = 0.34;
 /** The glow round each cutout: its colour, strength, and blur radius in pixels of a 192-pixel-wide shot. */
-const GLOW = { rgb: [255, 246, 232], alpha: 0.5, blur: 3.5 };
+const GLOW = { rgb: [255, 246, 232], alpha: 0.62, blur: 3.5 };
 /** Pixels across a shot: twice the tile's on this screen, within these bounds. */
 const SIZES = { min: 128, max: 400, tile: 64 };
 /** Lights from behind the head, high on either side, that edge dark helmets and hair against the tile. */
 const RIMS = [new THREE.Vector3(0.7, 0.8, -1).normalize(), new THREE.Vector3(-0.8, 0.5, -1).normalize()];
 const RIM = { color: '#e2ebff', intensity: 3.2 };
+/** Stronger rims for a figure dressed in its own tile's colour (Moss's green hood on the green tile), to edge it off the tile. */
+const RIM_BOOST: Partial<Record<CharacterId, number>> = { moss: 1.8 };
 
 /** Divides the multisampled edges' colour by their coverage before tone mapping, which would brighten and tint them after. */
 const STRAIGHT = /* glsl */ `
@@ -101,7 +112,8 @@ async function draw(kit: Kit, gr: GameRenderer, pose: AnimState, environment: TH
   const sun = new THREE.DirectionalLight(key.color, key.intensity);
   sun.position.copy(KEY_DIRECTION);
   const backs = RIMS.map(() => new THREE.DirectionalLight(RIM.color, RIM.intensity));
-  const lights = [sun, ...backs, aimed(rim), aimed(kicker), aimed(fill)];
+  const facing = new THREE.DirectionalLight(FACE_LIGHT.color, FACE_LIGHT.intensity);
+  const lights = [sun, ...backs, facing, aimed(rim), aimed(kicker), aimed(fill)];
   for (const light of lights) scene.add(light, light.target);
   scene.add(new THREE.HemisphereLight(sky.color, sky.ground, sky.intensity * 1.4));
   const camera = new THREE.PerspectiveCamera(22, WIDTH / HEIGHT, 0.05, 20);
@@ -149,14 +161,20 @@ async function draw(kit: Kit, gr: GameRenderer, pose: AnimState, environment: TH
     rig.root.rotation.y = Math.PI - TURN[id] - Math.atan2(-face.x, -face.z);
     rig.root.updateMatrixWorld(true);
     rig.headPosition(head);
-    const center = head.y + (ABOVE + OVER - BELOW) / 2;
-    const distance = (ABOVE + OVER + BELOW) / 2 / Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
-    camera.position.set(head.x, center - 0.07, head.z + distance);
+    const zoom = ZOOM[id] ?? 1;
+    const center = head.y + (ABOVE + OVER - BELOW) / 2 / zoom;
+    const distance = (ABOVE + OVER + BELOW) / 2 / zoom / Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+    camera.position.set(head.x, center - 0.07 / zoom, head.z + distance);
     camera.lookAt(head.x, center, head.z);
     backs.forEach((back, i) => {
+      back.intensity = RIM.intensity * (RIM_BOOST[id] ?? 1);
       back.target.position.copy(head);
       back.position.copy(head).add(RIMS[i]!);
     });
+    // From just below the lens, under a hood's brim.
+    facing.intensity = FACE_LIGHT.intensity * (FACE_LIGHT.hooded[id] ?? 1);
+    facing.target.position.copy(head);
+    facing.position.set(head.x - 0.3, head.y - 0.25, head.z + 1);
     renderer.setRenderTarget(hdr);
     renderer.render(scene, camera);
     renderer.setRenderTarget(straight);
@@ -165,6 +183,7 @@ async function draw(kit: Kit, gr: GameRenderer, pose: AnimState, environment: TH
     renderer.readRenderTargetPixels(ldr, 0, 0, WIDTH, HEIGHT, pixels);
     // GL rows run bottom-up.
     for (let y = 0; y < HEIGHT; y++) image.data.set(pixels.subarray((HEIGHT - 1 - y) * WIDTH * 4, (HEIGHT - y) * WIDTH * 4), y * WIDTH * 4);
+    sharpen(image.data, WIDTH, HEIGHT, SHARPEN);
     cut.putImageData(image, 0, 0);
     ctx.clearRect(0, 0, WIDTH, HEIGHT);
     ctx.drawImage(cutout, 0, 0);
@@ -205,6 +224,37 @@ function addGlow(px: Uint8ClampedArray, halo: Uint8ClampedArray) {
     const k = g * (1 - f);
     for (let c = 0; c < 3; c++) px[i + c] = (px[i + c]! * f + GLOW.rgb[c]! * k) / a;
     px[i + 3] = a * 255;
+  }
+}
+
+/**
+ * Unsharp mask on the cutout's colour (straight alpha), in place: each pixel pushed away from the mean of its 3×3
+ * neighbourhood, weighted by coverage so the clear background does not darken the edges.
+ */
+function sharpen(px: Uint8ClampedArray, width: number, height: number, amount: number) {
+  const src = px.slice();
+  for (let y = 1; y < height - 1; y++) {
+    for (let x = 1; x < width - 1; x++) {
+      const i = (y * width + x) * 4;
+      if (src[i + 3] === 0) continue;
+      let weight = 0;
+      let r = 0;
+      let g = 0;
+      let b = 0;
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          const j = i + (dy * width + dx) * 4;
+          const k = src[j + 3]! * (dx && dy ? 1 : dx || dy ? 2 : 4);
+          weight += k;
+          r += src[j]! * k;
+          g += src[j + 1]! * k;
+          b += src[j + 2]! * k;
+        }
+      }
+      px[i] = src[i]! + amount * (src[i]! - r / weight);
+      px[i + 1] = src[i + 1]! + amount * (src[i + 1]! - g / weight);
+      px[i + 2] = src[i + 2]! + amount * (src[i + 2]! - b / weight);
+    }
   }
 }
 

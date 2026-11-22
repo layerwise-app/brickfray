@@ -53,6 +53,43 @@ const TWIST_GAIN = 0.05;
 /** How much stiffer than the part's own spring the soft stop past its range is. */
 const STOP = 8;
 
+/** How a showroom cloth bends on the turntable (material.ts ClothSway): rad of hem per rad/s of turn and per (rad/s)², its own sway in Hz and damping ratio. */
+export interface ClothSwingSpec {
+  trail: number;
+  fling: number;
+  max: number;
+  hz: number;
+  zeta: number;
+}
+
+/**
+ * The bend a turn gives a cloth along its length, on top of its bone's swing: the hem trails the turn and flares out
+ * with it, late, and swings past the rest a couple of times when the turn stops.
+ */
+export class ClothSwing {
+  lateral = 0;
+  flare = 0;
+  private vl = 0;
+  private vf = 0;
+
+  constructor(readonly spec: ClothSwingSpec) {}
+
+  update(dt: number, spin: number) {
+    const { trail, fling, max, hz, zeta } = this.spec;
+    const w = Math.PI * 2 * hz;
+    const tl = soft(-trail * spin, -max, max);
+    const tf = soft(fling * spin * spin, -max, max);
+    const steps = Math.ceil(Math.max(dt, 0) / (1 / 120));
+    const h = dt / Math.max(steps, 1);
+    for (let i = 0; i < steps; i++) {
+      this.vl += (w * w * (tl - this.lateral) - 2 * zeta * w * this.vl) * h;
+      this.vf += (w * w * (tf - this.flare) - 2 * zeta * w * this.vf) * h;
+      this.lateral += this.vl * h;
+      this.flare = Math.max(0, this.flare + this.vf * h);
+    }
+  }
+}
+
 /** Eases an angle into [min, max]: unchanged up to 70% of the way to an end, then flattening toward it. */
 function soft(angle: number, min: number, max: number) {
   const end = angle < 0 ? min : max;

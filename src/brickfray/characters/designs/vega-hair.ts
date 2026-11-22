@@ -34,6 +34,8 @@ interface LockOptions {
   side?: V3;
   tip?: number;
   more?: number;
+  radial?: number;
+  relief?: (t: number, phi: number) => number;
 }
 type Lock = (bone: 'head' | 'dangleHead', points: V3[], r: number, color: string, o?: LockOptions) => void;
 
@@ -43,7 +45,7 @@ export function hair(b: PartSet) {
   const seg = tier(b, 4, 5, 14);
   const radial = tier(b, 4, 5, 12);
   const lock: Lock = (bone, points, r, color, o = {}) => {
-    b.add(bone, strand(points, tapering(r, o.tip), { flat: o.flat ?? 0.5, side: o.side ?? [0, 1, 0], seg: seg + (o.more ?? 0), radial }), color, { look: 'cloth' });
+    b.add(bone, strand(points, tapering(r, o.tip), { flat: o.flat ?? 0.5, side: o.side ?? [0, 1, 0], seg: seg + (o.more ?? 0), radial: o.radial ?? radial, relief: o.relief }), color, { look: 'cloth' });
   };
 
   // Cap: all around above the brow, behind the ears below it, down to the hairline at the nape, closed over the crown.
@@ -72,21 +74,42 @@ export function hair(b: PartSet) {
     const over: V3 = [start[1]![0] * 0.5, 0.243 + lift - Math.abs(a) * 0.006, lerp(start[1]![2], knot[2], 0.55)];
     lock('head', [...start, over, knot], r, color, { flat, side: SKULL.around(0.19, a), tip: 0.55 });
   };
-  const nape = (a: number, r: number, color: string, lift: number, flat: number) => {
+  const nape = (a: number, r: number, color: string, lift: number, flat: number, o: { from?: number; bend?: number; seed?: number } = {}) => {
+    const bend = o.bend ?? 0;
     const up = SKULL.path([
-      [0.0, lerp(a, Math.PI, 0.45), 0.008 + lift],
-      [0.09, a, 0.014 + lift],
-      [0.17, lerp(a, Math.PI, 0.25), 0.016 + lift]
+      [o.from ?? 0.0, lerp(a, Math.PI, 0.45), 0.008 + lift],
+      [0.09, a + bend, 0.014 + lift],
+      [0.17, lerp(a, Math.PI, 0.25) + bend * 0.5, 0.016 + lift]
     ]);
-    lock('head', [...up, knot], r, color, { flat, side: SKULL.around(0.12, a), tip: 0.6 });
+    // Close up each lock is combed into a few clumps of strands along its length.
+    const seed = o.seed ?? 0;
+    const relief = b.hero ? (t: number, phi: number) => (0.07 + 0.05 * Math.sin(seed * 3.1)) * Math.sin(phi * 3 + seed) * Math.min(1, t * 6) : undefined;
+    lock('head', [...up, knot], r, color, { flat, side: SKULL.around(0.12, a), tip: 0.6, radial: b.hero ? 18 : undefined, relief });
   };
   if (b.hero) {
     const under = [-1.95, -1.5, -1.05, -0.62, -0.2, 0.22, 0.64, 1.07, 1.5, 1.95];
     under.forEach((a, i) => combed(a, 0.026, i % 2 ? C.hairDark : C.hair, 0, 0.55));
     under.slice(0, -1).forEach((a, i) => combed((a + under[i + 1]!) / 2, 0.019, i % 3 ? C.hairLight : C.hair, 0.006, 0.72));
-    const back = [2.15, 2.5, 2.85, 3.2, 3.55, 3.9, 4.2];
-    back.forEach((a, i) => nape(a, 0.024, i % 2 ? C.hairDark : C.hair, 0, 0.55));
-    back.slice(0, -1).forEach((a, i) => nape((a + back[i + 1]!) / 2, 0.018, i % 2 ? C.hairLight : C.hair, 0.006, 0.72));
+    // The back: locks of uneven width and start, curving a little as they are combed up, in a loose mix of tones; the
+    // over layer covers only some of the gaps so the hair doesn't read as a row of equal tubes.
+    const back: [a: number, r: number, from: number, bend: number, color: string][] = [
+      [2.12, 0.023, 0.01, 0.06, C.hair],
+      [2.45, 0.028, 0.0, -0.04, C.hairDark],
+      [2.83, 0.021, 0.022, 0.08, C.hair],
+      [3.17, 0.03, 0.004, -0.02, C.hairDark],
+      [3.52, 0.024, 0.016, 0.1, C.hair],
+      [3.88, 0.027, 0.0, -0.06, C.hairDark],
+      [4.22, 0.022, 0.012, 0.03, C.hair]
+    ];
+    back.forEach(([a, r, from, bend, color], i) => nape(a, r, color, 0, 0.55, { from, bend, seed: i * 1.7 }));
+    const over: [a: number, r: number, from: number, bend: number, color: string][] = [
+      [2.3, 0.017, 0.034, 0.12, C.hairLight],
+      [2.64, 0.021, 0.012, 0.02, C.hair],
+      [3.36, 0.019, 0.028, -0.08, C.hairLight],
+      [3.7, 0.015, 0.05, 0.14, C.hairLight],
+      [4.05, 0.02, 0.02, -0.03, C.hair]
+    ];
+    over.forEach(([a, r, from, bend, color], i) => nape(a, r, color, 0.006, 0.72, { from, bend, seed: 4 + i * 2.3 }));
     // Swept back above the ears, over the cap's edge.
     b.mirror((_, sign) => {
       for (const [y, r, color] of [

@@ -200,6 +200,8 @@ export interface StrandOptions {
   radial?: number;
   /** A ring with no ends: the last point runs on into the first. */
   closed?: boolean;
+  /** Raises the surface by this fraction of the radius at t along and `phi` around (0 = the wide side): grooves, twisted folds. */
+  relief?: (t: number, phi: number) => number;
 }
 
 /**
@@ -237,13 +239,15 @@ export function strand(points: V3[], radius: number | ((t: number) => number), o
       const phi = (f / radial) * Math.PI * 2;
       const cs = Math.cos(phi);
       const sn = Math.sin(phi);
-      ring.push(new THREE.Vector3().copy(c).addScaledVector(bin, cs * r).addScaledVector(nor, sn * r * flat));
+      const rr = o.relief ? r * (1 + o.relief(t, phi)) : r;
+      ring.push(new THREE.Vector3().copy(c).addScaledVector(bin, cs * rr).addScaledVector(nor, sn * rr * flat));
       ringN.push(new THREE.Vector3().addScaledVector(bin, cs * flat).addScaledVector(nor, sn).normalize());
     }
     rings.push(ring);
     normals.push(ringN);
     centers.push(c);
   }
+  if (o.relief) reliefNormals(rings, normals, closed);
   const out = new Mesher();
   if (closed) {
     rings[seg] = rings[0]!;
@@ -269,6 +273,31 @@ export function strand(points: V3[], radius: number | ((t: number) => number), o
     }
   }
   return out.build();
+}
+
+/** Normals of a raised surface from its neighbours across and along, facing out from the core. */
+function reliefNormals(rings: THREE.Vector3[][], normals: THREE.Vector3[][], closed: boolean) {
+  // A closed strand's last ring lies on its first.
+  const n = closed ? rings.length - 1 : rings.length;
+  const radial = rings[0]!.length;
+  const across = new THREE.Vector3();
+  const along = new THREE.Vector3();
+  const out = new THREE.Vector3();
+  for (let k = 0; k < rings.length; k++) {
+    const prev = closed ? (k - 1 + n) % n : Math.max(0, k - 1);
+    const next = closed ? (k + 1) % n : Math.min(n - 1, k + 1);
+    for (let f = 0; f < radial; f++) {
+      across.subVectors(rings[k]![(f + 1) % radial]!, rings[k]![(f - 1 + radial) % radial]!);
+      along.subVectors(rings[next]![f]!, rings[prev]![f]!);
+      const normal = normals[k]![f]!;
+      out.crossVectors(across, along);
+      if (out.lengthSq() < 1e-14) continue;
+      out.normalize();
+      if (out.dot(normal) < 0) out.negate();
+      // Keep a little of the smooth tube's normal so the facets of a coarse ring don't flicker.
+      normal.lerp(out, 0.85).normalize();
+    }
+  }
 }
 
 /** Radius profile of a lock or tail: slim at the root, full by `swell`, tapering to `tip` × r at the end. */

@@ -51,6 +51,12 @@ const TURN = Math.PI * 2;
 const SPIN_SMOOTHING = 0.08;
 /** Every figure is framed as if it reached at least this high above the deck: the stand keeps its size from one character to the next, and a shorter one stands shorter. */
 const HEADROOM = 2.02;
+/**
+ * A screen this short is a sideways phone (framing's own threshold): the header row bounds the head, so each figure is
+ * framed by its own height to stand as tall as it can, and the stand keeps `AIR` meters clear of the bottom edge.
+ */
+const SHORT = 560;
+const AIR = 0.07;
 /** The menu draws at the screen's own resolution on every tier, up to this many pixels. */
 const MAX_PIXELS = 2560 * 1440;
 
@@ -171,9 +177,11 @@ export class Showroom {
     this.seenCover = coverVersion;
     let goal = this.goal;
     let distance = this.distance;
+    const short = this.height < SHORT;
     // The outline's perspective depends on the distance, which depends on the framing: two rounds settle it.
     for (let round = 0; round < 2; round++) {
-      goal = frame(silhouette(this.display.outline, VIEWS, LENS, distance, BASE_RADIUS, STAND_TOP, HEADROOM), this.width, this.height, cover);
+      const outline = silhouette(this.display.outline, VIEWS, LENS, distance, BASE_RADIUS, STAND_TOP + (short ? AIR : 0), short ? 0 : HEADROOM);
+      goal = frame(outline, this.width, this.height, cover);
       distance = this.reach(goal.scale);
     }
     this.goal = goal;
