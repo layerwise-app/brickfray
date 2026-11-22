@@ -2,9 +2,22 @@
 /* The narrowest wide screens: the left column folds to the width of three portraits so the stand has the room between the columns. */
 @media (min-width: 1024px) and (max-width: 1279.98px) and (min-height: 560.02px) {
   .bf-menu {
-    --thumb: 56px;
+    --thumb: 66px;
     --name: 44px;
-    --column: 204px;
+    --column: 222px;
+  }
+  /* The backdrop's builds stand behind the narrow column here: a soft shade keeps the hero's words on calm ground. */
+  .bf-menu-title {
+    position: relative;
+    isolation: isolate;
+  }
+  .bf-menu-title::before {
+    position: absolute;
+    z-index: -1;
+    inset: -18px -48px -14px -24px;
+    background: radial-gradient(closest-side, rgba(6, 9, 22, 0.7), rgba(6, 9, 22, 0.38) 62%, rgba(6, 9, 22, 0));
+    content: '';
+    pointer-events: none;
   }
   .bf-menu-loadout {
     width: var(--column);
@@ -42,7 +55,7 @@
     width: var(--column);
     grid-template-columns: repeat(3, auto);
     justify-content: space-between;
-    gap: 6px 0;
+    gap: 10px 0;
   }
 }
 

@@ -11,6 +11,9 @@ export interface FeedEntry {
   killerTeam: number;
   victim: string;
   victimTeam: number;
+  /** Their looks: a snapbot's (a BotKind) lets the HUD name it in the player's language. */
+  killerLook: CharacterId | BotKind | null;
+  victimLook: CharacterId | BotKind | null;
   weapon: KillCause;
   headshot: boolean;
   mine: boolean;

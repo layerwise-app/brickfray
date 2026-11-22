@@ -1,4 +1,4 @@
-import { GRACE } from './bot-fight';
+import { GRACE, HEAD_ABOVE_CHEST } from './bot-fight';
 import type { BotProfile } from './bot-profile';
 import type { Spot } from './bot-roam';
 import { PLAYER } from './constants';
@@ -22,6 +22,8 @@ export interface SenseState {
 
 /** A bot trading shots with an enemy that hurt it this recently (s) finishes that fight before turning to a new attacker. */
 const TRADING = 1.5;
+/** A fill bot sees an enemy that hurt it this recently (s) out to `range` m, past its gun's reach: it shoots back. */
+const RETURN_FIRE = { within: 3, range: 50 };
 
 /** Bot senses: sight (range, a narrower cone behind, a clear line), being hit, and settling on a target. */
 export class BotSense {
@@ -31,23 +33,25 @@ export class BotSense {
     private readonly saw: (at: Spot) => void
   ) {}
 
-  /** Chest height of `target` as it stood `lag` seconds ago. */
-  aimPoint(target: PlayerState, lag = 0): [number, number, number] {
+  /** Chest (or head) height of `target` as it stood `lag` seconds ago. */
+  aimPoint(target: PlayerState, lag = 0, head = false): [number, number, number] {
     const at = lag > 0 ? this.host.poseAt(target, this.host.time - lag) : null;
     const m = at ?? target.move;
-    const head = m.y + (PLAYER.eye + (PLAYER.crouchEye - PLAYER.eye) * m.crouch) * target.scale;
-    return [m.x, head - 0.35 * target.scale, m.z];
+    const eyes = m.y + (PLAYER.eye + (PLAYER.crouchEye - PLAYER.eye) * m.crouch) * target.scale;
+    return [m.x, head ? eyes : eyes - HEAD_ABOVE_CHEST * target.scale, m.z];
   }
 
   perceive(bot: PlayerState, b: SenseState, eye: [number, number, number], prof: BotProfile, skill: number) {
     const host = this.host;
     let best: PlayerState | null = null;
     let bestScore = Infinity;
+    const fill = bot.character !== bot.bot;
     for (const p of host.players.values()) {
       if (!p.alive || !host.hostile(bot, p)) continue;
       const aim = this.aimPoint(p);
       const d = Math.hypot(aim[0] - eye[0], aim[2] - eye[2]);
-      if (d > prof.range) continue;
+      const shotAt = fill && host.time - (b.hurtAt.get(p.id) ?? -99) < RETURN_FIRE.within;
+      if (d > (shotAt ? Math.max(prof.range, RETURN_FIRE.range) : prof.range)) continue;
       // A narrower awareness cone behind the bot unless the target is close or shooting.
       const facing = Math.cos(wrap(Math.atan2(-(aim[0] - eye[0]), -(aim[2] - eye[2])) - bot.yaw));
       if (facing < -0.2 && d > 6 && p.arms.sinceShot > 0.5) continue;

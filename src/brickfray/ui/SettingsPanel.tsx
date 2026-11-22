@@ -10,6 +10,7 @@ import { touchCapable } from '../game/input-mode';
 import { canFullscreen, setFullscreen } from '../game/touch-screen';
 import { TouchSettings } from './touch/TouchSettings';
 import { useTouchMode } from './touch/useInputMode';
+import './settings.css';
 
 type Tab = 'graphics' | 'controls' | 'audio' | 'interface';
 const TABS: Tab[] = ['graphics', 'controls', 'audio', 'interface'];
@@ -65,7 +66,7 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
 
   return (
     <div className='bf-screen-in absolute inset-0 z-40 grid place-items-center bg-[#0b1222]/65 p-3 backdrop-blur-sm min-[420px]:p-4' onClick={onClose}>
-      <div className='bf-panel bf-studs bf-pop flex h-[min(88vh,680px)] w-full max-w-[620px] flex-col gap-4 p-4 min-[420px]:p-6' onClick={(e) => e.stopPropagation()}>
+      <div className='bf-panel bf-studs bf-pop flex h-[min(88vh,600px)] w-full max-w-[620px] flex-col gap-4 p-4 min-[420px]:p-6' onClick={(e) => e.stopPropagation()}>
         <div className='flex items-center gap-3'>
           <button className='bf-btn bf-btn-ghost bf-icon-btn bf-touch-target !h-10 !w-10' onClick={onClose} aria-label={t('done')}>
             <BackIcon size={20} />
@@ -79,11 +80,11 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
             </button>
           ))}
         </div>
-        <div className='bf-scroll flex flex-col gap-5 overflow-y-auto pr-1'>
+        <div className='bf-settings-list bf-scroll flex flex-col overflow-y-auto pr-1'>
           {tab === 'graphics' && (
             <>
               {canFullscreen() && <SwitchRow label={t('fullscreen')} on={fullscreen} onChange={(on) => void setFullscreen(on)} />}
-              <div className='flex flex-col gap-2'>
+              <div className='bf-setting-block'>
                 <span className='font-medium'>{t('quality')}</span>
                 <div className='bf-seg'>
                   {(['low', 'medium', 'high'] as const).map((q) => (
@@ -115,7 +116,7 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
               {!touchMode && toggle('toggleAds', s.input.toggleAds, (toggleAds) => ({ ...s, input: { ...s.input, toggleAds } }))}
               {!touchMode && slider('gamepadSensitivity', s.input.gamepadSensitivity, 0.3, 2.5, 0.05, (gamepadSensitivity) => ({ ...s, input: { ...s.input, gamepadSensitivity } }))}
               {slider('aimAssist', s.input.aimAssist, 0, 1, 0.05, (aimAssist) => ({ ...s, input: { ...s.input, aimAssist } }), (v) => `${Math.round(v * 100)}%`)}
-              <div className={touchMode ? 'hidden' : 'flex flex-col gap-1.5'}>
+              <div className={touchMode ? 'hidden' : 'bf-setting-block !gap-1.5'}>
                 <span className='text-xs font-semibold uppercase tracking-[0.2em] text-[var(--bf-muted)]'>{t('keys')}</span>
                 {ACTIONS.map((action) => (
                   <div key={action} className='flex items-center gap-3 rounded-lg px-1 py-0.5'>
@@ -137,7 +138,7 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
           )}
           {tab === 'interface' && (
             <>
-              <div className='flex flex-col gap-2'>
+              <div className='bf-setting-block'>
                 <span className='font-medium'>{t('language')}</span>
                 <div className='grid grid-cols-3 gap-2 min-[420px]:grid-cols-4'>
                   {LANGUAGES.map((l) => (
@@ -147,7 +148,7 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
                   ))}
                 </div>
               </div>
-              <div className='flex flex-col gap-2'>
+              <div className='bf-setting-block'>
                 <span className='font-medium'>{t('crosshair')}</span>
                 <div className='flex gap-2'>
                   {CROSSHAIR_COLORS.map((color) => (

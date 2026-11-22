@@ -10,6 +10,9 @@ import { BossBars, NextWave } from './SoloHud';
 const LAST_MINUTE = 60;
 /** The last seconds also count down large under the score bar. */
 const FINAL = 10;
+/** A dark plate under the big countdowns: over a white cloud or a sunlit wall bare white words disappear. */
+const COUNT_PLATE =
+  'flex flex-col items-center rounded-2xl bg-[#0b1222]/72 px-6 pb-2 pt-2.5 shadow-[inset_0_2px_0_rgba(255,255,255,.1),0_5px_0_rgba(0,0,0,.35)] [@media(max-height:560px)]:!mt-2 [@media(max-height:560px)]:origin-top [@media(max-height:560px)]:scale-[.8]';
 const CLOCK_KEYFRAMES = `@keyframes bf-clock-tick { 0% { transform: scale(1.22); } 100% { transform: scale(1); } }`;
 
 function clock(seconds: number) {
@@ -55,15 +58,17 @@ export function TopBar() {
         {mode === 'ffa' && <Side row={rival} label={rival?.name ?? ''} crown={!!rival && first === rival} color='#ffffff33' portrait />}
       </div>
       {hud.phase === 'warmup' && hud.phaseLeft > 0 && (
-        <div key={Math.ceil(hud.phaseLeft)} className='bf-pop mt-16 flex flex-col items-center'>
-          <span className='text-lg font-semibold uppercase tracking-[0.25em] text-white/80'>{t('getReady')}</span>
-          <span className='bf-display bf-hud-text text-8xl leading-none text-[var(--bf-yellow)]'>{Math.ceil(hud.phaseLeft)}</span>
+        <div className={`bf-pop mt-16 ${COUNT_PLATE}`}>
+          <span className='text-lg font-semibold uppercase tracking-[0.25em] text-white/90'>{t('getReady')}</span>
+          <span key={Math.ceil(hud.phaseLeft)} className='bf-pop bf-display bf-hud-text text-8xl leading-none text-[var(--bf-yellow)]'>
+            {Math.ceil(hud.phaseLeft)}
+          </span>
         </div>
       )}
       {final && (
-        <div key={second} className='bf-pop mt-12 flex flex-col items-center'>
-          <span className='bf-hud-text text-lg font-semibold uppercase tracking-[0.25em] text-white/90'>{t('endsIn')}</span>
-          <span className='bf-display text-8xl leading-none tabular-nums' style={{ color: second <= 3 ? '#ff5a4a' : '#ffffff', textShadow: '0 3px 0 rgba(0,0,0,.5), 0 0 22px rgba(0,0,0,.45)' }}>
+        <div className={`bf-pop mt-12 ${COUNT_PLATE}`}>
+          <span className='text-lg font-semibold uppercase tracking-[0.25em] text-white/90'>{t('endsIn')}</span>
+          <span key={second} className='bf-pop bf-display text-8xl leading-none tabular-nums' style={{ color: second <= 3 ? '#ff5a4a' : '#ffffff', textShadow: '0 3px 0 rgba(0,0,0,.5), 0 0 22px rgba(0,0,0,.45)' }}>
             {second}
           </span>
         </div>

@@ -6,6 +6,7 @@ import { useHud } from '../App';
 import { Avatar } from '../board/Avatar';
 import { mapName } from '../board/format';
 import { useT } from '../i18n';
+import { shownName } from './names';
 import { SkullIcon } from '../icons';
 import { BountyChip, BountyRule } from './Bounty';
 import { AssistsIcon, KillsIcon, ScoreIcon } from './results-art';
@@ -72,7 +73,7 @@ function Table({ rows, places, ping }: { rows: ScoreRow[]; places: boolean; ping
           )}
           <span className='flex min-w-0 items-center gap-2.5 pl-2 font-bold'>
             <Avatar character={r.character} size={28} />
-            <span className='truncate'>{r.name}</span>
+            <span className='truncate'>{shownName(t, r.name, r.character)}</span>
             {r.bot && <span className='rounded bg-black/25 px-1.5 text-[10px] font-bold uppercase tracking-wider'>{t('bot')}</span>}
             {!!r.bounty && <BountyChip amount={r.bounty} size='sm' />}
           </span>

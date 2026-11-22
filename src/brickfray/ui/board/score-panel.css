@@ -145,10 +145,6 @@
 .bf-board-score-list .bf-board-tr[data-me] .bf-board-rank {
   color: #2a1a00;
 }
-.bf-board-score-list .bf-board-tr[data-me] .bf-board-tag {
-  background: #2a1a00;
-  color: var(--bf-yellow);
-}
 .bf-board-score-list .bf-board-tr[data-me] .bf-board-bot {
   background: rgba(0, 0, 0, 0.15);
   color: #2a1a00;

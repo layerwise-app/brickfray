@@ -16,6 +16,8 @@ export const playKo: Record<keyof typeof playEn, string> = {
   'lobby.count': '{h} + 봇 {b}',
   'lobby.open': '빈자리',
   'death.health': '남은 체력',
+  'feed.water': '물에 빠졌습니다',
+  'feed.self': '스스로 쓰러졌습니다',
   'death.streak': '연속 처치',
   'paused.title': '일시 정지',
   'notFound.title': '여기에는 아무것도 없어요',

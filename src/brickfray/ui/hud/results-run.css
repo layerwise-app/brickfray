@@ -120,16 +120,27 @@
   gap: calc(14 * var(--u));
 }
 .bf-cause {
-  gap: calc(10 * var(--u));
+  flex-direction: column;
+  gap: calc(8 * var(--u));
   padding: calc(12 * var(--u)) calc(16 * var(--u));
   border-radius: calc(18 * var(--u));
   background: rgba(8, 13, 28, 0.66);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
   --in-d: 0.55s;
 }
-.bf-cause > svg:not(.bf-cause-skull) {
+.bf-cause-icons {
+  display: flex;
+  align-items: center;
+  gap: calc(10 * var(--u));
+}
+.bf-cause-icons > svg {
   width: auto;
   height: calc(56 * var(--u));
+}
+.bf-cause-name {
+  font-size: calc(20 * var(--u));
+  line-height: 1;
+  white-space: nowrap;
 }
 .bf-cause-skull {
   position: absolute;

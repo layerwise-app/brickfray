@@ -53,6 +53,7 @@ export const boardJa: Record<BoardKey, string> = {
   'board.nameSpace': 'スペースは使えません（英数字・かな・漢字・ピリオド）',
   'board.nameLong': '長すぎます。{n} 文字までです。',
   'board.nameFailed': '名前を保存できませんでした。もう一度お試しください。',
+  'board.nameSaved': '名前を保存しました',
   'board.signIn': 'ログイン',
   'board.signInWhy': '戦績とプロフィールをどの端末でも使えます。メールでコードを送るので、パスワードは不要です。',
   'board.email': 'メールアドレス',

@@ -16,6 +16,8 @@ export const playZh: Record<keyof typeof playEn, string> = {
   'lobby.count': '{h} + {b} 个机器人',
   'lobby.open': '空位',
   'death.health': '剩余生命',
+  'feed.water': '落水了',
+  'feed.self': '把自己淘汰了',
   'death.streak': '连杀',
   'paused.title': '已暂停',
   'notFound.title': '这里什么都没有',

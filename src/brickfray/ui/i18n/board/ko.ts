@@ -53,6 +53,7 @@ export const boardKo: Record<BoardKey, string> = {
   'board.nameSpace': '띄어쓰기 사용 불가 (한글·영문·숫자·마침표만 가능)',
   'board.nameLong': '너무 깁니다. 최대 {n}자까지 쓸 수 있습니다.',
   'board.nameFailed': '이름을 저장하지 못했습니다. 다시 시도하세요.',
+  'board.nameSaved': '이름을 저장했습니다',
   'board.signIn': '로그인',
   'board.signInWhy': '전적과 프로필을 모든 기기에서 이어 갑니다. 이메일로 코드를 보내 드리니 비밀번호는 필요 없습니다.',
   'board.email': '이메일',

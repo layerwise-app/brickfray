@@ -16,6 +16,8 @@ export const playEs: Record<keyof typeof playEn, string> = {
   'lobby.count': '{h} + {b} bots',
   'lobby.open': 'Plaza libre',
   'death.health': 'Vida restante',
+  'feed.water': 'se cayó al agua',
+  'feed.self': 'se eliminó solo',
   'death.streak': 'Racha',
   'paused.title': 'Pausa',
   'notFound.title': 'Aquí no hay nada que construir',

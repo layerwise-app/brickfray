@@ -16,6 +16,8 @@ export const playJa: Record<keyof typeof playEn, string> = {
   'lobby.count': '{h} + ボット {b}',
   'lobby.open': '空き',
   'death.health': '残り体力',
+  'feed.water': '水に落ちた',
+  'feed.self': '自滅した',
   'death.streak': '連続キル',
   'paused.title': '一時停止中',
   'notFound.title': 'ここには何もありません',

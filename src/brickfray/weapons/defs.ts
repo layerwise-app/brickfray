@@ -45,7 +45,7 @@ export const WEAPONS: Record<WeaponId, WeaponDef> = {
     body: 22,
     head: 40,
     minDamage: 16,
-    rpm: 610,
+    rpm: 560,
     mag: 30,
     reload: 1.9,
     reloadEmpty: 2.4,
@@ -74,8 +74,8 @@ export const WEAPONS: Record<WeaponId, WeaponDef> = {
     id: 'shotgun',
     name: 'Snapgun',
     mode: 'pump',
-    body: 14,
-    head: 20,
+    body: 16,
+    head: 23,
     minDamage: 3,
     rpm: 70,
     mag: 6,
@@ -208,8 +208,8 @@ export const WEAPONS: Record<WeaponId, WeaponDef> = {
     minDamage: 55,
     rpm: 60,
     mag: 1,
-    reload: 0.95,
-    reloadEmpty: 0.95,
+    reload: 0.75,
+    reloadEmpty: 0.75,
     adsTime: 0.28,
     drawTime: 0.4,
     holsterTime: 0.24,
@@ -240,8 +240,8 @@ export const WEAPONS: Record<WeaponId, WeaponDef> = {
     pellets: 1,
     spread: 0.022,
     adsSpread: 0.002,
-    falloffStart: 18,
-    falloffEnd: 38,
+    falloffStart: 22,
+    falloffEnd: 42,
     recoil: [[0.045, 0.004]],
     moveScale: 1
   },
@@ -266,10 +266,10 @@ export const WEAPONS: Record<WeaponId, WeaponDef> = {
     falloffStart: 8,
     falloffEnd: 18,
     recoil: [
-      [0.009, 0.002],
-      [0.01, -0.003],
-      [0.009, 0.004],
-      [0.011, -0.004]
+      [0.006, 0.003],
+      [0.0065, -0.0035],
+      [0.006, 0.0035],
+      [0.0065, -0.003]
     ],
     moveScale: 1
   }

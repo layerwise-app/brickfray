@@ -22,12 +22,15 @@ export function NameField({ saved, tag, children }: { saved: string | null; tag:
   const [draft, setDraft] = useState<string | null>(null);
   const [composing, setComposing] = useState(false);
   const [failure, setFailure] = useState<{ name: string; key: MessageKey } | null>(null);
+  /** When the server last took the name: a tick shows in the field for a moment. */
+  const [savedAt, setSavedAt] = useState(0);
   const rename = useMutation({
     mutationFn: (name: string) => saveProfile({ data: { playerId: getPlayerId(), name } }),
     onSuccess: (result, name) => {
       if ('refused' in result) return setFailure({ name, key: 'board.tooFast' });
       markKnown();
       setFailure(null);
+      setSavedAt(Date.now());
       profileSaved(result);
     },
     onError: (_, name) => setFailure({ name, key: 'board.nameFailed' })
@@ -75,6 +78,7 @@ export function NameField({ saved, tag, children }: { saved: string | null; tag:
             onChange={(e) => {
               setDraft(e.target.value);
               setFailure(null);
+              setSavedAt(0);
             }}
             onCompositionStart={() => setComposing(true)}
             onCompositionEnd={(e) => {
@@ -85,6 +89,13 @@ export function NameField({ saved, tag, children }: { saved: string | null; tag:
             onKeyDown={(e) => e.key === 'Enter' && !e.nativeEvent.isComposing && e.currentTarget.blur()}
           />
           {tag !== null && <span className='bf-me-tag'>#{tag}</span>}
+          {savedAt > 0 && (
+            <span key={savedAt} className='bf-me-saved' role='status' aria-label={t('board.nameSaved')}>
+              <svg width={20} height={20} viewBox='0 0 20 20' aria-hidden>
+                <path d='M4.5 10.5l3.6 3.6 7.4-8.2' fill='none' stroke='currentColor' strokeWidth={2.8} strokeLinecap='round' strokeLinejoin='round' />
+              </svg>
+            </span>
+          )}
         </label>
       </div>
       {error && (

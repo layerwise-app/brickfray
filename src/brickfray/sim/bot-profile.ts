@@ -6,8 +6,11 @@ import type { PlayerState } from './types';
 export const THROW_REACH = 20;
 /** About how far (m) a thrown grenade skids on after it first comes down. */
 export const ROLL = 3.5;
-/** A Megabot takes this long (s) between blasts: each one is a beat the player can answer. */
-export const BOSS_VOLLEY = 1.4;
+/**
+ * A Megabot takes this long (s) between blasts: each one is a beat the player can answer. Scaled with the shotgun's
+ * pellet damage so its damage per second in solo stays where the waves were balanced.
+ */
+export const BOSS_VOLLEY = 1.6;
 
 /** Distances (m) a bot fights from: it closes beyond `max`, backs off inside `min`, holds and strafes between. */
 export interface Band {
@@ -24,8 +27,14 @@ export interface BotProfile {
   band: Band;
   /** Out of sight it heads for a waypoint inside its band with a line to the enemy; snapbots walk straight at the player. */
   standoff: boolean;
-  /** A gun where a miss costs a reload (scoped, one heavy shot): fire only aimed down the sights with the body under the crosshair. */
+  /** A scoped gun where a miss costs a reload: always aimed down the sights, at the head, fired with it under the crosshair. */
   patient?: boolean;
+  /** One heavy round at a time (hand cannon, pistol): fired with the body under the crosshair, not once roughly on. */
+  steady?: boolean;
+  /** Aims down the sights beyond this distance (m). */
+  sights?: number;
+  /** Fill bots: a fight nearer than `near` or farther than `far` (m) is fought with the kit's sidearm. */
+  sidearm?: { near?: number; far?: number };
 }
 
 /**
@@ -44,21 +53,22 @@ const FILL = { reaction: 0.42, turn: 4.2, error: 0.08 };
 
 /**
  * Fill bots play their character's primary at its good range: long guns hold far back, rifles stop at mid range,
- * close-range guns walk in.
+ * close-range guns walk in. Each kit's sidearm takes the fights at the range its primary is poor at, as the kit is built.
  */
-const ENGAGE: Record<WeaponId, { range: number; band: Band; patient?: boolean }> = {
+const ENGAGE: Record<WeaponId, Omit<BotProfile, keyof typeof FILL | 'standoff'>> = {
   ar: { range: 34, band: { min: 12, max: 26 } },
-  shotgun: { range: 24, band: { min: 0, max: 7 } },
-  sniper: { range: 70, band: { min: 22, max: 55 }, patient: true },
-  pistol: { range: 26, band: { min: 6, max: 16 } },
-  nailer: { range: 26, band: { min: 6, max: 16 } },
+  // The pattern kills in one shot only from the hip within about 5 m, aimed within about 7 m.
+  shotgun: { range: 24, band: { min: 0, max: 4 }, sights: 4, sidearm: { far: 10 } },
+  sniper: { range: 70, band: { min: 22, max: 55 }, patient: true, sidearm: { near: 8 } },
+  pistol: { range: 26, band: { min: 6, max: 16 }, steady: true, sights: 6 },
+  nailer: { range: 26, band: { min: 6, max: 16 }, sidearm: { far: 22 } },
   pulse: { range: 45, band: { min: 14, max: 32 } },
-  harpoon: { range: 55, band: { min: 18, max: 42 }, patient: true },
-  cannon: { range: 30, band: { min: 0, max: 10 } },
+  harpoon: { range: 55, band: { min: 18, max: 42 }, patient: true, sidearm: { near: 8 } },
+  cannon: { range: 30, band: { min: 0, max: 10 }, steady: true, sights: 6 },
   buzzer: { range: 20, band: { min: 0, max: 7 } }
 };
 
-/** How a bot reacts, turns, misses and spaces itself: by snapbot kind, or a fill bot's character's primary. */
-export function botProfile(bot: PlayerState): BotProfile {
-  return bot.character !== bot.bot ? { ...FILL, ...ENGAGE[LOADOUTS[bot.character].primary], standoff: true } : PROFILE[bot.bot ?? 'grunt'];
+/** How a bot reacts, turns, misses and spaces itself: by snapbot kind, or for a fill bot by the gun it holds (default its primary). */
+export function botProfile(bot: PlayerState, weapon: WeaponId = LOADOUTS[bot.character].primary): BotProfile {
+  return bot.character !== bot.bot ? { ...FILL, ...ENGAGE[weapon], standoff: true } : PROFILE[bot.bot ?? 'grunt'];
 }

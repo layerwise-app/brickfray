@@ -6,6 +6,7 @@ import { number } from '../board/format';
 import { useT, type MessageKey } from '../i18n';
 import { BotIcon, CrownIcon, SkullIcon } from '../icons';
 import { MedalIcon, type Medal } from './Medal';
+import { shownName } from './names';
 import { AssistsIcon, KillsIcon, ScoreIcon, Tip } from './results-art';
 
 export const medalKey = (m: Medal) => `results.medal.${m.kind}.${m.tier}` as MessageKey;
@@ -75,7 +76,7 @@ function Row({ row: r, place, order, medals, crown }: { row: ScoreRow; place: nu
       )}
       <span role='cell' className='bf-table-name'>
         <Avatar character={r.character} size={30} className='bf-table-av' />
-        <span className='truncate'>{r.name}</span>
+        <span className='truncate'>{shownName(t, r.name, r.character)}</span>
         {crown && <CrownIcon size={16} className='shrink-0 text-[var(--bf-yellow)]' />}
         {r.bot && <BotIcon size={14} className='shrink-0 opacity-60' aria-label={t('bot')} />}
       </span>

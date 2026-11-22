@@ -53,6 +53,7 @@ export const boardFr: Record<BoardKey, string> = {
   'board.nameSpace': 'Pas d’espaces : lettres, chiffres et points.',
   'board.nameLong': 'Trop long : {n} caractères maximum.',
   'board.nameFailed': 'Impossible d’enregistrer ton nom. Réessaie.',
+  'board.nameSaved': 'Nom enregistré',
   'board.signIn': 'Se connecter',
   'board.signInWhy': 'Retrouve tes parties et ton profil sur tous tes appareils. On t’envoie un code par e-mail, sans mot de passe.',
   'board.email': 'E-mail',

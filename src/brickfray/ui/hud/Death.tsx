@@ -6,6 +6,7 @@ import { Avatar } from '../board/Avatar';
 import { SkullIcon, WeaponIcon } from '../icons';
 import { KillsIcon } from './results-art';
 import { LOW_HEALTH } from './Vitals';
+import { shownName } from './names';
 
 type IconProps = SVGProps<SVGSVGElement> & { size?: number };
 
@@ -50,7 +51,7 @@ export function Death() {
         )}
         <div className='flex min-w-0 flex-col gap-1.5'>
           <div className='flex items-center gap-3'>
-            <span className='bf-display truncate text-3xl leading-none'>{water ? t('fellInWater') : d.killer ? t('eliminatedBy', { name: d.killer }) : t('eliminatedSelf')}</span>
+            <span className='bf-display truncate text-3xl leading-none'>{water ? t('fellInWater') : d.killer ? t('eliminatedBy', { name: shownName(t, d.killer, d.by?.character) }) : t('eliminatedSelf')}</span>
             <CauseIcon cause={d.weapon} size={56} className={`shrink-0 ${water ? 'text-[#7cc8ff]' : 'text-white/80'}`} />
           </div>
           {by && room && (

@@ -1,5 +1,5 @@
-import { GRENADE } from '../weapons/defs';
-import { ROLL, THROW_REACH, type Band } from './bot-profile';
+import { GRENADE, WEAPONS, type WeaponId } from '../weapons/defs';
+import { ROLL, THROW_REACH, type Band, type BotProfile } from './bot-profile';
 import { PLAYER, TICK } from './constants';
 import { throwPitchFor } from './grenades';
 import type { HostSim } from './host';
@@ -32,6 +32,34 @@ export const GRACE = 1.2;
 const HOLD = 0.4;
 /** How far (m) a step aside or back is checked for keeping the line. */
 const STEP = 1.2;
+/** A long gun's bot goes back to it once the enemy is this much (m) past where it took out its sidearm. */
+const SIDEARM_SLACK = 6;
+/** How much higher (m, at scale 1) the head is than the chest a bot aims at. */
+export const HEAD_ABOVE_CHEST = 0.35;
+
+/**
+ * The slot to fight with at `dist`: the sidearm where the primary is poor. A close-range kit keeps it to the end of the
+ * fight (swapping back costs more than it wins); a long gun goes back once the enemy is well out.
+ */
+export function kitSlot(side: NonNullable<BotProfile['sidearm']>, slot: number, dist: number) {
+  if (slot === 0) return (side.near !== undefined && dist < side.near) || (side.far !== undefined && dist > side.far) ? 1 : 0;
+  return side.near !== undefined && dist > side.near + SIDEARM_SLACK ? 0 : 1;
+}
+
+/**
+ * Whether the aim is good enough to fire: a scoped gun with its sights up and the head under the crosshair, a heavy
+ * one-round gun with the body under it, anything else once roughly on.
+ */
+export function onTarget(gun: BotProfile, ads: number, offAim: number, dist: number, scale: number) {
+  if (gun.patient) return ads > 0.9 && offAim < Math.atan2(0.45 * scale, dist) + 0.015;
+  if (gun.steady) return offAim < Math.atan2(0.4 * scale, dist) + 0.01;
+  return offAim < 0.12 + (1.5 / Math.max(4, dist)) * 0.1;
+}
+
+/** Aim down the sights: a scoped gun always (a snapbot's only beyond 12 m), others beyond their profile's `sights`. */
+export function wantsSights(gun: BotProfile, weapon: WeaponId, dist: number) {
+  return gun.patient || (gun.sights !== undefined && dist > gun.sights) || (WEAPONS[weapon].zoom > 2 && dist > 12);
+}
 
 /**
  * In sight: close in beyond the band; back off inside it while backing keeps the line, else stand and fight; strafe

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useGame, useHud } from '../App';
 import { WeaponIcon } from '../icons';
 import { UpgradeIcon } from './UpgradeIcon';
+import './vitals.css';
 
 /** Share of max health below which the screen edges and the health bar turn to warning red. */
 export const LOW_HEALTH = 0.45;
@@ -80,17 +81,15 @@ export function Health({ health, max, armor }: { health: number; max: number; ar
   const fill = low ? WARN_FILL : '#f4f6fb';
   const flash = low ? '#ffffff' : WARN_FILL;
   return (
-    <div className='bf-hud-health absolute bottom-6 left-6 flex items-end gap-3' style={{ ['--bf-hp-flash' as string]: flash }}>
+    <div className={`bf-hud-health bf-hp-plate absolute bottom-6 left-6 flex items-end gap-3 ${PLATE} pr-3.5`} style={{ ['--bf-hp-flash' as string]: flash }}>
       <style>{FLASH_KEYFRAMES}</style>
-      <div className={PLATE}>
-        <span
-          key={hits}
-          className='bf-display bf-hud-text inline-block min-w-[3ch] text-right text-6xl leading-none tabular-nums'
-          style={{ color: low ? WARN_TEXT : undefined, animation: hits ? 'bf-hp-text-flash .4s ease-out' : undefined }}
-        >
-          {Math.max(0, Math.ceil(health))}
-        </span>
-      </div>
+      <span
+        key={hits}
+        className='bf-display bf-hud-text inline-block min-w-[3ch] text-right text-6xl leading-none tabular-nums'
+        style={{ color: low ? WARN_TEXT : undefined, animation: hits ? 'bf-hp-text-flash .4s ease-out' : undefined }}
+      >
+        {Math.max(0, Math.ceil(health))}
+      </span>
       <div className='flex flex-col gap-1.5 pb-1.5'>
         {armor > 0 && <Armor armor={armor} />}
         <div className='flex' style={{ gap, width: BAR }}>
@@ -147,10 +146,10 @@ export function Ammo() {
   return (
     <div className='bf-hud-ammo absolute bottom-6 right-6 flex flex-col items-end gap-2'>
       <Grenades count={hud.grenades} max={hud.grenadeMax} timer={hud.grenadeTimer} refill={hud.grenadeRefill} />
-      <div className='flex items-end gap-4'>
+      {/* One soft dark plate under the gun and the count keeps both legible over bright, busy or red scenery. */}
+      <div className={`bf-ammo-plate flex items-center gap-4 ${PLATE} pl-3.5`}>
         <WeaponIcon weapon={hud.weapon} size={92} className='text-white/90 drop-shadow-[0_2px_0_rgba(0,0,0,.5)]' />
-        {/* A soft dark plate under the count keeps both numbers legible over bright or red scenery. */}
-        <div className={`flex items-baseline gap-1.5 ${PLATE}`}>
+        <div className='flex items-baseline gap-1.5'>
           <span className='bf-display bf-hud-text text-6xl leading-none tabular-nums' style={{ color: lowAmmo ? WARN_TEXT : undefined }}>
             {hud.ammo}
           </span>

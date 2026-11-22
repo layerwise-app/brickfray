@@ -26,6 +26,14 @@ export function Lobby() {
     game.audio.play('uiClick', { volume: 0.6 });
     game.setLobbySettings(patch);
   };
+  const go = host ? (
+    <button className='bf-btn bf-btn-primary !h-16 w-full' onClick={() => game.startMatch()}>
+      <PlayIcon size={26} />
+      <span className='bf-display text-3xl'>{t('start')}</span>
+    </button>
+  ) : (
+    <div className='py-4 text-center font-medium text-[var(--bf-muted)]'>{t('waitingForHost')}</div>
+  );
   const copy = async () => {
     if (!lobby.code) return;
     await navigator.clipboard?.writeText(lobby.code);
@@ -125,18 +133,11 @@ export function Lobby() {
               <LobbySeats players={lobby.players} settings={s} />
             )}
             {solo && <SoloBrief settings={s} />}
-            <div className='mt-auto pt-3'>
-              {host ? (
-                <button className='bf-btn bf-btn-primary !h-16 w-full' onClick={() => game.startMatch()}>
-                  <PlayIcon size={26} />
-                  <span className='bf-display text-3xl'>{t('start')}</span>
-                </button>
-              ) : (
-                <div className='py-4 text-center font-medium text-[var(--bf-muted)]'>{t('waitingForHost')}</div>
-              )}
-            </div>
+            <div className='mt-auto pt-3 max-lg:hidden'>{go}</div>
           </section>
         </div>
+        {/* One column (phones, narrow windows): Start rides at the bottom of the screen instead of two screens down. */}
+        <div className='sticky -bottom-4 z-10 -mx-4 -mb-4 bg-gradient-to-b from-transparent to-[#0b1222] to-35% px-4 pb-4 pt-6 sm:-bottom-8 sm:-mx-8 sm:-mb-8 sm:px-8 sm:pb-6 lg:hidden'>{go}</div>
       </div>
     </div>
   );

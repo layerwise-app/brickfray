@@ -4,6 +4,7 @@ import { hudJa } from './hud/ja';
 import { streaksJa } from './streaks/ja';
 import { achievementsJa } from './achievements/ja';
 import { playJa } from './play/ja';
+import { namesJa } from './names/ja';
 import type { Dictionary } from './en';
 
 export const ja: Dictionary = {
@@ -13,6 +14,7 @@ export const ja: Dictionary = {
   ...streaksJa,
   ...achievementsJa,
   ...playJa,
+  ...namesJa,
   play: 'プレイ',
   playCaption: 'オンライン対戦',
   solo: 'ソロ',

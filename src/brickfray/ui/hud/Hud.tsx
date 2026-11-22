@@ -17,6 +17,7 @@ import { KindIntro, WaveBanner } from './SoloHud';
 import { WarmupTips } from './WarmupTips';
 import { UpgradePick } from './UpgradePick';
 import { Ammo, Health, LOW_HEALTH } from './Vitals';
+import { shownName } from './names';
 import { TouchLayer } from '../touch/TouchLayer';
 import { useTouchMode } from '../touch/useInputMode';
 
@@ -27,16 +28,18 @@ export function Hud() {
   const { t } = useT();
   const touch = useTouchMode();
   const playing = hud.phase === 'playing' || hud.phase === 'warmup' || hud.phase === 'intermission';
+  /** The upgrade cards take the screen: the feed and the vitals stand aside until they leave. */
+  const picking = !!hud.offer;
 
   return (
     <div className='pointer-events-none absolute inset-0 select-none'>
       <LowHealth level={hud.alive ? Math.min(1, Math.max(0, (LOW_HEALTH - hud.health / hud.maxHealth) / 0.35)) : 0} />
       {hud.alive && playing && <Crosshair hidden={hud.scoped || hud.aiming || (!!hud.offer && !hud.offer.picked)} />}
       <KillConfirm />
-      <MultiKill />
+      {hud.alive && <MultiKill />}
       {hud.phase !== 'ended' && <TopBar />}
-      {hud.phase !== 'ended' && <KillFeed />}
-      {hud.alive && hud.phase !== 'ended' && (
+      {hud.phase !== 'ended' && !picking && <KillFeed />}
+      {hud.alive && hud.phase !== 'ended' && !picking && (
         <>
           <Health health={hud.health} max={hud.maxHealth} armor={hud.armor} />
           <Ammo />
@@ -77,19 +80,20 @@ function ClickToPlay() {
 }
 
 /**
- * Below LOW_HEALTH the screen edges drain of colour and darken, and a deep red rim beats like a pulse in the outer
- * band, both creeping inward with the health lost (`level` 0…1). The middle two thirds of the screen keep their colour
- * and contrast to aim through. Gradient stops are in units of the half-width / half-height, so 100% is an edge.
+ * Below LOW_HEALTH a thin red rim along the screen's edges beats like a pulse, and the outer band of the picture loses
+ * some colour, both growing a little with the health lost (`level` 0…1). The rim is the same thickness along every
+ * edge (an inset glow, not an ellipse that fills the corners), so the gun in the corner stays clear and readable.
  */
 function LowHealth({ level }: { level: number }) {
   const on = level > 0;
-  const clear = Math.round(70 - 14 * level);
-  const edge = `radial-gradient(ellipse 50% 50% at center, transparent ${clear}%, black ${Math.round(clear + 26)}%)`;
-  const grade = `saturate(${(1 - 0.8 * level).toFixed(3)}) brightness(${(1 - 0.28 * level).toFixed(3)})`;
+  const clear = Math.round(80 - 8 * level);
+  const edge = `radial-gradient(ellipse 50% 50% at center, transparent ${clear}%, black ${clear + 24}%)`;
+  const grade = `saturate(${(1 - 0.45 * level).toFixed(3)}) brightness(${(1 - 0.06 * level).toFixed(3)})`;
   const beat = on ? `bf-heartbeat ${(1.15 - level * 0.4).toFixed(2)}s ease-in-out infinite` : undefined;
+  const rim = `inset 0 0 ${(3 + 5 * level).toFixed(1)}vmin ${(0.4 + 0.8 * level).toFixed(2)}vmin rgba(170,0,0,${(0.55 + 0.35 * level).toFixed(2)})`;
   return (
     <>
-      <style>{`@keyframes bf-heartbeat { 0%, 100% { opacity: .45; } 9% { opacity: 1; } 20% { opacity: .6; } 30% { opacity: .92; } 55% { opacity: .45; } }`}</style>
+      <style>{`@keyframes bf-heartbeat { 0%, 100% { opacity: .4; } 9% { opacity: 1; } 20% { opacity: .55; } 30% { opacity: .9; } 55% { opacity: .4; } }`}</style>
       <div
         className='absolute inset-0'
         style={{
@@ -99,14 +103,8 @@ function LowHealth({ level }: { level: number }) {
           WebkitMaskImage: on ? edge : undefined
         }}
       />
-      <div className='absolute inset-0' style={{ opacity: on ? 0.5 + 0.5 * level : 0, transition: 'opacity .4s ease' }}>
-        <div
-          className='absolute inset-0'
-          style={{
-            background: `radial-gradient(ellipse 50% 50% at center, transparent ${Math.round(clear + 12)}%, rgba(135,0,0,${(0.32 + 0.33 * level).toFixed(2)}) 102%, rgba(70,0,0,.9) 138%)`,
-            animation: beat
-          }}
-        />
+      <div className='absolute inset-0' style={{ opacity: on ? 1 : 0, transition: 'opacity .4s ease' }}>
+        <div className='absolute inset-0' style={{ boxShadow: rim, animation: beat }} />
       </div>
     </>
   );
@@ -114,19 +112,31 @@ function LowHealth({ level }: { level: number }) {
 
 function KillFeed() {
   const hud = useHud();
+  const { t } = useT();
   return (
     <div className='bf-killfeed absolute right-4 top-4 flex flex-col items-end gap-1.5'>
       {hud.feed.map((f) => (
         <div
           key={f.key}
           className='bf-fade-in flex items-center gap-2 rounded-lg px-3 py-1 text-sm font-semibold'
-          style={{ background: f.mine ? 'rgba(255,205,46,.85)' : f.victimIsMe ? 'rgba(234,61,50,.85)' : 'rgba(0,0,0,.5)', color: f.mine ? '#2a1a00' : '#fff' }}
+          style={{ background: f.mine && !f.self ? 'rgba(255,205,46,.85)' : f.victimIsMe ? 'rgba(234,61,50,.85)' : 'rgba(0,0,0,.5)', color: f.mine && !f.self ? '#2a1a00' : '#fff' }}
         >
-          {!f.self && <FeedName name={f.killer} team={f.killerTeam} plain={f.mine || f.victimIsMe} />}
-          <CauseIcon cause={f.weapon} size={f.weapon in WEAPONS || f.weapon === 'water' ? 48 : 32} className='shrink-0' />
-          {f.headshot && <HeadshotIcon size={15} />}
-          {f.self && f.weapon !== 'water' && <SkullIcon size={15} />}
-          <FeedName name={f.victim} team={f.victimTeam} plain={f.mine || f.victimIsMe} />
+          {f.self ? (
+            // Nobody else did it: a skull, the player and what happened, then the cause.
+            <>
+              <SkullIcon size={16} className='shrink-0' style={{ color: f.victimIsMe ? '#ffffff' : '#ff6a5a' }} />
+              <FeedName name={shownName(t, f.victim, f.victimLook)} team={f.victimTeam} plain={f.victimIsMe} />
+              <span className='font-medium opacity-75'>{t(f.weapon === 'water' ? 'feed.water' : 'feed.self')}</span>
+              <CauseIcon cause={f.weapon} size={f.weapon in WEAPONS || f.weapon === 'water' ? 40 : 28} className='shrink-0' />
+            </>
+          ) : (
+            <>
+              <FeedName name={shownName(t, f.killer, f.killerLook)} team={f.killerTeam} plain={f.mine || f.victimIsMe} />
+              <CauseIcon cause={f.weapon} size={f.weapon in WEAPONS || f.weapon === 'water' ? 48 : 32} className='shrink-0' />
+              {f.headshot && <HeadshotIcon size={15} />}
+              <FeedName name={shownName(t, f.victim, f.victimLook)} team={f.victimTeam} plain={f.mine || f.victimIsMe} />
+            </>
+          )}
           {f.bounty > 0 && <BountyChip amount={f.bounty} collected size='sm' />}
           {f.chain > 1 && <ChainChip count={f.chain} />}
         </div>

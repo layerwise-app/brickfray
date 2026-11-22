@@ -174,6 +174,8 @@ export class MatchEvents {
             killerTeam: this.team(e.killer),
             victim: this.name(e.victim),
             victimTeam: this.team(e.victim),
+            killerLook: this.mv.session.roster.get(e.killer)?.character ?? null,
+            victimLook: this.mv.session.roster.get(e.victim)?.character ?? null,
             weapon: e.weapon,
             headshot: e.headshot,
             mine: e.killer === me,

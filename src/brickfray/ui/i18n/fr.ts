@@ -4,6 +4,7 @@ import { hudFr } from './hud/fr';
 import { streaksFr } from './streaks/fr';
 import { achievementsFr } from './achievements/fr';
 import { playFr } from './play/fr';
+import { namesFr } from './names/fr';
 import type { Dictionary } from './en';
 
 export const fr: Dictionary = {
@@ -13,6 +14,7 @@ export const fr: Dictionary = {
   ...streaksFr,
   ...achievementsFr,
   ...playFr,
+  ...namesFr,
   play: 'Jouer',
   playCaption: 'Partie en ligne',
   solo: 'Solo',

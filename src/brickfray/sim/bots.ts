@@ -1,6 +1,6 @@
 import { GRENADE, WEAPONS } from '../weapons/defs';
 import { GrenadeWatch, runTo, type DodgeState } from './bot-dodge';
-import { fightMove, GRACE, lostMove, throwAt, type FightState, type ThrowState } from './bot-fight';
+import { fightMove, GRACE, kitSlot, lostMove, onTarget, throwAt, wantsSights, type FightState, type ThrowState } from './bot-fight';
 import { BotNav, type NavState, type StuckState } from './bot-nav';
 import { BOSS_VOLLEY, botProfile, type BotProfile } from './bot-profile';
 import { BotRoam, HEADWAY, type RoamState, type Spot } from './bot-roam';
@@ -31,6 +31,10 @@ interface Brain extends NavState, StuckState, RoamState, RushState, FightState, 
 
 /** Out of a fight, a bot that has not got `HEADWAY` from where it stood for this many seconds goes on patrol. */
 const IDLE = 2;
+/** A kit carries its far-fight sidearm while hunting an enemy this much (m) beyond the range it switches at. */
+const HUNT_SLACK = 4;
+/** A fill bot steps right onto its firing spot (m): a metre off it, the post or crate edge the line passes can block it. */
+const SPOT_REACH = 0.3;
 
 /** Snapbot and fill-bot brains: perceive, navigate the waypoint graph, aim with human-like lag, shoot. */
 export class BotDirector {
@@ -173,32 +177,34 @@ export class BotDirector {
     if (visible && target) {
       b.seenFor += TICK;
       b.hunt = 0;
+      // A fill bot fights the way the gun in its hands wants; a snapbot has one way.
+      const gun = bot.character === bot.bot ? prof : botProfile(bot, bot.arms.weapon);
       // A Scopebot lines up one deliberate shot: its aim trails a moving target half as far.
-      const aim = this.sense.aimPoint(target, this.lag * (bot.bot === 'sniper' ? 0.5 : 1));
+      const aim = this.sense.aimPoint(target, this.lag * (bot.bot === 'sniper' ? 0.5 : 1), gun.patient);
       const { dist, offAim } = this.turnTo(b, eye, aim, prof, skill);
       b.errYaw *= 0.985 - skill * 0.02;
       b.errPitch *= 0.985 - skill * 0.02;
+      if (prof.sidearm) b.slot = kitSlot(prof.sidearm, b.slot, dist);
       const ready = b.seenFor > prof.reaction * (1.3 - skill * 0.6);
       const def = WEAPONS[bot.arms.weapon];
       const volley = bot.bot !== 'boss' || bot.arms.sinceShot > BOSS_VOLLEY;
-      // A long gun waits for its sights and for the body under the crosshair; others fire once roughly on.
-      const onAim = prof.patient && dist > 12 ? bot.arms.ads > 0.9 && offAim < Math.atan2(0.45 * target.scale, dist) + 0.015 : offAim < 0.12 + (1.5 / Math.max(4, dist)) * 0.1;
-      if (ready && volley && onAim && bot.arms.ammo[bot.arms.weapon] > 0) {
+      if (ready && volley && onTarget(gun, bot.arms.ads, offAim, dist, target.scale) && bot.arms.ammo[bot.arms.weapon] > 0) {
         if (def.mode === 'auto') cmd.buttons |= BUTTON.fire;
         else if (!b.fireHeld) cmd.buttons |= BUTTON.fire;
       }
       b.fireHeld = (cmd.buttons & BUTTON.fire) !== 0;
-      if (def.zoom > 2 && dist > 12) cmd.buttons |= BUTTON.ads;
+      if (wantsSights(gun, bot.arms.weapon, dist)) cmd.buttons |= BUTTON.ads;
       const swing = dist < 1.9 && bot.arms.meleeCooldown <= 0;
       if (swing) cmd.buttons |= BUTTON.melee;
       if (bot.bot === 'rusher') rush(b, dist, cmd, swing, () => this.random());
-      else fightMove(host, bot, b, b.aimYaw, aim, dist, prof.band, () => this.random(), cmd);
+      else fightMove(host, bot, b, b.aimYaw, aim, dist, gun.band, () => this.random(), cmd);
       if (!run) throwAt(bot, b, target, eye, dist, skill, () => this.random(), cmd);
       // A bot that walks on after its own grenade (or has it bounce back off cover) blows itself up.
       if (b.clearing > 0 && dist < GRENADE.radius * 2 + 4) cmd.forward = -1;
       if (cmd.forward > 0) goal = [target.move.x, target.move.y, target.move.z];
     } else {
       b.fireHeld = false;
+      if (b.lostFor > GRACE) b.slot = this.huntingSlot(bot, b, prof);
       startRush(b);
       if (lost) {
         const seen = b.lastSeen!;
@@ -222,7 +228,7 @@ export class BotDirector {
     }
 
     if (run) runTo(bot, b, run, cmd);
-    else this.steer(bot, b, goal, watcher, visible, lost, cmd);
+    else this.steer(bot, b, goal, watcher, visible, lost, prof.standoff ? SPOT_REACH : 1, cmd);
     b.sidestep = Math.max(0, b.sidestep - TICK);
     this.nav.unstick(bot, b, cmd);
     cmd.yaw = b.aimYaw;
@@ -233,8 +239,8 @@ export class BotDirector {
   }
 
   /** Walk the waypoint graph toward the goal: strafing in a fight, else facing the way it walks. */
-  private steer(bot: PlayerState, b: Brain, goal: Spot | null, watcher: Spot | null, visible: boolean, lost: boolean, cmd: Command) {
-    const steer = this.nav.navigate(bot, b, goal, watcher);
+  private steer(bot: PlayerState, b: Brain, goal: Spot | null, watcher: Spot | null, visible: boolean, lost: boolean, reach: number, cmd: Command) {
+    const steer = this.nav.navigate(bot, b, goal, watcher, reach);
     if (steer && !(visible && cmd.forward <= 0)) {
       const moveYaw = Math.atan2(-steer[0], -steer[1]);
       const rel = wrap(moveYaw - b.aimYaw);
@@ -246,8 +252,10 @@ export class BotDirector {
       } else {
         b.aimYaw += clamp(wrap(moveYaw - b.aimYaw), -5 * TICK, 5 * TICK);
         b.aimPitch *= 0.9;
-        cmd.forward = b.sidestep > 0 ? -0.4 : 1;
-        cmd.right = b.sidestep > 0 ? b.strafe : 0;
+        // It walks the route while it turns to it: walking the way it still faces can step off the quay it was aiming across.
+        const ahead = wrap(moveYaw - b.aimYaw);
+        cmd.forward = b.sidestep > 0 ? -0.4 : Math.cos(ahead);
+        cmd.right = b.sidestep > 0 ? b.strafe : -Math.sin(ahead);
         // With nobody known nearby a match bot runs to the fight, as a player would; solo waves keep their walking pace.
         const hurry = this.host.settings.mode !== 'solo' && b.lostFor > 2 && b.path.length > 2 && b.sidestep <= 0 && !(cmd.buttons & BUTTON.crouch);
         if (bot.bot === 'rusher' || hurry) cmd.buttons |= BUTTON.sprint;
@@ -267,6 +275,13 @@ export class BotDirector {
     b.noticed.clear();
     b.hunt = 0;
     b.lane = pickLane(this.host, bot, b, this.brains, () => this.random());
+  }
+
+  /** Out of a fight a kit with a sidearm for far fights carries it while the enemy it hunts is well beyond its primary's reach. */
+  private huntingSlot(bot: PlayerState, b: Brain, prof: BotProfile) {
+    const far = prof.sidearm?.far;
+    const enemy = far === undefined ? undefined : this.host.players.get(b.hunt);
+    return enemy?.alive && Math.hypot(enemy.move.x - bot.move.x, enemy.move.z - bot.move.z) > far! + HUNT_SLACK ? 1 : 0;
   }
 
   /** Nobody in sight: where to go for the enemy it hunts (a fill bot to a spot in its band, from its flank). */

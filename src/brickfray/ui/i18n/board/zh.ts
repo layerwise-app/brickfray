@@ -53,6 +53,7 @@ export const boardZh: Record<BoardKey, string> = {
   'board.nameSpace': '不能有空格，只能用字母、数字、小数点和汉字。',
   'board.nameLong': '名字太长，最多 {n} 个字符。',
   'board.nameFailed': '名字保存失败，请重试。',
+  'board.nameSaved': '名字已保存',
   'board.signIn': '登录',
   'board.signInWhy': '登录后，战绩和个人资料在每台设备上都能看到。我们会发验证码到你的邮箱，无需密码。',
   'board.email': '邮箱',

@@ -185,7 +185,12 @@
     scrollbar-width: none;
     padding-bottom: 12px;
   }
+  /* A narrow window shrinks the stat columns with the unit: the words under the icons need about 40 px each. */
   .bf-table {
     --row: clamp(30px, calc(50 * var(--u)), 50px);
+    --cols: max(20px, calc(34 * var(--u))) minmax(0, 1fr) max(24px, calc(56 * var(--u))) max(42px, calc(44 * var(--u))) max(42px, calc(44 * var(--u))) max(42px, calc(44 * var(--u))) max(44px, calc(78 * var(--u)));
+  }
+  .bf-table[data-teams] {
+    --cols: minmax(0, 1fr) max(24px, calc(56 * var(--u))) max(42px, calc(44 * var(--u))) max(42px, calc(44 * var(--u))) max(42px, calc(44 * var(--u))) max(44px, calc(78 * var(--u)));
   }
 }

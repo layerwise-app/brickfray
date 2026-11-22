@@ -16,6 +16,7 @@ import { markAvatarPicked, useAccount } from './me';
 import { NameField } from './NameField';
 import { SignIn } from './SignIn';
 import './profile.css';
+import './profile-fit.css';
 
 type Saved = ProfileView | { refused: 'rate' | 'invalid' };
 

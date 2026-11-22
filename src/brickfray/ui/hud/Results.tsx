@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from 'react';
 import type { ScoreRow } from '../../game/hud';
-import { useGame, useHud } from '../App';
+import { useApp, useGame, useHud } from '../App';
 import { TrophyIcon } from '../board/icons';
 import { useT } from '../i18n';
 import { CrownIcon, DoorIcon, PlayIcon, SkullIcon } from '../icons';
@@ -201,14 +201,19 @@ function MyLine({ row, medals, outcome }: { row: ScoreRow; medals: Medal[]; outc
   );
 }
 
-/** The room goes back to its lobby on its own: said in words, the seconds left as a ring that empties. */
+/**
+ * The room goes back to its lobby on its own: said in words, the seconds left as a ring that empties. For the host it is
+ * a button that goes now; everyone else follows the host.
+ */
 function LobbyRing({ left }: { left: number }) {
   const { t } = useT();
+  const game = useGame();
+  const app = useApp();
   const [total] = useState(() => Math.max(1, left));
   const n = Math.max(0, Math.ceil(left));
   const c = 2 * Math.PI * 15;
-  return (
-    <span className='bf-lobby-ring' role='timer' aria-label={t('backToLobby', { n })}>
+  const content = (
+    <>
       <span className='bf-lobby-words'>{t('results.lobby')}</span>
       <span className='bf-lobby-dial'>
         <svg viewBox='0 0 36 36' aria-hidden>
@@ -217,6 +222,26 @@ function LobbyRing({ left }: { left: number }) {
         </svg>
         <b className='bf-display'>{n}</b>
       </span>
+    </>
+  );
+  if (app.isHost) {
+    const back = () => game.backToLobby();
+    return (
+      <button
+        className='bf-lobby-ring'
+        aria-label={t('backToLobby', { n })}
+        onClick={() => {
+          game.audio.play('uiClick');
+          back();
+        }}
+      >
+        {content}
+      </button>
+    );
+  }
+  return (
+    <span className='bf-lobby-ring' role='timer' aria-label={t('backToLobby', { n })}>
+      {content}
     </span>
   );
 }

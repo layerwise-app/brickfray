@@ -4,6 +4,7 @@ import { hudZh } from './hud/zh';
 import { streaksZh } from './streaks/zh';
 import { achievementsZh } from './achievements/zh';
 import { playZh } from './play/zh';
+import { namesZh } from './names/zh';
 import type { Dictionary } from './en';
 
 export const zh: Dictionary = {
@@ -13,6 +14,7 @@ export const zh: Dictionary = {
   ...streaksZh,
   ...achievementsZh,
   ...playZh,
+  ...namesZh,
   play: '开战',
   playCaption: '在线对战',
   solo: '单人',
@@ -64,7 +66,7 @@ export const zh: Dictionary = {
   'difficulty.normal': '普通',
   'difficulty.hard': '困难',
   'difficultyHint.easy': '适合新手：机器人更少、瞄得更慢、打得更轻。每波之间回满血。',
-  'difficultyHint.normal': '正经挑战：压力每波递增，每隔几波来一个 Megabot。每波之间回满血。',
+  'difficultyHint.normal': '正经挑战：压力每波递增，每隔几波来一个巨无霸。每波之间回满血。',
   'difficultyHint.hard': '老手专用：机器人枪法准、波次大，每波之间只回一半血。',
   'map.plaza': '广场',
   'map.fortress': '城堡',

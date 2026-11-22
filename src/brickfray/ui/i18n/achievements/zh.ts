@@ -58,7 +58,7 @@ export const achievementsZh: Record<keyof typeof achievementsEn, string> = {
   'ach.waveHard': '钢铁防线',
   'ach.wave.how': '在{level}难度的波次生存中坚持到指定波次。',
   'ach.megabot': '扳倒巨无霸',
-  'ach.megabot.how': '在波次生存中击倒 Megabot。',
+  'ach.megabot.how': '在波次生存中击倒巨无霸。',
   'ach.roster': '全员集结',
   'ach.roster.how': '用每位英雄各打完一局。',
   'ach.rosterWins': '全员告捷',

@@ -75,7 +75,7 @@ export function ScorePanel({ open, onClose }: { open: OpenMatch; onClose: () => 
         </div>
       )}
       <div className='bf-board-detail-body bf-scroll' data-fetching={loading || undefined}>
-        {entry.mode === 'solo' ? <Run entry={entry} detail={detail} loading={loading} lang={lang} /> : <Room entry={entry} detail={detail} loading={loading} mine={mine} lang={lang} />}
+        {entry.mode === 'solo' ? <Run entry={entry} detail={detail} loading={loading} lang={lang} /> : <Room entry={entry} detail={detail} loading={loading} lang={lang} />}
       </div>
     </section>
   );
@@ -140,7 +140,7 @@ function Run({ entry, detail, loading, lang }: { entry: OpenMatch['entry']; deta
   );
 }
 
-function Room({ entry, detail, loading, mine, lang }: { entry: OpenMatch['entry']; detail: MatchDetail | null; loading: boolean; mine: boolean; lang: Lang }) {
+function Room({ entry, detail, loading, lang }: { entry: OpenMatch['entry']; detail: MatchDetail | null; loading: boolean; lang: Lang }) {
   const { t } = useT();
   const tiles = (
     <Tiles
@@ -163,7 +163,7 @@ function Room({ entry, detail, loading, mine, lang }: { entry: OpenMatch['entry'
               {detail.winner === team && <CrownIcon size={18} aria-label={t('board.winner')} />}
               {t(`team.${team}`)} <span className='tabular-nums'>{number(lang, detail.teams[team])}</span>
             </h4>
-            <Scoreboard players={detail.players} only={team} mine={mine} lang={lang} />
+            <Scoreboard players={detail.players} only={team} lang={lang} />
           </section>
         ))}
       </>
@@ -173,7 +173,7 @@ function Room({ entry, detail, loading, mine, lang }: { entry: OpenMatch['entry'
     return (
       <>
         {tiles}
-        <Scoreboard players={detail.players} winner={detail.winner} mine={mine} lang={lang} />
+        <Scoreboard players={detail.players} winner={detail.winner} lang={lang} />
       </>
     );
   }
@@ -189,7 +189,7 @@ function Room({ entry, detail, loading, mine, lang }: { entry: OpenMatch['entry'
  * The final scoreboard in its own order: a free-for-all numbers each place; a team's list does not (the team's score
  * is its place). The player's own row is yellow, as on the results screen.
  */
-function Scoreboard({ players, only, winner, mine, lang }: { players: DetailPlayer[]; only?: 0 | 1; winner?: number | null; mine: boolean; lang: Lang }) {
+function Scoreboard({ players, only, winner, lang }: { players: DetailPlayer[]; only?: 0 | 1; winner?: number | null; lang: Lang }) {
   const { t } = useT();
   const places = only === undefined;
   return (
@@ -205,7 +205,7 @@ function Scoreboard({ players, only, winner, mine, lang }: { players: DetailPlay
       <ol>
         {players.map((p, i) =>
           only !== undefined && p.team !== only ? null : (
-            <li key={i} className='bf-board-tr' data-me={p.me || undefined}>
+            <li key={i} className='bf-board-tr' data-me={p.me || undefined} aria-current={p.me || undefined}>
               {places && (
                 <span data-col='rank' className='bf-board-rank bf-display'>
                   {i + 1}
@@ -213,7 +213,7 @@ function Scoreboard({ players, only, winner, mine, lang }: { players: DetailPlay
               )}
               <span data-col='player' className='bf-board-who'>
                 <Avatar avatar={{ hero: p.character, image: null }} size={28} />
-                <PlayerName name={p.name} tag={null} label={p.me && mine && t('you')} />
+                <PlayerName name={p.name} tag={null} />
                 {p.bot && (
                   <span className='bf-board-bot' title={t('bot')}>
                     <span>{t('bot')}</span>

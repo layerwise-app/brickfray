@@ -110,7 +110,7 @@ export function Rankings({ filter, setFilter, onOpen }: { filter: RankFilter; se
             <ol>
               {data.rows.map((r) => (
                 <li key={r.id}>
-                  <button className='bf-board-tr' data-mine={r.mine || undefined} data-top={r.rank <= 3 ? r.rank : undefined} onClick={() => open(r)}>
+                  <button className='bf-board-tr' data-mine={r.mine || undefined} aria-current={r.mine || undefined} data-top={r.rank <= 3 ? r.rank : undefined} onClick={() => open(r)}>
                     <Cells row={r} columns={columns} lang={lang} />
                   </button>
                 </li>
@@ -163,7 +163,7 @@ function Cells({ row, columns, lang }: { row: RankedEntry; columns: Column[]; la
     player: (
       <span className='bf-board-who'>
         <Avatar avatar={row.avatar} character={row.character} size={32} />
-        <PlayerName name={row.name} tag={row.tag} label={row.mine && t('you')} />
+        <PlayerName name={row.name} tag={row.tag} />
       </span>
     ),
     wave: <span className='bf-display bf-board-big'>{number(lang, row.wave)}</span>,

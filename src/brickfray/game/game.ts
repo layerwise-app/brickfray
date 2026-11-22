@@ -393,6 +393,11 @@ export class Game {
   }
 
   /** Leave whatever game we're in and return to the main menu. */
+  /** The host ends the results screen early. */
+  backToLobby() {
+    this.host?.returnToLobby();
+  }
+
   leave() {
     if (this.client || this.host || this.match) this.audio.play('uiBack');
     this.reset();

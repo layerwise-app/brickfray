@@ -1,0 +1,84 @@
+/* The upgrade cards (hud/UpgradePick.tsx) on small screens; the whole set also scales down to fit (useFit). */
+
+/* Short screens, phones on their side above all: tighter spacing, wider cards so the effects wrap less, a shorter
+   picture band, and type set larger so that, scaled to fit, the cards' words stay at 12 px or more. */
+@media (max-height: 560px) {
+  .bf-pick .bf-pick-box {
+    gap: 14px;
+  }
+  .bf-pick .bf-pick-card {
+    width: 236px;
+  }
+  .bf-pick .bf-card-art {
+    height: 96px;
+  }
+  .bf-pick .bf-card-name {
+    font-size: 25px;
+  }
+  .bf-pick .bf-card-fx {
+    font-size: 19px;
+  }
+  .bf-pick .bf-card-delta {
+    font-size: 17px;
+  }
+  .bf-pick .bf-card-level {
+    font-size: 15px;
+    letter-spacing: 0.02em;
+  }
+  .bf-pick .bf-pick-hint {
+    font-size: 19px;
+  }
+  .bf-pick .bf-pick-auto {
+    font-size: 17px;
+  }
+}
+
+/* A narrow upright window: the cards stack, each a row with its picture on the left. */
+@media (max-width: 640px) and (orientation: portrait) {
+  .bf-pick .bf-pick-box {
+    gap: 18px;
+  }
+  .bf-pick .bf-pick-title {
+    font-size: 40px;
+  }
+  .bf-pick .bf-pick-cards {
+    flex-direction: column;
+    gap: 16px;
+  }
+  .bf-pick .bf-pick-card {
+    width: min(calc(100vw - 32px), 440px);
+    flex-direction: row;
+  }
+  .bf-pick .bf-card-art {
+    width: 112px;
+    height: auto;
+    flex-shrink: 0;
+    border-radius: 22px 0 0 22px;
+  }
+  .bf-pick .bf-card-art > svg {
+    width: 64px;
+    height: 64px;
+  }
+  .bf-pick .bf-card-index {
+    left: 8px;
+    top: 8px;
+    width: 30px;
+    height: 30px;
+    font-size: 20px;
+  }
+  .bf-pick .bf-card-rare {
+    top: auto;
+    right: 50%;
+    bottom: 10px;
+    translate: 50% 0;
+  }
+  .bf-pick .bf-card-body {
+    align-items: flex-start;
+    gap: 6px;
+    padding: 14px 16px 12px;
+    text-align: left;
+  }
+  .bf-pick .bf-card-delta {
+    justify-content: flex-start;
+  }
+}

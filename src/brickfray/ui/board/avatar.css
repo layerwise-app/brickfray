@@ -28,6 +28,11 @@
   height: auto;
   object-fit: initial;
 }
+.bf-av-bot {
+  display: grid;
+  place-items: center;
+  background: linear-gradient(160deg, #31415f, #1a2540);
+}
 .bf-av-spin {
   width: 16px;
   height: 16px;

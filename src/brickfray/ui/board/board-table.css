@@ -95,12 +95,25 @@ button.bf-board-tr:focus-visible {
 .bf-board-list[data-cols='scoreboard'] {
   --cols: 34px minmax(0, 1fr) 56px 56px 56px 70px;
 }
+/* The player's own row: yellow with dark ink, as on the results screen, the Tab table and the score panel. */
 .bf-board-tr[data-mine] {
-  background: rgba(255, 205, 46, 0.14);
-  box-shadow: inset 0 0 0 2px rgba(255, 205, 46, 0.7);
+  color: #2a1a00;
+  background: var(--bf-yellow);
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.35),
+    0 3px 0 rgba(0, 0, 0, 0.3);
 }
 button.bf-board-tr[data-mine]:hover {
-  background: rgba(255, 205, 46, 0.2);
+  background: #ffd84f;
+}
+.bf-board-tr[data-mine] :is(.bf-board-rank, .bf-board-tagno, .bf-board-result) {
+  color: rgba(42, 26, 0, 0.78);
+}
+.bf-board-tr[data-mine][data-top] .bf-board-rank {
+  color: #2a1a00;
+  box-shadow:
+    inset 0 0 0 2px rgba(42, 26, 0, 0.55),
+    0 3px 0 rgba(0, 0, 0, 0.3);
 }
 .bf-board-rank {
   font-size: 19px;
@@ -200,13 +213,9 @@ button.bf-board-tr[data-mine]:hover {
   position: sticky;
   bottom: 0;
   margin-top: 6px;
-  background: color-mix(in srgb, #ffcd2e 17%, #111c34) !important;
   box-shadow:
-    inset 0 0 0 2px rgba(255, 205, 46, 0.7),
-    0 -8px 14px rgba(9, 14, 28, 0.7);
-}
-.bf-board-mine-bar:hover {
-  background: color-mix(in srgb, #ffcd2e 24%, #111c34) !important;
+    inset 0 2px 0 rgba(255, 255, 255, 0.35),
+    0 -8px 14px rgba(9, 14, 28, 0.7) !important;
 }
 
 /* Narrower panels keep the columns that rank a row; the score panel shows the rest. A container query styles only

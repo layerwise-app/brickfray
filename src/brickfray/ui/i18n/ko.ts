@@ -4,6 +4,7 @@ import { hudKo } from './hud/ko';
 import { streaksKo } from './streaks/ko';
 import { achievementsKo } from './achievements/ko';
 import { playKo } from './play/ko';
+import { namesKo } from './names/ko';
 import type { Dictionary } from './en';
 
 export const ko: Dictionary = {
@@ -13,6 +14,7 @@ export const ko: Dictionary = {
   ...streaksKo,
   ...achievementsKo,
   ...playKo,
+  ...namesKo,
   play: '플레이',
   playCaption: '온라인 대전',
   solo: '솔로',

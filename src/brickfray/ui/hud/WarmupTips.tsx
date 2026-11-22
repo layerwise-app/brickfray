@@ -92,6 +92,9 @@ export function WarmupTips() {
     return () => clearTimeout(timer);
   }, [fighting, card.settings, settings]);
 
+  // The player's first kill: they have the controls, and the card would crowd the kill confirm under the crosshair.
+  if (card.settings === settings && gone !== settings && hud.feed.some((f) => f.mine && !f.self)) setGone(settings);
+
   const keys = card.keys && !touch;
   const live = card.settings === settings && gone !== settings && (hud.phase === 'warmup' || fighting);
   if (!live || (!keys && !card.waves)) return null;

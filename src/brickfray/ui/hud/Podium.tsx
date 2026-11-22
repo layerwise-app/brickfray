@@ -6,6 +6,7 @@ import { useApp } from '../App';
 import { BotIcon } from '../icons';
 import { ordinal } from './standings';
 import { useT } from '../i18n';
+import { shownName } from './names';
 
 type Spot = { row: ScoreRow; place: number };
 
@@ -41,16 +42,16 @@ export function Podium({ rows, teams }: { rows: readonly ScoreRow[]; teams: bool
 }
 
 function PodiumSpot({ spot, teams, floor }: { spot: Spot; teams: boolean; floor?: boolean }) {
-  const { lang } = useT();
+  const { t, lang } = useT();
   const { row, place } = spot;
   return (
-    <div className='bf-pod-spot' data-place={floor ? 'floor' : place} data-me={row.me || undefined} aria-label={`${ordinal(lang, place)} · ${row.name}`}>
+    <div className='bf-pod-spot' data-place={floor ? 'floor' : place} data-me={row.me || undefined} aria-label={`${ordinal(lang, place)} · ${shownName(t, row.name, row.character)}`}>
       <div className='bf-pod-fig bf-in'>
         {row.me && <span className='bf-pod-mark' aria-hidden />}
         <Figure row={row} />
       </div>
       <span className='bf-pod-tag' style={teams && !row.me ? { background: `color-mix(in srgb, ${TEAM_COLORS[row.team] ?? '#2a3a5e'} 70%, #0b1222)` } : undefined}>
-        <span className='truncate'>{row.name}</span>
+        <span className='truncate'>{shownName(t, row.name, row.character)}</span>
         {row.bot && <BotIcon size={13} className='shrink-0 opacity-70' />}
       </span>
       <div className='bf-pod-block bf-in'>

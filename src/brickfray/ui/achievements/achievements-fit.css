@@ -1,0 +1,81 @@
+/* The achievements page fitted to its box (container `ach`, achievements.css): wide, short and narrow. */
+
+/* Wide screens: the page grows with the panel like the leaderboard. */
+@container ach (min-width: 1500px) and (min-height: 1000px) {
+  .bf-ach {
+    width: min(100%, 1320px);
+    height: min(100%, 1040px);
+  }
+  .bf-ach-grid {
+    grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  }
+}
+
+/* A phone held sideways, or any short box: a tighter header and smaller cards, two or three to a row. */
+@container ach (max-height: 520px) {
+  .bf-ach-backdrop {
+    padding-block: 6px;
+  }
+  .bf-ach {
+    gap: 8px;
+    padding: 10px 6px 8px 12px;
+  }
+  .bf-ach-title {
+    font-size: 22px;
+  }
+  .bf-ach-total b {
+    font-size: 20px;
+  }
+  .bf-ach-total {
+    width: 130px;
+  }
+  .bf-ach-list {
+    gap: 12px;
+    padding-right: 8px;
+  }
+  .bf-ach-grid {
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 8px;
+  }
+  .bf-ach-card {
+    gap: 10px;
+    padding: 8px 10px 8px 8px;
+  }
+  .bf-ach-card .bf-ach-badge {
+    width: 44px;
+    height: 44px;
+  }
+  .bf-ach-name .bf-display {
+    font-size: 16px;
+  }
+  .bf-ach-how {
+    font-size: 12px;
+  }
+}
+@container ach (max-width: 600px) {
+  .bf-ach-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .bf-ach-total {
+    width: 110px;
+  }
+}
+/* A phone-width window: the count keeps only the room its numbers need, so the title is whole. */
+@container ach (max-width: 440px) {
+  .bf-ach {
+    padding-left: 16px;
+  }
+  .bf-ach-head {
+    gap: 10px;
+    padding-right: 6px;
+  }
+  .bf-ach-title {
+    font-size: 25px;
+  }
+  .bf-ach-total {
+    width: 76px;
+  }
+  .bf-ach-total b {
+    font-size: 22px;
+  }
+}

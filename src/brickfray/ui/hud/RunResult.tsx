@@ -68,16 +68,21 @@ export function RunHero({ outcome }: { outcome: Outcome | null }) {
   );
 }
 
+/** What ended the run: the snapbot's face and name over the weapon it used, or the water. */
 function Cause() {
   const hud = useHud();
+  const { t } = useT();
   const text = useCauseText();
   const cause = hud.soloCause;
   if (!cause || !text) return null;
   return (
     <Tip text={text} className='bf-cause bf-in'>
       <SkullIcon size={22} className='bf-cause-skull' />
-      {cause.killer && <BotFace kind={cause.killer} size={58} />}
-      <CauseIcon cause={cause.weapon} size={cause.killer ? 64 : 84} className={cause.weapon === 'water' ? 'text-[#7cc8ff]' : 'text-white/85'} />
+      <span className='bf-cause-icons'>
+        {cause.killer && <BotFace kind={cause.killer} size={58} />}
+        <CauseIcon cause={cause.weapon} size={cause.killer ? 64 : 84} className={cause.weapon === 'water' ? 'text-[#7cc8ff]' : 'text-white/85'} />
+      </span>
+      {cause.killer && <span className='bf-cause-name bf-display'>{t(`kind.${cause.killer}`)}</span>}
     </Tip>
   );
 }

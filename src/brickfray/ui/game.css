@@ -350,14 +350,6 @@ html.bf-rotated .bf-root input[type='range'] {
     0 0 12px rgba(0, 0, 0, 0.35);
 }
 
-.bf-vignette {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background: radial-gradient(ellipse at center, transparent 55%, rgba(200, 20, 10, 0.55) 100%);
-  transition: opacity 0.25s ease;
-}
-
 .bf-scroll::-webkit-scrollbar {
   width: 8px;
 }

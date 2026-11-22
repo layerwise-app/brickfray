@@ -47,7 +47,16 @@ export function ProfileChip({ ref, character, open, onOpen }: { ref: Ref<HTMLBut
     <button ref={ref} className='bf-btn bf-btn-ghost bf-menu-me' aria-haspopup='dialog' aria-expanded={open} aria-label={`${t('board.profile')}: ${name}${tag === null ? '' : `#${tag}`}`} onClick={onOpen}>
       <Avatar avatar={profile?.avatar.image || picked ? profile?.avatar : null} character={character} size={40} />
       <span className='bf-menu-me-name'>{name}</span>
-      {tag !== null && <span className='bf-menu-me-tag'>#{tag}</span>}
+      {tag !== null ? (
+        <span className='bf-menu-me-tag'>#{tag}</span>
+      ) : (
+        // The tag's room is kept while the account loads, so the chip does not grow when it arrives.
+        account.isPending && (
+          <span className='bf-menu-me-tag invisible' aria-hidden>
+            #0000
+          </span>
+        )
+      )}
     </button>
   );
 }

@@ -53,6 +53,7 @@ export const boardDe: Record<BoardKey, string> = {
   'board.nameSpace': 'Keine Leerzeichen: nur Buchstaben, Ziffern, Punkte.',
   'board.nameLong': 'Zu lang: höchstens {n} Zeichen.',
   'board.nameFailed': 'Name konnte nicht gespeichert werden. Versuch es noch mal.',
+  'board.nameSaved': 'Name gespeichert',
   'board.signIn': 'Anmelden',
   'board.signInWhy': 'Behalte deine Matches und dein Profil auf allen Geräten. Wir schicken dir einen Code per E-Mail, ganz ohne Passwort.',
   'board.email': 'E-Mail',

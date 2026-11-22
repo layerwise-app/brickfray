@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { lazy, startTransition, Suspense, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { ROSTER, CHARACTER_IDS } from '../characters/roster';
 import type { CharacterId } from '../characters/types';
 import { refreshPortraits } from '../game/portraits';
@@ -6,7 +6,8 @@ import { coverStage } from '../game/showroom';
 import { TURN_PER_PIXEL, turntable } from '../game/stage-turn';
 import { useApp, useGame } from './App';
 import { LANGUAGES, setLang, useT } from './i18n';
-import { MELEES, WEAPONS } from '../weapons/defs';
+import { WEAPONS } from '../weapons/defs';
+import { weaponName } from './hud/names';
 import { LOADOUTS } from '../weapons/loadouts';
 import { BotIcon, CreditsIcon, ExitFullscreenIcon, FullscreenIcon, GearIcon, GlobeIcon, PlayIcon, UsersIcon, WeaponIcon } from './icons';
 import { RoomsPanel } from './RoomsPanel';
@@ -27,9 +28,14 @@ import './menu-stacked.css';
 /** A drag that starts on one of these is theirs; anywhere else on the menu it turns the figure. */
 const CONTROLS = 'button, input, a, select, textarea, label, nav, [data-cover], .bf-panel';
 
-const BoardPanel = lazy(() => import('./board/BoardPanel'));
-const ProfilePanel = lazy(() => import('./board/ProfilePanel'));
-const AchievementsPage = lazy(() => import('./achievements/AchievementsPage'));
+const boardChunk = () => import('./board/BoardPanel');
+const profileChunk = () => import('./board/ProfilePanel');
+const achievementsChunk = () => import('./achievements/AchievementsPage');
+const BoardPanel = lazy(boardChunk);
+const ProfilePanel = lazy(profileChunk);
+const AchievementsPage = lazy(achievementsChunk);
+/** After the menu appears, this long (ms) before the dialogs' code loads in idle time: the stage warms up first. */
+const PRELOAD_AFTER = 1500;
 
 /** What covers the menu: one dialog at a time. */
 type Overlay = 'rooms' | 'ranks' | 'history' | 'profile' | 'credits' | 'achievements';
@@ -84,6 +90,24 @@ export function MainMenu({ openSettings }: { openSettings: () => void }) {
     };
   }, []);
 
+  // Timers: the dialogs' code loads in idle time once the menu has settled, so the first open has nothing to wait for.
+  useEffect(() => {
+    let idle = 0;
+    const preload = () => {
+      void boardChunk();
+      void profileChunk();
+      void achievementsChunk();
+    };
+    const timer = window.setTimeout(() => {
+      if (typeof requestIdleCallback === 'function') idle = requestIdleCallback(preload, { timeout: 3000 });
+      else preload();
+    }, PRELOAD_AFTER);
+    return () => {
+      clearTimeout(timer);
+      if (idle) cancelIdleCallback(idle);
+    };
+  }, []);
+
   // Matches an earlier visit could not upload (offline, rate limit) go up once the menu has settled.
   useEffect(() => {
     const timer = setTimeout(() => void flushMatches(game.settings.name), 5000);
@@ -103,15 +127,17 @@ export function MainMenu({ openSettings }: { openSettings: () => void }) {
     game.audio.play('uiHover', { volume: 0.6 });
   };
 
+  // A transition: the open dialog (or the bare menu) stays until the next one has its code, instead of a blank beat.
+  const show = (next: Overlay | null) => startTransition(() => setOverlay(next));
   const open = (next: Overlay) => {
     game.audio.play('uiClick');
-    setOverlay(next);
+    show(next);
   };
   const close = () => back(null);
   /** Back out of a dialog: My matches returns to the profile menu it was opened from. */
   const back = (to: Overlay | null) => {
     game.audio.play('uiBack');
-    setOverlay(to);
+    show(to);
   };
 
   const grab = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -203,21 +229,12 @@ export function MainMenu({ openSettings }: { openSettings: () => void }) {
           />
         </nav>
       </div>
-      {(overlay === 'ranks' || overlay === 'history') && (
-        <Suspense fallback={null}>
-          <BoardPanel key={overlay} view={overlay} onClose={overlay === 'history' ? () => back('profile') : close} />
-        </Suspense>
-      )}
-      {overlay === 'profile' && (
-        <Suspense fallback={null}>
-          <ProfilePanel character={character} onClose={close} onMatches={() => open('history')} onAchievements={() => open('achievements')} />
-        </Suspense>
-      )}
-      {overlay === 'achievements' && (
-        <Suspense fallback={null}>
-          <AchievementsPage onClose={() => back('profile')} />
-        </Suspense>
-      )}
+      {/* One boundary that is always there: a transition into a dialog whose code is still loading keeps what shows. */}
+      <Suspense fallback={null}>
+        {(overlay === 'ranks' || overlay === 'history') && <BoardPanel key={overlay} view={overlay} onClose={overlay === 'history' ? () => back('profile') : close} />}
+        {overlay === 'profile' && <ProfilePanel character={character} onClose={close} onMatches={() => open('history')} onAchievements={() => open('achievements')} />}
+        {overlay === 'achievements' && <AchievementsPage onClose={() => back('profile')} />}
+      </Suspense>
       {overlay === 'credits' && <Credits onClose={close} />}
       {overlay === 'rooms' && <RoomsPanel onClose={close} />}
     </div>
@@ -250,9 +267,9 @@ function Loadout({ character }: { character: CharacterId }) {
   const { t } = useT();
   const kit = LOADOUTS[character];
   const items = [
-    { slot: t('action.weapon1'), id: kit.primary, name: WEAPONS[kit.primary].name },
-    { slot: t('action.weapon2'), id: kit.secondary, name: WEAPONS[kit.secondary].name },
-    { slot: t('action.melee'), id: kit.melee, name: MELEES[kit.melee].name }
+    { slot: t('action.weapon1'), id: kit.primary, name: weaponName(t, kit.primary) },
+    { slot: t('action.weapon2'), id: kit.secondary, name: weaponName(t, kit.secondary) },
+    { slot: t('action.melee'), id: kit.melee, name: weaponName(t, kit.melee) }
   ];
   return (
     <ul data-cover className='bf-menu-loadout'>

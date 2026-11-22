@@ -42,10 +42,10 @@ export class BotNav {
   constructor(private readonly host: HostSim) {}
 
   /**
-   * Direction (x, z) to walk, following waypoints when the goal isn't straight ahead; null at the goal. With a
-   * `watcher` (an enemy a close-range bot is going for) the route keeps out of its sight where it can.
+   * Direction (x, z) to walk, following waypoints when the goal isn't straight ahead; null within `reach` m of the
+   * goal. With a `watcher` (an enemy a close-range bot is going for) the route keeps out of its sight where it can.
    */
-  navigate(bot: PlayerState, b: NavState, goal: readonly [number, number, number] | null, watcher: readonly [number, number, number] | null = null): [number, number] | null {
+  navigate(bot: PlayerState, b: NavState, goal: readonly [number, number, number] | null, watcher: readonly [number, number, number] | null = null, reach = 1): [number, number] | null {
     if (!goal) return null;
     const [gx, gy, gz] = goal;
     const wps = this.host.layout.waypoints;
@@ -53,7 +53,7 @@ export class BotNav {
     const direct = Math.hypot(gx - m.x, gz - m.z);
     // A goal on another floor (a balcony overhead) needs the graph even when it's close in plan.
     const sameLevel = Math.abs(gy - m.y) < 1.2;
-    if (direct < 1 && sameLevel) return null;
+    if (direct < reach && sameLevel) return null;
     const straight = watcher ? direct < 4 : direct < 10;
     if (wps.length === 0 || (sameLevel && straight && this.host.time > b.graphOnly && this.host.world.clearLine(m.x, m.y + 0.6, m.z, gx, m.y + 0.6, gz))) {
       return direct < 1e-3 ? null : [(gx - m.x) / direct, (gz - m.z) / direct];

@@ -1,17 +1,28 @@
 import { CHARACTER_IDS, ROSTER } from '../../characters/roster';
 import type { CharacterId } from '../../characters/types';
 import type { Avatar as AvatarData } from '../../../lib/board/contract';
+import type { BotKind } from '../../characters/types';
 import { useApp } from '../App';
+import { BotFace } from '../hud/SoloHud';
 import './avatar.css';
+
+const BOTS: ReadonlySet<string> = new Set<BotKind>(['grunt', 'rusher', 'sniper', 'boss']);
 
 function hero(id: string | null | undefined): CharacterId {
   return CHARACTER_IDS.includes(id as CharacterId) ? (id as CharacterId) : 'rivet';
 }
 
-/** A player's picture: their upload, else their chosen portrait, else the character they played. */
+/** A player's picture: their upload, else their chosen portrait, else the character they played (a snapbot's face). */
 export function Avatar({ avatar, character, size = 40, className = '' }: { avatar?: AvatarData | null; character?: string | null; size?: number; className?: string }) {
   const app = useApp();
   const style = { ['--av' as string]: `${size}px` };
+  if (!avatar && character && BOTS.has(character)) {
+    return (
+      <span className={`bf-av bf-av-bot ${className}`} style={style}>
+        <BotFace kind={character as BotKind} size={Math.round(size * 0.84)} />
+      </span>
+    );
+  }
   if (avatar?.image) {
     return (
       <span className={`bf-av ${className}`} style={style}>

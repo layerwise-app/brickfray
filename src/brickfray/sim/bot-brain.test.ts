@@ -64,17 +64,51 @@ describe('bots in a fight', () => {
     rifle.run(5);
     expect(rifle.apart()).toBeGreaterThan(20);
     expect(rifle.apart()).toBeLessThan(29);
-    const shotgun = duel('clack', 16);
-    shotgun.run(4);
-    expect(shotgun.apart()).toBeLessThan(8);
+    const shotgun = duel('clack', 8);
+    shotgun.run(3);
+    expect(shotgun.apart()).toBeLessThan(5);
   });
 
-  it('fire on an enemy in sight: a long gun once its sights are up and the body is under the crosshair', () => {
+  it('fire on an enemy in sight: a long gun once its sights are up and the head is under the crosshair', () => {
     for (const character of ['coral', 'moss', 'vega', 'clack'] as const) {
       const { bot, run } = duel(character, character === 'clack' ? 6 : 25);
       run(3);
       expect(bot.arms.shots, character).toBeGreaterThan(0);
     }
+  });
+
+  it('fight each range with the gun the kit carries for it, and put the primary back after', () => {
+    const clack = duel('clack', 16);
+    clack.run(2);
+    expect(clack.bot.arms.weapon).toBe('cannon');
+    const close = duel('clack', 6);
+    close.run(2);
+    expect(close.bot.arms.weapon).toBe('shotgun');
+    const moss = duel('moss', 5);
+    moss.run(1.5);
+    expect(moss.bot.arms.weapon).toBe('buzzer');
+    moss.me.alive = false;
+    moss.run(3);
+    expect(moss.bot.arms.weapon).toBe('sniper');
+  });
+
+  it('aim a scoped gun at the head', () => {
+    const { sim, bot, me, run } = duel('moss', 30);
+    run(2.5);
+    const eye = sim.eye(bot);
+    const pitchTo = (y: number) => Math.atan2(y - eye[1], Math.hypot(me.move.x - eye[0], me.move.z - eye[2]));
+    const head = sim.eye(me)[1];
+    expect(Math.abs(bot.pitch - pitchTo(head))).toBeLessThan(Math.abs(bot.pitch - pitchTo(head - 0.35)));
+  });
+
+  it('shoot back at an attacker beyond the reach of its gun', () => {
+    const { sim, bots, bot, me, run } = duel('rivet', 40);
+    run(0.5);
+    expect(brainsOf(bots).get(bot.id)!.target).toBe(0);
+    sim.damage(bot, 10, { attacker: me.id, weapon: 'ar', kind: 'body', from: sim.eye(me) });
+    run(0.6);
+    expect(brainsOf(bots).get(bot.id)!.target).toBe(me.id);
+    expect(brainsOf(bots).get(bot.id)!.lostFor).toBe(0);
   });
 });
 

@@ -16,6 +16,8 @@ export const playFr: Record<keyof typeof playEn, string> = {
   'lobby.count': '{h} + {b} bots',
   'lobby.open': 'Place libre',
   'death.health': 'Vie restante',
+  'feed.water': 'est tombé à l’eau',
+  'feed.self': 's’est éliminé tout seul',
   'death.streak': 'Série',
   'paused.title': 'Pause',
   'notFound.title': 'Rien à construire ici',

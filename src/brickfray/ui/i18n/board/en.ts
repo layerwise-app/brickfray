@@ -52,6 +52,7 @@ export const boardEn = {
   'board.nameSpace': 'No spaces: letters, numbers and dots only.',
   'board.nameLong': 'Too long: {n} characters at most.',
   'board.nameFailed': 'Couldn’t save your name. Try again.',
+  'board.nameSaved': 'Name saved',
   'board.signIn': 'Sign in',
   'board.signInWhy': 'Keep your matches and profile on every device. We email you a code, no password needed.',
   'board.email': 'Email',

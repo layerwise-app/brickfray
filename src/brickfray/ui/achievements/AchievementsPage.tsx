@@ -8,6 +8,7 @@ import { BackIcon } from '../icons';
 import { Badge, metalOf, TierPips } from './Badge';
 import { achievementHow, achievementName, day, useAchievements } from './model';
 import './achievements.css';
+import './achievements-fit.css';
 
 const SEEN = 'brickfray.achievementsSeen';
 /** On a first visit with no record, tiers reached within this long count as new. */

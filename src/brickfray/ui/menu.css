@@ -179,11 +179,16 @@ html.bf-touch .bf-menu-lang-item {
   align-self: flex-start;
 }
 .bf-menu-item {
+  /* Long names in some languages ("Clé dynamométrique") take a second line instead of an ellipsis. */
+  display: -webkit-box;
   overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
   font-size: calc(12 * var(--u));
   font-weight: 600;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.2;
+  hyphens: auto;
+  overflow-wrap: break-word;
 }
 
 .bf-menu-picker {

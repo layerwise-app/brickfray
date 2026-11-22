@@ -1,19 +1,24 @@
-import { useEffect, useRef, useState, type Ref } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type Ref } from 'react';
 import type { UpgradeOffer } from '../../game/hud';
 import type { Picker } from '../../game/input';
+import { phoneSized, touchCapable } from '../../game/input-mode';
 import { PICK_TIME } from '../../sim/match';
 import { maxLevel, UPGRADES, type UpgradeId } from '../../sim/upgrades';
 import { useGame, useHud } from '../App';
 import { useT } from '../i18n';
 import { WeaponIcon } from '../icons';
+import { useFrame } from '../touch/landscape';
 import { useTouchMode } from '../touch/useInputMode';
 import { cardText, type DetailPart } from './upgrade-text';
 import { UPGRADE_LOOK, UpgradeIcon } from './UpgradeIcon';
+import './upgrade-pick.css';
 
 /** Clicks and number keys this soon after the cards appear are leftovers from the fight, not a choice. */
 const GRACE_MS = 450;
 /** Screen pixels per mouse count for the drawn pointer. */
 const POINTER_SPEED = 1.15;
+/** Px kept clear around the cards when they scale down to fit a small screen. */
+const MARGIN = 10;
 const KEYFRAMES = `@keyframes bf-card-in { 0% { opacity: 0; transform: translateY(40px) scale(.86); } 100% { opacity: 1; transform: none; } }
 @keyframes bf-pip-next { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.35); } }`;
 
@@ -28,7 +33,9 @@ function Cards({ offer }: { offer: UpgradeOffer }) {
   const game = useGame();
   const hud = useHud();
   const { t } = useT();
-  const touch = useTouchMode();
+  // A phone is played by touch even when a stray mouse event switched the input mode: its cards are tapped.
+  const touch = useTouchMode() || (phoneSized() && touchCapable());
+  const fit = useFit();
   const [hovered, setHovered] = useState<number | null>(null);
   /** The card a number key marked: the same key again takes it. */
   const [marked, setMarked] = useState<number | null>(null);
@@ -110,53 +117,79 @@ function Cards({ offer }: { offer: UpgradeOffer }) {
   }, [game, offer, picked]);
 
   const waiting = !picked && hud.phase === 'intermission' && hud.phaseLeft > 0;
+  const again = !touch && marked !== null && marked === hovered;
   return (
-    <div className='bf-pick absolute inset-0 flex flex-col items-center justify-center gap-7' style={{ background: 'radial-gradient(ellipse 70% 60% at 50% 50%, rgba(6,10,22,.6), rgba(6,10,22,.15))' }}>
+    <div className='bf-pick absolute inset-0 flex flex-col items-center justify-center' style={{ background: 'radial-gradient(ellipse 70% 60% at 50% 50%, rgba(6,10,22,.6), rgba(6,10,22,.15))' }}>
       <style>{KEYFRAMES}</style>
-      <div className='bf-pop flex flex-col items-center'>
-        <span className='bf-display bf-hud-text text-5xl leading-none text-[var(--bf-yellow)]'>{t('upgrade.cleared', { n: offer.wave })}</span>
-        <span className='bf-hud-text mt-2 text-lg font-semibold uppercase tracking-[0.25em] text-white/90'>{t('upgrade.title')}</span>
-      </div>
-      <div className='flex items-stretch gap-[clamp(12px,2.2vw,30px)]'>
-        {offer.options.map((id, i) => (
-          <div key={id} className={touch ? 'pointer-events-auto' : undefined} onClick={touch ? () => game.input.pick(i) : undefined} style={{ animation: `bf-card-in .5s cubic-bezier(.2,1.4,.4,1) ${120 + i * 90}ms both` }}>
-            <Card
-              id={id}
-              index={i}
-              offer={offer}
-              character={character}
-              armor={armor}
-              state={picked ? (picked === id ? 'chosen' : 'faded') : hovered === i ? 'hover' : 'idle'}
-              setRef={(el) => {
-                cards.current[i] = el;
-              }}
-            />
+      <div ref={fit.ref} className='bf-pick-box flex shrink-0 flex-col items-center gap-7' style={{ transform: fit.scale < 1 ? `scale(${fit.scale})` : undefined }}>
+        <div className='bf-pop flex flex-col items-center text-center'>
+          <span className='bf-pick-title bf-display bf-hud-text text-5xl leading-none text-[var(--bf-yellow)]'>{t('upgrade.cleared', { n: offer.wave })}</span>
+          <span className='bf-hud-text mt-2 text-lg font-semibold uppercase tracking-[0.25em] text-white/90'>{t('upgrade.title')}</span>
+        </div>
+        <div className='bf-pick-cards flex items-stretch gap-[clamp(12px,2.2vw,30px)]'>
+          {offer.options.map((id, i) => (
+            <div key={id} className={touch ? 'pointer-events-auto' : undefined} onClick={touch ? () => game.input.pick(i) : undefined} style={{ animation: `bf-card-in .5s cubic-bezier(.2,1.4,.4,1) ${120 + i * 90}ms both` }}>
+              <Card
+                id={id}
+                index={i}
+                offer={offer}
+                character={character}
+                armor={armor}
+                state={picked ? (picked === id ? 'chosen' : 'faded') : hovered === i ? 'hover' : 'idle'}
+                setRef={(el) => {
+                  cards.current[i] = el;
+                }}
+              />
+            </div>
+          ))}
+        </div>
+        <div className='bf-pick-foot flex flex-col items-center gap-2' style={{ opacity: picked ? 0 : 1, transition: 'opacity .2s' }}>
+          {/* The hint and the "press again" line share one place: the second replaces the first while a key has marked a card. */}
+          <div className='grid place-items-center [&>*]:[grid-area:1/1]'>
+            <div className='bf-pick-hint bf-hud-text flex items-center gap-2 text-base font-semibold text-white/85' style={{ visibility: again ? 'hidden' : 'visible' }}>
+              {!touch &&
+                offer.options.map((_, i) => (
+                  <span key={i} className='bf-display grid h-7 w-7 place-items-center rounded-md bg-white/15 text-lg leading-none shadow-[inset_0_-2px_0_rgba(0,0,0,.3)]'>
+                    {i + 1}
+                  </span>
+                ))}
+              <span className={touch ? undefined : 'ml-1'}>{t(touch ? 'touch.pickHint' : 'upgrade.hint')}</span>
+            </div>
+            <div className='bf-hud-text bf-display text-2xl text-[var(--bf-yellow)]' style={{ visibility: again ? 'visible' : 'hidden' }}>
+              {t('upgrade.again', { n: (marked ?? 0) + 1 })}
+            </div>
           </div>
-        ))}
-      </div>
-      <div className='flex flex-col items-center gap-2' style={{ opacity: picked ? 0 : 1, transition: 'opacity .2s' }}>
-        <div className='bf-pick-hint bf-hud-text flex items-center gap-2 text-base font-semibold text-white/85'>
-          {!touch &&
-            offer.options.map((_, i) => (
-              <span key={i} className='bf-display grid h-7 w-7 place-items-center rounded-md bg-white/15 text-lg leading-none shadow-[inset_0_-2px_0_rgba(0,0,0,.3)]'>
-                {i + 1}
-              </span>
-            ))}
-          <span className='ml-1'>{t(touch ? 'touch.pickHint' : 'upgrade.hint')}</span>
-        </div>
-        <div className='bf-hud-text bf-display text-2xl text-[var(--bf-yellow)]' style={{ visibility: !touch && marked !== null && marked === hovered ? 'visible' : 'hidden' }}>
-          {t('upgrade.again', { n: (marked ?? 0) + 1 })}
-        </div>
-        <div className='bf-pick-auto flex items-center gap-3 text-sm font-semibold text-white/70' style={{ visibility: waiting ? 'visible' : 'hidden' }}>
-          <span className='bf-hud-text tabular-nums'>{t('upgrade.auto', { n: Math.ceil(hud.phaseLeft) })}</span>
-          <span className='h-1.5 w-40 overflow-hidden rounded-full bg-black/45'>
-            <span className='block h-full rounded-full bg-white/70' style={{ width: `${Math.min(1, hud.phaseLeft / PICK_TIME) * 100}%` }} />
-          </span>
+          <div className='bf-pick-auto flex items-center gap-3 text-sm font-semibold text-white/70' style={{ visibility: waiting ? 'visible' : 'hidden' }}>
+            <span className='bf-hud-text tabular-nums'>{t('upgrade.auto', { n: Math.ceil(hud.phaseLeft) })}</span>
+            <span className='h-1.5 w-40 overflow-hidden rounded-full bg-black/45'>
+              <span className='block h-full rounded-full bg-white/70' style={{ width: `${Math.min(1, hud.phaseLeft / PICK_TIME) * 100}%` }} />
+            </span>
+          </div>
         </div>
       </div>
       {!picked && !touch && <Pointer ref={pointer} />}
     </div>
   );
+}
+
+/**
+ * Scales the cards down until they fit a short or narrow screen. The frame is the external system: its size, and the
+ * cards' own layout size (a transform leaves that alone), decide the scale.
+ */
+function useFit() {
+  const frame = useFrame();
+  const ref = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(1);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const measure = () => setScale(Math.min(1, (frame.height - 2 * MARGIN) / el.offsetHeight, (frame.width - 2 * MARGIN) / el.offsetWidth));
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [frame.width, frame.height]);
+  return { ref, scale };
 }
 
 type CardState = 'idle' | 'hover' | 'chosen' | 'faded';
@@ -172,7 +205,7 @@ function Card({ id, index, offer, character, armor, state, setRef }: { id: Upgra
   return (
     <div
       ref={setRef}
-      className='bf-studs relative flex h-full w-[clamp(196px,21vw,282px)] flex-col rounded-[22px]'
+      className='bf-pick-card bf-studs relative flex h-full w-[clamp(196px,21vw,282px)] flex-col rounded-[22px]'
       style={{
         ['--stud' as string]: look.color,
         background: '#15233f',
@@ -187,20 +220,20 @@ function Card({ id, index, offer, character, armor, state, setRef }: { id: Upgra
         style={{ background: `linear-gradient(180deg, color-mix(in srgb, ${look.color} 82%, white) 0%, ${look.color} 55%)`, boxShadow: 'inset 0 3px 0 rgba(255,255,255,.35), inset 0 -6px 0 rgba(0,0,0,.18)' }}
       >
         <span
-          className='bf-display absolute left-3 top-3 grid h-9 w-9 place-items-center rounded-[10px] text-2xl leading-none'
+          className='bf-card-index bf-display absolute left-3 top-3 grid h-9 w-9 place-items-center rounded-[10px] text-2xl leading-none'
           style={{ background: up ? '#ffffff' : 'rgba(0,0,0,.3)', color: up ? '#15233f' : '#ffffff', boxShadow: 'inset 0 -3px 0 rgba(0,0,0,.25)' }}
         >
           {index + 1}
         </span>
         {UPGRADES[id].rare && (
-          <span className='absolute right-3 top-3.5 rounded-full px-2.5 py-0.5 text-[11px] font-extrabold uppercase tracking-[0.14em] text-[#3a2400]' style={{ background: 'linear-gradient(180deg,#ffe98a,#ffc21a)', boxShadow: '0 2px 0 #b07c00' }}>
+          <span className='bf-card-rare absolute right-3 top-3.5 rounded-full px-2.5 py-0.5 text-[11px] font-extrabold uppercase tracking-[0.14em] text-[#3a2400]' style={{ background: 'linear-gradient(180deg,#ffe98a,#ffc21a)', boxShadow: '0 2px 0 #b07c00' }}>
             {t('upgrade.rare')}
           </span>
         )}
         <UpgradeIcon id={id} size={92} style={{ color: look.ink, ['--bf-upgrade-tile' as string]: look.color, filter: 'drop-shadow(0 3px 0 rgba(0,0,0,.22))' }} />
       </div>
-      <div className='flex flex-1 flex-col items-center gap-2 px-4 pb-4 pt-3 text-center'>
-        <span className='bf-display text-[clamp(21px,2vw,27px)] leading-tight'>{t(`upgrade.name.${id}`)}</span>
+      <div className='bf-card-body flex flex-1 flex-col items-center gap-2 px-4 pb-4 pt-3 text-center'>
+        <span className='bf-card-name bf-display text-[clamp(21px,2vw,27px)] leading-tight'>{t(`upgrade.name.${id}`)}</span>
         <span className='bf-card-fx text-[clamp(15px,1.35vw,18px)] font-bold leading-snug text-[var(--bf-yellow)] [text-wrap:balance]'>{t(text.effect.key, text.effect.vars)}</span>
         <Detail parts={text.detail} />
         <div className='mt-auto flex items-center gap-1.5 pt-2'>

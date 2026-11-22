@@ -4,6 +4,7 @@ import { hudEn } from './hud/en';
 import { streaksEn } from './streaks/en';
 import { achievementsEn } from './achievements/en';
 import { playEn } from './play/en';
+import { namesEn } from './names/en';
 
 export const en = {
   ...boardEn,
@@ -12,6 +13,7 @@ export const en = {
   ...streaksEn,
   ...achievementsEn,
   ...playEn,
+  ...namesEn,
   play: 'Play',
   playCaption: 'Online match',
   solo: 'Solo',

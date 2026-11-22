@@ -1,0 +1,17 @@
+/* The settings panel: every setting on its own soft tile, so a short tab reads as a set rather than a few lines over
+   empty space. */
+.bf-settings-list {
+  gap: 10px;
+}
+.bf-settings-list .bf-setting,
+.bf-settings-list .bf-setting-block {
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.045);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+.bf-settings-list .bf-setting-block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}

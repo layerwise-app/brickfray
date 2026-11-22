@@ -15,6 +15,8 @@ export const playEn = {
   'lobby.count': '{h} + {b} bots',
   'lobby.open': 'Open seat',
   'death.health': 'Health left',
+  'feed.water': 'fell in the water',
+  'feed.self': 'took themselves out',
   'death.streak': 'Streak',
   'paused.title': 'Paused',
   'notFound.title': 'Nothing to build here',
