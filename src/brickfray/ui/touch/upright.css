@@ -1,0 +1,67 @@
+/*
+ * The upright text editor (UprightEditor.tsx). It is drawn over the turned app the right way up for the phone, so its
+ * rules (every selector names bf-upright) keep the browser's own safe-area insets: frame-css.ts leaves them as written.
+ */
+.bf-upright {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(6, 10, 20, 0.72);
+  color: #f4f6fb;
+  font-family: 'Rubik Variable', system-ui, -apple-system, 'PingFang SC', 'Hiragino Sans', 'Malgun Gothic', sans-serif;
+  opacity: 0;
+  pointer-events: none;
+}
+.bf-upright[data-open='true'] {
+  opacity: 1;
+  pointer-events: auto;
+}
+.bf-upright-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: max(14px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) 16px max(14px, env(safe-area-inset-left));
+  background: #15233f;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
+}
+.bf-upright-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: rgba(244, 246, 251, 0.62);
+}
+.bf-upright-row {
+  display: flex;
+  gap: 10px;
+}
+.bf-upright-input {
+  flex: 1;
+  min-width: 0;
+  height: 50px;
+  padding: 0 14px;
+  border-radius: 12px;
+  border: 2px solid #ffcd2e;
+  background: rgba(0, 0, 0, 0.32);
+  color: #f4f6fb;
+  font: inherit;
+  font-size: 20px;
+  outline: none;
+  user-select: text;
+  -webkit-user-select: text;
+}
+.bf-upright-done {
+  height: 50px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 12px;
+  background: #ffcd2e;
+  color: #241800;
+  font: inherit;
+  font-size: 17px;
+  font-weight: 700;
+  box-shadow: 0 4px 0 #c98f00;
+}
+.bf-upright-done:active {
+  transform: translateY(3px);
+  box-shadow: 0 1px 0 #c98f00;
+}

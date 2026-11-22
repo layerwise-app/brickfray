@@ -5,15 +5,17 @@ import { seo } from '~/utils/seo';
 const App = lazy(() => import('~/brickfray/ui/App'));
 
 /**
- * The game fills the screen edge to edge (the HUD keeps clear of notches through safe-area insets), never zooms, and
- * can be added to a phone's home screen to play without browser bars.
+ * The game fills the screen edge to edge (the HUD keeps clear of notches through safe-area insets) and never zooms.
+ * Added to a phone's home screen (the manifest is linked from the root), it opens as an app without browser bars.
  */
 const gameShell = [
   { name: 'viewport', content: 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover' },
   { name: 'theme-color', content: '#0b1222' },
   { name: 'mobile-web-app-capable', content: 'yes' },
   { name: 'apple-mobile-web-app-capable', content: 'yes' },
-  { name: 'apple-mobile-web-app-status-bar-style', content: 'black-translucent' }
+  { name: 'apple-mobile-web-app-status-bar-style', content: 'black-translucent' },
+  { name: 'apple-mobile-web-app-title', content: 'Brickfray' },
+  { name: 'application-name', content: 'Brickfray' }
 ];
 
 export const Route = createFileRoute('/')({

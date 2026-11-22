@@ -9,6 +9,8 @@ import { MainMenu } from './MainMenu';
 import { PauseMenu } from './PauseMenu';
 import { RunSaved } from './hud/RunSaved';
 import { SettingsPanel } from './SettingsPanel';
+import { watchFrame } from './touch/landscape';
+import { UprightEditor } from './touch/UprightEditor';
 import './game.css';
 
 const GameContext = createContext<Game | null>(null);
@@ -36,6 +38,9 @@ export default function App() {
   const [game, setGame] = useState<Game | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
 
+  // The viewport is the external system: a phone held upright turns the app. Before the game, which sizes to it.
+  useEffect(() => watchFrame(), []);
+
   // eslint-disable-next-line react-hooks/exhaustive-deps -- the WebGL game is created once per mount
   useEffect(() => {
     let instance: Game | null = null;
@@ -54,28 +59,31 @@ export default function App() {
   }, []);
 
   return (
-    <div className='bf-root'>
-      <canvas ref={canvasRef} className='bf-canvas' tabIndex={-1} />
-      <div ref={tagsRef} className='pointer-events-none absolute inset-0 overflow-hidden' />
-      {game && (
-        <GameContext.Provider value={game}>
-          <Screens
-            openSettings={() => {
-              game.audio.play('uiClick');
-              setSettingsOpen(true);
-            }}
-          />
-          {settingsOpen && (
-            <SettingsPanel
-              onClose={() => {
-                game.audio.play('uiBack');
-                setSettingsOpen(false);
+    <>
+      <div className='bf-root'>
+        <canvas ref={canvasRef} className='bf-canvas' tabIndex={-1} />
+        <div ref={tagsRef} className='pointer-events-none absolute inset-0 overflow-hidden' />
+        {game && (
+          <GameContext.Provider value={game}>
+            <Screens
+              openSettings={() => {
+                game.audio.play('uiClick');
+                setSettingsOpen(true);
               }}
             />
-          )}
-        </GameContext.Provider>
-      )}
-    </div>
+            {settingsOpen && (
+              <SettingsPanel
+                onClose={() => {
+                  game.audio.play('uiBack');
+                  setSettingsOpen(false);
+                }}
+              />
+            )}
+          </GameContext.Provider>
+        )}
+      </div>
+      <UprightEditor />
+    </>
   );
 }
 

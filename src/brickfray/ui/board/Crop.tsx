@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { AVATAR_MAX_BYTES, AVATAR_PX } from '../../../lib/board/contract';
 import { useT } from '../i18n';
+import { toFrame } from '../touch/landscape';
 import { PendingButton } from './Avatar';
 
 const VIEW = 240;
@@ -93,13 +94,16 @@ export function Crop({ file, pending, onCancel, onDone, onFail }: { file: File; 
     if (!d || d.id !== e.pointerId || !image) return;
     const { side } = cut(image, frame);
     const scale = side / VIEW;
+    const at = toFrame(e.clientX, e.clientY);
+    const dx = at.x - d.x;
+    const dy = at.y - d.y;
     setFrame((f) => ({
       ...f,
-      x: Math.min(1, Math.max(0, f.x - ((e.clientX - d.x) * scale) / image.width)),
-      y: Math.min(1, Math.max(0, f.y - ((e.clientY - d.y) * scale) / image.height))
+      x: Math.min(1, Math.max(0, f.x - (dx * scale) / image.width)),
+      y: Math.min(1, Math.max(0, f.y - (dy * scale) / image.height))
     }));
-    d.x = e.clientX;
-    d.y = e.clientY;
+    d.x = at.x;
+    d.y = at.y;
   };
 
   const finish = async () => {
@@ -118,7 +122,7 @@ export function Crop({ file, pending, onCancel, onDone, onFail }: { file: File; 
         <div
           className='bf-board-crop-frame'
           onPointerDown={(e) => {
-            drag.current = { id: e.pointerId, x: e.clientX, y: e.clientY };
+            drag.current = { id: e.pointerId, ...toFrame(e.clientX, e.clientY) };
             e.currentTarget.setPointerCapture(e.pointerId);
           }}
           onPointerMove={move}

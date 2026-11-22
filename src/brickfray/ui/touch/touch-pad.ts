@@ -1,5 +1,6 @@
 import type { Game } from '../../game/game';
 import { STICK_SPRINT, type Drag, type TouchButton } from '../../game/touch-input';
+import { toFrame } from './landscape';
 import { DRAG_AIMS, RUN_LOCK, STICK } from './touch-layout';
 
 /** The stick's parts: the ring (moved to where the thumb lands) and the knob inside it. */
@@ -94,6 +95,7 @@ export class TouchPad {
     if (control === 'scoreboard') return touch.toggleScoreboard();
     if (!this.live) return;
     const now = performance.now();
+    const at = toFrame(e.clientX, e.clientY);
     if (el && control) {
       const id = control as TouchButton;
       touch.press(id, now);
@@ -101,21 +103,21 @@ export class TouchPad {
       let drag: Drag | null = null;
       if (DRAG_AIMS.has(id)) {
         drag = newDrag();
-        touch.beginDrag(drag, e.clientX, e.clientY, e.timeStamp, false);
+        touch.beginDrag(drag, at.x, at.y, e.timeStamp, false);
       }
       this.slots.set(e.pointerId, { kind: 'button', id, el, drag });
       return;
     }
     const half = this.root.clientWidth / 2;
-    const stickSide = this.settings.leftHanded ? e.clientX >= half : e.clientX < half;
+    const stickSide = this.settings.leftHanded ? at.x >= half : at.x < half;
     if (stickSide && this.stickId === -1) {
       this.stickId = e.pointerId;
       this.slots.set(e.pointerId, { kind: 'stick', id: null, el: null, drag: null });
-      this.startStick(e.clientX, e.clientY);
+      this.startStick(at.x, at.y);
     } else if (!stickSide && this.lookId === -1) {
       this.lookId = e.pointerId;
       const drag = newDrag();
-      touch.beginDrag(drag, e.clientX, e.clientY, e.timeStamp, true);
+      touch.beginDrag(drag, at.x, at.y, e.timeStamp, true);
       this.slots.set(e.pointerId, { kind: 'look', id: null, el: null, drag });
     }
   };
@@ -123,8 +125,9 @@ export class TouchPad {
   private move = (e: PointerEvent) => {
     const slot = this.slots.get(e.pointerId);
     if (!slot) return;
-    if (slot.kind === 'stick') this.stickTo(e.clientX, e.clientY);
-    else if (slot.drag) this.game.input.touch.drag(slot.drag, e.clientX, e.clientY, e.timeStamp);
+    const at = toFrame(e.clientX, e.clientY);
+    if (slot.kind === 'stick') this.stickTo(at.x, at.y);
+    else if (slot.drag) this.game.input.touch.drag(slot.drag, at.x, at.y, e.timeStamp);
   };
 
   private up = (e: PointerEvent) => {

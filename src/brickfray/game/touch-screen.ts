@@ -2,31 +2,23 @@ import { phoneSized } from './input-mode';
 
 type Lockable = ScreenOrientation & { lock?: (orientation: 'landscape') => Promise<void> };
 
-let locked = false;
 /** The player switched fullscreen off (settings, menu button): touch play stops bringing it back until they switch it on. */
 let declined = false;
 
 /**
  * Fullscreen, and on a phone the landscape lock, where the browser allows them: both need a user gesture, and the lock
- * needs fullscreen (Chrome on Android). iPhone Safari allows neither; the layout copes with its bars and the rotate
- * prompt covers portrait. False when the browser refused for want of a gesture, so a later tap can try again.
+ * needs fullscreen (Chrome on Android). iPhone Safari allows neither; there the app turns itself to landscape
+ * (ui/touch/landscape.ts) and the menu offers the home-screen install instead. False when the browser refused for want
+ * of a gesture, so a later tap can try again.
  */
 export async function enterPlayScreen(): Promise<boolean> {
   if (declined) return true;
-  const root = document.documentElement;
   try {
-    if (!document.fullscreenElement && document.fullscreenEnabled && root.requestFullscreen) await root.requestFullscreen({ navigationUI: 'hide' });
+    if (!document.fullscreenElement && canFullscreen()) await document.documentElement.requestFullscreen({ navigationUI: 'hide' });
   } catch {
     return false;
   }
-  if (phoneSized() && document.fullscreenElement) {
-    try {
-      await (screen.orientation as Lockable | undefined)?.lock?.('landscape');
-      locked = true;
-    } catch {
-      // Not every browser locks even in fullscreen.
-    }
-  }
+  await lockLandscape();
   return true;
 }
 
@@ -44,28 +36,25 @@ export function onFullscreen(fn: () => void) {
   return () => document.removeEventListener('fullscreenchange', fn);
 }
 
-/** The player's own switch (menu button, settings); must run inside a click. In a match, fullscreen is the play screen. */
-export async function setFullscreen(on: boolean, playing: boolean) {
+/** The player's own switch (menu button, settings); must run inside a click. */
+export async function setFullscreen(on: boolean) {
   declined = !on;
   if (!on) {
-    leavePlayScreen();
     if (document.fullscreenElement) await document.exitFullscreen().catch(() => undefined);
     return;
   }
-  if (playing) {
-    await enterPlayScreen();
-    return;
-  }
-  if (!document.fullscreenElement) await document.documentElement.requestFullscreen({ navigationUI: 'hide' }).catch(() => undefined);
+  await enterPlayScreen();
 }
 
-/** Leaving the match: menus turn with the phone again. Fullscreen stays, for the next match. */
-export function leavePlayScreen() {
-  if (!locked) return;
-  locked = false;
+/**
+ * Phones are landscape only, menus included: in fullscreen the browser holds landscape however the phone is turned,
+ * and the app stands straight in it. Leaving fullscreen releases the lock.
+ */
+async function lockLandscape() {
+  if (!phoneSized() || !document.fullscreenElement) return;
   try {
-    screen.orientation?.unlock();
+    await (screen.orientation as Lockable | undefined)?.lock?.('landscape');
   } catch {
-    // Already unlocked.
+    // Not every browser locks even in fullscreen; the app turns itself while the phone is upright.
   }
 }

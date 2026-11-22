@@ -2,7 +2,7 @@ import { BUTTON } from '../sim/types';
 import { GamepadInput } from './gamepad-input';
 import { inputMode, onInputMode, watchInputMode } from './input-mode';
 import { TouchInput, type TouchSettings } from './touch-input';
-import { enterPlayScreen, leavePlayScreen } from './touch-screen';
+import { enterPlayScreen } from './touch-screen';
 
 export { DEFAULT_TOUCH } from './touch-input';
 
@@ -203,7 +203,6 @@ export class Input {
     if (!this.enabled) {
       this.frame.slot = null;
       this.frame.cycle = 0;
-      leavePlayScreen();
     }
   }
 

@@ -4,8 +4,6 @@ export const touchJa: Record<keyof typeof touchEn, string> = {
   'touch.tapToPlay': 'タップでプレイ',
   'touch.pickHint': 'カードをタップ',
   'touch.scopeHint': '息止めボタン長押しで照準を安定',
-  'touch.rotate': 'スマホを横向きにしてください',
-  'touch.rotateHint': '対戦は横画面でプレイします。',
   'touch.coach.move': '移動。リングの外まで押すとダッシュ',
   'touch.coach.look': 'ここをドラッグして視点移動',
   'touch.coach.fire': '射撃。そのままドラッグで照準',
@@ -29,5 +27,16 @@ export const touchJa: Record<keyof typeof touchEn, string> = {
   'touch.button.swap': '武器切り替え',
   'touch.button.steady': '息を止める',
   'touch.button.pause': '一時停止',
-  'touch.button.scoreboard': 'スコアボード'
+  'touch.button.scoreboard': 'スコアボード',
+  'touch.edit.done': '完了',
+  'touch.install.button': 'フルスクリーンで遊ぶ',
+  'touch.install.title': 'フルスクリーンで遊ぶ',
+  'touch.install.lead': 'Brickfray をホーム画面に追加すると、ブラウザのバーなしで開けます。',
+  'touch.install.share': '「共有」をタップ',
+  'touch.install.shareHint': 'Safari では「···」の中にあることも',
+  'touch.install.add': '「ホーム画面に追加」をタップ',
+  'touch.install.addHint': '見つからないときはリストを下へスクロール',
+  'touch.install.open': 'ホーム画面から Brickfray を開く',
+  'touch.install.openHint': 'フルスクリーン、常に横画面',
+  'touch.install.close': 'OK'
 };

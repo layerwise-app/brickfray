@@ -1,4 +1,5 @@
 import { useRef } from 'react';
+import { frameRect, toFrame, useFrame } from './touch/landscape';
 import { useTouchMode } from './touch/useInputMode';
 
 /** How far (px) a finger moves before a touch on a slider counts as sliding it (sideways) or scrolling the list (up or down). */
@@ -9,51 +10,65 @@ const THUMB_HALF = 15;
 /**
  * A slider. By mouse and keyboard it is the browser's own; by touch the browser's would jump to the finger the moment
  * it lands, so a swipe meant to scroll the settings list moved it first. Here a touch moves it only once the finger
- * goes sideways, or on a tap; a swipe up or down scrolls the list (touch-action: pan-y).
+ * goes sideways, or on a tap; a swipe up or down scrolls the list (touch-action: pan-y). On a phone held upright the app
+ * is turned and the browser would read pan-y across the screen, so there the swipe scrolls the list from here.
  */
 export function Range({ value, min, max, step, onValue }: { value: number; min: number; max: number; step: number; onValue: (value: number) => void }) {
   const touchMode = useTouchMode();
+  const { rotated } = useFrame();
   const input = useRef<HTMLInputElement>(null);
-  const finger = useRef<{ id: number; x: number; y: number; sliding: boolean } | null>(null);
+  const finger = useRef<{ id: number; x: number; y: number; sliding: boolean; list: Element | null } | null>(null);
 
-  const valueAt = (clientX: number) => {
-    const box = input.current!.getBoundingClientRect();
-    const ratio = Math.min(1, Math.max(0, (clientX - box.left - THUMB_HALF) / Math.max(1, box.width - 2 * THUMB_HALF)));
+  const valueAt = (x: number) => {
+    const box = frameRect(input.current!);
+    const ratio = Math.min(1, Math.max(0, (x - box.left - THUMB_HALF) / Math.max(1, box.width - 2 * THUMB_HALF)));
     const steps = Math.round((ratio * (max - min)) / step);
     const decimals = String(step).split('.')[1]?.length ?? 0;
     return Number(Math.min(max, min + steps * step).toFixed(decimals));
   };
-  const set = (clientX: number) => {
-    const next = valueAt(clientX);
+  const set = (x: number) => {
+    const next = valueAt(x);
     if (next !== value) onValue(next);
   };
 
   return (
     <div
       className='relative col-span-2 flex items-center'
-      style={{ touchAction: 'pan-y', minHeight: touchMode ? 44 : undefined }}
+      style={{ touchAction: rotated ? 'none' : 'pan-y', minHeight: touchMode ? 44 : undefined }}
       onPointerDown={(e) => {
         if (e.pointerType === 'mouse' || finger.current) return;
-        finger.current = { id: e.pointerId, x: e.clientX, y: e.clientY, sliding: false };
+        const at = toFrame(e.clientX, e.clientY);
+        finger.current = { id: e.pointerId, x: at.x, y: at.y, sliding: false, list: null };
       }}
       onPointerMove={(e) => {
         const f = finger.current;
         if (f?.id !== e.pointerId) return;
+        const at = toFrame(e.clientX, e.clientY);
+        if (f.list) {
+          f.list.scrollTop -= at.y - f.y;
+          f.y = at.y;
+          return;
+        }
         if (!f.sliding) {
-          const dx = Math.abs(e.clientX - f.x);
-          const dy = Math.abs(e.clientY - f.y);
-          if (dy > SLOP && dy >= dx) finger.current = null;
+          const dx = Math.abs(at.x - f.x);
+          const dy = Math.abs(at.y - f.y);
+          if (dy > SLOP && dy >= dx) {
+            f.list = rotated ? scrollParent(e.currentTarget) : null;
+            if (!f.list) finger.current = null;
+            else e.currentTarget.setPointerCapture(e.pointerId);
+            return;
+          }
           if (dx <= SLOP || dx < dy) return;
           f.sliding = true;
           e.currentTarget.setPointerCapture(e.pointerId);
         }
-        set(e.clientX);
+        set(at.x);
       }}
       onPointerUp={(e) => {
         const f = finger.current;
         if (f?.id !== e.pointerId) return;
         finger.current = null;
-        if (!f.sliding) set(e.clientX);
+        if (!f.sliding && !f.list) set(toFrame(e.clientX, e.clientY).x);
       }}
       onPointerCancel={() => (finger.current = null)}
     >
@@ -70,6 +85,14 @@ export function Range({ value, min, max, step, onValue }: { value: number; min: 
       />
     </div>
   );
+}
+
+function scrollParent(el: Element) {
+  for (let n = el.parentElement; n; n = n.parentElement) {
+    const overflow = getComputedStyle(n).overflowY;
+    if ((overflow === 'auto' || overflow === 'scroll') && n.scrollHeight > n.clientHeight) return n;
+  }
+  return null;
 }
 
 /** A setting that is on or off: its name (and a line about it) and a switch. */

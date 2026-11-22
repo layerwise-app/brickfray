@@ -3,8 +3,6 @@ export const touchEn = {
   'touch.tapToPlay': 'Tap to play',
   'touch.pickHint': 'Tap a card',
   'touch.scopeHint': 'Hold the breath button to steady',
-  'touch.rotate': 'Turn your phone sideways',
-  'touch.rotateHint': 'Matches play in landscape.',
   'touch.coach.move': 'Move. Push past the ring to run.',
   'touch.coach.look': 'Drag here to look',
   'touch.coach.fire': 'Fire. Keep dragging to aim.',
@@ -28,5 +26,16 @@ export const touchEn = {
   'touch.button.swap': 'Switch weapon',
   'touch.button.steady': 'Hold breath',
   'touch.button.pause': 'Pause',
-  'touch.button.scoreboard': 'Scoreboard'
+  'touch.button.scoreboard': 'Scoreboard',
+  'touch.edit.done': 'Done',
+  'touch.install.button': 'Play full screen',
+  'touch.install.title': 'Play full screen',
+  'touch.install.lead': 'Add Brickfray to your Home Screen. Opened from there, it has no browser bars.',
+  'touch.install.share': 'Tap Share',
+  'touch.install.shareHint': 'In Safari it may be under ···',
+  'touch.install.add': 'Tap Add to Home Screen',
+  'touch.install.addHint': 'Scroll down the list if you don’t see it',
+  'touch.install.open': 'Open Brickfray from your Home Screen',
+  'touch.install.openHint': 'Full screen, always landscape',
+  'touch.install.close': 'Got it'
 } as const;

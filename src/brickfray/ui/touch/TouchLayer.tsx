@@ -5,7 +5,6 @@ import { useApp, useGame, useHud } from '../App';
 import { useT, type MessageKey } from '../i18n';
 import { LockIcon, WeaponIcon } from '../icons';
 import { watchHaptics } from './haptics';
-import { RotatePrompt } from './RotatePrompt';
 import { TouchCoach } from './TouchCoach';
 import { BoardGlyph, BreathGlyph, BulletGlyph, CrouchGlyph, GrenadeGlyph, JumpGlyph, PauseGlyph, ReloadGlyph, RunGlyph, ScopeGlyph } from './TouchIcons';
 import { ACTION_SPOTS, FIRE_LEFT_SPOT, STEADY_SPOT, STICK, TOP_BUTTON, type Spot } from './touch-layout';
@@ -13,20 +12,14 @@ import { TouchPad } from './touch-pad';
 import { useTouchMode } from './useInputMode';
 import './touch.css';
 
-/** The on-screen controls while a match is played by touch (labelled in the first matches), and the portrait prompt on phones. */
+/** The on-screen controls while a match is played by touch (labelled in the first matches). */
 export function TouchLayer() {
   const touch = useTouchMode();
   const app = useApp();
   const hud = useHud();
   const game = useGame();
-  if (!touch) return null;
-  const playing = !app.paused && game.input.active && hud.phase !== 'ended';
-  return (
-    <>
-      {playing && <TouchControls />}
-      <RotatePrompt />
-    </>
-  );
+  const playing = touch && !app.paused && game.input.active && hud.phase !== 'ended';
+  return playing ? <TouchControls /> : null;
 }
 
 function TouchControls() {

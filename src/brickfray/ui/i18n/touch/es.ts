@@ -4,8 +4,6 @@ export const touchEs: Record<keyof typeof touchEn, string> = {
   'touch.tapToPlay': 'Toca para jugar',
   'touch.pickHint': 'Toca una carta',
   'touch.scopeHint': 'Mantén el botón de respiración para estabilizar',
-  'touch.rotate': 'Gira el teléfono',
-  'touch.rotateHint': 'Las partidas se juegan en horizontal.',
   'touch.coach.move': 'Muévete. Empuja más allá del aro para correr.',
   'touch.coach.look': 'Arrastra aquí para mirar',
   'touch.coach.fire': 'Dispara. Sigue arrastrando para apuntar.',
@@ -29,5 +27,16 @@ export const touchEs: Record<keyof typeof touchEn, string> = {
   'touch.button.swap': 'Cambiar de arma',
   'touch.button.steady': 'Contener la respiración',
   'touch.button.pause': 'Pausa',
-  'touch.button.scoreboard': 'Marcador'
+  'touch.button.scoreboard': 'Marcador',
+  'touch.edit.done': 'Listo',
+  'touch.install.button': 'Jugar a pantalla completa',
+  'touch.install.title': 'Jugar a pantalla completa',
+  'touch.install.lead': 'Añade Brickfray a tu pantalla de inicio: abierto desde allí, no tiene barras del navegador.',
+  'touch.install.share': 'Toca «Compartir»',
+  'touch.install.shareHint': 'En Safari puede estar dentro de «···»',
+  'touch.install.add': 'Toca «Añadir a pantalla de inicio»',
+  'touch.install.addHint': 'Si no lo ves, desplaza la lista hacia abajo',
+  'touch.install.open': 'Abre Brickfray desde la pantalla de inicio',
+  'touch.install.openHint': 'Pantalla completa, siempre en horizontal',
+  'touch.install.close': 'Entendido'
 };

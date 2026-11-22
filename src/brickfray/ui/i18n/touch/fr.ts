@@ -4,8 +4,6 @@ export const touchFr: Record<keyof typeof touchEn, string> = {
   'touch.tapToPlay': 'Touche pour jouer',
   'touch.pickHint': 'Touche une carte',
   'touch.scopeHint': 'Maintiens le bouton de respiration pour stabiliser',
-  'touch.rotate': 'Tourne ton téléphone',
-  'touch.rotateHint': 'Les parties se jouent à l’horizontale.',
   'touch.coach.move': 'Avance. Pousse au-delà de l’anneau pour courir.',
   'touch.coach.look': 'Glisse ici pour regarder',
   'touch.coach.fire': 'Tire. Continue de glisser pour viser.',
@@ -29,5 +27,16 @@ export const touchFr: Record<keyof typeof touchEn, string> = {
   'touch.button.swap': 'Changer d’arme',
   'touch.button.steady': 'Retenir son souffle',
   'touch.button.pause': 'Pause',
-  'touch.button.scoreboard': 'Tableau des scores'
+  'touch.button.scoreboard': 'Tableau des scores',
+  'touch.edit.done': 'OK',
+  'touch.install.button': 'Jouer en plein écran',
+  'touch.install.title': 'Jouer en plein écran',
+  'touch.install.lead': 'Ajoute Brickfray à ton écran d’accueil : ouvert de là, il n’a plus de barres de navigateur.',
+  'touch.install.share': 'Touche « Partager »',
+  'touch.install.shareHint': 'Dans Safari, il peut être sous « ··· »',
+  'touch.install.add': 'Touche « Sur l’écran d’accueil »',
+  'touch.install.addHint': 'Fais défiler la liste si tu ne le vois pas',
+  'touch.install.open': 'Ouvre Brickfray depuis l’écran d’accueil',
+  'touch.install.openHint': 'Plein écran, toujours à l’horizontale',
+  'touch.install.close': 'Compris'
 };

@@ -4,8 +4,6 @@ export const touchDe: Record<keyof typeof touchEn, string> = {
   'touch.tapToPlay': 'Zum Spielen tippen',
   'touch.pickHint': 'Tippe eine Karte an',
   'touch.scopeHint': 'Atem-Taste halten zum Stabilisieren',
-  'touch.rotate': 'Dreh dein Handy quer',
-  'touch.rotateHint': 'Matches laufen im Querformat.',
   'touch.coach.move': 'Bewegen. Über den Ring hinaus schieben zum Sprinten.',
   'touch.coach.look': 'Hier ziehen zum Umsehen',
   'touch.coach.fire': 'Feuern. Weiterziehen zum Zielen.',
@@ -29,5 +27,16 @@ export const touchDe: Record<keyof typeof touchEn, string> = {
   'touch.button.swap': 'Waffe wechseln',
   'touch.button.steady': 'Atem anhalten',
   'touch.button.pause': 'Pause',
-  'touch.button.scoreboard': 'Punktetafel'
+  'touch.button.scoreboard': 'Punktetafel',
+  'touch.edit.done': 'Fertig',
+  'touch.install.button': 'Im Vollbild spielen',
+  'touch.install.title': 'Im Vollbild spielen',
+  'touch.install.lead': 'Leg Brickfray auf deinen Home-Bildschirm. Von dort startet es ohne Browserleisten.',
+  'touch.install.share': 'Tippe auf „Teilen“',
+  'touch.install.shareHint': 'In Safari steckt es eventuell unter „···“',
+  'touch.install.add': 'Tippe auf „Zum Home-Bildschirm“',
+  'touch.install.addHint': 'Nicht zu sehen? Scroll in der Liste nach unten',
+  'touch.install.open': 'Öffne Brickfray vom Home-Bildschirm',
+  'touch.install.openHint': 'Vollbild, immer im Querformat',
+  'touch.install.close': 'Alles klar'
 };

@@ -4,8 +4,6 @@ export const touchZh: Record<keyof typeof touchEn, string> = {
   'touch.tapToPlay': '轻触继续',
   'touch.pickHint': '点一张卡',
   'touch.scopeHint': '按住屏息键稳住准星',
-  'touch.rotate': '请把手机横过来',
-  'touch.rotateHint': '对局需要横屏进行。',
   'touch.coach.move': '移动，推出外圈可锁定奔跑',
   'touch.coach.look': '在这里拖动转视角',
   'touch.coach.fire': '开火，按住拖动可瞄准',
@@ -29,5 +27,16 @@ export const touchZh: Record<keyof typeof touchEn, string> = {
   'touch.button.swap': '切换武器',
   'touch.button.steady': '屏息',
   'touch.button.pause': '暂停',
-  'touch.button.scoreboard': '计分板'
+  'touch.button.scoreboard': '计分板',
+  'touch.edit.done': '完成',
+  'touch.install.button': '全屏游玩',
+  'touch.install.title': '全屏游玩',
+  'touch.install.lead': '把 Brickfray 添加到主屏幕，从主屏幕打开就没有浏览器栏。',
+  'touch.install.share': '点“共享”',
+  'touch.install.shareHint': 'Safari 里它可能在“···”菜单中',
+  'touch.install.add': '选“添加到主屏幕”',
+  'touch.install.addHint': '没看到就把列表往下滑',
+  'touch.install.open': '从主屏幕打开 Brickfray',
+  'touch.install.openHint': '全屏，始终横屏',
+  'touch.install.close': '知道了'
 };

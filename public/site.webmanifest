@@ -1,1 +1,39 @@
-{"name":"Brickfray","short_name":"Brickfray","icons":[{"src":"/brickfray-icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any"}],"theme_color":"#ef7d40","background_color":"#eff2e6","display":"standalone","start_url":"/"}
+{
+  "id": "/",
+  "name": "Brickfray",
+  "short_name": "Brickfray",
+  "description": "An original brick-built online FPS. Battle with up to 10 players or survive waves of Snapbots in colorful arenas.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "fullscreen",
+  "display_override": [
+    "fullscreen",
+    "standalone"
+  ],
+  "orientation": "landscape",
+  "background_color": "#0b1222",
+  "theme_color": "#0b1222",
+  "categories": [
+    "games"
+  ],
+  "icons": [
+    {
+      "src": "/android-chrome-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/android-chrome-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

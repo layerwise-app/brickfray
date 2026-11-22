@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { Action } from '../game/input';
 import type { Settings } from '../game/settings';
-import { useApp, useGame } from './App';
+import { useGame } from './App';
 import { useFullscreen } from './fullscreen';
 import { LANGUAGES, setLang, useT, type MessageKey } from './i18n';
 import { BackIcon } from './icons';
@@ -24,7 +24,6 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
   const [binding, setBinding] = useState<Action | null>(null);
   const touchMode = useTouchMode();
   const fullscreen = useFullscreen();
-  const playing = useApp().screen === 'match';
 
   const update = (next: Settings) => {
     setS(next);
@@ -83,7 +82,7 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
         <div className='bf-scroll flex flex-col gap-5 overflow-y-auto pr-1'>
           {tab === 'graphics' && (
             <>
-              {canFullscreen() && <SwitchRow label={t('fullscreen')} on={fullscreen} onChange={(on) => void setFullscreen(on, playing)} />}
+              {canFullscreen() && <SwitchRow label={t('fullscreen')} on={fullscreen} onChange={(on) => void setFullscreen(on)} />}
               <div className='flex flex-col gap-2'>
                 <span className='font-medium'>{t('quality')}</span>
                 <div className='bf-seg'>

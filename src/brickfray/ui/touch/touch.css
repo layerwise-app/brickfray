@@ -180,20 +180,6 @@ html.bf-touch .bf-root {
   box-shadow: inset 0 0 0 3px var(--bf-yellow);
 }
 
-.bf-rotate-phone {
-  animation: bf-rotate-phone 2.4s ease-in-out infinite;
-}
-@keyframes bf-rotate-phone {
-  0%,
-  25% {
-    transform: rotate(0deg);
-  }
-  55%,
-  100% {
-    transform: rotate(-90deg);
-  }
-}
-
 /* The HUD moves out from under the thumbs: health and ammo stack at the bottom centre, small. */
 html.bf-touch .bf-hud-health,
 html.bf-touch .bf-hud-ammo {

@@ -15,6 +15,8 @@ import { useFullscreen } from './fullscreen';
 import { TrophyIcon } from './board/icons';
 import { ProfileChip } from './board/ProfileChip';
 import { canFullscreen, setFullscreen } from '../game/touch-screen';
+import { InstallButton } from './touch/InstallGuide';
+import { frameRect, toFrame } from './touch/landscape';
 import { flushMatches } from '../../lib/board/client/sync';
 import './menu.css';
 import './menu-wide.css';
@@ -53,8 +55,8 @@ export function MainMenu({ openSettings }: { openSettings: () => void }) {
       // Side by side, the figure stands between the columns and each block bounds it on its own; stacked, the sheet is one floor.
       const stacked = getComputedStyle(root.current!).getPropertyValue('--bf-stage').trim() === 'stacked';
       coverStage({
-        header: [logo.current!.getBoundingClientRect(), controls.current!.getBoundingClientRect(), me.current!.getBoundingClientRect()],
-        panels: stacked ? [sheet.current!.getBoundingClientRect()] : [...blocks, nav.current!].map(clearance)
+        header: [frameRect(logo.current!), frameRect(controls.current!), frameRect(me.current!)],
+        panels: stacked ? [frameRect(sheet.current!)] : [...blocks, nav.current!].map(clearance)
       });
     };
     const observer = new ResizeObserver(report);
@@ -114,7 +116,7 @@ export function MainMenu({ openSettings }: { openSettings: () => void }) {
     const target = e.target as Element;
     if (overlay || drag.current || e.button !== 0 || target.closest(CONTROLS)) return;
     if (sheet.current!.contains(target) && getComputedStyle(root.current!).getPropertyValue('--bf-stage').trim() === 'stacked') return;
-    drag.current = { pointer: e.pointerId, x: e.clientX, at: e.timeStamp };
+    drag.current = { pointer: e.pointerId, x: toFrame(e.clientX, e.clientY).x, at: e.timeStamp };
     e.currentTarget.setPointerCapture(e.pointerId);
     turntable.grab();
     setTurning(true);
@@ -122,8 +124,9 @@ export function MainMenu({ openSettings }: { openSettings: () => void }) {
   const turn = (e: React.PointerEvent<HTMLDivElement>) => {
     const d = drag.current;
     if (d?.pointer !== e.pointerId) return;
-    turntable.drag((e.clientX - d.x) * TURN_PER_PIXEL, (e.timeStamp - d.at) / 1000);
-    d.x = e.clientX;
+    const x = toFrame(e.clientX, e.clientY).x;
+    turntable.drag((x - d.x) * TURN_PER_PIXEL, (e.timeStamp - d.at) / 1000);
+    d.x = x;
     d.at = e.timeStamp;
   };
   const drop = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -216,7 +219,7 @@ export function MainMenu({ openSettings }: { openSettings: () => void }) {
 
 /** A block's box as the stage keeps clear of it; the big name wants more air on its right than the usual gap. */
 function clearance(el: Element) {
-  const box = el.getBoundingClientRect();
+  const box = frameRect(el);
   const name = el.querySelector('.bf-menu-name');
   if (!name) return box;
   const air = 0.45 * parseFloat(getComputedStyle(name).fontSize);
@@ -269,13 +272,13 @@ function BigButton(props: { primary?: boolean; icon: React.ReactNode; label: str
   );
 }
 
-/** Left out where the browser has no fullscreen (iPhone Safari). */
+/** Where the browser has no fullscreen (iPhone Safari), a phone gets the home-screen guide in its place. */
 function FullscreenButton() {
   const { t } = useT();
   const on = useFullscreen();
-  if (!canFullscreen()) return null;
+  if (!canFullscreen()) return <InstallButton />;
   return (
-    <button className='bf-btn bf-btn-ghost bf-icon-btn' onClick={() => void setFullscreen(!on, false)} aria-pressed={on} aria-label={t('fullscreen')} title={t('fullscreen')}>
+    <button className='bf-btn bf-btn-ghost bf-icon-btn' onClick={() => void setFullscreen(!on)} aria-pressed={on} aria-label={t('fullscreen')} title={t('fullscreen')}>
       {on ? <ExitFullscreenIcon size={22} /> : <FullscreenIcon size={22} />}
     </button>
   );

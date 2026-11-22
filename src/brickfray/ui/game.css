@@ -33,6 +33,33 @@
   outline: none;
 }
 
+/*
+ * A phone held upright draws the app turned a quarter clockwise (ui/touch/landscape.ts): the box is as wide as the
+ * viewport is tall. Browsers read touch-action pans in screen directions, so the drags that turn the figure or move a
+ * slider claim the touch themselves while turned. Chrome lets a finger slide a range input only along the screen axis
+ * of its length unless the input itself carries a rotation, hence the null one.
+ */
+html.bf-rotated,
+html.bf-rotated body {
+  background: #0b1222;
+}
+html.bf-rotated .bf-root {
+  inset: auto;
+  left: 0;
+  top: 0;
+  width: var(--bf-frame-w);
+  height: var(--bf-frame-h);
+  transform-origin: 0 0;
+  transform: translateX(var(--bf-frame-h)) rotate(90deg);
+}
+html.bf-rotated .bf-menu,
+html.bf-rotated .bf-root input[type='range'] {
+  touch-action: none;
+}
+html.bf-rotated .bf-root input[type='range'] {
+  transform: rotate(0deg);
+}
+
 .bf-display {
   font-family: 'Lilita One', 'Rubik Variable', system-ui, 'PingFang SC', 'Hiragino Sans', 'Malgun Gothic', sans-serif;
   font-weight: 400;

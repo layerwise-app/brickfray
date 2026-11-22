@@ -28,7 +28,11 @@ export const Route = createRootRouteWithContext<{
           'An original brick-built online FPS with Snapbots, four weapons and three colorful arenas.'
       }).meta
     ],
-    links: [{ rel: 'icon', href: '/brickfray-icon.svg' }]
+    links: [
+      { rel: 'icon', href: '/brickfray-icon.svg' },
+      { rel: 'apple-touch-icon', href: '/apple-touch-icon.png' },
+      { rel: 'manifest', href: '/site.webmanifest' }
+    ]
   }),
   errorComponent: (props) => (
     <RootDocument>

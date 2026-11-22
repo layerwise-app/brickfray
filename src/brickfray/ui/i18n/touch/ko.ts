@@ -4,8 +4,6 @@ export const touchKo: Record<keyof typeof touchEn, string> = {
   'touch.tapToPlay': '탭해서 플레이',
   'touch.pickHint': '카드를 탭하세요',
   'touch.scopeHint': '숨 참기 버튼을 누르고 있으면 조준이 안정됩니다',
-  'touch.rotate': '휴대폰을 가로로 돌려 주세요',
-  'touch.rotateHint': '대전은 가로 화면으로 진행됩니다.',
   'touch.coach.move': '이동. 링 밖까지 밀면 달리기',
   'touch.coach.look': '여기를 드래그해 시점 이동',
   'touch.coach.fire': '사격. 그대로 드래그해 조준',
@@ -29,5 +27,16 @@ export const touchKo: Record<keyof typeof touchEn, string> = {
   'touch.button.swap': '무기 교체',
   'touch.button.steady': '숨 참기',
   'touch.button.pause': '일시 정지',
-  'touch.button.scoreboard': '점수판'
+  'touch.button.scoreboard': '점수판',
+  'touch.edit.done': '완료',
+  'touch.install.button': '전체 화면으로 플레이',
+  'touch.install.title': '전체 화면으로 플레이',
+  'touch.install.lead': 'Brickfray를 홈 화면에 추가하면 브라우저 막대 없이 열립니다.',
+  'touch.install.share': '‘공유’ 탭',
+  'touch.install.shareHint': 'Safari에서는 ‘···’ 안에 있을 수 있어요',
+  'touch.install.add': '‘홈 화면에 추가’ 탭',
+  'touch.install.addHint': '보이지 않으면 목록을 아래로 스크롤하세요',
+  'touch.install.open': '홈 화면에서 Brickfray 열기',
+  'touch.install.openHint': '전체 화면, 항상 가로 모드',
+  'touch.install.close': '확인'
 };
