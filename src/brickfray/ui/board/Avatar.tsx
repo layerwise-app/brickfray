@@ -22,7 +22,7 @@ export function Avatar({ avatar, character, size = 40, className = '' }: { avata
   const id = hero(avatar?.hero ?? character);
   const info = ROSTER[id];
   return (
-    <span className={`bf-av bf-av-hero ${className}`} style={{ ...style, background: `linear-gradient(160deg, ${info.primary} 0 calc(55% - 0.7px), ${info.secondary} calc(55% + 0.7px) 100%)` }}>
+    <span className={`bf-av bf-av-hero ${className}`} style={{ ...style, background: `linear-gradient(160deg, ${info.primary} 0 calc(66% - 0.7px), ${info.secondary} calc(66% + 0.7px) 100%)` }}>
       {app.portraits[id] && <img src={app.portraits[id]} alt='' draggable={false} />}
     </span>
   );

@@ -7,6 +7,7 @@ import { Hud } from './hud/Hud';
 import { Lobby } from './Lobby';
 import { MainMenu } from './MainMenu';
 import { PauseMenu } from './PauseMenu';
+import { LeftRunUnlocks } from './achievements/LeftRunUnlocks';
 import { RunSaved } from './hud/RunSaved';
 import { SettingsPanel } from './SettingsPanel';
 import { watchFrame } from './touch/landscape';
@@ -97,6 +98,7 @@ function Screens({ openSettings }: { openSettings: () => void }) {
       {app.screen === 'match' && <Hud />}
       {app.screen === 'match' && app.paused && <PauseMenu openSettings={openSettings} />}
       <RunSaved />
+      <LeftRunUnlocks />
       {app.error && <ErrorBanner error={app.error} />}
     </>
   );

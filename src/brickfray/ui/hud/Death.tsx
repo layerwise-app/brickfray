@@ -30,7 +30,7 @@ export function Death() {
   const water = d.weapon === 'water';
   const second = Math.ceil(hud.respawnLeft);
   return (
-    <div className='bf-fade-in absolute inset-x-0 bottom-[22%] flex flex-col items-center gap-2'>
+    <div className='bf-fade-in absolute inset-x-0 bottom-[4%] flex origin-bottom flex-col items-center justify-center gap-2 [@media(max-height:480px)]:scale-[0.7] [@media(max-height:480px)]:flex-row'>
       <div className='flex items-center gap-3 rounded-2xl bg-black/55 px-5 py-3'>
         <SkullIcon size={26} className='text-[var(--bf-red)]' />
         <span className='bf-display text-3xl'>{water ? t('fellInWater') : d.killer ? t('eliminatedBy', { name: d.killer }) : t('eliminatedSelf')}</span>
