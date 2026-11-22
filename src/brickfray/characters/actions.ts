@@ -30,16 +30,16 @@ type ActionKey = readonly [number, number, number, number, number, number, numbe
 const k9 = [0, 0, 0, 0, 0, 0, 0, 0, 0];
 
 /**
- * Overarm off-hand throw. The grenade is brought out low on the left and cocked high behind the shoulder, elbow up and
- * out, chest coiled away (cooking holds at 0.25). The bomb leaves the hand when the cook ends (0.25, when the match
+ * Overarm off-hand throw. The grenade is brought out low on the left and cocked back behind the shoulder, the elbow
+ * low and out and the chest coiled well away, so a held cook reads as a throw about to happen (cooking holds at 0.25). The bomb leaves the hand when the cook ends (0.25, when the match
  * spawns it): the elbow leads forward over the shoulder, the arm whips long toward the target with the wrist snapped
  * down, then follows through down across the body to the right hip while the thrower drives onto the lead foot.
  */
 const THROW: readonly ActionKey[] = [
   [0.0, -0.03, -0.1, -0.36, 0, 0, 0, -0.4, -1, 0.3],
   [0.1, -0.38, -0.04, -0.06, 1.4, 0.2, 3.14, -1, -0.6, 0.2],
-  [0.2, -0.34, 0.15, 0.36, 2.3, 0.4, 3.14, -1, 0.05, -0.25],
-  [0.25, -0.35, 0.16, 0.38, 2.35, 0.4, 3.14, -1, 0.05, -0.25],
+  [0.2, -0.3, 0.07, 0.44, 1.95, 0.5, 3.14, -0.8, -0.4, 0.4],
+  [0.25, -0.31, 0.08, 0.46, 2.0, 0.5, 3.14, -0.8, -0.4, 0.4],
   [0.3, -0.46, 0.38, 0.04, 1.75, 0.12, 3.14, -0.9, -0.3, -0.2],
   [0.36, -0.38, 0.36, -0.3, 0.9, 0, 3.14, -0.8, -0.6, 0],
   [0.42, -0.32, 0.18, -0.5, 0.4, -0.05, 3.14, -0.7, -0.8, 0.2],
@@ -60,7 +60,7 @@ export function throwAction(g: number, out: HandAction) {
   path(THROW, g, out);
   out.weight = window4(g, 0, 0.1, 0.82, 0.97);
   out.lower = window4(g, 0, 0.1, 0.86, 0.99);
-  out.twist = -0.7 * window4(g, 0.02, 0.2, 0.26, 0.34) + 0.45 * window4(g, 0.27, 0.4, 0.8, 0.97);
+  out.twist = -0.95 * window4(g, 0.02, 0.2, 0.26, 0.34) + 0.45 * window4(g, 0.27, 0.4, 0.8, 0.97);
   out.bend = 0.16 * window4(g, 0.05, 0.2, 0.26, 0.32) - 0.36 * window4(g, 0.28, 0.44, 0.8, 0.97);
   out.mallet = 0;
   out.grenade = g < 0.29 ? smooth(g, 0.04, 0.12) : 0;

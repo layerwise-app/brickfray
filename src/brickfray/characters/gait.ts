@@ -35,6 +35,8 @@ export interface FootPose {
   planted: number;
   /** Stance progress 0…1, or -1 in swing. */
   stance: number;
+  /** Swing progress 0…1 from lift-off to touchdown, or -1 on the ground. */
+  swing: number;
 }
 
 export function gaitParams(v: number, crouch: number, sprint: number, back: number, st: Style): GaitParams {
@@ -74,7 +76,7 @@ const tmp = { along: 0, h: 0 };
 const tmp2 = { along: 0, h: 0 };
 
 /** One foot at cycle phase p (0 = heel strike) along the gait axis: forward distance, ankle height, pitch. */
-export function footAt(p: number, P: GaitParams, out: { along: number; h: number; pitch: number; toe: number; planted: number; stance: number }) {
+export function footAt(p: number, P: GaitParams, out: { along: number; h: number; pitch: number; toe: number; planted: number; stance: number; swing: number }) {
   const span = P.duty * P.stride;
   const front = P.reach * span;
   if (p < P.duty) {
@@ -82,6 +84,7 @@ export function footAt(p: number, P: GaitParams, out: { along: number; h: number
     stanceAt(s, span, front, P, out);
     out.planted = 1;
     out.stance = s;
+    out.swing = -1;
     return out;
   }
   const s = (p - P.duty) / (1 - P.duty);
@@ -97,6 +100,7 @@ export function footAt(p: number, P: GaitParams, out: { along: number; h: number
   out.toe = 0;
   out.planted = 0;
   out.stance = -1;
+  out.swing = s;
   return out;
 }
 
@@ -122,7 +126,7 @@ function stanceAt(s: number, span: number, front: number, P: GaitParams, out: { 
   }
 }
 
-const foot = { along: 0, h: 0, pitch: 0, toe: 0, planted: 0, stance: 0 };
+const foot = { along: 0, h: 0, pitch: 0, toe: 0, planted: 0, stance: 0, swing: -1 };
 
 /**
  * Cycle state: phase advances by distance over stride so planted feet hold
@@ -134,7 +138,7 @@ export class Gait {
   heading = 0;
   backward = false;
   params: GaitParams | null = null;
-  readonly feet: [FootPose, FootPose] = [0, 1].map(() => ({ pos: new THREE.Vector3(), heading: 0, pitch: 0, toe: 0, planted: 1, stance: 0 })) as [FootPose, FootPose];
+  readonly feet: [FootPose, FootPose] = [0, 1].map(() => ({ pos: new THREE.Vector3(), heading: 0, pitch: 0, toe: 0, planted: 1, stance: 0, swing: -1 })) as [FootPose, FootPose];
   readonly pelvis = new THREE.Vector3();
   yaw = 0;
   roll = 0;
@@ -176,6 +180,8 @@ export class Gait {
       out.toe = foot.toe;
       out.planted = foot.planted;
       out.stance = foot.stance;
+      // Run backwards, the cycle meets the swing from its end.
+      out.swing = foot.swing < 0 ? -1 : this.backward ? 1 - foot.swing : foot.swing;
     }
     const ph = this.phase * Math.PI * 2;
     const walkBob = -Math.cos(2 * (ph - 0.12));

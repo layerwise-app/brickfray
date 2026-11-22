@@ -14,6 +14,7 @@ import type { WeaponModel } from '../weapons/types';
 import { Figures, type Look } from './figures';
 
 export const TEAM_COLORS = ['#2f7dff', '#ff7a1a'] as const;
+const hitPoint = new THREE.Vector3();
 
 export interface Remote {
   entry: RosterEntry;
@@ -36,6 +37,9 @@ export interface Remote {
   knock: THREE.Vector3;
   /** Direction of the last hit's shove. */
   shove: THREE.Vector3;
+  /** Where the last hit landed, from the figure's position; `markedAt` is when a shot was seen to land (-1 none). */
+  hitOffset: THREE.Vector3;
+  markedAt: number;
   /** Heel strikes of the rig's walk, for footsteps. */
   feet: FootStrikes;
 }
@@ -60,13 +64,16 @@ const anim: AnimState = {
   slide: false,
   swap: -1,
   swapFrom: null,
-  alert: false
+  alert: false,
+  place: { x: 0, z: 0, yaw: 0 }
 };
 
 /** Progress that runs forward between two snapshots is blended; a restart or an end is taken as it comes. */
 const between = (a: number, b: number, k: number, step: number) => (a >= 0 && b >= a ? a + (b - a) * k : step);
 
 const lerpAngle = (a: number, b: number, t: number) => a + Math.atan2(Math.sin(b - a), Math.cos(b - a)) * t;
+/** The fastest a figure turns (rad/s): a flick of the aim shows as a quick turn, not a snap. */
+const TURN_RATE = 18;
 
 /**
  * Other players, drawn 100 ms in the past between two snapshots (brief
@@ -78,7 +85,10 @@ export class Remotes {
   readonly map = new Map<number, Remote>();
   onFire: ((remote: Remote) => void) | null = null;
   onStep: ((remote: Remote, loud: boolean) => void) | null = null;
+  /** A remote seen dead comes back: it snaps together where it stands. */
+  onSpawn: ((remote: Remote) => void) | null = null;
   private readonly figures: Figures;
+  private clock = 0;
 
   constructor(
     kit: Kit,
@@ -106,7 +116,7 @@ export class Remotes {
         if (r) this.remove(id);
         const { rig, guns, feet } = this.figures.take(entry.character);
         if (rig instanceof Rig) rig.animator.vary(id);
-        r = { entry, rig, guns, weapon: null, armed: false, state: null, alive: false, shots: -1, sinceShot: 9, sinceHurt: 9, hurtDir: { x: 0, z: 0 }, hurtAmount: 30, position: new THREE.Vector3(), yaw: 0, visible: false, knock: new THREE.Vector3(), shove: new THREE.Vector3(), feet };
+        r = { entry, rig, guns, weapon: null, armed: false, state: null, alive: false, shots: -1, sinceShot: 9, sinceHurt: 9, hurtDir: { x: 0, z: 0 }, hurtAmount: 30, position: new THREE.Vector3(), yaw: 0, visible: false, knock: new THREE.Vector3(), shove: new THREE.Vector3(), hitOffset: new THREE.Vector3(), markedAt: -1, feet };
         this.map.set(id, r);
       }
       r.entry = entry;
@@ -135,6 +145,7 @@ export class Remotes {
 
   /** Interpolate every remote at `renderTime` (host clock) from the snapshot buffer. */
   update(dt: number, snapshots: readonly Snapshot[], renderTime: number) {
+    this.clock += dt;
     let older: Snapshot | undefined;
     let newer: Snapshot | undefined;
     for (let i = snapshots.length - 1; i >= 0; i--) {
@@ -157,15 +168,20 @@ export class Remotes {
       }
       const b = newer?.players.find((p) => p.id === r.entry.id) ?? a;
       const s = k < 0.5 ? a : b;
+      const seen = r.state !== null;
       r.state = s;
       const latest = snapshots[snapshots.length - 1]?.players.find((p) => p.id === r.entry.id);
-      if (s.alive && !r.alive) {
+      const respawn = s.alive && !r.alive;
+      if (respawn) {
         r.rig.reset();
         r.feet.reset();
+        if (seen) r.rig.assemble();
       }
       r.alive = s.alive;
       r.position.set(a.x + (b.x - a.x) * k + a.vx * extra, a.y + (b.y - a.y) * k, a.z + (b.z - a.z) * k + a.vz * extra);
-      r.yaw = lerpAngle(a.yaw, b.yaw, k);
+      const aim = lerpAngle(a.yaw, b.yaw, k);
+      const turn = Math.atan2(Math.sin(aim - r.yaw), Math.cos(aim - r.yaw));
+      r.yaw = respawn || !seen ? aim : r.yaw + THREE.MathUtils.clamp(turn, -TURN_RATE * dt, TURN_RATE * dt);
       const pitch = a.pitch + (b.pitch - a.pitch) * k;
       r.visible = s.alive;
       r.rig.root.visible = s.alive;
@@ -190,6 +206,7 @@ export class Remotes {
       r.knock.multiplyScalar(Math.exp(-dt * 14));
       r.rig.root.position.copy(r.position).add(r.knock);
       r.rig.root.rotation.y = r.yaw;
+      if (respawn && seen) this.onSpawn?.(r);
       const vx = a.vx + (b.vx - a.vx) * k;
       const vz = a.vz + (b.vz - a.vz) * k;
       const sin = Math.sin(r.yaw);
@@ -217,6 +234,9 @@ export class Remotes {
       anim.sinceHurt = r.sinceHurt;
       anim.hurtDirection = r.hurtDir;
       anim.hurtAmount = r.hurtAmount;
+      anim.place!.x = r.rig.root.position.x;
+      anim.place!.z = r.rig.root.position.z;
+      anim.place!.yaw = r.yaw;
       r.rig.update(dt, anim);
       // After the pose, so the flash leaves the gun where it is drawn this frame.
       if (fired) this.onFire?.(r);
@@ -240,13 +260,24 @@ export class Remotes {
     const cos = Math.cos(r.yaw);
     r.hurtDir = { x: (dx * cos - dz * sin) / len, z: -(dx * sin + dz * cos) / len };
     r.shove.set(-dx / len, 0, -dz / len);
+    // Without a shot seen landing, the hit shows on the chest's side toward the shooter.
+    if (r.markedAt < 0 || this.clock - r.markedAt > 0.5) r.hitOffset.set((dx / len) * 0.15, 1.15 * (r.entry.bot === 'boss' ? 1.6 : 1), (dz / len) * 0.15);
+    r.markedAt = -1;
     if (r.sinceHurt >= 0) this.jolt(r);
   }
 
-  /** A small shove away from the shooter and the white flash; the body's own jolt is the animator's flinch. */
+  /** A shot seen landing on a remote at `point` (world): the next hit on it shows there. */
+  mark(id: number, point: THREE.Vector3) {
+    const r = this.map.get(id);
+    if (!r) return;
+    r.hitOffset.subVectors(point, r.position);
+    r.markedAt = this.clock;
+  }
+
+  /** A small shove away from the shooter and a hot spot where the shot landed; the body's own jolt is the animator's flinch. */
   private jolt(r: Remote) {
-    r.knock.copy(r.shove).multiplyScalar(0.04);
-    r.rig.flash();
+    r.knock.copy(r.shove).multiplyScalar(0.06);
+    r.rig.flash(hitPoint.copy(r.position).add(r.hitOffset));
   }
 
   /** World muzzle position of a remote's current gun (falls back to the eye). */

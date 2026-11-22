@@ -70,11 +70,11 @@ function ear(b: PartSet, s: BodyStyle, sign: number) {
   // The rim: an ellipse from inside the bowl, up over the top, round the back and down into the lobe.
   const rim = (t: number, inset = 1, x = 0.0145): V3 => put(x + 0.003 * Math.sin(t / 2) ** 2, 0.004 + 0.028 * inset * Math.sin(t), 0.004 - 0.018 * inset * Math.cos(t));
   const arc = (from: number, to: number, n: number, inset?: number, x?: number) => Array.from({ length: n + 1 }, (_, i) => rim(from + ((to - from) * i) / n, inset, x));
-  const helix = [put(0.008, -0.004, 0.0), ...arc(0.05 * Math.PI, 1.42 * Math.PI, b.hero ? 9 : 6)];
+  const helix = [put(0.008, -0.004, 0.0), ...arc(0.05 * Math.PI, 1.42 * Math.PI, b.hero ? 9 : b.lean ? 4 : 6)];
   if (!b.hero) {
     // One pinna and a rim whose ends sink into it: the lower tiers' triangle budget.
-    b.add('head', S.blob(0.026, 0.064, 0.044, 0.72, 8), s.skin, { at: put(0.002, 0, 0.002), rot, look: 'skin' });
-    b.add('head', S.tube([...helix, put(0.005, -0.026, 0.004)], 0.0065, b.detail >= 2 ? 8 : 6, b.detail >= 2 ? 4 : 3), s.skin, { look: 'skin' });
+    b.add('head', S.blob(0.026, 0.064, 0.044, 0.72, b.lean ? 6 : 8), s.skin, { at: put(0.002, 0, 0.002), rot, look: 'skin' });
+    b.add('head', S.tube([...helix, put(0.005, -0.026, 0.004)], 0.0065, b.detail >= 2 ? 8 : b.lean ? 5 : 6, b.detail >= 2 ? 4 : 3), s.skin, { look: 'skin' });
     if (b.detail >= 2) orb(b, 'head', 0.013, 6, tone(s.skin, 0.78), { at: put(0.0105, -0.004, 0.001), rot, scale: [0.32, 1.25, 0.95], look: 'skin' });
     return;
   }

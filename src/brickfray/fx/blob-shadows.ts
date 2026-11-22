@@ -23,7 +23,8 @@ void main() {
   vLook = aLook;
   gl_Position = projectionMatrix * modelViewMatrix * instanceMatrix * vec4(position, 1.0);
 }`;
-// aLook: strength, edge hardness (0 soft cast shadow, 1 foot core), fade toward the far (sun-away) end.
+// aLook: strength, edge hardness (0 soft, 1 a firmer rim), fade toward the far (sun-away) end. Neutral dark: it
+// darkens the floor's own colour instead of tinting it.
 const FRAGMENT = /* glsl */ `
 varying vec2 vUv;
 varying vec3 vLook;
@@ -34,7 +35,7 @@ void main() {
   float tail = 1.0 - vLook.z * smoothstep(-0.5, 1.0, d.y);
   float a = shape * tail * vLook.x;
   if (a < 0.004) discard;
-  gl_FragColor = vec4(0.03, 0.04, 0.08, a);
+  gl_FragColor = vec4(0.035, 0.037, 0.042, a);
 }`;
 
 const scratch: number[] = [];
@@ -51,9 +52,9 @@ const qView = new THREE.Quaternion();
 
 /**
  * Shadows on the floor under figures, for tiers without shadow maps: one instanced draw, no render targets. Each
- * figure casts a soft blob stretched away from the sun, and each planted foot presses a dark, hard-edged core into
- * the floor. They sit on the highest box top below the figure, so they stay on the ground through jumps and falls;
- * an airborne figure's shadow slides away from the sun and lightens, its foot cores lift off first.
+ * figure casts a soft blob stretched away from the sun, and each planted foot darkens the floor round its sole. They
+ * sit on the highest box top below the figure, so they stay on the ground through jumps and falls; an airborne
+ * figure's shadow slides away from the sun and lightens, its foot darkening lifts off first.
  */
 export class BlobShadows {
   readonly mesh: THREE.InstancedMesh<THREE.PlaneGeometry, THREE.ShaderMaterial>;
@@ -137,15 +138,17 @@ export class BlobShadows {
       if (!foot || !toe || strength <= 0.01) continue;
       foot.getWorldPosition(ankle);
       toe.getWorldPosition(ball);
-      const sole = Math.min(ankle.y - ANKLE_H * scale, ball.y - 0.03 * scale) - floor;
-      const planted = 1 - THREE.MathUtils.smoothstep(sole, 0.02, 0.2);
+      const sole = Math.max(0, Math.min(ankle.y - ANKLE_H * scale, ball.y - 0.03 * scale) - floor);
+      // Darkest with the sole on the floor; it fades and spreads as the foot lifts, gone by 15 cm.
+      const planted = 1 - THREE.MathUtils.smoothstep(sole, 0, 0.15);
       if (planted <= 0.01) continue;
       q.setFromAxisAngle(up, Math.atan2(ankle.x - ball.x, ankle.z - ball.z));
-      // A little larger than the sole and pushed off it away from the sun, so the dark rim shows around the shoe.
+      // Soft-edged and wider than the sole, so it reads as the floor darkening round the shoe, not as a printed outline.
       p.lerpVectors(ankle, ball, 0.45).setY(floor + 0.016);
-      p.x += dx * 0.03 * scale;
-      p.z += dz * 0.03 * scale;
-      this.put(p, 0.115 * scale, 0.2 * scale, 0.97 * planted * strength, 1, 0);
+      p.x += dx * 0.02 * scale;
+      p.z += dz * 0.02 * scale;
+      const spread = 1 + 0.6 * (1 - planted);
+      this.put(p, 0.15 * scale * spread, 0.25 * scale * spread, 0.7 * planted * strength, 0, 0);
     }
   }
 

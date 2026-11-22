@@ -87,7 +87,12 @@ export function remoteMuzzle(glow: SpritePool, smoke: SpritePool, position: THRE
       if (f.kind === 'blast') {
         // A shotgun's flame fans out: three short tongues spread about the barrel.
         for (const a of [-0.32, 0, 0.32]) tongue(f.tongue * (a === 0 ? 1 : 0.7), dir, angle + a, f.fire, 1.25);
-      } else tongue(f.tongue, dir, angle, f.fire);
+      } else {
+        // A slim flame with two short prongs, a little different each shot: side-on it reads as fire, not one long card.
+        const k = 0.85 + Math.random() * 0.3;
+        tongue(f.tongue * 0.55 * k, dir, angle, f.fire);
+        for (const a of [-0.36, 0.36]) tongue(f.tongue * 0.36 * k, dir, angle + a + jitter(0.12), f.fire);
+      }
       glow.emit({ position: tip, size: star * 0.9, color: f.fire, alpha: 0.16, life: 0.08, shape: 'soft' });
       puff(f.smoke, '#d8d8d8', 0.24, f.kind === 'blast' ? 2 : 1, 0.8);
       break;

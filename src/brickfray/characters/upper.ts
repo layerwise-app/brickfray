@@ -191,7 +191,7 @@ export function poseUpper(pose: Pose, I: UpperInput) {
   const look = I.seed ? 0.1 * Math.sin(t * 0.31 + I.seed * 2.3) * I.ready * (1 - busy) : 0;
   hprQuat(f.head[1] + 0.05 * I.ads + (rb[2]! - 0.08) * watch + look, headPitch, 0.14 * I.ads + f.head[2] + 0.1 * watch, q2);
   // The head snaps further than the chest.
-  if (joltSize > 1e-4) q2.premultiply(tilt(v2.set(jolt.x, 0, jolt.y).multiplyScalar(1.5), q3));
+  if (joltSize > 1e-4) q2.premultiply(tilt(v2.set(jolt.x, 0, jolt.y).multiplyScalar(1.3), q3));
   qa.copy(pose.mq[BONE.chest]!).invert().multiply(q2);
   pose.q[BONE.neck]!.slerpQuaternions(ID, qa, 0.4).multiply(q3.setFromAxisAngle(X, -st.hunch));
   pose.solve(BONE.neck);

@@ -7,7 +7,7 @@ import * as S from '../shapes';
 import type { BoneName, V3 } from '../skeleton';
 
 /** A count for the tiers a costume is built on: medium, high, showroom. */
-export const tier = (b: PartSet, medium: number, high: number, hero: number) => (b.hero ? hero : b.detail >= 2 ? high : medium);
+export const tier = (b: PartSet, medium: number, high: number, hero: number) => (b.hero ? hero : b.detail >= 2 ? high : b.cut(medium));
 
 /** Rounded box with its own segment count, for the many small soft shapes a costume is made of. */
 export function lump(b: PartSet, bone: BoneName, size: V3, seg: number, color: string, o: PartOptions & { e?: number; taper?: number } = {}) {

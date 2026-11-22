@@ -25,8 +25,8 @@ const LINGER = 0.11;
 const TRACER_EVERY = 3;
 const TRACER_LINGER = 0.2;
 /** On-screen width limits in radians (halo included; the hot core is the middle third): thick enough to read on a bright facade far away, never a slab next to the muzzle. */
-const WIDEST = 0.022;
-const THINNEST = 0.0115;
+const WIDEST = 0.026;
+const THINNEST = 0.015;
 /** View-space depth the ribbon is clipped at, so a shot passing beside the camera never smears across the screen. */
 const NEAR = 0.15;
 
@@ -68,15 +68,16 @@ varying vec3 vHead;
 varying float vNear;
 void main() {
   float across = abs(vUv.y - 0.5) * 2.0;
-  float core = smoothstep(0.36, 0.1, across);
-  float rim = smoothstep(0.6, 0.34, across);
-  float halo = pow(max(1.0 - across, 0.0), 2.2);
+  float core = smoothstep(0.42, 0.12, across);
+  float rim = smoothstep(0.64, 0.4, across);
+  float halo = pow(max(1.0 - across, 0.0), 1.6);
   // The bullet itself is the bright last stretch; behind it a fainter trail back to the muzzle.
   float head = pow(smoothstep(1.0 - vHead.x, 1.0, vUv.x), 1.3);
   float trail = vHead.z * smoothstep(0.0, 0.12, vUv.x);
   float k = max(head, trail) * vHead.y * vNear;
   // A white-hot core inside a deep-coloured rim that covers what is behind (it reads on white walls and sky, where
-  // light alone vanishes), wrapped in a soft glow of the gun's colour that only adds light; written premultiplied.
+  // light alone vanishes), wrapped in a soft glow of the gun's colour that also dims what is behind it a little, so
+  // the glow still shows on a bright wall; written premultiplied.
   gl_FragColor = vec4(vTint, 1.0);
   #include <colorspace_fragment>
   vec3 glow = gl_FragColor.rgb;
@@ -84,7 +85,7 @@ void main() {
   gl_FragColor = vec4(col, 1.0);
   #include <colorspace_fragment>
   float cover = rim * k;
-  gl_FragColor = vec4(gl_FragColor.rgb * cover * 1.25 + glow * halo * k * 0.4, min(1.0, cover * 0.95));
+  gl_FragColor = vec4(gl_FragColor.rgb * cover * 1.25 + glow * halo * k * 0.5, min(1.0, cover * 0.95 + halo * k * 0.22));
 }`;
 
 /**

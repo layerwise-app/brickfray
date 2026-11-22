@@ -97,7 +97,7 @@ export function head(b: PartSet, s: BodyStyle, noFace = false) {
 }
 
 export function face(b: PartSet, s: BodyStyle, z = FACE_Z) {
-  if (b.detail < 2) blockFace(b, s, z);
+  if (b.detail === 0 || b.lean) blockFace(b, s, z);
   else sculptFace(b, s, z);
 }
 

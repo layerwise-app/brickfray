@@ -28,14 +28,14 @@ export function vega(b: PartSet) {
     fore: { half: [0.025, 0.024], corner: 0.009, yaw: 0.45, roll: 0.3, seat: 0.004, sink: 0.004 },
     brow: HAIR,
     browTilt: 0.05,
-    mouth: b.detail >= 2 ? 'none' : 'smirk',
+    mouth: b.detail >= 1 ? 'none' : 'smirk',
     lashes: true,
     blush: '#f0a78f',
     expression: { open: 0.93, squint: 0.22, lidTilt: -0.03, brows: [-0.002, 0.008], gaze: [0.2, 0.15] },
     omit: b.detail >= 2 ? ['upperArms'] : []
   });
   if (b.detail === 0) return blockCostume(b, bulk);
-  if (b.detail >= 2) smirk(b);
+  smirk(b);
   jacket(b);
   sleeves(b);
   scarf(b);

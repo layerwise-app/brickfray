@@ -1,12 +1,17 @@
 import * as THREE from 'three';
 import { clamp } from './ik';
 
-/** Spring of the jolt: about 3 Hz, half damped, so a hit snaps the body away in ~65 ms and it is back on aim by ~0.3 s. */
-const OMEGA = 2 * Math.PI * 3;
-const ZETA = 0.45;
+/**
+ * Spring of the jolt: 2.4 Hz, half damped, so a hit throws the body back in ~80 ms and it is back on aim by ~0.4 s:
+ * long enough to read across a room.
+ */
+const OMEGA = 2 * Math.PI * 2.4;
+const ZETA = 0.5;
 const DAMPED = OMEGA * Math.sqrt(1 - ZETA * ZETA);
-/** Kick per hit (rad/s of lean): a mid-sized hit leans the chest ~0.35 rad at its peak. */
-const KICK = 11;
+/** Kick per hit (rad/s of lean): a mid-sized hit leans the chest ~0.45 rad at its peak. */
+const KICK = 14;
+/** A burst stacks its jolts up to this lean, and no further. */
+const MOST = 0.7;
 
 /** Lean of a spring kicked at t = 0 with unit speed, t seconds later. */
 const response = (t: number) => (t <= 0 ? 0 : (Math.exp(-ZETA * OMEGA * t) * Math.sin(DAMPED * t)) / DAMPED);
@@ -56,6 +61,7 @@ export class Flinch {
       }
     }
     this.lean.copy(this.kick).multiplyScalar(sinceHurt < 2 ? response(sinceHurt) : 0).add(this.carry);
+    if (this.lean.lengthSq() > MOST * MOST) this.lean.setLength(MOST);
     return this.lean;
   }
 }

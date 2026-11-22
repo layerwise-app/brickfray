@@ -1,10 +1,11 @@
 import * as THREE from 'three';
-import { chamferBox } from '../engine/geometry';
 import type { Kit } from '../engine/kit';
 import { Animator } from './animator';
+import { Assembly } from './assemble';
 import { HandProps } from './carried';
+import { holsterShape } from './holster';
 import { patchCharacterMaterial, pieceMaterial, type CharacterMaterial } from './material';
-import { capeLength, farRim, type CapeUniforms } from './rig-shading';
+import { capeLength, farRim, type CapeUniforms, type HitUniform } from './rig-shading';
 import { wristOffset } from './body-hands';
 import type { BakedCharacter, Hands } from './parts';
 import { BONE, createBones, restModelPositions, type V3 } from './skeleton';
@@ -20,6 +21,10 @@ const tmpM = new THREE.Matrix4();
 const tmpV = new THREE.Vector3();
 const tmpV2 = new THREE.Vector3();
 const tmpE = new THREE.Euler();
+/** How far running streams a cape's hem back (rad at a sprint). */
+const CAPE_WIND = 0.42;
+/** How long a hit's tint shows, in seconds. */
+const FLASH = 0.16;
 
 export interface RigSource {
   id: CharacterId | BotKind;
@@ -29,6 +34,8 @@ export interface RigSource {
   rest: V3[];
   style: Style;
   scale: number;
+  /** Size of its guns against a human's. */
+  grip?: number;
   /** The melee weapon on its 'mallet' bone, whose swing the animator plays. */
   tool: MeleeId;
 }
@@ -57,9 +64,13 @@ export class Rig implements CharacterRig {
   private readonly stowed = new Map<THREE.Object3D, StowPlace>();
   private holster: THREE.Mesh | null = null;
   private flashT = 0;
+  /** The last hit's spot on the figure, in root space. */
+  private readonly hitAt = new THREE.Vector3();
+  private readonly hit: HitUniform = { value: new THREE.Vector4() };
   private seed = 1;
-  private readonly cape: CapeUniforms = { into: { value: new THREE.Matrix4() }, out: { value: new THREE.Matrix4() }, bend: { value: new THREE.Vector3() } };
+  private readonly cape: CapeUniforms = { into: { value: new THREE.Matrix4() }, out: { value: new THREE.Matrix4() }, bend: { value: new THREE.Vector4() } };
   private readonly capeLength: number;
+  private readonly assembly: Assembly;
 
   constructor(
     private src: RigSource,
@@ -73,7 +84,7 @@ export class Rig implements CharacterRig {
     this.body.add(this.bones[BONE.pelvis]!);
     this.body.updateMatrixWorld(true);
     const skeleton = new THREE.Skeleton(this.bones);
-    this.mat = farRim(patchCharacterMaterial(kit.materials.vertexColored('plastic', true)), !kit.profile.pbr, this.cape);
+    this.mat = farRim(patchCharacterMaterial(kit.materials.vertexColored('plastic', true)), !kit.profile.pbr, this.cape, this.hit);
     this.mesh = new THREE.SkinnedMesh(src.baked.main, this.mat.material);
     this.glass = src.baked.glass ? new THREE.SkinnedMesh(src.baked.glass, kit.materials.vertexColored('glass')) : null;
     for (const m of [this.mesh, this.glass]) {
@@ -96,6 +107,7 @@ export class Rig implements CharacterRig {
     this.bones[BONE.handL]!.add(this.leftHold);
     this.animator = new Animator(src.rest, src.style);
     this.animator.tool = src.tool;
+    this.animator.scale = src.scale;
     this.animator.fit = fitStow(src.baked, restModelPositions(src.rest));
     if (src.hands) {
       this.animator.pose.wrist.L.set(...wristOffset(src.hands.L, 'L'));
@@ -103,18 +115,25 @@ export class Rig implements CharacterRig {
     }
     this.animator.pose.apply(this.bones);
     this.props = new HandProps(kit, this.bones[BONE.handL]!);
+    this.assembly = new Assembly(this.root, this.bones, src.baked, kit);
   }
 
   update(dt: number, state: AnimState) {
     this.animator.support = this.supportGrip && relativeMatrix(this.supportGrip, this.rightHand, this.supportMatrix) ? this.supportMatrix : null;
     this.animator.update(dt, state);
     this.animator.pose.apply(this.bones);
-    if (this.capeLength > 0) this.cape.bend.value.set(Math.min(0, tmpE.setFromQuaternion(this.animator.pose.q[BONE.dangleBack]!, 'XYZ').x), this.capeLength, this.cape.bend.value.z + dt);
-    if (this.flashT > 0) {
-      this.flashT = Math.max(0, this.flashT - dt);
-      this.mat.material.emissive.setScalar(Math.pow(this.flashT / 0.12, 2) * 0.9);
+    if (this.capeLength > 0) {
+      const wind = state.grounded || state.speed > 3 ? CAPE_WIND * THREE.MathUtils.smoothstep(state.speed, 1.2, 6.5) : 0;
+      const bend = this.cape.bend.value;
+      bend.set(Math.min(0, tmpE.setFromQuaternion(this.animator.pose.q[BONE.dangleBack]!, 'XYZ').x), this.capeLength, bend.z + dt, THREE.MathUtils.damp(bend.w, wind, 6, dt));
     }
     this.root.updateMatrixWorld();
+    if (this.assembly.active) this.body.visible = !this.assembly.update(dt);
+    if (this.flashT > 0) {
+      this.flashT = Math.max(0, this.flashT - dt);
+      const p = this.root.localToWorld(tmpV.copy(this.hitAt));
+      this.hit.value.set(p.x, p.y, p.z, Math.pow(this.flashT / FLASH, 1.5));
+    }
     const held = this.animator.held;
     this.props.update(held.item, held.magazine, held.grenade);
   }
@@ -127,6 +146,7 @@ export class Rig implements CharacterRig {
       this.stowed.delete(model);
       model.position.set(0, 0, 0);
       model.quaternion.identity();
+      model.scale.setScalar(this.src.grip ?? 1);
       this.rightHand.add(model);
       this.showHolster();
     }
@@ -146,6 +166,7 @@ export class Rig implements CharacterRig {
       this.stowed.set(model, place);
       this.bones[STOW_BONE[place]]!.add(model);
       stowTransform(place, this.animator.fit, model.position, model.quaternion);
+      model.scale.setScalar(this.src.grip ?? 1);
       model.visible = true;
     }
     this.showHolster();
@@ -159,6 +180,7 @@ export class Rig implements CharacterRig {
       this.bones[BONE.pelvis]!.add(this.holster);
       this.holster.position.copy(holstered.position);
       this.holster.quaternion.copy(holstered.quaternion);
+      this.holster.scale.copy(holstered.scale);
     }
     if (this.holster) this.holster.visible = !!holstered;
   }
@@ -180,12 +202,23 @@ export class Rig implements CharacterRig {
     if (color !== null) this.mat.tint.value.set(color);
   }
 
-  flash() {
-    this.flashT = 0.12;
-    this.mat.material.emissive.setScalar(0.9);
+  flash(at?: THREE.Vector3) {
+    this.flashT = FLASH;
+    this.root.updateMatrixWorld();
+    if (at) this.root.worldToLocal(this.hitAt.copy(at));
+    else this.hitAt.set(0, 1.15 * this.src.scale, -0.12);
+    const p = this.root.localToWorld(tmpV.copy(this.hitAt));
+    this.hit.value.set(p.x, p.y, p.z, 1);
+  }
+
+  /** Respawn: the figure snaps together out of its pieces (see `Assembly`). */
+  assemble() {
+    this.assembly.start(this.seed + Math.random());
+    this.body.visible = false;
   }
 
   shatter(impulse: THREE.Vector3): ShatterPiece[] {
+    this.assembly.stop();
     this.root.updateMatrixWorld(true);
     const pieces: ShatterPiece[] = [];
     const center = this.body.localToWorld(tmpV2.set(0, 1, 0));
@@ -228,9 +261,10 @@ export class Rig implements CharacterRig {
   }
 
   reset() {
+    this.assembly.stop();
     this.body.visible = true;
     this.flashT = 0;
-    this.mat.material.emissive.setScalar(0);
+    this.hit.value.w = 0;
     this.animator.reset();
     this.animator.pose.apply(this.bones);
   }
@@ -277,10 +311,10 @@ function holsterFor(gun: THREE.Object3D, kit: Kit) {
     const bottom = top - 0.095;
     const front = holsterBox.min.z - 0.014;
     const back = -0.025;
-    geometry = chamferBox(x * 2, top - bottom, back - front, 0.008).translate(0, (top + bottom) / 2, (front + back) / 2);
+    geometry = holsterShape(x, top, bottom, front, back);
     holsters.set(key, geometry);
   }
-  const mesh = new THREE.Mesh(geometry, kit.materials.get('#3a2a20', 'plastic'));
+  const mesh = new THREE.Mesh(geometry, kit.materials.vertexColored('plastic'));
   mesh.name = 'holster';
   mesh.castShadow = kit.profile.shadows;
   return mesh;

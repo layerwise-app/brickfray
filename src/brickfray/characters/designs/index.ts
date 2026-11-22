@@ -14,6 +14,8 @@ export interface Design {
   /** Where the swinging bones hang from (ponytail, plume, antenna, scarf, cloak). */
   rest?: RestOverrides;
   scale?: number;
+  /** Size of the guns it carries against a human's: big hands hold a big gun. */
+  grip?: number;
 }
 
 export const BOT_KINDS: readonly BotKind[] = ['grunt', 'rusher', 'sniper', 'boss'];
@@ -28,5 +30,5 @@ export const DESIGNS: Record<CharacterId | BotKind, Design> = {
   grunt: { build: bot('grunt') },
   rusher: { build: bot('rusher') },
   sniper: { build: bot('sniper'), rest: { dangleHead: [0.06, 0.19, 0.07] } },
-  boss: { build: bot('boss'), scale: 1.6 }
+  boss: { build: bot('boss'), scale: 1.6, grip: 1.3 }
 };

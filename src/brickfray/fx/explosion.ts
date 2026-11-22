@@ -92,6 +92,8 @@ export function explode(fx: Effects, position: THREE.Vector3, ground: number | n
   if (high) fx.shockwaves.add(floor, 0.4, 5.6, 0.3, '#c8b896');
   else fx.shockwaves.add(floor, 1, 4.6, 0.24, '#5a3a20', true);
   fx.scorches.add('scorch', v(position.x, ground, position.z), UP, 3.6, 0.92);
+  // Tone-mapped tiers lift dark multiplied soot toward the floor colour: a second, tighter mark darkens the heart.
+  if (!low) fx.scorches.add('scorch', v(position.x, ground, position.z), UP, 2.1, 0.85);
   // A ring of dust kicked out along the floor: low, fast and close-packed so it reads as one skirt round the blast.
   const ring = low ? 12 : 16;
   for (let i = 0; i < ring; i++) {

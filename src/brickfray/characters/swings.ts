@@ -24,9 +24,9 @@ const BACK = (t: number): Key => [t, -0.02, -0.15, -0.38, -0.4, 0.05, 0, -0.4, -
 /**
  * Each tool's own blow, read at a glance from across a lane (all with the off hand; the gun stays in the right):
  * the mallet slams straight down over the left shoulder, the hatchet chops steeply across to the right knee, the
- * sword sweeps a wide diagonal from high left to low right, the knife is drawn back by the ribs and thrust straight
- * out, the anchor swings back low and hooks up through the target, tipping over to the right, and the wrench is
- * cocked out to the left at head height and hooked flat across.
+ * sword sweeps a wide diagonal from high left to low right, the knife is drawn back past the hip and lunged straight
+ * out at full reach with the left shoulder driven forward, the anchor swings back low and hooks up through the
+ * target, tipping over to the right, and the wrench is cocked out to the left at head height and hooked flat across.
  */
 const SWINGS: Record<MeleeId, Swing> = {
   mallet: {
@@ -98,22 +98,22 @@ const SWINGS: Record<MeleeId, Swing> = {
   knife: {
     keys: [
       HOME,
-      [0.12, -0.2, -0.22, -0.2, 0.12, 0.08, 0, -0.6, -0.8, 0.4],
-      [0.25, -0.2, -0.14, 0.04, 0.18, 0.12, 0, -0.7, -0.5, 0.6],
-      [0.31, -0.19, -0.13, 0.05, 0.18, 0.12, 0, -0.7, -0.5, 0.6],
-      [0.36, -0.12, -0.08, -0.4, 0.06, 0.12, 0, -0.5, -0.8, 0.3],
-      [0.4, -0.05, -0.05, -0.66, 0.0, 0.1, 0, -0.4, -0.9, 0.2],
-      [0.47, -0.05, -0.06, -0.66, 0.0, 0.1, 0, -0.4, -0.9, 0.2],
-      [0.62, -0.14, -0.18, -0.32, 0.08, 0.06, 0, -0.5, -0.9, 0.3],
+      [0.12, -0.24, -0.24, -0.12, 0.12, 0.08, 0, -0.6, -0.6, 0.6],
+      [0.25, -0.24, -0.2, 0.12, 0.2, 0.12, 0, -0.7, -0.3, 0.9],
+      [0.31, -0.23, -0.19, 0.13, 0.2, 0.12, 0, -0.7, -0.3, 0.9],
+      [0.36, -0.12, -0.08, -0.42, 0.08, 0.1, 0, -0.5, -0.7, 0.4],
+      [0.4, -0.04, -0.02, -0.72, 0.04, 0.06, 0, -0.4, -0.9, 0.2],
+      [0.55, -0.04, -0.03, -0.72, 0.04, 0.06, 0, -0.4, -0.9, 0.2],
+      [0.68, -0.14, -0.18, -0.32, 0.08, 0.06, 0, -0.5, -0.9, 0.3],
       BACK(0.86),
       BACK(1)
     ],
-    twist: [-0.35, 0.5],
-    bend: [0.02, -0.18],
-    step: 0.42,
+    twist: [-0.6, 0.8],
+    bend: [0.04, -0.3],
+    step: 0.48,
     turn: 0.05,
-    drop: 0.1,
-    push: 0.2,
+    drop: 0.12,
+    push: 0.28,
     sink: 0.04
   },
   anchor: {

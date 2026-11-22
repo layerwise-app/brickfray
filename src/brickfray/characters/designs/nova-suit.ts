@@ -105,14 +105,15 @@ export const VISOR = (b: PartSet): Look => (b.hero ? 'chrome' : 'gold');
 /** Bubble helmet on the head bone: gold visor in a dark bezel, crest, ear modules with lamps, neck ring. */
 export function helmet(b: PartSet) {
   const hi = b.detail > 1;
-  const steps = pick(b, 8, 12, 28);
+  // The bubble is the figure's silhouette: the lean low tier keeps the medium tier's shell and visor.
+  const steps = b.lean ? 8 : pick(b, 8, 12, 28);
   const shell: [number, number][] = Array.from({ length: steps + 1 }, (_, i) => {
     const th = (i / steps) * Math.PI;
     return [Math.max(0, HELMET_R * Math.sin(th)), -HELMET_R * Math.cos(th)];
   });
-  b.lathe('head', shell, C.suit, { at: HELMET, look: 'gloss', seg: pick(b, 14, 20, 56) });
+  b.lathe('head', shell, C.suit, { at: HELMET, look: 'gloss', seg: b.lean ? 14 : pick(b, 14, 20, 56) });
   if (hi) b.add('head', visorPatch(HELMET_R + 0.0025, 1.06, 0.68, 0.03, pick(b, 16, 28, 64), 2, 0.84), C.dark, { look: 'gloss' });
-  b.add('head', visorPatch(HELMET_R + (hi ? 0.0055 : 0.003), 0.98, 0.6, 0.03, pick(b, 16, 28, 64), pick(b, 3, 4, 10)), C.visor, { look: VISOR(b) });
+  b.add('head', visorPatch(HELMET_R + (hi ? 0.0055 : 0.003), 0.98, 0.6, 0.03, b.lean ? 16 : pick(b, 16, 28, 64), pick(b, 3, 4, 10)), C.visor, { look: VISOR(b) });
 
   // Neck ring and its locking collar.
   b.lathe('neck', [[0.07, -0.034], [0.104, -0.03], [0.108, -0.012], [0.098, -0.004], [0.098, 0.02], [0.104, 0.026], [0.104, 0.04], [0.09, 0.05], [0.07, 0.05]], C.purple, { look: 'gloss', seg: pick(b, 12, 16, 40) });

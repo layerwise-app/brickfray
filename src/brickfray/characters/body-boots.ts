@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { even, tone, type BodyKit } from './body-kit';
+import { lowBoot } from './body-low';
 import * as S from './shapes';
 import type { LoftRing } from './shapes';
 import type { V3 } from './skeleton';
@@ -41,6 +42,7 @@ export function instep(forward: number) {
 /** Boot on the foot and toe bones: padded shaft, heel counter and instep, toe box, welted sole with a heel block. */
 export function boot(k: BodyKit, side: 'L' | 'R') {
   const { b, s, fine } = k;
+  if (b.lean) return lowBoot(b, s, side, Math.min(k.legs, 1.12));
   // The shaft follows the leg up to the width of the sole it stands on.
   const L = Math.min(k.legs, 1.12);
   const steps = k.limbSteps;

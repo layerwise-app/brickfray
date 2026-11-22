@@ -12,7 +12,7 @@ const c = new THREE.Vector3();
 const n = new THREE.Vector3();
 
 /** A count for the medium, high and showroom tiers. */
-export const pick = (b: PartSet, medium: number, high: number, hero: number) => (b.hero ? hero : b.detail > 1 ? high : medium);
+export const pick = (b: PartSet, medium: number, high: number, hero: number) => (b.hero ? hero : b.detail > 1 ? high : b.cut(medium));
 
 /** n+1 samples over 0…1; `edge` adds a tight pair at each end so a cloth border comes out round. */
 export function samples(count: number, edge = 0) {

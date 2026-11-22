@@ -29,7 +29,7 @@ import type { FrameInput } from './input';
 import { MatchEvents } from './match-events';
 import { NameTags } from './name-tags';
 import { Predictor } from './predictor';
-import { Remotes } from './remotes';
+import { Remotes, TEAM_COLORS } from './remotes';
 
 const v3 = () => new THREE.Vector3();
 
@@ -57,6 +57,7 @@ export class MatchView {
   private tmp2 = v3();
   /** The local player's own pieces from the last death, which the death camera keeps in view. */
   private ownPieces: THREE.Object3D[] = [];
+  private ownShards: THREE.Object3D[] = [];
   private lastSnapshot: Snapshot | null = null;
   private shots: { time: number; traces: Snapshot['traces'] }[] = [];
   private pendingSnapshot: Snapshot | null = null;
@@ -117,6 +118,7 @@ export class MatchView {
       const surface = this.world.surfaceBelow(r.position.x, r.position.y, r.position.z);
       this.sound.footstep(surface, r.entry.character, r.position, loud ? 1.2 : 0.9, 3, this.sound.occlusion(r.entry.id, r.position, 1), r.entry.id);
     };
+    this.remotes.onSpawn = (r) => this.effects.spawn(r.position, r.entry.team !== -1 ? TEAM_COLORS[r.entry.team]! : '#fff1c2', r.entry.bot === 'boss' ? 1.6 : 1);
     this.effects.onChipBounce = (p, speed) => this.sound.debris.bounce(p, speed);
     this.remotes.syncRoster(session.roster);
     if (settings.mode === 'solo') this.remotes.prepare(BOT_KINDS);
@@ -171,14 +173,14 @@ export class MatchView {
     for (const d of dirs) {
       const wall = this.world.raycast(ox, oy, oz, d[0], d[1], d[2], 260, true);
       let maxT = wall?.t ?? 260;
-      let hitRemote: { color: string; head: boolean } | null = null;
+      let hitRemote: { color: string; head: boolean; id: number } | null = null;
       for (const r of this.remotes.map.values()) {
         const pose = this.remotes.pose(r);
         if (!pose || (r.entry.team !== -1 && r.entry.team === this.myTeam)) continue;
         const hit = rayHitPlayer(pose, ox, oy, oz, d[0], d[1], d[2], maxT);
         if (hit) {
           maxT = hit.t;
-          hitRemote = { color: '#f2f2ee', head: hit.kind === 'head' };
+          hitRemote = { color: '#f2f2ee', head: hit.kind === 'head', id: r.entry.id };
         }
       }
       const end = new THREE.Vector3(ox + d[0] * maxT, oy + d[1] * maxT, oz + d[2] * maxT);
@@ -192,6 +194,7 @@ export class MatchView {
       });
       if (hitRemote) {
         this.effects.bodyHit(end, new THREE.Vector3(...d), hitRemote.color, hitRemote.head);
+        this.remotes.mark(hitRemote.id, end);
         predicted = predicted === 'head' || hitRemote.head ? 'head' : 'body';
       } else if (wall) {
         const n = new THREE.Vector3(...wall.normal);
@@ -344,8 +347,11 @@ export class MatchView {
       aspect: this.renderer.canvas.clientWidth / Math.max(1, this.renderer.canvas.clientHeight)
     });
     if (alive) {
-      this.deathCam = null;
-      this.deathView.active = false;
+      // The kill event can land a frame before the snapshot that says so: keep its killer until the death view runs.
+      if (this.deathView.active) {
+        this.deathCam = null;
+        this.deathView.end();
+      }
       this.fp.place(this.eye);
     } else this.placeDeathCam(dt);
     this.footsteps(dt, speed);
@@ -446,13 +452,17 @@ export class MatchView {
     if (!this.deathCam) this.deathCam = { at: this.eye.clone(), killer: 0, t: 0 };
     const d = this.deathCam;
     const killer = this.remotes.map.get(d.killer);
+    const focus = killer?.visible ? this.tmp2.copy(killer.position).setY(killer.position.y + 1.3) : null;
     if (!this.deathView.active) {
-      this.deathView.begin(d.at, this.fp.camera.getWorldDirection(this.tmp));
-      if (d.t === 0) this.shatterOwn(killer?.position ?? null);
+      this.deathView.begin(d.at, this.fp.camera.getWorldDirection(this.tmp), focus);
+      if (d.t === 0) {
+        this.shatterOwn(killer?.position ?? null);
+        // A multi-kill callout from before the death would hang over the death view.
+        if (this.hud.state.multikill) this.hud.set({ multikill: null });
+      }
     }
     d.t += dt;
-    const focus = killer?.visible ? this.tmp2.copy(killer.position).setY(killer.position.y + 1.3) : null;
-    this.deathView.update(dt, this.fp.camera, focus, this.ownPieces);
+    this.deathView.update(dt, this.fp.camera, focus, this.ownPieces, this.ownShards);
   }
 
   /** The local player's own figure breaks apart where they fell, away from the killer, for the death camera. */
@@ -465,6 +475,7 @@ export class MatchView {
     const pieces = this.remotes.shatterOwn(at, this.fp.yaw, this.me.arms.weapon, m.crouch, this.fp.pitch, impulse);
     if (pieces.length) this.effects.shatter(pieces);
     this.ownPieces = pieces.filter((p) => !p.head).map((p) => p.mesh);
+    this.ownShards = pieces.map((p) => p.mesh);
   }
 
   private onSnapshot(snap: Snapshot) {

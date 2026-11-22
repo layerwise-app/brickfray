@@ -6,7 +6,7 @@ import type { V3 } from '../skeleton';
 /** Costume tier: 1 medium, 2 high, 3 showroom. */
 export const tier = (b: PartSet) => (b.hero ? 3 : b.detail);
 /** A count for the medium, high and showroom tiers. */
-export const pick = (b: PartSet, medium: number, high: number, hero: number) => [medium, medium, high, hero][tier(b)]!;
+export const pick = (b: PartSet, medium: number, high: number, hero: number) => [b.cut(medium), b.cut(medium), high, hero][tier(b)]!;
 
 /**
  * One cross-section of a lofted plate: half width `w`, half depths toward the

@@ -22,6 +22,11 @@ const LIMB: Record<LimbPart, [number, number, number, number][]> = {
 /** A shared limb's rings at a limb thickness: what its bands, seams and patches are cut from. */
 export const limbRings = (part: LimbPart, L: number): LoftRing[] => LIMB[part].map(([y, radius, cz, deep]) => ({ y, rx: radius * L, rz: radius * L * deep, cz: cz * L, e: 2.15 }));
 const around = (b: PartSet) => (b.hero ? 18 : even(b.seg(6, 8, 12)));
+/** A limb's loft rings on this tier: the lean low tier skips the one between the joint end and the fullest. */
+const limbLoft = (b: PartSet, part: LimbPart, L: number) => {
+  const rings = limbRings(part, L);
+  return b.lean ? [rings[0]!, rings[2]!, rings[3]!] : rings;
+};
 
 /**
  * A band lying on one of the shared limbs between two heights, `grow` proud of it: straps, cuffs, tape, hems.
@@ -51,7 +56,7 @@ export function limbs(k: BodyKit) {
 
     if (!omit.has('upperArms')) {
       orb(b, ua, 0.06 * L, joint, sleeve, { look: shirtLook });
-      b.add(ua, S.loft(limbRings('upperArm', L), n, { steps, bottom: 0.02, top: 0.03 }), sleeve, { look: shirtLook });
+      b.add(ua, S.loft(limbLoft(b, 'upperArm', L), n, { steps, bottom: 0.02, top: 0.03 }), sleeve, { look: shirtLook });
     }
     b.cyl(ua, 0.0585 * L, 0.0565 * L, 0.07, '#ffffff', { at: [0, -0.12, 0], look: 'tint', seg: b.seg(6, 10, 12) });
 
@@ -63,7 +68,7 @@ export function limbs(k: BodyKit) {
       if (elbowLook === 'skin') orb(b, fa, (b.hero ? 0.0442 : 0.0478) * L, joint, elbow, { scale: b.hero ? [1.01, 1.08, 1.01] : [1.07, 1, 1.03], look: elbowLook });
       else if (b.hero && s.joints !== 'hinge') clothElbow(k, side, elbow, elbowLook);
       else hinge(k, fa, 0.0455 * L, 0.1 * L, elbow, elbowLook);
-      b.add(fa, S.loft(limbRings('forearm', L), n, { steps, bottom: 0.012, top: 0.02 }), s.forearm ?? sleeve, { look: s.forearmLook ?? shirtLook });
+      b.add(fa, S.loft(limbLoft(b, 'forearm', L), n, { steps, bottom: 0.012, top: 0.02 }), s.forearm ?? sleeve, { look: s.forearmLook ?? shirtLook });
       const G = L * (s.cuff ?? 1);
       const cuff: [number, number][] = b.hero
         ? [
@@ -88,13 +93,13 @@ export function limbs(k: BodyKit) {
     if (!omit.has('hands')) hand(b, s, side, b.hands[side]);
 
     if (!omit.has('thighs')) {
-      b.add(th, S.loft(limbRings('thigh', legs), n, { steps, bottom: 0.02, top: 0.07 * legs }), s.pants, { look: pantsLook });
+      b.add(th, S.loft(limbLoft(b, 'thigh', legs), n, { steps, bottom: 0.02, top: 0.07 * legs }), s.pants, { look: pantsLook });
     }
     if (!omit.has('shins')) {
       if (b.hero && s.joints !== 'hinge') clothKnee(k, side);
       else hinge(k, sh, 0.057 * legs, 0.126 * legs, s.pants, pantsLook);
       if (fine) b.add(sh, S.blob(0.082 * legs, 0.078, 0.036, 0.7, b.hero ? 14 : 8), s.pants, { at: [0, 0.002, -0.046 * legs], look: pantsLook });
-      b.add(sh, S.loft(limbRings('shin', legs), n, { steps, top: 0.02 }), s.pants, { look: pantsLook });
+      b.add(sh, S.loft(limbLoft(b, 'shin', legs), n, { steps, top: 0.02 }), s.pants, { look: pantsLook });
     }
     if (!omit.has('boots')) boot(k, side);
   });

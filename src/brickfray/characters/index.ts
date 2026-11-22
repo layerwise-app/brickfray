@@ -29,7 +29,7 @@ export function createCharacter(id: CharacterId | BotKind, kit: Kit, hero?: { ha
   const key = hero ? `${id}:hero:${hero.hands.L}:${hero.hands.R}` : `${id}:${kit.profile.level}`;
   let baked = cache.get(key);
   if (!baked) {
-    const parts = new PartSet(kit.profile, hero ? { hero: true, hands: hero.hands } : {});
+    const parts = new PartSet(kit.profile, hero ? { hero: true, hands: hero.hands } : { lean: id in ROSTER });
     design.build(parts);
     meleeProp(parts, LOADOUTS[id].melee, !(id in ROSTER));
     baked = parts.bake(restModelPositions(rest));
@@ -37,7 +37,7 @@ export function createCharacter(id: CharacterId | BotKind, kit: Kit, hero?: { ha
     cache.set(key, baked);
   }
   const hands = hero ? hero.hands : kit.profile.detail === 2 ? DEFAULT_HANDS : null;
-  return new Rig({ id, baked, hands, rest, style: STYLES[id], scale: design.scale ?? 1, tool: LOADOUTS[id].melee }, kit);
+  return new Rig({ id, baked, hands, rest, style: STYLES[id], scale: design.scale ?? 1, grip: design.grip ?? 1, tool: LOADOUTS[id].melee }, kit);
 }
 
 /** Frees every cached character geometry (after a quality change or when leaving the game). */

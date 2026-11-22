@@ -1,5 +1,6 @@
 import type * as THREE from 'three';
 import type { WeaponId } from '../weapons/defs';
+import type { Place } from './foot-lock';
 import type { Stance } from './stance';
 import type { StowPlace } from './stow';
 
@@ -47,6 +48,8 @@ export interface AnimState {
   swapFrom?: WeaponId | null;
   /** A shot is about to show (seen in a newer snapshot): the gun comes up ahead of it. */
   alert?: boolean;
+  /** Where the figure stands in a match (absent in labs and portraits): planted feet then hold their spots. */
+  place?: Place;
 }
 
 /** A part that flies off when the character shatters. */
@@ -76,8 +79,8 @@ export interface CharacterRig {
   setMelee(model: THREE.Object3D | null): void;
   /** Team or player tint shown on an armband/visor stripe; null clears it. */
   setTint(color: THREE.ColorRepresentation | null): void;
-  /** Brief white hit flash. */
-  flash(): void;
+  /** Brief hit tint round a world-space point on the figure (the chest when none). */
+  flash(at?: THREE.Vector3): void;
   /**
    * Breaks the character into its parts in world space and hides the rig;
    * `impulse` pushes pieces (bullet direction × strength).
@@ -85,6 +88,8 @@ export interface CharacterRig {
   shatter(impulse: THREE.Vector3): ShatterPiece[];
   /** Restore after shatter (respawn). */
   reset(): void;
+  /** Snap the figure together out of its pieces where it stands (a respawn). */
+  assemble(): void;
   /** Head center in world space, for hit boxes and name tags. */
   headPosition(out: THREE.Vector3): THREE.Vector3;
   dispose(): void;

@@ -42,6 +42,8 @@ const v = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
 const jitter = (spread: number) => (Math.random() - 0.5) * spread;
 
 const HEAD_GOLD = '#ffd23f';
+const DUST_GREY = new THREE.Color('#a39d92');
+const dustTone = new THREE.Color();
 /** The one flash light's settings for a blast and for a shot; a blast wins while it lasts. */
 const BLAST = { color: '#ffb466', distance: 16, decay: 1.6, peak: 180, life: 0.4 };
 const SHOT = { color: '#ffc27a', distance: 5, decay: 2, peak: 2, life: 0.07 };
@@ -94,7 +96,7 @@ export class Effects {
     this.shatterField = new ShatterField(world, kit.profile.level === 'low' ? 60 : kit.profile.level === 'medium' ? 140 : 260);
     this.decals = new Decals(kit.profile.maxDecals);
     this.casings = new Casings(kit, world);
-    this.splashes = new Splashes(this.smoke, this.shockwaves);
+    this.splashes = new Splashes(this.smoke, this.glow, this.shockwaves);
     this.tracers.onAdd = (from, to, small) => this.splashes.shot(from, to, this.camera?.getWorldPosition(probe) ?? null, small);
     this.debris.onBounce = (p, s) => this.onChipBounce?.(p, s);
     this.shatterField.onClatter = (p, s) => this.onChipBounce?.(p, s);
@@ -136,7 +138,7 @@ export class Effects {
   impact(point: THREE.Vector3, normal: THREE.Vector3, surface: string, color?: THREE.ColorRepresentation) {
     const c = color ?? SURFACE_COLOR[surface] ?? SURFACE_COLOR.plastic!;
     if (surface === 'water') {
-      this.splashes.splash(this.splashes.lift(point));
+      this.splashes.hit(point);
       return;
     }
     if (surface === 'foliage') {
@@ -172,7 +174,17 @@ export class Effects {
       default:
         this.debris.burst(point, normal, c, 5, 3, 0.05);
     }
-    this.smoke.emit({ position: point.clone().addScaledVector(normal, 0.08), velocity: normal.clone().multiplyScalar(0.6), size: 0.18, grow: 1, color: c, alpha: surface === 'stone' ? 0.7 : 0.5, life: 0.55, drag: 2 });
+    this.dust(point, normal, c, surface === 'stone' ? 0.95 : 0.85);
+  }
+
+  /**
+   * A puff of dust off the hit that hangs a moment, so a hit across the map shows for more than a frame. It is the
+   * surface's colour turned toward grey and shaded as a lump, so it still shows against the wall it came off.
+   */
+  private dust(point: THREE.Vector3, normal: THREE.Vector3, color: THREE.ColorRepresentation, alpha: number) {
+    const tone = dustTone.set(color).lerp(DUST_GREY, 0.35).multiplyScalar(0.85);
+    this.smoke.emit({ position: point.clone().addScaledVector(normal, 0.08), velocity: normal.clone().multiplyScalar(1).add(v(0, 0.15, 0)), size: 0.28, grow: 0.8, color: tone, alpha, life: 0.8, drag: 3.5, shape: 'smoke' });
+    this.smoke.emit({ position: point.clone().addScaledVector(normal, 0.05), velocity: normal.clone().multiplyScalar(2.2).add(v(jitter(0.7), 0.35, jitter(0.7))), size: 0.17, grow: 0.6, color: tone, alpha: alpha * 0.85, life: 0.6, drag: 4.5, shape: 'smoke' });
   }
 
   /**
@@ -206,6 +218,20 @@ export class Effects {
       if (fits) return size * k;
     }
     return 0;
+  }
+
+  /** A figure snapping together where it respawns: a ring racing out and a pool of light at its feet, sparks up its height. */
+  spawn(position: THREE.Vector3, color: THREE.ColorRepresentation, scale = 1) {
+    const feet = probe.copy(position).setY(position.y + 0.02);
+    this.shockwaves.add(feet, 0.3 * scale, 1.6 * scale, 0.6, color);
+    this.shockwaves.add(feet, 1.1 * scale, 1.1 * scale, 0.65, new THREE.Color(color).multiplyScalar(0.6), true);
+    // A soft column of light up the figure: what reads from across the map, where the floor ring is seen edge-on.
+    for (const h of [0.35, 0.9, 1.45]) this.glow.emit({ position: v(position.x, position.y + h * scale, position.z), size: 0.7 * scale, grow: 0.6, color, alpha: 0.55, life: 0.5, shape: 'soft', delay: h * 0.12 });
+    for (let i = 0; i < 12; i++) {
+      const a = (i / 12) * Math.PI * 2;
+      const at = v(position.x + Math.sin(a) * 0.45 * scale, position.y + 0.1, position.z + Math.cos(a) * 0.45 * scale);
+      this.glow.emit({ position: at, velocity: v(-Math.sin(a) * 0.5, (2.4 + Math.random() * 1.4) * scale, -Math.cos(a) * 0.5), size: 0.09 * scale, color, life: 0.5, shape: 'soft', drag: 1.5, delay: (i % 3) * 0.05 });
+    }
   }
 
   bodyHit(point: THREE.Vector3, dir: THREE.Vector3, color: THREE.ColorRepresentation, head: boolean) {

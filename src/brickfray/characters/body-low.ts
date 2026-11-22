@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import type { BodyStyle } from './body';
+import { FACE_Z, HEAD } from './body-head';
 import { limbRings, type LimbPart } from './body-limbs';
 import type { Look, PartOptions, PartSet } from './parts';
 import type { BoneName, V3 } from './skeleton';
@@ -37,8 +38,6 @@ export function blockBody(b: PartSet, s: BodyStyle) {
     const fa = `forearm${side}` as const;
     const th = `thigh${side}` as const;
     const sh = `shin${side}` as const;
-    const ft = `foot${side}` as const;
-    const toe = `toe${side}` as const;
     if (!omit.has('upperArms')) lowShaped(b, ua, 'upperArm', L, 0.064 * L, sleeve, shirtLook, 6, 3);
     lowBand(b, ua, 'upperArm', L, -0.155, -0.085, 0.003, '#ffffff', 'tint');
     if (!omit.has('forearms')) {
@@ -50,17 +49,21 @@ export function blockBody(b: PartSet, s: BodyStyle) {
     // The hip ball sits under the hips and the knee ball inside the leg's ends (a pad or cop covers the knee): both coarse.
     if (!omit.has('thighs')) lowShaped(b, th, 'thigh', L, 0.08 * L, s.pants, pantsLook, 6, 3);
     if (!omit.has('shins')) lowShaped(b, sh, 'shin', L, 0.056 * L, s.pants, pantsLook, 6, 3);
-    if (!omit.has('boots')) {
-      const bl = s.bootLook ?? 'plastic';
-      const sole = s.sole ?? '#2b2f33';
-      b.cyl(ft, 0.061 * L, 0.059 * L, 0.13, s.boot, { at: [0, 0.02, 0.0], look: bl, open: true });
-      // A rounded upper on a flat sole that stands out from it a little all round.
-      b.add(ft, S.blob(0.112, 0.1, 0.21, 0.5, 6, 0), s.boot, { at: [0, -0.032, -0.035], look: bl });
-      b.box(ft, [0.116, 0.022, 0.2], sole, { at: [0, -0.074, -0.035], look: 'rubber' });
-      b.add(toe, S.blob(0.1, 0.07, 0.11, 0.5, 5, 0), s.boot, { at: [0, 0.002, -0.03], rot: [0, Math.PI / 2, 0], look: bl });
-      b.box(toe, [0.114, 0.022, 0.088], sole, { at: [0, -0.019, -0.034], look: 'rubber' });
-    }
+    if (!omit.has('boots')) lowBoot(b, s, side, L);
   });
+}
+
+/** The low tier's boot: a shaft, a rounded upper on a flat sole that stands out from it a little all round, and a toe. */
+export function lowBoot(b: PartSet, s: BodyStyle, side: 'L' | 'R', L: number) {
+  const ft = `foot${side}` as const;
+  const toe = `toe${side}` as const;
+  const bl = s.bootLook ?? 'plastic';
+  const sole = s.sole ?? '#2b2f33';
+  b.add(ft, S.cylinder(0.061 * L, 0.059 * L, 0.13, 6, true), s.boot, { at: [0, 0.02, 0.0], look: bl });
+  b.add(ft, S.blob(0.112, 0.1, 0.21, 0.5, 6, 0), s.boot, { at: [0, -0.032, -0.035], look: bl });
+  b.add(ft, S.box(0.116, 0.022, 0.2, 0), sole, { at: [0, -0.074, -0.035], look: 'rubber' });
+  b.add(toe, S.blob(0.1, 0.07, 0.11, 0.5, 5, 0), s.boot, { at: [0, 0.002, -0.03], rot: [0, Math.PI / 2, 0], look: bl });
+  b.add(toe, S.box(0.114, 0.022, 0.088, 0), sole, { at: [0, -0.019, -0.034], look: 'rubber' });
 }
 
 /**
@@ -271,10 +274,16 @@ export function blockFace(b: PartSet, s: BodyStyle, z = -0.121) {
       b.add('head', S.cylinder(0.0175, 0, 0.002, 8), s.iris ?? '#6a4a30', { at: [ix, 0.073, z - 0.0045], rot: [-Math.PI / 2, 0, 0], scale: [1, 1, 1.15], look: 'gloss' });
       b.box('head', [0.016, 0.02, 0.004], eyes, { at: [ix, 0.073, z - 0.006], look: 'gloss', bevel: 0 });
       b.box('head', [0.008, 0.009, 0.003], '#ffffff', { at: [ix + 0.007, 0.082, z - 0.0085], look: 'glow', bevel: 0 });
-      b.box('head', [0.05, 0.006, 0.01], eyes, { at: [x, 0.1, z + 0.002], rot: [0, 0, sign * 0.08], look: 'gloss', bevel: 0 });
+      // A thin lash line along the top of the white, as the sculpted lids draw it; a thick bar reads as heavy lids.
+      b.box('head', [0.05, 0.0035, 0.01], eyes, { at: [x, 0.0985, z + 0.002], rot: [0, 0, sign * 0.08], look: 'gloss', bevel: 0 });
+      if (s.lashes) b.box('head', [0.012, 0.003, 0.008], eyes, { at: [x + sign * 0.026, 0.1, z + 0.003], rot: [0, 0, sign * 0.7], look: 'gloss', bevel: 0 });
     }
     if (s.brow) b.box('head', [0.054, 0.014, 0.016], s.brow, { at: [sign * 0.05, 0.121, z - 0.002], rot: [0, 0, sign * (s.browTilt ?? 0.1)], bevel: 0 });
     if (s.blush && b.detail === 0) b.box('head', [0.026, 0.012, 0.008], s.blush, { at: [sign * 0.074, 0.034, z + 0.013], rot: [0, sign * 0.5, 0], look: 'skin', bevel: 0 });
+    else if (s.blush) {
+      const bz = z === FACE_Z ? S.loftFrontZ(HEAD, sign * 0.076, 0.036) + 0.002 : z + 0.012;
+      b.add('head', S.sphere(0.017, 6, 3), s.blush, { at: [sign * 0.076, 0.036, bz], rot: [0, sign * 0.5, 0], scale: [1, 0.75, 0.25], look: 'skin' });
+    }
   });
   if (b.detail > 0) b.blob('head', [0.03, 0.042, 0.03], s.skin, { at: [0, 0.035, z - 0.006], look: 'skin', e: 0.7 });
   else b.taper('head', [0.034, 0.03], [0.018, 0.012], 0.044, s.skin, { at: [0, 0.03, z - 0.004], look: 'skin', shiftZ: 0.008 });

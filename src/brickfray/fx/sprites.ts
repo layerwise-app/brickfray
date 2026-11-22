@@ -99,11 +99,11 @@ void main() {
       a = smoothstep(reach, reach * 0.72, r);
       col = mix(col, vec3(1.0, 0.97, 0.9), smoothstep(0.34, 0.08, r));
     } else {
-      // Flame tongue along local +x: wide and white at the muzzle end (-x), tapering to a point.
+      // Flame tongue along local +x: white at the muzzle end (-x), a slim cone to a point, soft at its edges and tip.
       float u = d.x * 0.5 + 0.5;
-      float w = 0.34 * pow(max(1.0 - u, 0.0), 0.65) * smoothstep(0.0, 0.1, u) + 0.002;
-      a = smoothstep(w, w * 0.45, abs(d.y)) * smoothstep(1.0, 0.9, u);
-      col = mix(col, vec3(1.0, 0.96, 0.86), smoothstep(0.5, 0.05, u) * 0.85);
+      float w = 0.27 * pow(max(1.0 - u, 0.0), 0.95) * smoothstep(0.0, 0.12, u) + 0.002;
+      a = smoothstep(w, w * 0.2, abs(d.y)) * smoothstep(1.0, 0.7, u) * mix(1.0, 0.6, u);
+      col = mix(col, vec3(1.0, 0.96, 0.86), smoothstep(0.5, 0.05, u) * smoothstep(w, 0.0, abs(d.y)) * 0.9);
     }
   } else {
     // Billows: a ragged soft silhouette from two scrolling noise layers; the noise turns with the sprite, the light doesn't.
@@ -137,12 +137,14 @@ void main() {
       float body = sqrt(max(0.0, 1.0 - sr * sr));
       float lit = dot(vec3(sd * 0.9, body), vec3(-0.36, 0.74, 0.57));
       float n1 = texture2D(uNoise, nuv + vec2(0.0, age * 0.16)).r;
-      float heat = 1.22 - sr * 0.7 - age * 1.3 + (n1 - 0.5) * 0.7 + 0.3 * lit;
-      col = mix(${lin('#4d4642')}, ${lin('#6f6761')}, step(0.5, lit));
-      col = mix(col, ${lin('#a8240c')}, smoothstep(0.1, 0.13, heat));
-      col = mix(col, ${lin('#ff6a12')}, smoothstep(0.3, 0.33, heat));
-      col = mix(col, ${lin('#ffbf2e')}, smoothstep(0.52, 0.55, heat));
-      col = mix(col, ${lin('#fff7e2')}, smoothstep(0.76, 0.79, heat));
+      // Heat follows each lump's shape (hot in its sunward middle, cooler at its rim) more than the noise, and the bands
+      // blend over a short ramp: patches with noise-cut hard edges read as a cut-out camo print, not a volume.
+      float heat = 1.22 - sr * 0.75 - age * 1.3 + (n1 - 0.5) * 0.36 + 0.5 * lit;
+      col = mix(${lin('#4d4642')}, ${lin('#6f6761')}, smoothstep(0.35, 0.65, lit));
+      col = mix(col, ${lin('#a8240c')}, smoothstep(0.06, 0.16, heat));
+      col = mix(col, ${lin('#ff6a12')}, smoothstep(0.26, 0.37, heat));
+      col = mix(col, ${lin('#ffbf2e')}, smoothstep(0.49, 0.59, heat));
+      col = mix(col, ${lin('#fff7e2')}, smoothstep(0.74, 0.84, heat));
       // A darker lip where one lump turns away, so lumps in front stand off the ones behind.
       col *= 1.0 - 0.2 * smoothstep(0.72, 0.92, edge);
       col *= vColor.rgb;

@@ -55,7 +55,9 @@ export function hair(b: PartSet) {
     const half = lerp(lerp(behindEars, HALF + 0.62, smoothstep(y, 0.085, 0.118)), Math.PI, smoothstep(y, 0.15, 0.172));
     return [Math.PI - half, Math.PI + half];
   };
-  b.add('head', SKULL.panel({ y: [y0, y1], a: cap, lift: 0.001, thick: b.hero ? 0.008 : 0.011, seg: [tier(b, 10, 14, 30), tier(b, 3, 4, 8)] }), C.hair, { look: 'cloth' });
+  // Off the showroom the cap's facets are coarser than the head's: it stands off far enough that no facet dips into the scalp.
+  const lift = b.hero ? 0.001 : b.detail >= 2 ? 0.004 : b.lean ? 0.008 : 0.006;
+  b.add('head', SKULL.panel({ y: [y0, y1], a: cap, lift, thick: b.hero ? 0.008 : 0.011, seg: [b.lean ? 8 : tier(b, 10, 14, 30), b.lean ? 3 : tier(b, 3, 4, 8)] }), C.hair, { look: 'cloth' });
   b.add('head', S.dome(0.08, tier(b, 8, 10, 20), tier(b, 2, 3, 5)), C.hair, { at: [0, 0.222, 0.004], scale: [0.95, 0.3, 1.05], look: 'cloth' });
   lump(b, 'head', [0.1, 0.085, 0.1], tier(b, 6, 8, 14), C.hair, { at: [0, 0.2, 0.092], rot: [-0.5, 0, 0], look: 'cloth', e: 0.9 });
 
@@ -305,6 +307,6 @@ export function smirk(b: PartSet) {
   // A painted line: a flat band lying in the skin, proud of it by under a millimetre, so the profile stays clean.
   const points = SMIRK.map(([x, y]) => at(x, y, -0.0006));
   const width = (t: number) => 0.0034 * (1 - 0.45 * Math.abs(2 * t - 1) ** 2);
-  b.add('head', strand(points, width, { flat: 0.4, side: [0, 1, 0], seg: b.hero ? 16 : 8, radial: b.hero ? 10 : 6 }), C.mouth, { look: 'skin' });
-  orb(b, 'head', 0.011, b.hero ? 12 : 6, C.lip, { at: at(0.002, -0.0178, -0.0036), rot: [0, 0, 0.12], scale: [1.4, 0.38, 0.38], look: 'skin' });
+  b.add('head', strand(points, width, { flat: 0.4, side: [0, 1, 0], seg: b.hero ? 16 : b.lean ? 5 : 8, radial: b.hero ? 10 : b.lean ? 4 : 6 }), C.mouth, { look: 'skin' });
+  orb(b, 'head', 0.011, b.hero ? 12 : b.lean ? 5 : 6, C.lip, { at: at(0.002, -0.0178, -0.0036), rot: [0, 0, 0.12], scale: [1.4, 0.38, 0.38], look: 'skin' });
 }

@@ -57,6 +57,8 @@ export interface BakedCharacter {
  * so the body has a chest and a seat in profile and each garment keeps its fit.
  */
 export const TORSO_DEPTH = 1.12;
+/** Share of the medium tier's segment counts the lean low tier keeps. */
+const LEAN = 0.5;
 const TORSO = new Set<BoneName>(['pelvis', 'spine', 'chest']);
 const deepen = new THREE.Matrix4().makeScale(1, 1, TORSO_DEPTH);
 
@@ -77,24 +79,35 @@ export class PartSet {
   readonly hero: boolean;
   /** Hand shapes to build; a showroom stance picks them. */
   readonly hands: Hands;
+  /** Low tier cut from the medium design: every costume part kept, with the low tier's segment counts and no bevels. */
+  readonly lean: boolean;
 
   constructor(
     readonly profile: QualityProfile,
-    options: { hero?: boolean; hands?: Hands } = {}
+    options: { hero?: boolean; hands?: Hands; lean?: boolean } = {}
   ) {
     this.hero = options.hero ?? false;
-    this.detail = this.hero ? 2 : profile.detail;
+    this.lean = !this.hero && profile.detail === 0 && (options.lean ?? false);
+    this.detail = this.hero ? 2 : this.lean ? 1 : profile.detail;
     this.hands = options.hands ?? DEFAULT_HANDS;
   }
 
   /** Segment count for the current tier. */
   seg(low: number, medium: number, high: number) {
     if (this.hero) return Math.round(high * 1.7);
+    if (this.lean) return low;
     return this.detail === 0 ? low : this.detail === 1 ? medium : high;
   }
 
   get bevel() {
-    return this.detail === 0 ? 0 : this.detail === 1 ? 0.008 : 0.012;
+    return this.detail === 0 || this.lean ? 0 : this.detail === 1 ? 0.008 : 0.012;
+  }
+
+  /** A costume's medium-tier count, cut down on the lean low tier; even counts stay even (symmetric parts). */
+  cut(n: number) {
+    if (!this.lean) return n;
+    const m = Math.max(Math.min(n, n >= 6 ? 6 : 3), Math.round(n * LEAN));
+    return Math.min(n, n % 2 ? m : m + (m % 2));
   }
 
   add(bone: BoneName, geometry: THREE.BufferGeometry, color: THREE.ColorRepresentation, o: PartOptions = {}) {
@@ -110,12 +123,12 @@ export class PartSet {
 
   box(bone: BoneName, size: V3, color: THREE.ColorRepresentation, o: PartOptions & { bevel?: number } = {}) {
     const b = o.bevel ?? Math.min(this.bevel, Math.min(...size) * 0.3);
-    return this.add(bone, S.box(size[0], size[1], size[2], this.detail === 0 ? 0 : b), color, o);
+    return this.add(bone, S.box(size[0], size[1], size[2], this.detail === 0 || this.lean ? 0 : b), color, o);
   }
 
   /** Tapered box: bottom [w, d] to top [w, d] over height h. */
   taper(bone: BoneName, bottom: [number, number], top: [number, number], h: number, color: THREE.ColorRepresentation, o: PartOptions & { bevel?: number; shiftZ?: number } = {}) {
-    const b = this.detail === 0 ? 0 : (o.bevel ?? this.bevel * 1.4);
+    const b = this.detail === 0 || this.lean ? 0 : (o.bevel ?? this.bevel * 1.4);
     return this.add(bone, S.taper(bottom[0], bottom[1], top[0], top[1], h, b, o.shiftZ ?? 0), color, o);
   }
 

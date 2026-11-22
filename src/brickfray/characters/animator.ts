@@ -14,6 +14,7 @@ import { Flinch } from './flinch';
 import { SLIDE, slideFoot, slidePelvis } from './slide';
 import type { StowFit } from './stow';
 import { Airborne } from './airborne';
+import { FootLock } from './foot-lock';
 
 const v1 = new THREE.Vector3();
 const v2 = new THREE.Vector3();
@@ -24,7 +25,7 @@ const knee = new THREE.Vector3();
 const reached = new THREE.Vector3();
 const X = new THREE.Vector3(1, 0, 0);
 const body = [0, 0, 0, 0, 0, 0];
-const feet: FootPose[] = [0, 1].map(() => ({ pos: new THREE.Vector3(), heading: 0, pitch: 0, toe: 0, planted: 1, stance: 0 }));
+const feet: FootPose[] = [0, 1].map(() => ({ pos: new THREE.Vector3(), heading: 0, pitch: 0, toe: 0, planted: 1, stance: 0, swing: -1 }));
 const legs = emptyLegs();
 const turn = { heading: 0, pitch: 0, roll: 0 };
 
@@ -71,6 +72,9 @@ export class Animator {
   fit: StowFit = { back: 0.15, hip: 0.18 };
   private slide = 0;
   private readonly flinch = new Flinch();
+  private readonly lock = new FootLock();
+  /** The body's scale in the world, for holding the feet on their spots. */
+  scale = 1;
 
   constructor(
     rest: V3[],
@@ -97,6 +101,7 @@ export class Animator {
     this.time = u * 37;
     this.vx = this.vz = this.speed = this.crouch = this.sprint = this.ads = this.slide = 0;
     this.flinch.reset();
+    this.lock.reset();
     this.jump.reset();
     this.ready = 1;
     this.nade = -1;
@@ -123,6 +128,14 @@ export class Animator {
       return;
     }
     const st = this.style;
+    const turned = this.lock.turn(dt, s.place, smooth(this.speed, 0.12, 0.8));
+    if (turned) {
+      // The velocity's smoothing and the stride's direction stay put in the world as the body turns.
+      const c = Math.cos(turned);
+      const sn = Math.sin(turned);
+      [this.vx, this.vz] = [this.vx * c + this.vz * sn, this.vz * c - this.vx * sn];
+      this.gait.heading = Math.atan2(Math.sin(this.gait.heading + turned), Math.cos(this.gait.heading + turned));
+    }
     this.vx = damp(this.vx, s.localVelocity.x, 10, dt);
     this.vz = damp(this.vz, s.localVelocity.z, 10, dt);
     this.speed = Math.hypot(this.vx, this.vz);
@@ -180,6 +193,7 @@ export class Animator {
       f.toe = lerp(f.toe, g.toe, moving);
       f.planted = lerp(1, g.planted, moving);
       f.stance = moving > 0.5 ? g.stance : 0.5;
+      f.swing = moving > 0.5 && air < 0.5 ? g.swing : -1;
       if (air > 0) {
         const tuck = AIR_TUCK[i]!;
         const fall = AIR_FALL[i]!;
@@ -194,6 +208,7 @@ export class Animator {
       }
       slideFoot(f, i, sl);
     }
+    this.lock.hold(dt, feet, this.scale, s.grounded ? (1 - air) * (1 - sl) : 0, moving);
 
     // Pelvis: height, bob/sway, heading toward the move direction, lean.
     const pose = this.pose;
@@ -217,15 +232,15 @@ export class Animator {
       pp.x += body[5]! * reloadW;
     } else body.fill(0);
     const idleHeading = -0.22 - 0.06 * crouch + 0.3 * body[0]! * reloadW + hip[3]! * planted;
-    turn.heading = lerp(idleHeading, pelvisHeading, moving) + this.gait.yaw * moving;
+    turn.heading = lerp(idleHeading + this.lock.twist, pelvisHeading, moving) + this.gait.yaw * moving;
     turn.roll = this.gait.roll * moving + shift * 1.5;
     const airPitch = air * lerp(0.06, -0.1, rising);
     turn.pitch = -lerp(0.14, 0.3, moving) * crouch - (0.04 + 0.08 * P.run) * moving * (this.gait.backward ? -0.5 : 1) - 0.5 * landX + airPitch + hip[4]! * planted;
     slidePelvis(pp, turn, sl);
     // A hit shoves the hips away from the shooter and the knees give.
-    pp.x += 0.07 * jolt.x;
-    pp.z += 0.07 * jolt.y;
-    pp.y -= 0.1 * jolt.length();
+    pp.x += 0.12 * jolt.x;
+    pp.z += 0.12 * jolt.y;
+    pp.y -= 0.12 * jolt.length();
     hprQuat(turn.heading, turn.pitch, turn.roll, pose.q[BONE.pelvis]!);
     pose.solve(BONE.pelvis);
 
