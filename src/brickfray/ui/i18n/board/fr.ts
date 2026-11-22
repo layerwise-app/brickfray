@@ -5,7 +5,7 @@ export const boardFr: Record<BoardKey, string> = {
   'board.tab.ranks': 'Classement',
   'board.tab.history': 'Mes parties',
   'board.tab.profile': 'Profil',
-  'board.mode.solo': 'Vagues',
+  'board.mode.solo': 'Solo',
   'board.mode.ffa': 'Chacun pour soi',
   'board.mode.tdm': 'Équipes',
   'board.allMaps': 'Toutes',

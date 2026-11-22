@@ -5,7 +5,7 @@ export const boardZh: Record<BoardKey, string> = {
   'board.tab.ranks': '排名',
   'board.tab.history': '我的战绩',
   'board.tab.profile': '个人资料',
-  'board.mode.solo': '波次',
+  'board.mode.solo': '单人',
   'board.mode.ffa': '个人混战',
   'board.mode.tdm': '团队',
   'board.allMaps': '全部',

@@ -5,7 +5,7 @@ export const boardJa: Record<BoardKey, string> = {
   'board.tab.ranks': '順位',
   'board.tab.history': 'マイ戦績',
   'board.tab.profile': 'プロフィール',
-  'board.mode.solo': 'ウェーブ',
+  'board.mode.solo': 'ソロ',
   'board.mode.ffa': '個人戦',
   'board.mode.tdm': 'チーム',
   'board.allMaps': 'すべて',

@@ -5,7 +5,7 @@ export const boardKo: Record<BoardKey, string> = {
   'board.tab.ranks': '순위',
   'board.tab.history': '내 전적',
   'board.tab.profile': '프로필',
-  'board.mode.solo': '웨이브',
+  'board.mode.solo': '솔로',
   'board.mode.ffa': '개인전',
   'board.mode.tdm': '팀전',
   'board.allMaps': '전체',

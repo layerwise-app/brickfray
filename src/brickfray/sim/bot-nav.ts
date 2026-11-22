@@ -20,6 +20,8 @@ export interface NavState {
 
 /** How far from a goal its route may end when the nearest waypoint can't see it (m). */
 const GOAL_REACH = 7;
+const REPATH = 1.5;
+const RETRY = 0.3;
 
 /** Bot legwork: the waypoint route to a goal, and never stepping off a ledge into the kill zone. */
 export class BotNav {
@@ -41,8 +43,9 @@ export class BotNav {
       return direct < 1e-3 ? null : [(gx - m.x) / direct, (gz - m.z) / direct];
     }
     b.repath -= TICK;
-    if (b.path.length === 0 || b.repath <= 0) {
-      b.repath = 1.5;
+    // An empty route is searched again only after a pause: with no way to the goal the search would run every tick.
+    if (b.repath <= 0 || (b.path.length === 0 && b.repath <= REPATH - RETRY)) {
+      b.repath = REPATH;
       const now = this.host.time;
       const blocked = (i: number) => (b.blocked.get(i) ?? 0) > now;
       b.path = findPath(wps, nearestWaypoint(wps, m.x, m.y, m.z, blocked), this.goalWaypoint(gx, gy, gz), (from, to) => (b.avoid.get(`${from}>${to}`) ?? 0) > now || blocked(to));

@@ -4,7 +4,7 @@ export const boardEn = {
   'board.tab.ranks': 'Rankings',
   'board.tab.history': 'My matches',
   'board.tab.profile': 'Profile',
-  'board.mode.solo': 'Waves',
+  'board.mode.solo': 'Solo',
   'board.mode.ffa': 'Free-for-all',
   'board.mode.tdm': 'Teams',
   'board.allMaps': 'All maps',
