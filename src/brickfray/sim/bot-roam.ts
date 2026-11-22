@@ -1,4 +1,5 @@
 import { nearestWaypoint } from './bot-nav';
+import type { Band } from './bot-profile';
 import { PLAYER } from './constants';
 import type { HostSim } from './host';
 import type { PlayerState } from './types';
@@ -29,6 +30,12 @@ const HIGH = 2;
 const HIGH_SHARE = 0.3;
 /** An enemy this far (m) across or this far above or below the nearest waypoint stands where the graph can't take a bot. */
 const OFF_GRAPH = { across: 4, up: 1.5 };
+/** How far (m) to the side of an enemy a flanking bot aims to come from. */
+const FLANK = 18;
+/** How much (per m) a flanking bot will walk farther to come from its flank. */
+const FLANK_PULL = 1.5;
+/** Cheapest standoff spots tried for a line on the enemy, per look. */
+const TRIES = 48;
 
 /** Bot goals out of a fight: the last sighting, a patrol, or the nearest enemy; never nothing for long. */
 export class BotRoam {
@@ -44,12 +51,18 @@ export class BotRoam {
     this.fight = { at, time: this.host.time };
   }
 
-  /** The last sighting until it is reached, a patrol while one runs, else whatever `hunt` finds, else a new patrol. */
-  goal(bot: PlayerState, b: RoamState, hunt: () => Spot | null): Spot | null {
+  /**
+   * The last sighting (or the spot `toward` picks for it) until it is reached, a patrol while one runs, else whatever
+   * `hunt` finds, else a new patrol.
+   */
+  goal(bot: PlayerState, b: RoamState, hunt: () => Spot | null, toward = (seen: Spot) => seen): Spot | null {
     const m = bot.move;
     const at = (p: Spot) => Math.hypot(p[0] - m.x, p[2] - m.z) < HEADWAY && Math.abs(p[1] - m.y) < 1.2;
-    if (b.lastSeen && at(b.lastSeen)) b.lastSeen = null;
-    if (b.lastSeen) return b.lastSeen;
+    if (b.lastSeen) {
+      const spot = toward(b.lastSeen);
+      if (at(spot) || at(b.lastSeen)) b.lastSeen = null;
+      else return spot;
+    }
     if (b.patrol && (this.host.time > b.patrolUntil || at(b.patrol))) b.patrol = null;
     return b.patrol ?? hunt() ?? this.patrol(bot, b);
   }
@@ -81,6 +94,71 @@ export class BotRoam {
     const spot = this.firingSpot(bot, enemy, range);
     b.approach = { for: enemy, at: this.host.time, spot };
     return spot;
+  }
+
+  /**
+   * `approach` for a bot that fights from its band: a waypoint inside the band with a line on the enemy, taken from the
+   * `flank` side when it has one. A spot that still holds is kept: no hopping between two equally good ones.
+   */
+  standoff(bot: PlayerState, b: RoamState, enemy: Spot, band: Band, range: number, flank: Spot | null): Spot {
+    const last = b.approach;
+    if (last && this.host.time - last.at < 1.5 && Math.hypot(last.for[0] - enemy[0], last.for[1] - enemy[1], last.for[2] - enemy[2]) < 1.5) return last.spot;
+    const keep = last && last.spot !== last.for && this.holds(last.spot, enemy, band);
+    const spot = keep ? last.spot : this.standoffSpot(bot, enemy, band, range, flank);
+    b.approach = { for: enemy, at: this.host.time, spot };
+    return spot;
+  }
+
+  /** In team matches, the point `FLANK` m to the bot's lane side of an enemy, across the line from its team's spawns. */
+  flank(bot: PlayerState, lane: number, enemy: Spot): Spot | null {
+    if (bot.team < 0 || lane === 0) return null;
+    const home = this.home(bot.team);
+    if (!home) return null;
+    const ax = enemy[0] - home[0];
+    const az = enemy[2] - home[1];
+    const len = Math.hypot(ax, az);
+    if (len < 1) return null;
+    return [enemy[0] - (az / len) * lane * FLANK, enemy[1], enemy[2] + (ax / len) * lane * FLANK];
+  }
+
+  private homes = new Map<number, [number, number] | null>();
+
+  private home(team: number) {
+    if (!this.homes.has(team)) {
+      const own = this.host.layout.spawns.filter((s) => s.team === team);
+      this.homes.set(team, own.length ? [own.reduce((a, s) => a + s.position[0], 0) / own.length, own.reduce((a, s) => a + s.position[2], 0) / own.length] : null);
+    }
+    return this.homes.get(team)!;
+  }
+
+  private sees(p: Spot, enemy: Spot) {
+    return this.host.world.clearLine(p[0], p[1] + PLAYER.eye, p[2], enemy[0], enemy[1] + 1.2, enemy[2]);
+  }
+
+  private holds(p: Spot, enemy: Spot, band: Band) {
+    const d = Math.hypot(p[0] - enemy[0], p[2] - enemy[2]);
+    return d >= band.min && d <= band.max && this.sees(p, enemy);
+  }
+
+  /**
+   * A waypoint inside the bot's band from the enemy with a line on it: near the bot, near the middle of the band and,
+   * when flanking, near the flank point. A close-range gun with no such spot walks straight in.
+   */
+  private standoffSpot(bot: PlayerState, enemy: Spot, band: Band, range: number, flank: Spot | null): Spot {
+    const { min, max } = band;
+    const mid = (min + max) / 2;
+    const m = bot.move;
+    const scored: [number, Spot][] = [];
+    for (const w of this.host.layout.waypoints) {
+      const [x, y, z] = w.position;
+      const d = Math.hypot(x - enemy[0], z - enemy[2]);
+      if (d < min || d > max) continue;
+      const cost = Math.hypot(x - m.x, y - m.y, z - m.z) + 0.3 * Math.abs(d - mid) + (flank ? FLANK_PULL * Math.hypot(x - flank[0], z - flank[2]) : 0);
+      scored.push([cost, w.position]);
+    }
+    scored.sort((a, b) => a[0] - b[0]);
+    for (let i = 0; i < Math.min(TRIES, scored.length); i++) if (this.sees(scored[i]![1], enemy)) return scored[i]![1];
+    return this.firingSpot(bot, enemy, min === 0 ? range : max);
   }
 
   private firingSpot(bot: PlayerState, enemy: Spot, range: number): Spot {

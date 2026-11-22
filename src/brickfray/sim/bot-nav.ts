@@ -18,8 +18,20 @@ export interface NavState {
   graphOnly: number;
 }
 
+/** What getting unstuck keeps: how long the bot has pushed without moving, from where, and its sidestep round it. */
+export interface StuckState {
+  stuck: number;
+  lastPos: [number, number];
+  /** Seconds left of stepping aside round whatever the bot walked into (a post, a crate corner). */
+  sidestep: number;
+  crouchTime: number;
+  aimYaw: number;
+}
+
 /** How far from a goal its route may end when the nearest waypoint can't see it (m). */
 const GOAL_REACH = 7;
+/** A route past waypoints in an enemy's sight (within `EXPOSED.range` m) counts each as this many metres longer. */
+const EXPOSED = { cost: 8, range: 35 };
 const REPATH = 1.5;
 const RETRY = 0.3;
 
@@ -29,8 +41,11 @@ export class BotNav {
 
   constructor(private readonly host: HostSim) {}
 
-  /** Direction (x, z) to walk, following waypoints when the goal isn't straight ahead; null at the goal. */
-  navigate(bot: PlayerState, b: NavState, goal: readonly [number, number, number] | null): [number, number] | null {
+  /**
+   * Direction (x, z) to walk, following waypoints when the goal isn't straight ahead; null at the goal. With a
+   * `watcher` (an enemy a close-range bot is going for) the route keeps out of its sight where it can.
+   */
+  navigate(bot: PlayerState, b: NavState, goal: readonly [number, number, number] | null, watcher: readonly [number, number, number] | null = null): [number, number] | null {
     if (!goal) return null;
     const [gx, gy, gz] = goal;
     const wps = this.host.layout.waypoints;
@@ -39,7 +54,8 @@ export class BotNav {
     // A goal on another floor (a balcony overhead) needs the graph even when it's close in plan.
     const sameLevel = Math.abs(gy - m.y) < 1.2;
     if (direct < 1 && sameLevel) return null;
-    if (wps.length === 0 || (sameLevel && direct < 10 && this.host.time > b.graphOnly && this.host.world.clearLine(m.x, m.y + 0.6, m.z, gx, m.y + 0.6, gz))) {
+    const straight = watcher ? direct < 4 : direct < 10;
+    if (wps.length === 0 || (sameLevel && straight && this.host.time > b.graphOnly && this.host.world.clearLine(m.x, m.y + 0.6, m.z, gx, m.y + 0.6, gz))) {
       return direct < 1e-3 ? null : [(gx - m.x) / direct, (gz - m.z) / direct];
     }
     b.repath -= TICK;
@@ -48,7 +64,7 @@ export class BotNav {
       b.repath = REPATH;
       const now = this.host.time;
       const blocked = (i: number) => (b.blocked.get(i) ?? 0) > now;
-      b.path = findPath(wps, nearestWaypoint(wps, m.x, m.y, m.z, blocked), this.goalWaypoint(gx, gy, gz), (from, to) => (b.avoid.get(`${from}>${to}`) ?? 0) > now || blocked(to));
+      b.path = findPath(wps, nearestWaypoint(wps, m.x, m.y, m.z, blocked), this.goalWaypoint(gx, gy, gz), (from, to) => (b.avoid.get(`${from}>${to}`) ?? 0) > now || blocked(to), watcher ? this.exposure(watcher) : undefined);
     }
     while (b.path.length) {
       const w = wps[b.path[0]!]!.position;
@@ -117,6 +133,34 @@ export class BotNav {
     cmd.right = (c * vx - s * vz) * k;
   }
 
+  /** Duck under a low beam, else jump, when pushing without moving; after a while give up on that link and step aside. */
+  unstick(bot: PlayerState, b: NavState & StuckState, cmd: Command) {
+    const host = this.host;
+    const moved = Math.hypot(bot.move.x - b.lastPos[0], bot.move.z - b.lastPos[1]);
+    b.lastPos = [bot.move.x, bot.move.z];
+    b.stuck = Math.abs(cmd.forward) + Math.abs(cmd.right) > 0.3 && moved < 0.01 ? b.stuck + TICK : 0;
+    if (b.stuck <= 0.25) return;
+    if (this.ducks(bot, b.aimYaw, cmd.forward, cmd.right)) {
+      b.crouchTime = 1.5;
+      cmd.buttons |= BUTTON.crouch;
+    } else cmd.buttons |= BUTTON.jump;
+    if (b.stuck <= 1.2) return;
+    const wps = host.layout.waypoints;
+    if (b.path.length && wps.length) {
+      const here = nearestWaypoint(wps, bot.move.x, bot.move.y, bot.move.z);
+      const next = b.path[0] === here && b.path.length > 1 ? b.path[1]! : b.path[0]!;
+      b.avoid.set(`${here}>${next}`, host.time + 12);
+      // Nearest but not stood on: it may be the far side of the very thing the bot is pressed against.
+      const w = wps[here]!.position;
+      if (Math.hypot(w[0] - bot.move.x, w[2] - bot.move.z) > 0.9) b.blocked.set(here, host.time + 12);
+    }
+    b.graphOnly = host.time + 3;
+    b.path = [];
+    b.strafe *= -1;
+    b.sidestep = 0.6;
+    b.stuck = 0;
+  }
+
   /** A beam or shelf at head height a step ahead of where the bot is walking (facing `yaw`), with room under it for a crouch. */
   ducks(bot: PlayerState, yaw: number, forward: number, right: number) {
     const s = Math.sin(yaw);
@@ -131,6 +175,28 @@ export class BotNav {
     const r = PLAYER.halfWidth;
     const fits = (h: number) => this.host.world.overlaps(x - r, m.y + 0.05, z - r, x + r, m.y + h, z + r, this.hits).length === 0;
     return !fits(PLAYER.height) && fits(PLAYER.crouchHeight);
+  }
+
+  /** Extra route cost of each waypoint in `watcher`'s sight, looked up once per waypoint per search. */
+  private exposure(watcher: readonly [number, number, number]) {
+    const wps = this.host.layout.waypoints;
+    const seen = new Map<number, number>();
+    return (i: number) => {
+      let cost = seen.get(i);
+      if (cost === undefined) {
+        const [x, y, z] = wps[i]!.position;
+        const near = Math.hypot(x - watcher[0], z - watcher[2]) < EXPOSED.range;
+        cost = near && this.host.world.clearLine(watcher[0], watcher[1] + PLAYER.eye, watcher[2], x, y + 1.2, z) ? EXPOSED.cost : 0;
+        seen.set(i, cost);
+      }
+      return cost;
+    };
+  }
+
+  /** Whether a body standing at height `y` can step to (x, z): a floor within a step, not over the kill zone. */
+  footing(x: number, y: number, z: number) {
+    const floor = this.floor(x, y, z);
+    return floor > this.host.layout.killY + 0.4 && Math.abs(floor - y) < PLAYER.stepHeight;
   }
 
   /** A drop ahead that kills, or one whose fall carries the body past the ledge below it into one. */
@@ -190,8 +256,8 @@ export function nearestWaypoint(wps: readonly Waypoint[], x: number, y: number, 
   return best;
 }
 
-/** A* over the waypoint graph; returns node indices excluding the start. */
-export function findPath(wps: readonly Waypoint[], start: number, goal: number, avoid: (from: number, to: number) => boolean = () => false): number[] {
+/** A* over the waypoint graph, `extra` adding to the cost of entering a node; returns node indices excluding the start. */
+export function findPath(wps: readonly Waypoint[], start: number, goal: number, avoid: (from: number, to: number) => boolean = () => false, extra: (node: number) => number = () => 0): number[] {
   if (start === goal) return [goal];
   const dist = (a: number, b: number) => {
     const p = wps[a]!.position;
@@ -219,7 +285,7 @@ export function findPath(wps: readonly Waypoint[], start: number, goal: number, 
     open.delete(current);
     for (const next of wps[current]!.links) {
       if (avoid(current, next)) continue;
-      const cost = g.get(current)! + dist(current, next);
+      const cost = g.get(current)! + dist(current, next) + extra(next);
       if (cost < (g.get(next) ?? Infinity)) {
         g.set(next, cost);
         from.set(next, current);

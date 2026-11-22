@@ -1,41 +1,29 @@
 import { GRENADE, WEAPONS } from '../weapons/defs';
-import { BotNav, nearestWaypoint, type NavState } from './bot-nav';
-import { BOSS_VOLLEY, botProfile, ROLL, THROW_REACH } from './bot-profile';
+import { GrenadeWatch, runTo, type DodgeState } from './bot-dodge';
+import { fightMove, GRACE, lostMove, throwAt, type FightState, type ThrowState } from './bot-fight';
+import { BotNav, type NavState, type StuckState } from './bot-nav';
+import { BOSS_VOLLEY, botProfile, type BotProfile } from './bot-profile';
 import { BotRoam, HEADWAY, type RoamState, type Spot } from './bot-roam';
 import { rush, startRush, type RushState } from './bot-rush';
-import { throwPitchFor } from './grenades';
-import { PLAYER, TICK } from './constants';
+import { BotSense, wrap, type SenseState } from './bot-sense';
+import { huntTarget, pickLane, type TeamState } from './bot-team';
+import { TICK } from './constants';
 import type { HostSim } from './host';
 import { BUTTON, type Command, type PlayerState } from './types';
 
 export { findPath } from './bot-nav';
 
-interface Brain extends NavState, RoamState, RushState {
+interface Brain extends NavState, StuckState, RoamState, RushState, FightState, ThrowState, DodgeState, SenseState, TeamState {
   seq: number;
-  target: number;
-  seenFor: number;
-  lostFor: number;
+  /** The life (`PlayerState.life`) this brain last played. */
+  life: number;
   /** Where the bot last made headway out of a fight, and the host time it did. */
   anchor: Spot;
   anchorAt: number;
-  think: number;
-  strafeTime: number;
-  aimYaw: number;
   aimPitch: number;
-  errYaw: number;
-  errPitch: number;
-  stuck: number;
-  lastPos: [number, number];
-  crouchTime: number;
-  /** Seconds left of stepping aside round whatever the bot walked into (a post, a crate corner). */
-  sidestep: number;
-  grenadeCooldown: number;
-  /** Seconds left to stay clear of a grenade the bot just threw. */
-  clearing: number;
-  /** Ticks left holding `lobPitch`, the aim of a throw on its way out of the hand. */
-  lob: number;
-  lobPitch: number;
   fireHeld: boolean;
+  /** A reload starts on a press, and a grenade throw cancels one: a held button would never start it again. */
+  reloadHeld: boolean;
   slot: number;
   /** A fixed skill instead of the director's (a scripted stand-in for a player in tests). */
   skill: number | null;
@@ -43,6 +31,7 @@ interface Brain extends NavState, RoamState, RushState {
 
 /** Out of a fight, a bot that has not got `HEADWAY` from where it stood for this many seconds goes on patrol. */
 const IDLE = 2;
+
 /** Snapbot and fill-bot brains: perceive, navigate the waypoint graph, aim with human-like lag, shoot. */
 export class BotDirector {
   private brains = new Map<number, Brain>();
@@ -52,45 +41,61 @@ export class BotDirector {
   lag = 0;
   private readonly nav: BotNav;
   private readonly roam: BotRoam;
+  private readonly sense: BotSense;
+  private readonly grenades: GrenadeWatch;
   /** Bot choices are drawn from the match's seed, so a seeded match plays out the same every time. */
   private seed: number;
 
   constructor(private readonly host: HostSim) {
+    const random = () => this.random();
     this.nav = new BotNav(host);
-    this.roam = new BotRoam(host, () => this.random());
+    this.roam = new BotRoam(host, random);
+    this.sense = new BotSense(host, random, (at) => this.roam.saw(at));
+    this.grenades = new GrenadeWatch(host, this.nav);
     this.seed = Math.floor(host.random() * 4294967296);
   }
 
   add(player: PlayerState, skill: number | null = null) {
+    const m = player.move;
     this.brains.set(player.id, {
       skill,
       seq: 0,
+      life: player.life,
       target: 0,
       seenFor: 0,
       lostFor: 99,
+      hunt: 0,
+      dealt: new Map(),
+      hurtAt: new Map(),
       lastSeen: null,
       patrol: null,
       patrolUntil: 0,
       approach: null,
-      anchor: [player.move.x, player.move.y, player.move.z],
+      lane: 0,
+      anchor: [m.x, m.y, m.z],
       anchorAt: this.host.time,
       path: [],
       repath: 0,
       think: this.random() * 0.2,
       strafe: 1,
       strafeTime: 0,
+      lineCheck: 0,
+      sideOk: true,
+      backOk: true,
       aimYaw: player.yaw,
       aimPitch: 0,
       errYaw: 0,
       errPitch: 0,
       stuck: 0,
-      lastPos: [player.move.x, player.move.z],
+      lastPos: [m.x, m.z],
       crouchTime: 0,
       sidestep: 0,
       grenadeCooldown: 6,
       clearing: 0,
       lob: 0,
       lobPitch: 0,
+      noticed: new Map(),
+      escape: null,
       rush: 'close',
       rushTime: 0,
       avoid: new Map(),
@@ -98,6 +103,7 @@ export class BotDirector {
       blocked: new Map(),
       graphOnly: 0,
       fireHeld: false,
+      reloadHeld: false,
       slot: 0
     });
   }
@@ -107,6 +113,7 @@ export class BotDirector {
   }
 
   tick() {
+    this.grenades.update();
     for (const [id, brain] of this.brains) {
       const bot = this.host.players.get(id);
       if (!bot) {
@@ -127,24 +134,30 @@ export class BotDirector {
     if (!bot.alive) {
       // It comes back somewhere else with nothing in sight: what it was after died with it.
       b.path = [];
-      b.target = 0;
-      b.seenFor = 0;
-      b.lostFor = 99;
-      b.lastSeen = null;
+      this.sense.forget(b);
       b.patrol = null;
+      b.escape = null;
       b.anchor = [m.x, m.y, m.z];
       b.anchorAt = host.time;
       return cmd;
     }
+    if (b.life !== bot.life) this.newLife(bot, b);
+    const skill = b.skill ?? this.skill;
     const eye = host.eye(bot);
+    this.sense.feelHits(bot, b, prof, skill);
     b.think -= TICK;
     if (b.think <= 0) {
       b.think = 0.15 + this.random() * 0.1;
-      this.perceive(bot, b, eye, prof.range);
+      this.sense.perceive(bot, b, eye, prof, skill);
     }
     const target = b.target ? host.players.get(b.target) : undefined;
-    const visible = !!target && target.alive && b.lostFor === 0;
-    if (visible || Math.hypot(m.x - b.anchor[0], m.y - b.anchor[1], m.z - b.anchor[2]) > HEADWAY) {
+    if (b.target && !target?.alive) this.sense.forget(b);
+    const visible = !!target?.alive && b.lostFor === 0;
+    // A close-range gun goes after an enemy at once, round through cover.
+    const closer = bot.bot === 'rusher' || (prof.standoff && prof.band.min === 0);
+    // Just out of sight, a fight goes on: aim where the enemy was and look for it, rather than walk off after it.
+    const lost = !!target?.alive && !visible && b.lostFor <= GRACE && !!b.lastSeen && !closer;
+    if (visible || lost || Math.hypot(m.x - b.anchor[0], m.y - b.anchor[1], m.z - b.anchor[2]) > HEADWAY) {
       b.anchor = [m.x, m.y, m.z];
       b.anchorAt = host.time;
     } else if (host.time - b.anchorAt > IDLE) {
@@ -152,29 +165,25 @@ export class BotDirector {
       this.roam.patrol(bot, b);
       b.anchorAt = host.time;
     }
+    const run = this.grenades.dodge(bot, b, skill, () => this.random());
 
-    let goal: [number, number, number] | null = null;
+    let goal: Spot | null = null;
+    /** The enemy a close-range bot's route keeps out of the sight of. */
+    let watcher: Spot | null = null;
     if (visible && target) {
       b.seenFor += TICK;
+      b.hunt = 0;
       // A Scopebot lines up one deliberate shot: its aim trails a moving target half as far.
-      const aim = this.aimPoint(target, this.lag * (bot.bot === 'sniper' ? 0.5 : 1));
-      const dx = aim[0] - eye[0];
-      const dy = aim[1] - eye[1];
-      const dz = aim[2] - eye[2];
-      const dist = Math.hypot(dx, dz);
-      const wantYaw = Math.atan2(-dx, -dz) + b.errYaw;
-      const wantPitch = Math.atan2(dy, dist) + b.errPitch;
-      const skill = b.skill ?? this.skill;
-      const turn = prof.turn * (0.6 + skill * 0.8) * TICK;
-      b.aimYaw += clamp(wrap(wantYaw - b.aimYaw), -turn, turn);
-      b.aimPitch += clamp(wantPitch - b.aimPitch, -turn, turn);
+      const aim = this.sense.aimPoint(target, this.lag * (bot.bot === 'sniper' ? 0.5 : 1));
+      const { dist, offAim } = this.turnTo(b, eye, aim, prof, skill);
       b.errYaw *= 0.985 - skill * 0.02;
       b.errPitch *= 0.985 - skill * 0.02;
-      const offAim = Math.abs(wrap(wantYaw - b.errYaw - b.aimYaw)) + Math.abs(wantPitch - b.errPitch - b.aimPitch);
       const ready = b.seenFor > prof.reaction * (1.3 - skill * 0.6);
       const def = WEAPONS[bot.arms.weapon];
       const volley = bot.bot !== 'boss' || bot.arms.sinceShot > BOSS_VOLLEY;
-      if (ready && volley && offAim < 0.12 + 1.5 / Math.max(4, dist) * 0.1 && bot.arms.ammo[bot.arms.weapon] > 0) {
+      // A long gun waits for its sights and for the body under the crosshair; others fire once roughly on.
+      const onAim = prof.patient && dist > 12 ? bot.arms.ads > 0.9 && offAim < Math.atan2(0.45 * target.scale, dist) + 0.015 : offAim < 0.12 + (1.5 / Math.max(4, dist)) * 0.1;
+      if (ready && volley && onAim && bot.arms.ammo[bot.arms.weapon] > 0) {
         if (def.mode === 'auto') cmd.buttons |= BUTTON.fire;
         else if (!b.fireHeld) cmd.buttons |= BUTTON.fire;
       }
@@ -183,51 +192,49 @@ export class BotDirector {
       const swing = dist < 1.9 && bot.arms.meleeCooldown <= 0;
       if (swing) cmd.buttons |= BUTTON.melee;
       if (bot.bot === 'rusher') rush(b, dist, cmd, swing, () => this.random());
-      else {
-        // Keep a preferred distance and strafe.
-        b.strafeTime -= TICK;
-        if (b.strafeTime <= 0) {
-          b.strafe = this.random() < 0.5 ? -1 : 1;
-          b.strafeTime = 0.5 + this.random() * 1.1;
-          if (this.random() < 0.15) b.crouchTime = 0.8;
-        }
-        cmd.right = b.strafe * (bot.bot === 'sniper' ? 0.3 : 0.85);
-        cmd.forward = dist > prof.keep + 3 ? 1 : dist < prof.keep - 3 ? -0.7 : 0;
-      }
-      b.grenadeCooldown -= TICK;
-      if ((bot.bot === 'boss' || bot.bot === 'grunt') && b.grenadeCooldown <= 0 && dist > GRENADE.radius + 4 && dist < THROW_REACH && bot.arms.grenades > 0 && this.random() < 0.01) {
-        // Aimed to come down short of the target and roll the rest, with an error that shrinks with skill.
-        const pitch = throwPitchFor(dist - ROLL, target.move.y - eye[1]);
-        if (pitch !== null) {
-          b.grenadeCooldown = 9;
-          b.clearing = GRENADE.fuse + 0.6;
-          b.lob = 3;
-          b.lobPitch = pitch + (this.random() - 0.5) * (1 - skill) * 0.12;
-          cmd.buttons |= BUTTON.grenade;
-        }
-      }
+      else fightMove(host, bot, b, b.aimYaw, aim, dist, prof.band, () => this.random(), cmd);
+      if (!run) throwAt(bot, b, target, eye, dist, skill, () => this.random(), cmd);
       // A bot that walks on after its own grenade (or has it bounce back off cover) blows itself up.
       if (b.clearing > 0 && dist < GRENADE.radius * 2 + 4) cmd.forward = -1;
       if (cmd.forward > 0) goal = [target.move.x, target.move.y, target.move.z];
     } else {
-      b.seenFor = 0;
       b.fireHeld = false;
       startRush(b);
-      if (bot.arms.ammo[bot.arms.weapon] < WEAPONS[bot.arms.weapon].mag * 0.5) cmd.buttons |= BUTTON.reload;
-      goal = this.roam.goal(bot, b, () => {
-        const enemy = this.nearestEnemy(bot);
-        return enemy && this.roam.approach(bot, b, enemy, prof.range);
-      });
+      if (lost) {
+        const seen = b.lastSeen!;
+        const { dist } = this.turnTo(b, eye, [seen[0], seen[1] + 1.2, seen[2]], prof, skill);
+        lostMove(b.lostFor, dist, prof.band, cmd);
+      } else {
+        b.seenFor = 0;
+        const toward = prof.standoff ? (seen: Spot) => this.roam.standoff(bot, b, (watcher = seen), prof.band, prof.range, null) : undefined;
+        goal = this.roam.goal(bot, b, () => this.hunt(bot, b, prof, closer, (enemy) => (watcher = enemy)), toward);
+        if (!closer || bot.bot === 'rusher') watcher = null;
+      }
     }
     b.clearing = Math.max(0, b.clearing - TICK);
-    if (bot.arms.ammo[bot.arms.weapon] === 0) cmd.buttons |= BUTTON.reload;
+    const ammo = bot.arms.ammo[bot.arms.weapon];
+    const engaged = b.target !== 0 && b.lostFor <= 2;
+    if ((ammo === 0 || (!engaged && ammo < WEAPONS[bot.arms.weapon].mag * 0.5)) && !b.reloadHeld) cmd.buttons |= BUTTON.reload;
+    b.reloadHeld = (cmd.buttons & BUTTON.reload) !== 0;
     if (b.crouchTime > 0) {
       b.crouchTime -= TICK;
       cmd.buttons |= BUTTON.crouch;
     }
 
-    // Walk the waypoint graph toward the goal.
-    const steer = this.nav.navigate(bot, b, goal);
+    if (run) runTo(bot, b, run, cmd);
+    else this.steer(bot, b, goal, watcher, visible, lost, cmd);
+    b.sidestep = Math.max(0, b.sidestep - TICK);
+    this.nav.unstick(bot, b, cmd);
+    cmd.yaw = b.aimYaw;
+    cmd.pitch = b.lob > 0 ? b.lobPitch : clamp(b.aimPitch, -1.2, 1.2);
+    b.lob = Math.max(0, b.lob - 1);
+    this.nav.keepOnGround(bot, b, cmd);
+    return cmd;
+  }
+
+  /** Walk the waypoint graph toward the goal: strafing in a fight, else facing the way it walks. */
+  private steer(bot: PlayerState, b: Brain, goal: Spot | null, watcher: Spot | null, visible: boolean, lost: boolean, cmd: Command) {
+    const steer = this.nav.navigate(bot, b, goal, watcher);
     if (steer && !(visible && cmd.forward <= 0)) {
       const moveYaw = Math.atan2(-steer[0], -steer[1]);
       const rel = wrap(moveYaw - b.aimYaw);
@@ -242,114 +249,52 @@ export class BotDirector {
         cmd.forward = b.sidestep > 0 ? -0.4 : 1;
         cmd.right = b.sidestep > 0 ? b.strafe : 0;
         // With nobody known nearby a match bot runs to the fight, as a player would; solo waves keep their walking pace.
-        const hurry = host.settings.mode !== 'solo' && b.lostFor > 2 && b.path.length > 2 && b.sidestep <= 0 && !(cmd.buttons & BUTTON.crouch);
+        const hurry = this.host.settings.mode !== 'solo' && b.lostFor > 2 && b.path.length > 2 && b.sidestep <= 0 && !(cmd.buttons & BUTTON.crouch);
         if (bot.bot === 'rusher' || hurry) cmd.buttons |= BUTTON.sprint;
       }
-    } else if (!visible && b.approach) {
+    } else if (!visible && !lost && b.approach) {
       // Arrived where the enemy should be in sight: face it, or it stays out of the bot's view cone behind it.
       const [ex, , ez] = b.approach.for;
-      b.aimYaw += clamp(wrap(Math.atan2(-(ex - m.x), -(ez - m.z)) - b.aimYaw), -5 * TICK, 5 * TICK);
+      b.aimYaw += clamp(wrap(Math.atan2(-(ex - bot.move.x), -(ez - bot.move.z)) - b.aimYaw), -5 * TICK, 5 * TICK);
     }
-    b.sidestep = Math.max(0, b.sidestep - TICK);
-    // Unstick: duck under a low beam, else jump, when not making progress.
-    const moved = Math.hypot(bot.move.x - b.lastPos[0], bot.move.z - b.lastPos[1]);
-    b.lastPos = [bot.move.x, bot.move.z];
-    b.stuck = Math.abs(cmd.forward) + Math.abs(cmd.right) > 0.3 && moved < 0.01 ? b.stuck + TICK : 0;
-    if (b.stuck > 0.25) {
-      if (this.nav.ducks(bot, b.aimYaw, cmd.forward, cmd.right)) {
-        b.crouchTime = 1.5;
-        cmd.buttons |= BUTTON.crouch;
-      } else cmd.buttons |= BUTTON.jump;
-      if (b.stuck > 1.2) {
-        const wps = host.layout.waypoints;
-        if (b.path.length && wps.length) {
-          const here = nearestWaypoint(wps, bot.move.x, bot.move.y, bot.move.z);
-          const next = b.path[0] === here && b.path.length > 1 ? b.path[1]! : b.path[0]!;
-          b.avoid.set(`${here}>${next}`, host.time + 12);
-          // Nearest but not stood on: it may be the far side of the very thing the bot is pressed against.
-          const w = wps[here]!.position;
-          if (Math.hypot(w[0] - bot.move.x, w[2] - bot.move.z) > 0.9) b.blocked.set(here, host.time + 12);
-        }
-        b.graphOnly = host.time + 3;
-        b.path = [];
-        b.strafe *= -1;
-        b.sidestep = 0.6;
-        b.stuck = 0;
-      }
-    }
-    cmd.yaw = b.aimYaw;
-    cmd.pitch = b.lob > 0 ? b.lobPitch : clamp(b.aimPitch, -1.2, 1.2);
-    b.lob = Math.max(0, b.lob - 1);
-    this.nav.keepOnGround(bot, b, cmd);
-    return cmd;
+  }
+
+  /** A fresh life: last life's grudges are gone, and a team bot takes the flank fewest living teammates are on. */
+  private newLife(bot: PlayerState, b: Brain) {
+    b.life = bot.life;
+    b.dealt.clear();
+    b.hurtAt.clear();
+    b.noticed.clear();
+    b.hunt = 0;
+    b.lane = pickLane(this.host, bot, b, this.brains, () => this.random());
+  }
+
+  /** Nobody in sight: where to go for the enemy it hunts (a fill bot to a spot in its band, from its flank). */
+  private hunt(bot: PlayerState, b: Brain, prof: BotProfile, closer: boolean, chose: (enemy: Spot) => void): Spot | null {
+    const enemy = huntTarget(this.host, bot, b, this.brains, closer);
+    if (!enemy) return null;
+    chose(enemy);
+    return prof.standoff ? this.roam.standoff(bot, b, enemy, prof.band, prof.range, this.roam.flank(bot, b.lane, enemy)) : this.roam.approach(bot, b, enemy, prof.range);
+  }
+
+  /** Turn the aim toward `at` (with the bot's aim error) at its turn rate; the distance in plan and how far off it still is. */
+  private turnTo(b: Brain, eye: [number, number, number], at: readonly number[], prof: BotProfile, skill: number) {
+    const dx = at[0]! - eye[0];
+    const dy = at[1]! - eye[1];
+    const dz = at[2]! - eye[2];
+    const dist = Math.hypot(dx, dz);
+    const wantYaw = Math.atan2(-dx, -dz) + b.errYaw;
+    const wantPitch = Math.atan2(dy, dist) + b.errPitch;
+    const turn = prof.turn * (0.6 + skill * 0.8) * TICK;
+    b.aimYaw += clamp(wrap(wantYaw - b.aimYaw), -turn, turn);
+    b.aimPitch += clamp(wantPitch - b.aimPitch, -turn, turn);
+    return { dist, offAim: Math.abs(wrap(wantYaw - b.errYaw - b.aimYaw)) + Math.abs(wantPitch - b.errPitch - b.aimPitch) };
   }
 
   private random() {
     this.seed = (Math.imul(this.seed, 1664525) + 1013904223) >>> 0;
     return this.seed / 4294967296;
   }
-
-  /** Chest height of `target` as it stood `lag` seconds ago. */
-  private aimPoint(target: PlayerState, lag = 0): [number, number, number] {
-    const at = lag > 0 ? this.host.poseAt(target, this.host.time - lag) : null;
-    const m = at ?? target.move;
-    const head = m.y + (PLAYER.eye + (PLAYER.crouchEye - PLAYER.eye) * m.crouch) * target.scale;
-    return [m.x, head - 0.35 * target.scale, m.z];
-  }
-
-  private perceive(bot: PlayerState, b: Brain, eye: [number, number, number], range: number) {
-    const host = this.host;
-    let best: PlayerState | null = null;
-    let bestScore = Infinity;
-    for (const p of host.players.values()) {
-      if (!p.alive || !host.hostile(bot, p)) continue;
-      const aim = this.aimPoint(p);
-      const d = Math.hypot(aim[0] - eye[0], aim[2] - eye[2]);
-      if (d > range) continue;
-      // A narrower awareness cone behind the bot unless the target is close or shooting.
-      const facing = Math.cos(wrap(Math.atan2(-(aim[0] - eye[0]), -(aim[2] - eye[2])) - bot.yaw));
-      if (facing < -0.2 && d > 6 && p.arms.sinceShot > 0.5) continue;
-      if (!host.world.clearLine(eye[0], eye[1], eye[2], aim[0], aim[1], aim[2])) continue;
-      const score = d - (p.id === b.target ? 6 : 0);
-      if (score < bestScore) {
-        bestScore = score;
-        best = p;
-      }
-    }
-    if (best) {
-      if (best.id !== b.target) {
-        b.target = best.id;
-        b.seenFor = 0;
-        const miss = (1 - (b.skill ?? this.skill)) * 0.25 + 0.03;
-        b.errYaw = (this.random() - 0.5) * miss * 2;
-        b.errPitch = (this.random() - 0.5) * miss;
-      }
-      b.lostFor = 0;
-      b.lastSeen = [best.move.x, best.move.y, best.move.z];
-      this.roam.saw(b.lastSeen);
-    } else if (b.target) {
-      b.lostFor += 0.2;
-      if (b.lostFor > 4) {
-        b.target = 0;
-        b.lastSeen = null;
-      }
-    }
-  }
-
-  private nearestEnemy(bot: PlayerState): Spot | null {
-    let best: Spot | null = null;
-    let bestD = Infinity;
-    for (const p of this.host.players.values()) {
-      if (!p.alive || !this.host.hostile(bot, p)) continue;
-      const d = Math.hypot(p.move.x - bot.move.x, p.move.z - bot.move.z);
-      if (d < bestD) {
-        bestD = d;
-        best = [p.move.x, p.move.y, p.move.z];
-      }
-    }
-    return best;
-  }
 }
 
-const wrap = (a: number) => Math.atan2(Math.sin(a), Math.cos(a));
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
