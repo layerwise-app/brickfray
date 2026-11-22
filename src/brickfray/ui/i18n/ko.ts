@@ -1,12 +1,14 @@
 import { boardKo } from './board/ko';
 import { touchKo } from './touch/ko';
 import { hudKo } from './hud/ko';
+import { streaksKo } from './streaks/ko';
 import type { Dictionary } from './en';
 
 export const ko: Dictionary = {
   ...boardKo,
   ...touchKo,
   ...hudKo,
+  ...streaksKo,
   play: '플레이',
   playCaption: '온라인 대전',
   solo: '솔로',

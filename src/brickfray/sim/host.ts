@@ -10,7 +10,10 @@ import type { HitPose } from './hitboxes';
 import { resolveMelee, resolveShot } from './hits';
 import { createMoveState, eyeHeight, stepMove } from './movement';
 import { pickSpawn, type RecentDeath } from './spawns';
+import { KILL_SCORE } from './streaks';
 import { BUTTON, type Command, type GameEvent, type HitKind, type HostPlayer, type KillCause, type MatchSettings, type PlayerState, type ShotTrace } from './types';
+
+type KillEvent = Extract<GameEvent, { type: 'kill' }>;
 import { applyLevels, noUpgrades, upgradeStats } from './upgrades';
 
 const HISTORY = 72;
@@ -36,7 +39,7 @@ export class HostSim {
   traces: ShotTrace[] = [];
   time = 0;
   /** Rules hook: decides respawns, scoring and round flow (see match.ts). */
-  onKill: ((victim: HostPlayer, killer: HostPlayer | null, weapon: KillCause) => void) | null = null;
+  onKill: ((victim: HostPlayer, killer: HostPlayer | null, weapon: KillCause, kill: KillEvent) => void) | null = null;
   damageEnabled = true;
   /** Bots hit humans for less; solo raises it wave by wave. */
   botDamage = 0.55;
@@ -225,11 +228,11 @@ export class HostSim {
     const killer = attacker && !self ? attacker : null;
     if (killer) {
       killer.kills++;
-      killer.score += src.kind === 'head' ? 150 : 100;
+      killer.score += src.kind === 'head' ? KILL_SCORE.head : KILL_SCORE.body;
     }
-    const kill = { type: 'kill' as const, killer: killer?.id ?? victim.id, victim: victim.id, weapon: src.weapon, headshot: src.kind === 'head', assister, respawnAt: null as number | null };
+    const kill: KillEvent = { type: 'kill', killer: killer?.id ?? victim.id, victim: victim.id, weapon: src.weapon, headshot: src.kind === 'head', assister, respawnAt: null, bounty: 0 };
     this.events.push(kill);
-    this.onKill?.(victim, killer, src.weapon);
+    this.onKill?.(victim, killer, src.weapon, kill);
     if (victim.respawnAt > this.time && Number.isFinite(victim.respawnAt)) kill.respawnAt = victim.respawnAt;
   }
 

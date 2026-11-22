@@ -49,14 +49,14 @@ export class MusicPlayer {
     for (const track of tracks) void this.load(track);
   }
 
-  /** Gameplay is loud right now: sink the music under it. */
-  duck(): void {
+  /** Gameplay is loud (or a voice speaks) for the next `hold` s: sink the music under it. */
+  duck(hold = DUCK.hold): void {
     if (!this.target || !this.current) return;
     const { ctx, duck } = this.target;
     const t = ctx.currentTime;
     duck.gain.cancelScheduledValues(t);
     duck.gain.setTargetAtTime(DUCK.depth, t, DUCK.attack);
-    duck.gain.setTargetAtTime(1, t + DUCK.hold, DUCK.release / 3);
+    duck.gain.setTargetAtTime(1, t + hold, DUCK.release / 3);
   }
 
   clear(): void {

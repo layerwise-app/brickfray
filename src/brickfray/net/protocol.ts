@@ -2,7 +2,7 @@ import type { BotKind, CharacterId } from '../characters/types';
 import type { GameEvent, MatchSettings, MatchState } from '../sim/types';
 import type { UpgradeId } from '../sim/upgrades';
 
-export const PROTOCOL_VERSION = 4;
+export const PROTOCOL_VERSION = 5;
 
 export interface LobbyPlayer {
   id: number;
@@ -37,6 +37,8 @@ export interface BoardRow {
   assists: number;
   score: number;
   ping: number;
+  /** Points whoever takes this player down collects on top of the kill (rooms; 0 = none). */
+  bounty: number;
 }
 
 export interface Board {

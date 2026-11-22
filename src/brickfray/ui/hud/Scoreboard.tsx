@@ -6,6 +6,7 @@ import { useHud } from '../App';
 import { mapName } from '../board/format';
 import { useT } from '../i18n';
 import { BotIcon } from '../icons';
+import { BountyChip, BountyRule } from './Bounty';
 import { RunStats } from './RunResult';
 
 export function Swatch({ row }: { row: ScoreRow }) {
@@ -51,6 +52,7 @@ function Table({ rows }: { rows: ScoreRow[] }) {
             <Swatch row={r} />
             <span className='truncate'>{r.name}</span>
             {r.bot && <span className='rounded bg-black/25 px-1.5 text-[10px] font-bold uppercase tracking-wider'>{t('bot')}</span>}
+            {!!r.bounty && <BountyChip amount={r.bounty} size='sm' />}
           </span>
           <span className='bf-display text-center text-xl tabular-nums'>{r.kills}</span>
           <span className='bf-display text-center text-xl tabular-nums opacity-80'>{r.deaths}</span>
@@ -100,6 +102,7 @@ export function Scoreboard() {
         ) : (
           <Table rows={hud.rows} />
         )}
+        {mode && mode !== 'solo' && <BountyRule />}
       </div>
     </div>
   );

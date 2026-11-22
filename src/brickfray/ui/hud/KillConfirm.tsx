@@ -2,6 +2,7 @@ import { TEAM_COLORS } from '../../game/remotes';
 import { useHud } from '../App';
 import { useT } from '../i18n';
 import { HeadshotIcon, SkullIcon } from '../icons';
+import { BountyChip } from './Bounty';
 
 const HEAD_GOLD = '#ffd23f';
 const KEYFRAMES = `@keyframes bf-kill-confirm {
@@ -37,6 +38,7 @@ export function KillConfirm() {
         </span>
         {/* The gold HEADSHOT callout above says it in words; the tag here is its reticle. */}
         {kill.headshot && <HeadshotIcon size={20} className='drop-shadow-[0_1px_0_rgba(0,0,0,.6)]' style={{ color: HEAD_GOLD }} />}
+        {kill.bounty > 0 && <BountyChip amount={kill.bounty} collected />}
       </div>
     </>
   );

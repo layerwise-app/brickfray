@@ -2,7 +2,7 @@ import { CHARACTER_IDS } from '~/brickfray/characters/roster';
 import { MATCH } from '~/brickfray/sim/constants';
 import { botsThrough, secondsToReach } from '~/brickfray/sim/waves';
 import { BoardError, MODES, SOLO_LEVELS, UPLOAD_BATCH, type BoardMode, type LeaderboardQuery, type MatchReport, type MatchResult, type SoloLevel } from './contract';
-import { OVER, parseDetail } from './detail';
+import { maxScore, OVER, parseDetail } from './detail';
 import { cleanName } from './names';
 import type { Ticket } from './ticket';
 
@@ -88,8 +88,8 @@ export function parseReport(raw: unknown, now: number): MatchReport {
   if (mode === 'tdm' && kills > MATCH.tdmKills + OVER) fail('kills over the limit');
   if (mode === 'ffa' && assists > (players - 1) * MATCH.ffaKills) fail('too many assists');
   if (mode === 'tdm' && assists > MATCH.tdmKills + OVER) fail('too many assists');
-  // A kill scores 100 (150 to the head), an assist 50; nothing else scores.
-  if (score > 150 * kills + 50 * assists) fail('score over its kills');
+  // A kill scores 100 (150 to the head) plus, in a room, its victim's bounty; an assist 50; nothing else scores.
+  if (score > maxScore(mode, kills, assists)) fail('score over its kills');
 
   const ticket = r.ticket ?? null;
   if (ticket !== null && (typeof ticket !== 'string' || ticket.length > 1000)) throw new BoardError('invalid', 'bad ticket');

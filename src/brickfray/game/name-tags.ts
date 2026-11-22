@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { BOUNTY_GOLD, coinSvg } from '../ui/hud/bounty-art';
 import { GrenadeAlerts } from '../ui/hud/grenade-alerts';
 import type { GrenadeView } from './grenade-view';
 import { TEAM_COLORS, type Remotes } from './remotes';
@@ -26,6 +27,13 @@ const CHEVRON_SVG =
 const DIAMOND_SVG =
   '<svg width="18" height="14" viewBox="0 0 18 14" style="display:block;margin-bottom:3px;overflow:visible"><path d="M9,1L15,7L9,13L3,7Z" fill="none" stroke="rgba(255,255,255,.9)" stroke-width="4" stroke-linejoin="round"/><path d="M9,1L15,7L9,13L3,7Z" fill="currentColor" stroke="rgba(0,10,40,.85)" stroke-width="1.8" stroke-linejoin="round"/></svg>';
 const MARK = { w: 18, h: 17 };
+/**
+ * An enemy carrying a bounty, in plain sight at any range up to SIGHT_RANGE, wears a gold chip with the coin and the
+ * amount in place of the chevron.
+ */
+const wantedHtml = (bounty: number) =>
+  `<div style="display:flex;align-items:center;gap:3px;margin-bottom:3px;padding:1px 8px 2px 2px;border-radius:999px;background:${BOUNTY_GOLD.backing};box-shadow:inset 0 0 0 1.5px ${BOUNTY_GOLD.dark},0 2px 0 rgba(0,0,0,.3);color:${BOUNTY_GOLD.light};font:400 16px/18px 'Lilita One',sans-serif;white-space:nowrap">${coinSvg(18)}${bounty}</div>`;
+const WANTED = { w: 58, h: 25 };
 const PILL_H = 30;
 /** A marker is full size at the near edge of its range and shrinks with distance like the figure under it, to 0.6 by 20 m. */
 const markScale = (far: number) => THREE.MathUtils.clamp(12 / far, 0.6, 1);
@@ -68,7 +76,9 @@ export class NameTags {
 
   constructor(
     private readonly container: HTMLElement,
-    private readonly clearLine?: ClearLine
+    private readonly clearLine?: ClearLine,
+    /** Rooms: the bounty a player carries (0 = none). */
+    private readonly bounty: (id: number) => number = () => 0
   ) {
     this.alerts = new GrenadeAlerts(container, clearLine);
   }
@@ -85,7 +95,9 @@ export class NameTags {
       const isAimed = r.entry.id === aimed;
       const far = Math.hypot(r.position.x - eye.x, r.position.z - eye.z);
       const spot = teammate ? 1 : THREE.MathUtils.smoothstep(far, SPOT_IN[0], SPOT_IN[1]) * (1 - THREE.MathUtils.smoothstep(far, SIGHT_RANGE - 4, SIGHT_RANGE));
-      const marked = teammate ? far > NAME_RANGE : spot > 0.02 && this.inSight(r.entry.id, eye, r.position.x, r.position.y + 1.5, r.position.z, now);
+      const bounty = teammate ? 0 : this.bounty(r.entry.id);
+      const wanted = bounty > 0 && this.inSight(r.entry.id, eye, r.position.x, r.position.y + 1.5, r.position.z, now);
+      const marked = wanted || (teammate ? far > NAME_RANGE : spot > 0.02 && this.inSight(r.entry.id, eye, r.position.x, r.position.y + 1.5, r.position.z, now));
       const named = isAimed || (teammate && !marked);
       if (!marked && !named) continue;
       const over = r.rig.headPosition(this.v).y + OVER_HEAD * (r.entry.bot === 'boss' ? 1.6 : 1);
@@ -99,11 +111,12 @@ export class NameTags {
       const color = teammate ? TEAM_COLORS[myTeam as 0 | 1] : '#ff4a3a';
       let mark: Placed | undefined;
       if (marked) {
-        const el = this.markEl(tag, teammate ? DIAMOND_SVG : CHEVRON_SVG);
+        const el = this.markEl(tag, wanted ? wantedHtml(bounty) : teammate ? DIAMOND_SVG : CHEVRON_SVG);
         el.style.color = color;
-        el.style.opacity = teammate ? '0.95' : (0.95 * spot).toFixed(2);
+        el.style.opacity = teammate || wanted ? '0.95' : (0.95 * spot).toFixed(2);
         const scale = markScale(far);
-        mark = { el, x, y, w: MARK.w * scale, h: MARK.h * scale, scale, far, rank: far };
+        const size = wanted ? WANTED : MARK;
+        mark = { el, x, y, w: size.w * scale, h: size.h * scale, scale, far, rank: far };
         marks.push(mark);
       } else this.dropMark(tag);
       if (named) {

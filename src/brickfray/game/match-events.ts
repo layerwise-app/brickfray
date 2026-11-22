@@ -9,6 +9,8 @@ import type { FeedEntry, ScoreRow } from './hud';
 import type { MatchView } from './match-view';
 
 const FEED_LIFE = 6;
+/** Seconds the local player's multi-kill callout stays up (a newer chain replaces it). */
+const MULTIKILL_LIFE = 2.6;
 const NO_BOSSES: { id: number; health: number; max: number }[] = [];
 let feedKey = 1;
 
@@ -27,6 +29,7 @@ export class MatchEvents {
   private feed: (FeedEntry & { at: number })[] = [];
   private chat: { key: number; name: string; text: string; team: number; at: number }[] = [];
   private bannerUntil = 0;
+  private multikillUntil = 0;
   private clock = 0;
   private hudTimer = 0;
   /** The local player's own record of the match for the HUD: headshot kills, shots fired and landed, seconds played. */
@@ -38,6 +41,7 @@ export class MatchEvents {
     this.feed = from.feed;
     this.chat = from.chat;
     this.bannerUntil = from.bannerUntil;
+    this.multikillUntil = from.multikillUntil;
     this.clock = from.clock;
     this.offerUntil = from.offerUntil;
     this.mine = from.mine;
@@ -148,7 +152,9 @@ export class MatchEvents {
             headshot: e.headshot,
             mine: e.killer === me,
             victimIsMe: e.victim === me,
-            self: e.killer === e.victim
+            self: e.killer === e.victim,
+            bounty: e.bounty,
+            chain: 0
           });
           this.pushFeed();
           break;
@@ -186,6 +192,18 @@ export class MatchEvents {
         case 'upgrade':
           if (e.player === me) this.upgraded(e);
           break;
+        case 'multikill': {
+          // The host sends it right after the kill that made the chain, so that kill is the feed's newest entry.
+          const last = this.feed.at(-1);
+          if (last && last.killer === this.name(e.player)) last.chain = e.count;
+          this.pushFeed();
+          if (e.player === me) {
+            mv.hud.set({ multikill: { key: feedKey++, count: e.count } });
+            this.multikillUntil = this.clock + MULTIKILL_LIFE;
+            mv.audio.announce(e.count);
+          }
+          break;
+        }
         case 'join':
         case 'leave':
           break;
@@ -227,6 +245,7 @@ export class MatchEvents {
       mv.hud.set({ chat: this.chat.map(({ at: _, ...c }) => c) });
     }
     if (mv.hud.state.banner && this.clock > this.bannerUntil) mv.hud.set({ banner: null });
+    if (mv.hud.state.multikill && this.clock > this.multikillUntil) mv.hud.set({ multikill: null });
     if (mv.hud.state.offer?.picked && this.clock > this.offerUntil) mv.hud.set({ offer: null });
     this.finalSeconds();
     this.hudTimer -= dt;
@@ -326,7 +345,7 @@ export class MatchEvents {
     return [...mv.session.roster.values()]
       .map((e) => {
         const s = stats.get(e.id);
-        return { id: e.id, name: e.name, character: e.character, team: e.team, kills: s?.kills ?? 0, deaths: s?.deaths ?? 0, assists: s?.assists ?? 0, score: s?.score ?? 0, ping: s?.ping ?? 0, me: e.id === mv.session.you, bot: !!e.bot };
+        return { id: e.id, name: e.name, character: e.character, team: e.team, kills: s?.kills ?? 0, deaths: s?.deaths ?? 0, assists: s?.assists ?? 0, score: s?.score ?? 0, ping: s?.ping ?? 0, me: e.id === mv.session.you, bot: !!e.bot, bounty: s?.bounty ?? 0 };
       })
       .sort((a, b) => b.score - a.score || b.kills - a.kills);
   }

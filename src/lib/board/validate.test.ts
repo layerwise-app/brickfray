@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { BoardError } from './contract';
 import { report, soloReport } from './test-db';
+import { BOUNTY, KILL_SCORE } from '~/brickfray/sim/streaks';
 import { botsThrough, secondsToReach } from '~/brickfray/sim/waves';
 import { issueTicket, openTicket, type Ticket } from './ticket';
 import { admit, parseLeaderboardQuery, parseMatchQuery, parseReport, parseUpload } from './validate';
@@ -116,8 +117,19 @@ describe('match reports', () => {
     expect(refused(report({ kills: 36, score: 3600 }))).toBe('kills over the limit');
     expect(refused(report({ mode: 'tdm', kills: 56, score: 5600 }))).toBe('kills over the limit');
     expect(refused(report({ mode: 'tdm', assists: 80 }))).toBe('too many assists');
-    expect(refused(report({ kills: 10, assists: 2, score: 1601 }))).toBe('score over its kills');
+    expect(refused(report({ kills: 10, assists: 2, score: 3101 }))).toBe('score over its kills');
     expect(refused(report({ endedAt: NOW - 90 * 86_400_000 }))).toBe('bad time');
+  });
+
+  it('lets a room kill score up to a headshot plus the largest bounty, a solo kill only the headshot', () => {
+    const top = KILL_SCORE.head + BOUNTY.cap;
+    expect(top).toBe(300);
+    expect(parseReport(report({ kills: 10, headshots: 10, assists: 2, score: 10 * top + 100 }), NOW).score).toBe(3100);
+    expect(parseReport(report({ mode: 'tdm', kills: 10, assists: 2, score: 10 * top + 100 }), NOW).score).toBe(3100);
+    expect(refused(report({ mode: 'tdm', kills: 10, assists: 2, score: 10 * top + 101 }))).toBe('score over its kills');
+    const kills = botsThrough('normal', 5) - 2;
+    expect(parseReport(soloReport({ kills, assists: 0, score: 150 * kills }), NOW).score).toBe(150 * kills);
+    expect(refused(soloReport({ kills, assists: 0, score: 150 * kills + 1 }))).toBe('score over its kills');
   });
 
   it('pulls a time from the future back to now', () => {

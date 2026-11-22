@@ -161,8 +161,10 @@ export interface ShotTrace {
 }
 
 export type GameEvent =
-  /** `respawnAt`: host time the victim comes back, null when it won't (solo, match over). */
-  | { type: 'kill'; killer: number; victim: number; weapon: KillCause; headshot: boolean; assister: number | null; respawnAt: number | null }
+  /** `respawnAt`: host time the victim comes back, null when it won't (solo, match over); `bounty`: points the killer collected on top of the kill. */
+  | { type: 'kill'; killer: number; victim: number; weapon: KillCause; headshot: boolean; assister: number | null; respawnAt: number | null; bounty: number }
+  /** Right after the kill that made it: `player`'s `count`-th kill in a row, each within CHAIN_WINDOW s of the last (2 = a double kill). */
+  | { type: 'multikill'; player: number; count: number }
   | { type: 'damage'; attacker: number; victim: number; amount: number; kind: HitKind; from: [number, number, number]; fatal: boolean }
   | { type: 'explosion'; position: [number, number, number]; owner: number }
   | { type: 'spawn'; player: number }

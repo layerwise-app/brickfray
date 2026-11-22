@@ -77,7 +77,9 @@ describe('match detail', () => {
     expect(refused(withPlayers(ffa(), (list) => [list[0]!, { ...list[1]!, character: 'brickman' }, list[2]!]))).toBe('detail character');
     expect(refused(withPlayers(ffa(), (list) => [list[0]!, { ...list[1]!, team: 1 }, list[2]!]))).toBe('detail team');
     expect(refused(withPlayers(ffa(), (list) => [list[0]!, { ...list[1]!, kills: 36, score: 1100 }, list[2]!]))).toBe('detail kills out of range');
-    expect(refused(withPlayers(ffa(), (list) => [list[0]!, { ...list[1]!, score: 1000, kills: 5 }, list[2]!]))).toBe('detail score out of range');
+    // Five kills score at most five headshots on players carrying the largest bounty.
+    expect(refused(withPlayers(ffa(), (list) => [list[0]!, { ...list[1]!, score: 1150, kills: 5 }, list[2]!]))).toBeNull();
+    expect(refused(withPlayers(ffa(), (list) => [{ ...list[0]!, score: 1600 }, { ...list[1]!, score: 1501, kills: 5 }, list[2]!]))).toBe('detail score out of range');
     expect(refused(withPlayers(ffa(), (list) => [list[0]!, { ...list[1]!, deaths: 500 }, list[2]!]))).toBe('detail deaths out of range');
     expect(refused(withPlayers(ffa(), (list) => [list[0]!, { ...list[1]!, bot: 'yes' as never }, list[2]!]))).toBe('detail flags');
     expect(refused({ ...ffa(), detail: { mode: 'ffa', players: players(ffa()), winner: 7 } })).toBe('detail winner');

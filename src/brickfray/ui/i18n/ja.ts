@@ -1,12 +1,14 @@
 import { boardJa } from './board/ja';
 import { touchJa } from './touch/ja';
 import { hudJa } from './hud/ja';
+import { streaksJa } from './streaks/ja';
 import type { Dictionary } from './en';
 
 export const ja: Dictionary = {
   ...boardJa,
   ...touchJa,
   ...hudJa,
+  ...streaksJa,
   play: 'プレイ',
   playCaption: 'オンライン対戦',
   solo: 'ソロ',

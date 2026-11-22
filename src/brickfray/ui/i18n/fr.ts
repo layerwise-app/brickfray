@@ -1,12 +1,14 @@
 import { boardFr } from './board/fr';
 import { touchFr } from './touch/fr';
 import { hudFr } from './hud/fr';
+import { streaksFr } from './streaks/fr';
 import type { Dictionary } from './en';
 
 export const fr: Dictionary = {
   ...boardFr,
   ...touchFr,
   ...hudFr,
+  ...streaksFr,
   play: 'Jouer',
   playCaption: 'Partie en ligne',
   solo: 'Solo',

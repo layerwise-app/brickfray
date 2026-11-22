@@ -7,8 +7,10 @@ import { useT } from '../i18n';
 import { HeadshotIcon, SkullIcon } from '../icons';
 import { Crosshair } from './Crosshair';
 import { CauseIcon, Death } from './Death';
+import { BountyChip } from './Bounty';
 import { KillConfirm } from './KillConfirm';
 import { TopBar } from './MatchClock';
+import { ChainChip, MultiKill } from './MultiKill';
 import { Results } from './Results';
 import { Scoreboard } from './Scoreboard';
 import { KindIntro, WaveBanner } from './SoloHud';
@@ -32,6 +34,7 @@ export function Hud() {
       {hud.scoped && <div className='bf-scope' />}
       {hud.alive && playing && <Crosshair hidden={hud.scoped || hud.aiming || (!!hud.offer && !hud.offer.picked)} />}
       <KillConfirm />
+      <MultiKill />
       <TopBar />
       <KillFeed />
       {hud.alive && (
@@ -125,6 +128,8 @@ function KillFeed() {
           {f.headshot && <HeadshotIcon size={15} />}
           {f.self && f.weapon !== 'water' && <SkullIcon size={15} />}
           <span style={{ color: !f.mine && f.victimTeam !== -1 ? TEAM_COLORS[f.victimTeam] : undefined }}>{f.victim}</span>
+          {f.bounty > 0 && <BountyChip amount={f.bounty} collected size='sm' />}
+          {f.chain > 1 && <ChainChip count={f.chain} />}
         </div>
       ))}
     </div>

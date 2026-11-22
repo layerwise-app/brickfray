@@ -1,6 +1,7 @@
 import type * as THREE from 'three';
 import type { MapId } from '../world/types';
 import { Ambience } from './ambience';
+import { Announcer } from './announcer';
 import { CATEGORIES, inverseGain, type Category } from './catalog';
 import { applyMix, busInput, createMixer, outputPeak, setRoom, type Mixer } from './mixer';
 import { MATCH_TRACKS } from './music';
@@ -76,6 +77,7 @@ export class WebAudioEngine implements AudioEngine {
   private readonly bank = new Map<SoundId, AudioBuffer[]>();
   private readonly music = new MusicPlayer();
   private ambience: Ambience | null = null;
+  private announcer: Announcer | null = null;
   private scene: MapId | null = null;
   private readonly pool = new VoicePool<Voice>(VOICES);
   private readonly variants = new VariantPicker();
@@ -110,6 +112,7 @@ export class WebAudioEngine implements AudioEngine {
     this.ambience = new Ambience(ctx, this.graph.effectsIn);
     this.applyMix();
     this.music.attach(ctx, this.graph.music);
+    this.announcer = new Announcer(ctx, busInput(this.graph, 'marker'), (seconds) => this.music.duck(seconds));
     this.syncScene();
     const started = performance.now();
     await renderBank({
@@ -286,6 +289,10 @@ export class WebAudioEngine implements AudioEngine {
     this.music.set(track, level, delay);
   }
 
+  announce(count: number): void {
+    if (!this.disposed && !this.suspended) this.announcer?.say(count);
+  }
+
   setScene(map: MapId | null): void {
     if (map === this.scene) return;
     this.scene = map;
@@ -299,6 +306,7 @@ export class WebAudioEngine implements AudioEngine {
     this.music.clear();
     this.ambience?.dispose();
     this.ambience = null;
+    this.announcer = null;
     void this.ctx?.close();
     this.ctx = null;
     this.graph = null;
@@ -332,6 +340,7 @@ export class WebAudioEngine implements AudioEngine {
     if (!ctx || !graph) return;
     const map = this.scene;
     this.ambience?.set(map);
+    if (map) void this.announcer?.prefetch();
     this.roomIndex = 0;
     graph.room.buffer = map ? roomSpace(ctx, map) : null;
     if (!map) {

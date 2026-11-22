@@ -15,6 +15,10 @@ export interface FeedEntry {
   mine: boolean;
   victimIsMe: boolean;
   self: boolean;
+  /** Points the killer collected for ending the victim's streak (0 = none). */
+  bounty: number;
+  /** The killer's chain this kill made (2 = a double kill; 0 or 1 = none). */
+  chain: number;
 }
 
 export interface ScoreRow {
@@ -29,6 +33,8 @@ export interface ScoreRow {
   ping: number;
   me: boolean;
   bot: boolean;
+  /** Rooms: points whoever takes this player down collects on top of the kill (absent or 0 = none). */
+  bounty?: number;
 }
 
 /** Solo: the upgrade cards dealt after a cleared wave; `picked` holds the choice while the cards leave. */
@@ -96,6 +102,8 @@ export interface HudState {
   playTime: number;
   /** Solo: living Megabots and their health. */
   bosses: { id: number; health: number; max: number }[];
+  /** The local player's latest multi-kill (2 = a double kill) while its callout is up. */
+  multikill: { key: number; count: number } | null;
 }
 
 export type HudPulse =
@@ -148,7 +156,8 @@ export function initialHud(): HudState {
     shots: 0,
     shotsHit: 0,
     playTime: 0,
-    bosses: []
+    bosses: [],
+    multikill: null
   };
 }
 

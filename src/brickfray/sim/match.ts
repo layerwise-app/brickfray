@@ -5,7 +5,8 @@ import { BotDirector } from './bots';
 import { MATCH, PLAYER, REGEN } from './constants';
 import { HostSim } from './host';
 import type { MapLayout } from '../world/types';
-import type { HostPlayer, KillCause, MatchSettings, MatchState } from './types';
+import { Streaks } from './streaks';
+import type { GameEvent, HostPlayer, KillCause, MatchSettings, MatchState } from './types';
 import { drawOffer, idleCards, takeUpgrade, type UpgradeId } from './upgrades';
 import { WAVE_BREAK, waveRoster, waveTuning } from './waves';
 
@@ -20,6 +21,8 @@ const SNAPBOT_NAMES: Record<BotKind, string> = { grunt: 'Snapbot', rusher: 'Zipb
 export class Match {
   readonly sim: HostSim;
   readonly bots: BotDirector;
+  /** Kill streaks (rooms: the bounty on each player) and multi-kill chains. */
+  readonly streaks: Streaks;
   state: MatchState = { phase: 'warmup', phaseEnds: 0, teamScore: [0, 0], wave: 0, winner: null, waveLeft: 0, theme: null, cause: null };
   private waveQueue: BotKind[] = [];
   private waveSpawnTimer = 0;
@@ -32,7 +35,8 @@ export class Match {
     this.seed = seed >>> 0;
     this.sim = new HostSim(layout, settings, seed);
     this.bots = new BotDirector(this.sim);
-    this.sim.onKill = (victim, killer, weapon) => this.onKill(victim, killer, weapon);
+    this.streaks = new Streaks(settings.mode !== 'solo');
+    this.sim.onKill = (victim, killer, weapon, kill) => this.onKill(victim, killer, weapon, kill);
   }
 
   get time() {
@@ -59,6 +63,7 @@ export class Match {
   remove(id: number) {
     this.offers.delete(id);
     this.bots.remove(id);
+    this.streaks.remove(id);
     this.sim.removePlayer(id);
   }
 
@@ -96,7 +101,13 @@ export class Match {
     if (bot) this.remove(bot.id);
   }
 
-  private onKill(victim: HostPlayer, killer: HostPlayer | null, weapon: KillCause) {
+  private onKill(victim: HostPlayer, killer: HostPlayer | null, weapon: KillCause, kill: Extract<GameEvent, { type: 'kill' }>) {
+    const { bounty, chain } = this.streaks.kill(this.time, victim, killer);
+    if (killer && bounty) {
+      killer.score += bounty;
+      kill.bounty = bounty;
+    }
+    if (killer && chain >= 2) this.sim.events.push({ type: 'multikill', player: killer.id, count: chain });
     if (this.settings.mode === 'tdm' && killer && killer.team !== -1) this.state.teamScore[killer.team]++;
     if (this.settings.mode === 'solo') {
       if (victim.bot) {

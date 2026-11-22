@@ -277,7 +277,7 @@ export class HostSession {
     for (const link of this.links.values()) if (link.playerId !== null) pings.set(link.playerId, link.ping);
     return {
       match: { ...match.state, teamScore: [...match.state.teamScore] },
-      rows: [...match.sim.players.values()].map((p) => ({ id: p.id, kills: p.kills, deaths: p.deaths, assists: p.assists, score: p.score, ping: pings.get(p.id) ?? 0 }))
+      rows: [...match.sim.players.values()].map((p) => ({ id: p.id, kills: p.kills, deaths: p.deaths, assists: p.assists, score: p.score, ping: pings.get(p.id) ?? 0, bounty: match.streaks.bounty(p.id) }))
     };
   }
 

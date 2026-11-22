@@ -71,7 +71,11 @@ export class MatchView {
     readonly hud: HudStore,
     tagLayer: HTMLElement
   ) {
-    this.tags = new NameTags(tagLayer, (ax, ay, az, bx, by, bz) => this.world.clearLine(ax, ay, az, bx, by, bz));
+    this.tags = new NameTags(
+      tagLayer,
+      (ax, ay, az, bx, by, bz) => this.world.clearLine(ax, ay, az, bx, by, bz),
+      (id) => this.session.board?.rows.find((r) => r.id === id)?.bounty ?? 0
+    );
     const def = MAPS[settings.map];
     this.layout = def.layout();
     this.world = new CollisionWorld(this.layout.colliders);

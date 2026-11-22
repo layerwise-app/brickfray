@@ -162,6 +162,8 @@ export interface AudioEngine {
    * music out. Starts once loaded.
    */
   playMusic(track: MusicTrack | null, level?: number, delay?: number): void;
+  /** The multi-kill voice for the local player's chain of `count` kills (2 = double kill; 6 and up share the last line). */
+  announce(count: number): void;
   /** The map being played: its ambience bed and its reverb. null in menus. */
   setScene(map: MapId | null): void;
   dispose(): void;
