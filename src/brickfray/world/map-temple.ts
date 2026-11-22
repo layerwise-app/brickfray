@@ -1,19 +1,14 @@
 import * as THREE from 'three';
-import { WATER } from './blocks';
 import { templeBackdrop } from './backdrop-temple';
 import type { LabView } from './lab-map';
 import { defineMap, Plan } from './plan';
+import { templeCover } from './temple-cover';
 import { templeDressing } from './temple-dressing';
-import { CAMP_SPAWNS, FFA_SPAWNS, T } from './temple-layout';
+import { CAMP_SPAWNS, FFA_SPAWNS } from './temple-geometry';
+import { T } from './temple-layout';
 import { templeStructures } from './temple-parts';
+import { HAZE } from './temple-scenery';
 import { yawToward } from './util';
-
-function streams(p: Plan) {
-  for (const s of [-1, 1]) {
-    const x0 = s < 0 ? -34.4 : 31.2;
-    p.add(WATER, { x0, z0: -T.edge, x1: x0 + 3.2, z1: T.edge, y: T.water, color: '#2a7f78' });
-  }
-}
 
 function spawns(p: Plan) {
   for (const [x, z] of CAMP_SPAWNS) p.spawn(x, 0, z, Math.PI, 1);
@@ -28,21 +23,25 @@ const EYE = 1.62;
 const HIGH = T.high + EYE;
 
 export const TEMPLE_VIEWS: LabView[] = [
-  { name: 'overview', cam: [40, 50, 56], target: [0, 0, 0], fov: 50 },
-  { name: 'top', cam: [0, 95, 0.1], target: [0, 0, 0], fov: 45 },
-  { name: 'overview-west', cam: [-58, 40, -24], target: [0, 0, 0], fov: 50 },
-  { name: 'aerial', cam: [-30, 24, 30], target: [-2, 2, 0], fov: 55 },
-  { name: 'card', cam: [-18.8, 5.6, 0.6], target: [0, 6.5, -0.6], fov: 68 },
-  { name: 'bridge', cam: [-18.8, HIGH, 0], target: [0, 5, 0], fov: 75 },
-  { name: 'shrine-roof', cam: [-4.4, HIGH, -2.4], target: [10, 3, -12], fov: 75 },
-  { name: 'court', cam: [-16.8, EYE, -9.4], target: [2, 3, -2], fov: 75 },
-  { name: 'altar', cam: [13.6, HIGH, -12], target: [-6, 1, 2], fov: 75 },
-  { name: 'lane-west', cam: [-27.6, EYE, -17.6], target: [-27.6, 1.6, 10], fov: 70 },
-  { name: 'gallery', cam: [-23.2, EYE, -17.2], target: [-23.2, 1.8, 10], fov: 70 },
-  { name: 'camp-north', cam: [-24, EYE, -28.8], target: [6, 3, -20], fov: 75 },
-  { name: 'hall', cam: [-20.0, EYE, -16.8], target: [-6, 1.4, -12.4], fov: 75 },
-  { name: 'crypt', cam: [-3.6, EYE, -17.6], target: [-3.6, 1.4, 0], fov: 70 },
-  { name: 'shrine-inside', cam: [-4.6, EYE, -2.6], target: [3, 1.4, 2.4], fov: 75 }
+  { name: 'overview', cam: [58, 52, 66], target: [0, 0, 0], fov: 50 },
+  { name: 'top', cam: [0, 118, 0.1], target: [0, 0, 0], fov: 45 },
+  { name: 'nave', cam: [-3.6, EYE, -18.4], target: [2, 2.4, 10], fov: 75 },
+  { name: 'gallery', cam: [9.2, HIGH, -4], target: [-6, 1, 6], fov: 75 },
+  { name: 'aisle', cam: [9.6, EYE, -18.0], target: [9.2, 1.8, 10], fov: 70 },
+  { name: 'court', cam: [24, EYE, -16.4], target: [15, 1.8, 8], fov: 75 },
+  { name: 'court-cross', cam: [22.4, EYE, 14.4], target: [-20, 1.6, -4], fov: 75 },
+  { name: 'yard-east', cam: [24, EYE, -33.6], target: [4, 1.6, -26], fov: 75 },
+  { name: 'yard-west', cam: [-24, EYE, -24], target: [-4, 1.6, -34], fov: 75 },
+  { name: 'porch', cam: [11.2, EYE, -23.2], target: [3, 1.6, -27], fov: 75 },
+  { name: 'gate', cam: [0, EYE, -35.6], target: [0, 1.6, -22], fov: 70 },
+  { name: 'camp-north', cam: [-24, EYE, -40.4], target: [6, 2.5, -34], fov: 75 },
+  { name: 'camp-south', cam: [24, EYE, 40.4], target: [-6, 2.5, 34], fov: 75 },
+  { name: 'strip-west', cam: [-29.6, EYE, -36], target: [-31, 1.6, 0], fov: 70 },
+  { name: 'strip-east', cam: [29.6, EYE, 36], target: [31, 1.6, 0], fov: 70 },
+  { name: 'edge-west', cam: [-34.4, EYE, 12], target: [-70, -3, 10], fov: 75 },
+  { name: 'edge-east', cam: [33.6, EYE, -17.2], target: [80, 2.5, -17.2], fov: 75 },
+  { name: 'edge-south', cam: [6.4, EYE, 38.4], target: [10, -1, 90], fov: 75 },
+  { name: 'edge-north', cam: [-9.6, EYE, -39.2], target: [-14, 7, -70], fov: 75 }
 ];
 
 export const TEMPLE = defineMap({
@@ -50,21 +49,21 @@ export const TEMPLE = defineMap({
   name: 'Jade Temple',
   atmosphere: {
     zenith: '#4f9ad6',
-    horizon: '#d9ead2',
-    ground: '#7f9a6a',
-    sunColor: '#fff0cc',
-    sunIntensity: 2.8,
-    sunDirection: new THREE.Vector3(0.62, 0.55, -0.35).normalize(),
+    horizon: HAZE,
+    ground: '#a48c64',
+    sunColor: '#ffe4b0',
+    sunIntensity: 2.9,
+    sunDirection: new THREE.Vector3(0.5, 0.6, 0.62).normalize(),
     fogNear: 80,
     clouds: { count: 9, seed: 5 }
   },
-  bounds: { min: [-34.4, -6, -30.8], max: [34.4, 40, 30.8] },
+  bounds: { min: [-T.edgeX - 0.4, -12, -T.edge - 0.4], max: [T.edgeX + 0.4, 40, T.edge + 0.4] },
   killY: -0.8,
   seed: 61,
   plan() {
     const p = new Plan();
-    streams(p);
     templeStructures(p);
+    templeCover(p);
     templeDressing(p);
     spawns(p);
     return p;

@@ -2,14 +2,20 @@ import { PLATE } from '../engine/geometry';
 import { drawBlock, plates, slab, STAIRS, type Masonry, type StairParams } from './blocks';
 import type { Drawer, Element, Plan } from './plan';
 import { Pen } from './props-kit';
-import { belfry, stupa, tieredRoof } from './temple-ornament';
-import { T, templeGeometry, type Kind, type Piece } from './temple-layout';
-import { box, Frame, Rng, type Face } from './util';
+import { burner, fence, greatStatue, guardians, house, kiosk, rail, ruin, screen, stack, stele } from './temple-art';
+import { clerestory, ROOF_CLAY, ROOF_JADE, tiledRoof } from './temple-ornament';
+import { templeGeometry } from './temple-geometry';
+import { T, type Kind, type Piece } from './temple-layout';
+import { box, Frame, Rng, shade, type Face } from './util';
 
 export const JADE: Masonry = { colors: ['#93a996', '#849c88', '#a2b6a3', '#76907b'], variance: 0.35, lens: [3, 4, 2, 5], seam: '#4f6656' };
-export const SANDSTONE: Masonry = { colors: ['#d8c9a3', '#cbbb93', '#e2d5b2'], variance: 0.3, lens: [2, 3, 4] };
+export const SANDSTONE: Masonry = { colors: ['#e0c48e', '#d6b984', '#e8cf9c'], variance: 0.25, lens: [2, 3, 4], seam: '#a08860' };
+/** District palettes: red lacquer in the great hall, ochre plaster in the ranges, weathered grey stone in the strips. */
+const HALL_RED: Masonry = { colors: ['#a83a2c', '#9e3427', '#b24536'], variance: 0.15, lens: [4, 6, 8], seam: '#6a2219' };
+const RANGE_OCHRE: Masonry = { colors: ['#d2a050', '#c99446', '#dcad62'], variance: 0.2, lens: [3, 4, 6], seam: '#8a6230' };
+const LINTEL: Masonry = { colors: ['#2f6f5a', '#2a6553'], variance: 0.1, lens: [6, 8], seam: '#e0b040' };
 const ROCK = ['#7d8276', '#6f7469', '#878c80', '#666b61', '#73806a', '#8a8470', '#5f7a5a'];
-const VINE = '#3f8a3a';
+const VINE = '#2f6f36';
 const CEILING = '#8a3a2c';
 export const C = {
   plinth: '#5f7d68',
@@ -76,14 +82,14 @@ function pillar(d: Drawer, q: Piece) {
   t.box(0, h - 0.32, 0, 0.8, 0.32, 0.8, C.gold, 'metal');
 }
 
-/** Balustrade post standing in for a parapet block: plinth, carved shaft, coping with a gold knob. */
+/** Balustrade post standing in for a parapet block: plinth, red lacquered shaft, coping with a gold knob. */
 function post(d: Drawer, q: Piece) {
   const w = q.max[0] - q.min[0];
   const dd = q.max[2] - q.min[2];
   const h = q.max[1] - q.min[1];
   const t = new Pen(d, new Frame((q.min[0] + q.max[0]) / 2, q.min[1], (q.min[2] + q.max[2]) / 2));
   t.box(0, 0, 0, w, 0.24, dd, C.plinth);
-  t.box(0, 0.24, 0, w - 0.1, h - 0.48, dd - 0.08, '#a2b6a3');
+  t.box(0, 0.24, 0, w - 0.1, h - 0.48, dd - 0.08, '#a83a2c');
   if (d.detail > 0) t.box(0, 0.62, 0, w - 0.04, 0.08, dd - 0.02, C.sand, undefined, 0);
   t.box(0, h - 0.24, 0, w, 0.24, dd, C.sand);
   if (d.detail > 0) t.cone(0, h, 0, 0.08, 0.02, 0.16, C.gold, 'metal', 8);
@@ -91,8 +97,9 @@ function post(d: Drawer, q: Piece) {
 
 /** A face that looks out of the playable area (the backs of the cliffs) is never seen. */
 function outward(f: Face, q: Piece) {
-  const E = T.edge + 0.01;
-  return (f === 'n' && q.min[2] < -E) || (f === 's' && q.max[2] > E) || (f === 'w' && q.min[0] < -E) || (f === 'e' && q.max[0] > E);
+  const Z = T.edge + 0.01;
+  const X = T.edgeX + 0.01;
+  return (f === 'n' && q.min[2] < -Z) || (f === 's' && q.max[2] > Z) || (f === 'w' && q.min[0] < -X) || (f === 'e' && q.max[0] > X);
 }
 
 /** Unreachable cliff or rock mass: rock columns stepped back from its face (never in front of the collider), moss on top. */
@@ -128,11 +135,29 @@ function rock(d: Drawer, q: Piece, e: Exposure) {
         last = out;
         y += h;
       }
-      if (d.detail > 0 && rng.chance(0.35)) put(alongX, face, sign, a + rng.range(0.2, Math.max(0.2, w - 0.7)), 0.5, y1 - rng.range(1.6, 4.4), y1 + 0.1, 0.04, 0.3, VINE);
+      if (d.detail > 0 && y1 - y0 > 5 && rng.chance(0.35)) {
+        const v = a + rng.range(0.2, Math.max(0.2, w - 0.9));
+        for (let k = 0; k < 3; k++) put(alongX, face, sign, v + k * 0.26, rng.range(0.12, 0.2), y1 - rng.range(1.0, 3.2), y1 + 0.1, 0.04, 0.2, k % 2 ? VINE : shade(VINE, -0.12));
+      }
       a += w;
     }
   }
   plates(d, x0, z0, x1, z1, y1 - 0.2, C.moss, false);
+}
+
+/** Timber boards on a gallery floor: seams along its length every 0.8 m and staggered board ends every 4.8 m. */
+function boards(d: Drawer, q: Piece) {
+  const [x0, , z0] = q.min;
+  const [x1, y, z1] = q.max;
+  const alongX = x1 - x0 > z1 - z0;
+  const [a0, a1] = alongX ? [x0, x1] : [z0, z1];
+  const [c0, c1] = alongX ? [z0, z1] : [x0, x1];
+  const seam = (a: number, b: number, c: number, e: number) => slab(d, alongX ? [a, y, c] : [c, y, a], alongX ? [b, y + 0.012, e] : [e, y + 0.012, b], '#7a5232');
+  let row = 0;
+  for (let c = c0 + 0.8; c < c1 - 0.1; c += 0.8, row++) {
+    seam(a0, a1, c - 0.02, c + 0.02);
+    for (let a = a0 + (row % 2 ? 2.4 : 4.8); a < a1 - 0.4; a += 4.8) seam(a - 0.02, a + 0.02, c - 0.8, c);
+  }
 }
 
 /** Lacquered red ceiling under a floor slab, seen from the rooms and passages below. */
@@ -140,54 +165,67 @@ function ceiling(d: Drawer, q: Piece) {
   slab(d, [q.min[0] + 0.02, q.min[1] - 0.04, q.min[2] + 0.02], [q.max[0] - 0.02, q.min[1], q.max[2] - 0.02], CEILING);
 }
 
-/** Gold sun discs and offering bowls on the four faces of the shrine's central pier (half-size r). */
-function altarFaces(d: Drawer, r: number) {
-  const t = new Pen(d, new Frame(0, 0, 0));
-  for (const turns of [0, 1, 2, 3]) {
-    const f = t.at(new Frame(0, 0, 0, turns));
-    f.cylZ(0, 1.9, r + 0.04, 0.42, 0.08, C.gold, 'metal', 0.02, d.detail === 0 ? 10 : 16);
-    if (d.detail > 0) f.cylZ(0, 1.9, r + 0.1, 0.2, 0.06, C.red, undefined, 0.01);
-    f.box(0, 0.9, r + 0.12, 1.4, 0.12, 0.24, C.sand, undefined, 0.02);
-    for (const x of [-0.4, 0.4]) f.cyl(x, 1.02, r + 0.12, 0.09, 0.1, C.gold, 'metal', 0.02);
+const inRange = (q: Piece) => Math.min(Math.abs(q.min[2]), Math.abs(q.max[2])) >= T.row + 0.79;
+const inGate = (q: Piece) => q.max[0] <= 3.21 && q.min[0] >= -3.21 && Math.min(Math.abs(q.min[2]), Math.abs(q.max[2])) >= T.row - 0.01;
+
+/** Roofs: the nave's gable drawn once over both halves, lean-tos over the galleries, clay gables over the ranges. */
+function roof(d: Drawer, q: Piece) {
+  const [x0, y0, z0] = q.min;
+  const [x1, y1, z1] = q.max;
+  slab(d, [x0, y0, z0], [x1, y1 - 0.24, z1], CEILING);
+  if (x1 <= 0.01 && x0 > -7) return;
+  if (x0 >= -0.01 && x1 < 7) return tiledRoof(d, -x1, z0, x1, z1, y1, ROOF_JADE);
+  if (y0 > T.roofTop - 0.1 && y0 < T.hallTop - 0.1) {
+    const east = x0 > 0;
+    tiledRoof(d, x0, z0, x1, z1, y1, ROOF_JADE, east ? 1 : -1);
+    const cx = east ? T.col - 0.12 : -T.col + 0.12;
+    return clerestory(d, cx - 0.28, y1, z0 + 0.2, cx + 0.28, T.hallTop, z1 - 0.2);
   }
+  tiledRoof(d, x0, z0, x1, z1, y1, x1 - x0 < 7 ? ROOF_JADE : ROOF_CLAY);
 }
 
+let houses = 0;
 const DRAW: Record<Kind, (d: Drawer, q: Piece, e: Exposure) => void> = {
   cliff: rock,
   rock,
-  bank: (d, q, e) => stone(d, q, e, SANDSTONE, false),
+  spur: rock,
+  boulder: rock,
   pillar,
-  roof: (d, q) => tieredRoof(d, q),
-  wall: (d, q, e) => stone(d, q, e, JADE),
-  hall: (d, q, e) => stone(d, q, e, JADE),
-  lintel: (d, q, e) => stone(d, q, e, SANDSTONE, false),
+  pier: (d, q, e) => stone(d, q, e, HALL_RED),
+  roof,
+  wall: (d, q, e) => stone(d, q, e, HALL_RED),
+  hall: (d, q, e) => stone(d, q, e, inRange(q) || inGate(q) ? RANGE_OCHRE : HALL_RED),
+  cloister: (d, q, e) => stone(d, q, e, SANDSTONE),
+  kiosk: (d, q) => kiosk(d, q),
+  house: (d, q) => house(d, q, houses++),
+  lintel: (d, q, e) => stone(d, q, e, q.min[1] > 2.5 && q.max[1] < 3.5 ? LINTEL : inRange(q) ? RANGE_OCHRE : HALL_RED, false),
   slab: (d, q, e) => {
     drawBlock(d, { min: q.min, max: [q.max[0], q.max[1] - PLATE, q.max[2]], surface: 'stone', style: SANDSTONE, faces: e.faces, top: 'none' });
     ceiling(d, q);
-    if (e.top) plates(d, q.min[0], q.min[2], q.max[0], q.max[2], q.max[1] - PLATE, C.terrace, false);
+    if (e.top) plates(d, q.min[0], q.min[2], q.max[0], q.max[2], q.max[1] - PLATE, '#c08a58', false);
+    if (e.top && d.detail > 0) boards(d, q);
   },
-  deck: (d, q, e) => {
-    drawBlock(d, { min: q.min, max: [q.max[0], q.max[1] - PLATE, q.max[2]], surface: 'stone', style: SANDSTONE, faces: e.faces, top: 'none' });
-    ceiling(d, q);
-    plates(d, q.min[0], q.min[2], q.max[0], q.max[2], q.max[1] - PLATE, C.terrace, false);
-    for (const z of [q.min[2] - 0.05, q.max[2]]) slab(d, [q.min[0], q.min[1] + 0.12, z], [q.max[0], q.min[1] + 0.26, z + 0.05], C.gold, 'metal');
-  },
-  pier: (d, q, e) => stone(d, q, e, JADE),
   parapet: post,
-  stupa: (d, q) => stupa(d, q),
-  kiosk: (d, q, e) => stone(d, q, e, JADE),
-  tower: (d, q, e) => stone(d, q, e, JADE),
-  bell: (d, q) => belfry(d, q),
-  altar: (d, q, e) => {
-    stone(d, q, e, SANDSTONE);
-    if (q.min[2] < 0) altarFaces(d, q.max[0]);
+  rail: (d, q) => rail(d, q),
+  fence: (d, q) => fence(d, q),
+  screen: (d, q) => screen(d, q, inRange(q)),
+  statue: (d, q) => (Math.abs(q.min[2]) < 3 ? greatStatue(d, q) : guardians(d, q)),
+  dais: (d, q, e) => {
+    stone(d, q, e, SANDSTONE, false);
+    slab(d, [q.min[0] - 0.04, q.max[1] - 0.1, q.min[2] - 0.04], [q.max[0] + 0.04, q.max[1], q.max[2] + 0.04], C.gold, 'metal');
   },
-  screen: (d, q, e) => stone(d, q, e, SANDSTONE)
+  burner: (d, q) => burner(d, q),
+  stele: (d, q) => stele(d, q, Math.abs(q.min[0]) > T.courtOut || Math.abs(q.max[0]) > T.courtOut),
+  ruin: (d, q) => ruin(d, q),
+  stall: (d, q, e) => stone(d, q, e, SANDSTONE, false),
+  stack: (d, q) => stack(d, q),
+  planter: (d, q, e) => stone(d, q, e, SANDSTONE, false)
 };
 
 export const TEMPLE: Element<{ pieces: Piece[] }> = {
   colliders: (p) => p.pieces.map((q) => box(q.min, q.max, q.surface ?? 'stone', { walk: q.walk })),
   draw(d, p) {
+    houses = 0;
     for (const q of p.pieces) DRAW[q.kind](d, q, exposure(q, p.pieces));
   }
 };

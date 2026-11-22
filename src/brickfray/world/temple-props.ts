@@ -26,6 +26,8 @@ export const LANTERN: Element<At> = {
     t.ball(0, 1.86, 0, 0.08, MOSS);
     const f = frameOf(p);
     d.anim.flame(f.p(0, 1.1, 0));
+    const [x, , z] = f.p(0, 0, 0);
+    d.anim.pools.add(x, z, 0.006, 2.4, '#ffc070', 0.25);
   }
 };
 
@@ -41,7 +43,10 @@ export const BRAZIER: Element<At> = {
     t.cone(0, 0.72, 0, 0.22, 0.5, 0.34, BRONZE, 'metal');
     t.ring(0, 1.06, 0, 0.48, 0.05, GOLD, 'metal');
     t.cyl(0, 0.98, 0, 0.4, 0.06, '#3a2a1f');
-    d.anim.flame(frameOf(p).p(0, 1.08, 0));
+    const f = frameOf(p);
+    d.anim.flame(f.p(0, 1.08, 0));
+    const [x, , z] = f.p(0, 0, 0);
+    d.anim.pools.add(x, z, 0.006, 3.2, '#ffb060', 0.32);
   }
 };
 
@@ -140,14 +145,13 @@ export const LOTUS_POOL: Element<At> = {
     const f = frameOf(p);
     const H = 1.4;
     const R = 0.32;
-    const h = 0.56;
+    const h = 0.48;
     const out: PlanCollider[] = [
       f.box([-H, 0, -H], [H, h, -H + R], 'stone'),
       f.box([-H, 0, H - R], [H, h, H], 'stone'),
       f.box([-H, 0, -H + R], [-H + R, h, H - R], 'stone'),
       f.box([H - R, 0, -H + R], [H, h, H - R], 'stone'),
-      f.box([-H + R, 0, -H + R], [H - R, 0.16, H - R], 'water', { walk: true }),
-      f.box([-0.3, 0.16, -0.3], [0.3, 1.0, 0.3], 'stone')
+      f.box([-H + R, 0, -H + R], [H - R, 0.16, H - R], 'water', { walk: true })
     ];
     return out;
   },
@@ -156,7 +160,7 @@ export const LOTUS_POOL: Element<At> = {
     const t = pen(d, p);
     const H = 1.4;
     const R = 0.32;
-    const h = 0.56;
+    const h = 0.48;
     const rim = (a: Vec3, b: Vec3) => {
       const [x0, y0, z0] = f.p(...a);
       const [x1, y1, z1] = f.p(...b);
@@ -181,6 +185,17 @@ export const LOTUS_POOL: Element<At> = {
       if (d.detail > 0 && i % 2 === 0) t.cone(Math.cos(a) * r, 0.44, Math.sin(a) * r, 0.04, 0.12, 0.12, '#f4a6c4', undefined, 6);
     }
     d.anim.jet(f.p(0, 1.06, 0), 0.55, 0.9);
+    // Four glassy arcs from the bud to the water: the fountain reads as water, not as drops.
+    if (d.detail > 0) for (let i = 0; i < 4; i++) {
+      const a = (i / 4) * Math.PI * 2 + Math.PI / 4;
+      let prev: Vec3 = [0, 1.06, 0];
+      for (let k = 1; k <= 5; k++) {
+        const u = k / 5;
+        const cur: Vec3 = [Math.cos(a) * u * 0.8, 1.06 + 0.3 * (4 * u - 4 * u * u) - 0.64 * u * u, Math.sin(a) * u * 0.8];
+        t.beam(prev[0], prev[1], prev[2], cur[0], cur[1], cur[2], 0.06, '#cdeefc', 'glass');
+        prev = cur;
+      }
+    }
   }
 };
 
@@ -219,8 +234,8 @@ export function prayerFlags(d: Drawer, a: Vec3, b: Vec3, count: number) {
   }
 }
 
-/** Low fern clumps along a wall foot (no collider: knee-high, players brush through them). */
-export function ferns(d: Drawer, from: [number, number], to: [number, number], seed: number) {
+/** Low shrubs with grass blades along a wall foot (no collider: knee-high, players brush through them). */
+export function shrubs(d: Drawer, from: [number, number], to: [number, number], seed: number) {
   const t = pen(d, { x: 0, z: 0 });
   const rng = new Rng(seed);
   const len = Math.hypot(to[0] - from[0], to[1] - from[1]);
@@ -232,13 +247,9 @@ export function ferns(d: Drawer, from: [number, number], to: [number, number], s
     const z = from[1] + (to[1] - from[1]) * u;
     const s = rng.range(0.7, 1.2);
     const c = rng.pick([LEAF, MOSS, '#2f7a34']);
-    t.cyl(x, 0, z, 0.16 * s, 0.32 * s, shade(c, -0.15), undefined, 0.03, 6);
-    const fronds = d.detail === 0 ? 3 : 6;
-    const a0 = rng.range(0, Math.PI);
-    for (let k = 0; k < fronds; k++) {
-      const a = a0 + (k / fronds) * Math.PI * 2;
-      const r = 0.38 * s;
-      t.box(x + Math.sin(a) * r, 0.12 + (k % 2) * 0.1, z + Math.cos(a) * r, 0.16, 0.06, 0.7 * s, k % 2 ? c : shade(c, 0.1), undefined, 0, a);
-    }
+    t.ball(x, 0.1, z, 0.34 * s, shade(c, -0.1), [1.3, 0.75, 1.3], 0.25, rng.int(1, 5));
+    if (d.detail === 0) continue;
+    t.ball(x + rng.range(-0.3, 0.3) * s, 0.08, z + rng.range(-0.3, 0.3) * s, 0.24 * s, c, [1.2, 0.8, 1.2], 0.25, rng.int(1, 5));
+    for (let k = 0; k < 3; k++) t.cone(x + rng.range(-0.25, 0.25) * s, 0.1, z + rng.range(-0.25, 0.25) * s, 0.05 * s, 0.005, rng.range(0.45, 0.7) * s, shade(c, 0.12), undefined, 4);
   }
 }
