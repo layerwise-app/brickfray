@@ -4,6 +4,7 @@ import { FORTRESS_DETAILS } from './fortress-details';
 import { fortressDressing } from './fortress-dressing';
 import { fortressGround } from './fortress-ground';
 import { fortressOutside } from './fortress-outside';
+import { fortressRooms } from './fortress-rooms';
 import { NAV_SEEDS } from './fortress-nav';
 import { fortressWorks, WORKS } from './fortress-works';
 import { KEEP } from './keep';
@@ -23,23 +24,25 @@ export const FORTRESS_AMBIENCE: { flags: Spot[]; battlements: Spot[]; trees: Spo
 
 /**
  * Team 1 in the upper ward (north) with side clusters in the kitchen garden and the postern lane; team 0 in the barbican
- * (south) with a side cluster in the lists. Each cluster faces the lane it opens on, so a side spawn starts a side lane.
+ * (south) with side clusters at its sally end and in the lists. Each cluster faces the lane it opens on, so a side
+ * spawn starts a side lane.
  */
 const TEAM1: [number, number, [number, number]][] = [
-  ...([[-17.6, -44.8], [-13.6, -43.2], [-9.6, -46.4], [-3.2, -45.6], [-1.6, -40.0], [5.6, -40.0], [6.4, -46.4], [12.0, -44.0], [14.4, -46.4], [15.2, -40.8], [19.2, -42.4]] as const).map(([x, z]): [number, number, [number, number]] => [x, z, [2.4, -40.0]]),
-  [-32.0, -46.4, [-32.4, -28.0]], [-32.0, -41.6, [-32.4, -28.0]], [-29.6, -38.4, [-32.4, -28.0]],
+  ...([[-17.6, -44.8], [-13.6, -43.2], [-9.6, -46.4], [-3.2, -45.6], [-2.4, -43.6], [5.6, -43.2], [6.4, -46.4], [12.0, -44.0], [14.4, -46.4]] as const).map(([x, z]): [number, number, [number, number]] => [x, z, [2.4, -40.0]]),
+  [-32.0, -46.4, [-32.4, -28.0]], [-32.0, -41.6, [-32.4, -28.0]], [-29.6, -38.4, [-32.4, -28.0]], [-32.0, -35.2, [-32.4, -28.0]], [-29.2, -44.8, [-32.4, -28.0]], [-25.6, -40.4, [-24.0, -20.0]], [-23.6, -32.0, [-24.0, -20.0]],
   [28.0, -46.4, [30.4, -28.0]], [30.4, -42.4, [30.4, -28.0]], [28.0, -38.4, [30.4, -28.0]]
 ];
 const TEAM0: [number, number, [number, number]][] = [
-  ...([[-23.2, 37.6], [-20.0, 42.4], [-16.8, 37.6], [-13.6, 42.4], [-8.8, 42.4], [-4.8, 43.2], [-0.8, 42.4], [2.4, 37.6], [1.6, 44.0], [-11.2, 36.8]] as const).map(([x, z]): [number, number, [number, number]] => [x, z, [x, 0]]),
-  [12.8, 32.0, [30.0, 26.0]], [16.0, 36.0, [30.0, 26.0]], [12.8, 39.2, [30.0, 26.0]]
+  ...([[-16.8, 37.6], [-13.6, 42.4], [-8.8, 42.4], [-4.8, 43.2], [-0.8, 42.4], [-11.2, 36.8]] as const).map(([x, z]): [number, number, [number, number]] => [x, z, [x, 0]]),
+  [-23.2, 37.6, [-23.2, 24.0]], [-20.0, 42.4, [-23.2, 24.0]], [-24.8, 41.6, [-23.2, 24.0]], [-22.4, 44.4, [-23.2, 24.0]], [-19.6, 38.8, [-23.2, 24.0]], [-17.6, 44.0, [-23.2, 24.0]],
+  [12.8, 32.0, [34.8, 24.0]], [16.0, 36.0, [34.8, 24.0]], [12.8, 39.2, [34.8, 24.0]]
 ];
 /** Free-for-all spawns, all on the ground and spread over every district; each faces the keep unless given a point to face. */
 const FFA: [number, number, [number, number]?][] = [
-  [-40.0, -24.8], [-32.0, -16.0], [-31.2, -40.0, [-20.0, -43.2]], [-30.4, 13.6], [-6.0, -18.0, [20.0, -18.0]], [6.0, -22.0], [-2.0, 20.0],
+  [-40.0, -24.8], [-32.0, -16.0], [-31.2, -40.0, [-20.0, -43.2]], [-30.4, 13.6], [-6.0, -18.0, [20.0, -18.0]], [4.8, -20.8], [-2.0, 20.0],
   [-12.0, -24.0], [12.0, -16.0, [12.0, -28.0]], [-12.0, 22.4], [9.6, 12.0], [-3.2, -44.0], [-18.4, 40.8],
-  [29.6, -24.0, [32.0, -8.0]], [31.2, -10.0], [32.0, 16.8], [21.6, 36.8], [16.0, 34.4, [30.0, 34.4]], [29.6, -37.6], [1.6, 42.4],
-  [-6.4, -2.4], [6.4, 2.4], [-15.6, 0.0], [15.6, 0.0], [-10.4, -32.8]
+  [32.0, -2.4, [24.0, 8.0]], [32.0, 16.8], [21.6, 36.8], [19.2, 20.8, [12.4, 24.8]], [29.6, -37.6], [1.6, 42.4],
+  [-6.4, -2.4], [-15.6, 0.0], [-45.6, -6.0, [-34.0, -6.0]], [-32.6, 25.6, [-24.0, 18.4]]
 ];
 
 function spawns(p: Plan) {
@@ -56,7 +59,7 @@ export const FORTRESS_VIEWS: LabView[] = [
   { name: 'top', cam: [0, 130, 0.1], target: [0, 0, 0], fov: 45 },
   { name: 'overview-west', cam: [-84, 56, -30], target: [0, 0, 0], fov: 50 },
   { name: 'inner-court', cam: [-17.6, EYE, -25.6], target: [4, 3, -12], fov: 75 },
-  { name: 'outer-bailey', cam: [16.8, EYE, 12.0], target: [-6, 2.5, 20], fov: 75 },
+  { name: 'outer-bailey', cam: [10.4, EYE, 16.0], target: [-12, 2.2, 21], fov: 75 },
   { name: 'market', cam: [-4.8, EYE, 14.4], target: [-13, 1.6, 19], fov: 75 },
   { name: 'keep-hall', cam: [-4.4, EYE, 4.4], target: [3, 2, -3], fov: 80 },
   { name: 'great-hall', cam: [-1.6, EYE, -29.6], target: [-14, 2.6, -33], fov: 80 },
@@ -64,7 +67,7 @@ export const FORTRESS_VIEWS: LabView[] = [
   { name: 'smithy', cam: [18.4, EYE, -6.4], target: [12, 1.6, 2], fov: 80 },
   { name: 'stables', cam: [-36.0, EYE, 6.0], target: [-46, 2, -4], fov: 75 },
   { name: 'stable-yard', cam: [-27.2, EYE, 18.4], target: [-42, 2.5, 20], fov: 75 },
-  { name: 'orchard', cam: [-22.4, EYE, -24.8], target: [-40, 3, -16], fov: 75 },
+  { name: 'orchard', cam: [-28.0, EYE, -26.0], target: [-40, 3, -14], fov: 75 },
   { name: 'kitchen-garden', cam: [-23.2, EYE, -30.4], target: [-28, 2, -44], fov: 75 },
   { name: 'river-north', cam: [36.0, EYE, -9.6], target: [30, 3, -22], fov: 75 },
   { name: 'river-south', cam: [34.4, EYE, 8.8], target: [36, 1, 26], fov: 75 },
@@ -75,7 +78,7 @@ export const FORTRESS_VIEWS: LabView[] = [
   { name: 'gate', cam: [-5.6, EYE, 22], target: [-5.6, 2, 34], fov: 70 }
 ];
 
-/** The fortress's plan: ground, works, keep, details, dressing and spawns (the backdrop draws the land beyond). */
+/** The fortress's plan: ground, works, keep, details, rooms, dressing and spawns (the backdrop draws the land beyond). */
 export function fortressPlan() {
   const p = new Plan();
   fortressGround(p);
@@ -84,6 +87,7 @@ export function fortressPlan() {
   p.add(KEEP, {});
   p.add(KEEP_DRESSING, {});
   p.add(FORTRESS_DETAILS, works);
+  fortressRooms(p, works);
   p.navSeeds.push(...NAV_SEEDS);
   fortressDressing(p);
   spawns(p);

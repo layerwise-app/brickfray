@@ -6,7 +6,7 @@ import { box, type PlanCollider, type Vec3 } from './util';
 /**
  * The keep on its rock at the middle of the map: a hall (the audio room) 17.6 m across with four doors in a pinwheel,
  * the west and east ones into the flanks, a hearth column at the middle that stops every line from door to door, a long
- * table in each of the two corners no door opens on and a pillar between each pair of doors, so a rifle has 18-21 m
+ * table against the wall in each of the two corners no door opens on and a pillar between each pair of doors, so a rifle has 18-21 m
  * lines past the column inside. The tower and the rock are out of reach.
  */
 export const K = {
@@ -27,10 +27,10 @@ export const K = {
   notch: 1.6
 } as const;
 
-/** Long tables in the north-west and south-east corners of the hall: [x0, z0, x1, z1], 0.96 high. */
+/** Long tables against the walls of the north-west and south-east corners of the hall: [x0, z0, x1, z1], 0.96 high. */
 export const KEEP_TABLES: [number, number, number, number][] = [
-  [-7.2, -6.0, -2.4, -5.2],
-  [2.4, 5.2, 7.2, 6.0]
+  [-7.2, -8.8, -2.4, -8.0],
+  [2.4, 8.0, 7.2, 8.8]
 ];
 
 /** Pillars between the two doors of the north-east and of the south-west quarter: [x0, z0, x1, z1], to the ceiling. */
@@ -39,7 +39,8 @@ export const KEEP_PILLARS: [number, number, number, number][] = [
   [-6.6, 5.4, -5.4, 6.6]
 ];
 
-const KEEP_STONE: Masonry = { colors: ['#d3ccbb', '#c4bdab', '#ddd7c8', '#b9b2a2'], variance: 0.3, lens: [3, 4, 2, 5] };
+/** Grey ashlar: the keep is the one grey building among the beige halls. */
+const KEEP_STONE: Masonry = { colors: ['#a4a8ab', '#979b9f', '#b1b4b6', '#8c9094'], variance: 0.3, lens: [3, 4, 2, 5] };
 const OAK: Masonry = { colors: ['#8a5f3a', '#7a5434', '#9a6a3f'], variance: 0.25, lens: [4, 6] };
 const ROCK: Masonry = { colors: ['#8a8578', '#7d786c', '#969083', '#706b60'], variance: 0.4, lens: [2, 3, 5] };
 
@@ -93,7 +94,7 @@ export const KEEP: Element<Record<string, never>> = {
     const i = K.half - 1.6;
     out.push([m(K.doorN), 0, -o], [m(K.doorN), 0, -i], [m(K.doorS), 0, o], [m(K.doorS), 0, i]);
     out.push([-i, 0, m(K.doorW)], [i, 0, m(K.doorE)], [-K.half, 0, m(K.doorW)], [K.half, 0, m(K.doorE)]);
-    for (const [x, z] of [[-4.0, -4.0], [4.0, -4.0], [-4.0, 4.0], [4.0, 4.0], [-6.4, 0], [6.4, 0], [0, -6.4], [0, 6.4], [-7.2, -7.6], [7.2, 7.6], [7.6, -3.2], [-7.6, 3.2]] as const) out.push([x, 0, z]);
+    for (const [x, z] of [[-4.0, -4.0], [4.0, -4.0], [-4.0, 4.0], [4.0, 4.0], [-6.4, 0], [6.4, 0], [0, -6.4], [0, 6.4], [-7.2, -6.8], [7.2, 6.8], [7.6, -3.2], [-7.6, 3.2]] as const) out.push([x, 0, z]);
     return out;
   },
   draw(d) {

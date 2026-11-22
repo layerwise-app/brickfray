@@ -27,7 +27,7 @@ function beams(d: Drawer, r: Roof) {
 }
 
 /** Glazed lancets in the solid long walls of the great hall and the chapel: [x, sill, head]. */
-const GLAZING: [number, number, number][] = [
+export const GLAZING: [number, number, number][] = [
   [-11.6, 4.0, 5.6],
   [0.4, 4.0, 5.6],
   [8.0, 2.4, 4.6],

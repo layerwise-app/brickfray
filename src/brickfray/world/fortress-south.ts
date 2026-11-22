@@ -23,12 +23,13 @@ export const GH = { x0: -14.4, x1: 3.2, z0: F.bandS, z1: F.gate, p0: -7.2, p1: -
 
 /**
  * Gatehouse: the passage under a vault; the west tower holds a turning stair from a door on the bailey side up to the
- * gate room, which looks over the bailey through two windows; an open stair climbs from the barbican to its south door.
+ * gate room, lit by two slits over the bailey; an open stair climbs from the barbican to its south door.
  */
 function gatehouse(w: Works) {
   const { x0, x1, z0, z1, p0, p1, vault, roof } = GH;
   w.windows('tower', true, x0, x1, z0, z0 + 0.8, 0, S, [[-11.2, -9.6, 0, F.door], [p0, p1, 0, vault]]);
-  w.windows('tower', true, x0, x1, z0, z0 + 0.8, S, roof, [[-6.0, -5.2, 4.8, 6.0], [-0.4, 0.4, 4.8, 6.0]]);
+  // Slits over head height: the gate room is a way over the gate, not a seat over the bailey.
+  w.windows('tower', true, x0, x1, z0, z0 + 0.8, S, roof, [[-6.0, -5.2, 5.6, 6.6], [-0.4, 0.4, 5.6, 6.6]]);
   w.windows('tower', true, x0, x1, z1 - 0.8, z1, 0, S, [[p0, p1, 0, vault]]);
   w.windows('tower', true, x0, x1, z1 - 0.8, z1, S, roof, [[-2.4, -0.8, S, 6.72]]);
   w.box('tower', x0, 0, z0 + 0.8, x0 + 0.8, roof, z1 - 0.8);

@@ -25,6 +25,9 @@ function doorTorches(p: Plan, x: number, z: number, half: number, turns: number,
 function ward(p: Plan) {
   for (const x of [-14.4, -2.4]) p.add(BANNER, { x, z: -38.4, y: 5.6, turns: 2, colors: RED, width: 1.2, height: 2.2, pattern: 'border' });
   doorTorches(p, -7.2, -38.4, 2.0, 2);
+  // The hall stair's wall facing the spawns: red banners and a torch.
+  for (const x of [-18.0, -12.8]) p.add(BANNER, { x, z: -40.8, y: 5.0, turns: 2, colors: RED, width: 1.2, height: 2.0, pattern: 'chevron' });
+  p.add(TORCH, { x: -15.4, z: -40.8, y: 2.3, turns: 2 });
   doorTorches(p, 4.8, -38.4, 2.0, 2);
   p.add(FLAGPOLE, { x: 16.8, z: -47.2, colors: RED, height: 5.6, pattern: 'chevron' });
   // Kitchen garden beds against its west wall, a fruit tree at its foot.
@@ -48,7 +51,7 @@ function courts(p: Plan) {
     const alongX = t % 2 === 0;
     for (const s of [-1, 1]) p.add(TORCH, { x: alongX ? x + s * 1.75 : x, z: alongX ? z : z + s * 1.75, y: 2.3, turns: t });
   }
-  for (const [x, z] of [[4.55, -21.6], [4.6, -20.85]] as const) p.add(BARREL, { x, z });
+  for (const [x, z] of [[8.4, -23.3], [8.4, -22.55]] as const) p.add(BARREL, { x, z });
   p.add(CART, { x: 8.0, z: 26.2, turns: 0, load: 'barrels' });
   p.add(HAY, { x: -18.6, z: 25.8, turns: 1 });
   // Flank sheds: the forge's stock beside its fire, a rack on the coal store, barrels at the trough house, planks at the woodshed.
@@ -69,7 +72,6 @@ function westLane(p: Plan) {
   p.add(HAY, { x: -37.0, z: -22.1 });
   p.add(HAY, { x: -37.7, z: -22.1, y: 0.64 });
   for (const z of [-6.0, 6.0]) p.add(HAY, { x: -46.6, z, turns: 1 });
-  p.add(HAY, { x: -46.6, z: -2.0, turns: 1 });
   p.add(CART, { x: -34.6, z: 25.6, turns: 1, load: 'hay' });
   for (const x of [-46.4, -45.1]) p.add(HAY, { x, z: 15.5 });
   p.add(HAY, { x: -45.75, z: 15.5, y: 0.64 });
@@ -82,7 +84,7 @@ function westLane(p: Plan) {
 
 function eastLane(p: Plan) {
   for (const x of [16.8, 19.6]) p.add(TARGET, { x, z: 39.45, turns: 2 });
-  p.add(HAY, { x: 22.4, z: 39.5 });
+  p.add(HAY, { x: 22.4, z: 40.35 });
   for (const [x, z] of [[35.3, 17.9], [36.0, 17.85]] as const) p.add(BARREL, { x, z });
   p.add(CRATE, { x: 23.05, z: -26.55, size: 'large' });
 }

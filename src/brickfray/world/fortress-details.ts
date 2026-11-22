@@ -1,8 +1,9 @@
-import { FLANK_SHEDS } from './fortress-core';
+import { COURT_WAGON, FLANK_SHEDS, WOODPILE } from './fortress-core';
 import { MILL, WHEEL } from './fortress-east';
 import { HEARTH, OVEN } from './fortress-north';
-import { F, type Works } from './fortress-plan';
+import { F, type Kind, type Works } from './fortress-plan';
 import { exposure } from './fortress-trim';
+import { K } from './keep';
 import type { Drawer, Element } from './plan';
 import { Pen } from './props-kit';
 import { Frame, Rng, type Face } from './util';
@@ -21,8 +22,70 @@ export const FORTRESS_DETAILS: Element<Works> = {
     river(d);
     furniture(d);
     tufts(d, w);
+    ivy(d, w);
   }
 };
+
+const IVY = new Set<Kind>(['wall', 'curtain', 'tower', 'rubble', 'hall', 'bank', 'breast']);
+/** Faces that always get ivy, by a point just off them: the ruin's stair wall over the river, the hall stair's wall in the upper ward. */
+const IVY_FACES: [number, number][] = [[32.0, -11.1], [-15.2, -41.3]];
+
+/** Under a roof or inside the keep. */
+const indoors = (w: Works) => (x: number, z: number) =>
+  (Math.abs(x) < K.half + 0.2 && Math.abs(z) < K.half + 0.2) || w.roofs.some((r) => x > r.x0 && x < r.x1 && z > r.z0 && z < r.z1);
+
+/**
+ * Ivy up the outdoor faces of the walls, thickest in the lanes and the upper ward, so long walls are not bare stone
+ * (no collider: it lies flat on the wall).
+ */
+function ivy(d: Drawer, w: Works) {
+  const t = new Pen(d, new Frame(0, 0, 0, 0));
+  const rng = new Rng(23);
+  const inside = indoors(w);
+  for (const q of w.pieces) {
+    if (q.min[1] > 0.01 || q.max[1] < 2.4 || !IVY.has(q.kind)) continue;
+    for (const face of exposure(q, w.pieces).faces) {
+      const alongX = face === 'n' || face === 's';
+      const [a0, a1] = alongX ? [q.min[0], q.max[0]] : [q.min[2], q.max[2]];
+      if (a1 - a0 < 2.4) continue;
+      const out = face === 's' || face === 'e' ? 1 : -1;
+      const c = face === 's' ? q.max[2] : face === 'n' ? q.min[2] : face === 'e' ? q.max[0] : q.min[0];
+      const [ox, oz] = alongX ? [(a0 + a1) / 2, c + out * 0.5] : [c + out * 0.5, (a0 + a1) / 2];
+      if (inside(ox, oz)) continue;
+      const forced = IVY_FACES.some(([x, z]) => Math.abs(x - ox) < 2.0 && Math.abs(z - oz) < 2.0);
+      const lush = ox < F.core0 || ox > F.core1 || oz < F.hall;
+      const patches = forced ? Math.ceil((a1 - a0) / 3.6) : rng.chance(lush ? 0.55 : 0.2) ? 1 : 0;
+      const span = (a1 - a0) / Math.max(1, patches);
+      for (let k = 0; k < patches; k++) ivyPatch(t, rng, { alongX, c, out, a0: a0 + k * span, a1: a0 + (k + 1) * span, top: q.max[1] });
+    }
+  }
+}
+
+/** One spray of ivy on a stretch a0..a1 of a face at c (out: the side it faces): stems and a fan of leaves, densest low. */
+function ivyPatch(t: Pen, rng: Rng, f: { alongX: boolean; c: number; out: number; a0: number; a1: number; top: number }) {
+  const width = Math.min(f.a1 - f.a0 - 0.8, rng.range(1.4, 2.8));
+  const a = rng.range(f.a0 + 0.4 + width / 2, f.a1 - 0.4 - width / 2);
+  const height = Math.min(f.top - 0.3, rng.range(1.6, 3.6));
+  const put = (u0: number, u1: number, y0: number, y1: number, d0: number, d1: number, color: string) => {
+    const [c0, c1] = [f.c + f.out * d0, f.c + f.out * d1];
+    if (f.alongX) t.span(u0, y0, c0, u1, y1, c1, color, undefined, 0);
+    else t.span(c0, y0, u0, c1, y1, u1, color, undefined, 0);
+  };
+  for (let k = 0; k < 3; k++) {
+    const u = a + rng.range(-0.3, 0.3) * width;
+    put(u - 0.025, u + 0.025, 0, height * rng.range(0.6, 0.95), 0.01, 0.04, '#4a5a2a');
+  }
+  const n = Math.round(width * height * (t.detail === 0 ? 5 : 11));
+  for (let k = 0; k < n; k++) {
+    const h = 1 - Math.sqrt(rng.range(0, 1));
+    const u = a + rng.range(-0.5, 0.5) * width * (1 - 0.6 * h);
+    const s = rng.pick([0.2, 0.26, 0.32]);
+    const depth = rng.range(0.02, 0.07);
+    put(u - s / 2, u + s / 2, h * height, h * height + s, depth, depth + 0.03, rng.pick(IVY_GREENS));
+  }
+}
+
+const IVY_GREENS = ['#3f6e2a', '#4f7f32', '#5e8f3a', '#356024', '#6a9a40'];
 
 /** Grass tufts where the yards meet the outdoor walls (no collider: ankle high). */
 function tufts(d: Drawer, w: Works) {
@@ -30,12 +93,14 @@ function tufts(d: Drawer, w: Works) {
   const t = new Pen(d, new Frame(0, 0, 0, 0));
   const rng = new Rng(17);
   const greens = ['#5f9a3c', '#6fa845', '#4f8a34', '#7fb04f'];
+  const inside = indoors(w);
   for (const q of w.pieces) {
     if (q.min[1] > 0.01 || !(q.kind === 'curtain' || q.kind === 'wall' || q.kind === 'tower' || q.kind === 'bank')) continue;
     for (const face of exposure(q, w.pieces).faces) {
       const alongX = face === 'n' || face === 's';
       const [a0, a1] = alongX ? [q.min[0], q.max[0]] : [q.min[2], q.max[2]];
       const out = face === 's' ? q.max[2] + 0.18 : face === 'n' ? q.min[2] - 0.18 : face === 'e' ? q.max[0] + 0.18 : q.min[0] - 0.18;
+      if (alongX ? inside((a0 + a1) / 2, out) : inside(out, (a0 + a1) / 2)) continue;
       for (let a = a0 + 0.6; a < a1 - 0.6; a += rng.range(2.2, 3.6)) {
         if (rng.chance(0.35)) continue;
         const blades = rng.int(3, 5);
@@ -129,17 +194,10 @@ function river(d: Drawer) {
   }
 }
 
-/** Boards on the hall tables, the altar cloth, market produce, hay wagon wheels, log ends in the court's timber stack. */
+/** The altar cloth, market produce, hay wagon wheels, log ends in the court's timber stack. */
 function furniture(d: Drawer) {
   const t = new Pen(d, new Frame(0, 0, 0, 0));
   const fine = d.detail > 0;
-  // Great hall: cloth and plates on the long table and the high table.
-  t.box(-10.4, 0.96, -34.8, 4.6, 0.04, 0.7, '#c7b08a', undefined, 0);
-  t.box(-1.2, 0.96, -33.2, 0.7, 0.04, 3.8, '#c7b08a', undefined, 0);
-  if (fine) {
-    for (const x of [-12.0, -10.8, -9.6, -8.4]) t.cyl(x, 1.0, -34.8, 0.18, 0.03, '#d9d2c3', undefined, 0, 10);
-    for (const z of [-34.4, -33.2, -32.0]) t.cyl(-1.2, 1.0, z, 0.18, 0.03, '#d9d2c3', undefined, 0, 10);
-  }
   // Altar cloth and candles.
   t.box(14.4, 1.2, -32.8, 1.7, 0.04, 4.1, '#f2ede0', undefined, 0);
   for (const z of [-34.0, -31.6]) t.box(15.22, 0.5, z, 0.04, 0.74, 0.5, '#b8402f', undefined, 0);
@@ -157,7 +215,7 @@ function furniture(d: Drawer) {
     }
   });
   // Hay wagons in the inner court and the outer bailey, the bailey's timber cart: wheels on their long sides, shafts.
-  for (const [x0, z0, x1, z1, dir] of [[-15.2, -21.6, -12.0, -19.2, -1], [5.6, 21.6, 8.8, 24.0, 1], [-16.0, 13.6, -13.6, 15.2, 1]] as const) {
+  for (const [x0, z0, x1, z1, dir] of [[...COURT_WAGON, -1], [5.6, 21.6, 8.8, 24.0, 1], [-16.0, 13.6, -13.6, 15.2, 1]] as const) {
     for (const x of [x0 + 0.7, x1 - 0.7]) for (const z of [z0 - 0.06, z1 + 0.06]) {
       t.cylZ(x, 0.5, z, 0.5, 0.1, OAK, undefined, 0.02);
       if (fine) t.cylZ(x, 0.5, z, 0.12, 0.16, '#3a4148', 'metal');
@@ -174,6 +232,6 @@ function furniture(d: Drawer) {
       }
     };
     logs(14.4 - 0.03, -21.6, -16.0, 4);
-    logs(-17.6, 22.4, 24.8, 4);
+    logs(WOODPILE[2], WOODPILE[1], WOODPILE[3], 4);
   }
 }

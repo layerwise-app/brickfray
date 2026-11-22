@@ -1,7 +1,7 @@
 import { DECAL, GROUND, type GroundParams } from './blocks';
 import { F } from './fortress-plan';
 import type { Element, Plan } from './plan';
-import { Rng, shade } from './util';
+import { mix, Rng, shade } from './util';
 
 type Rect = [number, number, number, number];
 
@@ -20,10 +20,15 @@ const EARTH = '#c4a476';
 const STRAW = '#d9c27a';
 const COBBLE = '#cbbd9c';
 const FORGE = '#a49b8c';
+const COURT = '#b8b2a4';
+const GRAVEL = '#beb39b';
+const SANDSTONE = '#c9ab8c';
 
-/** District floors, first match wins; everything else is sand. */
+/** District floors, first match wins; everything else is sand. The halls' floors are darker than the yards outside. */
 const ZONES: [Rect, string][] = [
-  [[-5.6, -5.6, 5.6, 5.6], FLAGS],
+  [[-20.0, -37.6, 1.6, -28.0], '#9a826c'],
+  [[2.4, -37.6, 16.0, -28.0], '#8d8f95'],
+  [[-8.8, -8.8, 8.8, 8.8], '#99938a'],
   [[-20.0, -36.0, 16.0, -27.2], FLAGS],
   [[-20.0, -48.0, 24.0, -36.0], FLAGS],
   [[10.4, -7.2, 19.2, 7.2], FORGE],
@@ -35,7 +40,10 @@ const ZONES: [Rect, string][] = [
   [[F.west, 8.8, -25.6, 27.2], EARTH],
   [[F.terrace, 29.6, F.ford0, 40.0], GRASS],
   [[32.0, 6.4, F.ford0, 29.6], GRASS],
-  [[F.terrace, -27.2, 26.4, -21.6], GRASS]
+  [[F.terrace, -27.2, 26.4, -21.6], GRASS],
+  [[-20.0, -27.2, 20.0, -11.2], COURT],
+  [[F.terrace, F.bandN, F.ford0, 40.0], GRAVEL],
+  [[-28.0, F.bandS, 10.4, 45.6], SANDSTONE]
 ];
 
 /** Worn paths from the gates to the keep doors, a shade off the yard they cross. */
@@ -72,12 +80,18 @@ export function fortressGround(p: Plan) {
         const base = ZONES.find(([[r0, s0, r1, s1]]) => cx > r0 && cx < r1 && cz > s0 && cz < s1)?.[1] ?? SAND;
         const key = `${Math.floor(cx / STEP)},${Math.floor(cz / STEP)},${base}`;
         if (!tone.has(key)) tone.set(key, rng.pick([0.045, 0.02, 0, -0.025, -0.045]));
-        p.add(DECAL, { x0: a, z0: b, x1: c, z1: e, y: 0, color: shade(base, tone.get(key)!), surface: 'plastic' });
+        p.add(PLATE, { x0: a, z0: b, x1: c, z1: e, y: 0, color: shade(base, tone.get(key)!), surface: 'plastic' });
       }
     }
   }
-  for (const [x0, z0, x1, z1] of PATHS) p.add(DECAL, { x0, z0, x1, z1, y: 0.003, color: COBBLE, surface: 'plastic' });
+  for (const [x0, z0, x1, z1] of PATHS) p.add(PLATE, { x0, z0, x1, z1, y: 0.003, color: COBBLE, surface: 'plastic' });
 }
+
+/**
+ * Low draws the ground without the sky's reflection and without shadows, so sand turns a saturated yellow there: its
+ * plates take a greyer tone to match medium and high.
+ */
+const PLATE: Element<GroundParams> = { draw: (d, p) => DECAL.draw(d, d.detail === 0 ? { ...p, color: mix(p.color, '#a7a9aa', 0.38) } : p) };
 
 /** A walkable ground collider drawn by nothing: its look comes from the plates. */
 const FLOOR: Element<GroundParams> = { colliders: GROUND.colliders, draw() {} };

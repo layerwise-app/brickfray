@@ -39,9 +39,14 @@ const EDGE_GARDEN = -34.4;
 /** The great hall's central hearth: a stone stack under a louvre, standing between the ward door and the east court door. */
 export const HEARTH = [-6.4, -33.6, -3.2, -31.2] as const;
 
+/** The great hall's long table against its north wall and the high table against its east wall: [x0, z0, x1, z1]. */
+export const HALL_TABLE = [-14.4, -37.6, -10.0, -36.8] as const;
+export const HIGH_TABLE = [0.8, -35.2, 1.6, -31.2] as const;
+
 /**
  * Great hall x -20..2.4, 9.6 m inside: a door from the ward (behind a porch), two to the inner court; a hearth stack
- * in the middle, a long table in the north aisle, a high table at the east end.
+ * in the middle, the long table against the north wall, the high table against the east wall (furniture stands against
+ * walls, so no bot route runs over it).
  * A gallery over the west end looks over the hall and, through a window, into the court; a turning stair climbs to it
  * inside, an open stair outside from the ward.
  */
@@ -57,9 +62,9 @@ function greatHall(w: Works) {
   w.box('slab', x0, S - 0.48, z0 + 0.8, -13.6, S, z1 - 0.8, { walk: true });
   w.box('parapet', -13.8, S, z0 + 0.8, -13.6, S + 1.28, -29.6, { surface: 'wood', bulletsPass: true });
   w.uStair(-13.6, -31.2, 'e', 4, 'hall');
-  w.box('timber', -12.8, 0, -35.2, -8.0, 0.96, -34.4);
-  w.box('timber', -1.6, 0, -35.2, -0.8, 0.96, -31.2);
-  w.box('hall', HEARTH[0], 0, HEARTH[1], HEARTH[2], top, HEARTH[3]);
+  w.box('timber', HALL_TABLE[0], 0, HALL_TABLE[1], HALL_TABLE[2], 0.96, HALL_TABLE[3]);
+  w.box('timber', HIGH_TABLE[0], 0, HIGH_TABLE[1], HIGH_TABLE[2], 0.96, HIGH_TABLE[3]);
+  w.box('tower', HEARTH[0], 0, HEARTH[1], HEARTH[2], top, HEARTH[3]);
   w.box('block', x0, 0, z0 - 1.6, -16.8, S, z0, { walk: true });
   w.stairs({ x: -10.4, z: z0 - 0.8, y0: 0, dir: 'w', width: 1.6, steps: 8 });
   w.box('wall', x0, 0, z0 - 2.4, -10.4, S + 1.92, z0 - 1.6);

@@ -16,10 +16,14 @@ export function core(w: Works) {
   outerBailey(w);
 }
 
+/** The inner court's hay wagon: [x0, z0, x1, z1]. */
+export const COURT_WAGON = [-15.2, -21.6, -12.0, -19.2] as const;
+
 /** Inner court: a hay wagon and a horse trough west, the well in the middle third, a timber stack east, low walls. */
 function innerCourt(w: Works) {
-  w.box('timber', -15.2, 0, -21.6, -12.0, 0.96, -19.2);
-  w.box('hay', -15.2, 0.96, -21.6, -12.0, 2.88, -19.2);
+  const [hx0, hz0, hx1, hz1] = COURT_WAGON;
+  w.box('timber', hx0, 0, hz0, hx1, 0.96, hz1);
+  w.box('hay', hx0, 0.96, hz0, hx1, 2.88, hz1);
   w.box('wall', -10.4, 0, -15.2, -7.2, F.rail, -14.4);
   w.box('wall', -3.2, 0, -21.6, 0.0, F.rail, -20.8);
   w.box('block', 4.0, 0, -18.4, 6.4, F.rail, -16.0);
@@ -46,6 +50,9 @@ function flanks(w: Works) {
   FLANK_SHEDS.forEach(([x0, z0, x1, z1], i) => w.shed(i % 2 ? 'hall' : 'timber', x0, z0, x1, z1, 2.88, colors[i]!));
 }
 
+/** The bailey woodpile in its south-west corner: [x0, z0, x1, z1]. */
+export const WOODPILE = [F.core0, 22.4, -17.6, 24.8] as const;
+
 /** Outer bailey: an open market stall row west, a hay wagon east, a low timber cart, low walls, the bakehouse in the south-east corner. */
 function outerBailey(w: Works) {
   for (const x of [-17.6, -13.6, -9.6]) {
@@ -55,7 +62,7 @@ function outerBailey(w: Works) {
   w.box('timber', 5.6, 0, 21.6, 8.8, 0.96, 24.0);
   w.box('hay', 5.6, 0.96, 21.6, 8.8, 2.88, 24.0);
   w.box('timber', -16.0, 0, 13.6, -13.6, F.rail, 15.2);
-  w.box('timber', F.core0, 0, 22.4, -17.6, 2.4, 24.8);
+  w.box('timber', WOODPILE[0], 0, WOODPILE[1], WOODPILE[2], 2.4, WOODPILE[3]);
   w.box('wall', 1.6, 0, 15.2, 4.8, F.rail, 16.0);
   w.box('wall', -4.0, 0, 22.4, -3.2, F.rail, 25.6);
   w.box('block', -8.0, 0, 13.6, -5.6, F.rail, 16.0);

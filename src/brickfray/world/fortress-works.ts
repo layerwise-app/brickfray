@@ -39,6 +39,23 @@ const STYLE: Partial<Record<Kind, Masonry>> = {
   hay: { colors: ['#e3c25a', '#d6b24a', '#ecd06a'], variance: 0.3, lens: [2, 3], course: 0.64 }
 };
 const PLAIN: Masonry = { colors: ['#b8b1a3', '#a8a294'], variance: 0.25 };
+/** Each district keeps its own stone for its low walls: mossy in the west lane, river grey in the east, ochre in the upper ward, red sandstone in the barbican. */
+const MOSSY: Masonry = { colors: ['#8e9a7e', '#828f74', '#9aa588', '#76845f'], variance: 0.35, lens: [2, 3, 4] };
+const RIVER: Masonry = { colors: ['#8f989c', '#848c91', '#9aa2a5', '#7a8287'], variance: 0.35, lens: [2, 3, 4] };
+const SANDSTONE: Masonry = { colors: ['#b98f72', '#aa8269', '#c59d7f'], variance: 0.3, lens: [3, 4, 2] };
+const OCHRE: Masonry = { colors: ['#c09a70', '#b38d66', '#caa67c', '#a7835e'], variance: 0.3, lens: [3, 4, 2] };
+const LOCAL = new Set<Kind>(['wall', 'screen', 'parapet', 'block']);
+
+function styleOf(q: Piece): Masonry {
+  const base = STYLE[q.kind] ?? PLAIN;
+  if (!LOCAL.has(q.kind)) return base;
+  const [x, z] = [(q.min[0] + q.max[0]) / 2, (q.min[2] + q.max[2]) / 2];
+  if (x < F.core0 - 1.0) return MOSSY;
+  if (x > F.core1 + 1.0) return RIVER;
+  if (z > F.bandS) return SANDSTONE;
+  if (z < F.hall) return OCHRE;
+  return base;
+}
 const SURFACE: Partial<Record<Kind, 'wood' | 'foliage' | 'metal'>> = { timber: 'wood', deck: 'wood', stakes: 'wood', paling: 'wood', gate: 'wood', hay: 'foliage', hedge: 'foliage', grille: 'metal' };
 
 const stairParams = (f: Flight): StairParams => ({
@@ -80,7 +97,7 @@ function drawPiece(d: Drawer, q: Piece, all: Piece[]) {
   }
   const e = exposure(q, all);
   if (!e.faces.length && !e.top) return;
-  const style = STYLE[q.kind] ?? PLAIN;
+  const style = styleOf(q);
   // Tops over 6 m are seen only from above the map: one flat skin instead of rows of plates.
   const high = e.top && !q.walk && q.max[1] >= 6.0;
   const top = q.kind === 'deck' || q.walk ? 'tiles' : e.top && !high ? (q.max[1] <= 2.5 ? 'studs' : 'tiles') : 'none';

@@ -33,6 +33,10 @@ export const EDGE = {
   yardGate: [8.8, 16.0] as const
 } as const;
 
+/** Centres (z) of the half-doors in the stables' back wall, one per stall, and of the barn's street windows. */
+export const STABLE_DOORS = [-6.0, -2.0, 2.0, 6.0] as const;
+export const BARN_WINDOWS = [19.6, 24.0] as const;
+
 export function edges(w: Works) {
   const { crag, breast, west } = EDGE;
   const thin = 0.4;
@@ -54,9 +58,10 @@ export function edges(w: Works) {
   w.box('paling', west - thin, 0, EDGE.hedge, west, EDGE.paling, -8.8);
   w.box('hedge', west - thin, 0, EDGE.hedge - 0.8, EDGE.garden, 2.88, EDGE.hedge);
   w.box('paling', EDGE.garden - thin, 0, crag, EDGE.garden, EDGE.paling, EDGE.hedge - 0.8);
-  w.box('timber', west - 0.8, 0, -8.8, west, F.inner, 8.8);
+  // Stable half-doors (the lower leaf shut, over a jump) and barn windows: the street shows through the village's backs.
+  w.windows('timber', false, -8.8, 8.8, west - 0.8, west, 0, F.inner, STABLE_DOORS.map((z): [number, number, number, number] => [z - 0.8, z + 0.8, F.rail, 2.4]));
   w.box('gate', west - thin, 0, EDGE.yardGate[0], west, F.inner, EDGE.yardGate[1]);
-  w.box('timber', west - 0.8, 0, 16.0, west, F.inner, F.bandS + 0.8);
+  w.windows('timber', false, 16.0, F.bandS + 0.8, west - 0.8, west, 0, F.inner, BARN_WINDOWS.map((z): [number, number, number, number] => [z - 1.2, z + 1.2, F.rail, 2.4]));
   w.box('timber', west - 0.8, 0, F.bandS, -36.0, F.inner, F.bandS + 0.8);
   w.box('paling', -36.0, 0, F.bandS, -28.0, EDGE.paling, F.bandS + thin);
 }
@@ -96,12 +101,13 @@ function stakes(d: Drawer, q: Piece) {
   const t = new Pen(d, new Frame(0, 0, 0, 0));
   const [alongX, a0, a1, c] = axis(q);
   const rng = new Rng(Math.round(a0 * 13 + c * 7));
-  const gap = d.detail === 0 ? 0.62 : 0.36;
+  // Stakes a hand apart: they stop nobody's bullets, so the river shows between them.
+  const gap = 0.72;
   for (let a = a0 + gap / 2; a < a1; a += gap) {
     const h = 2.3 + rng.range(-0.25, 0.2);
     const [x, z] = at(alongX, a + rng.range(-0.04, 0.04), c);
     const shade0 = rng.pick(['#6e4a2f', '#5e3f27', '#7a5434']);
-    t.box(x, F.ford, z, 0.2, h - F.ford, 0.2, shade0, undefined, 0.02);
+    t.box(x, F.ford, z, 0.18, h - F.ford, 0.18, shade0, undefined, 0.02);
     t.cone(x, h, z, 0.13, 0.01, 0.34, shade(shade0, 0.06), undefined, 4, Math.PI / 4);
   }
   for (const y of [0.55, 1.75]) {
@@ -114,7 +120,7 @@ function stakes(d: Drawer, q: Piece) {
   d.anim.foam.edge(x0, z0, x1, z1, F.water, alongX ? 0 : -1, alongX ? -1 : 0, 0.5);
 }
 
-/** A paling: posts every 2.4 m with two rails, close-set pales with pointed tops and a hand's gap between them. */
+/** A paling: posts every 2.4 m with two rails, pales with pointed tops and a wide gap between them, so it reads as see-through. */
 function paling(d: Drawer, q: Piece) {
   const t = new Pen(d, new Frame(0, 0, 0, 0));
   const [alongX, a0, a1, c] = axis(q);
@@ -129,7 +135,7 @@ function paling(d: Drawer, q: Piece) {
     if (alongX) t.box(x, y, z + 0.12, a1 - a0, 0.12, 0.08, OAK, undefined, 0.01);
     else t.box(x + 0.12, y, z, 0.08, 0.12, a1 - a0, OAK, undefined, 0.01);
   }
-  const step = d.detail === 0 ? 0.4 : 0.22;
+  const step = 0.4;
   const rng = new Rng(Math.round(a0 * 7 + c * 3));
   for (let a = a0 + step / 2; a < a1; a += step) {
     const [x, z] = at(alongX, a, c);
