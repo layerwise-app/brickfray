@@ -94,3 +94,26 @@ function lighthouse(t: Pen, x: number, z: number) {
   t.cyl(x, WATER_Y + 17.4, z, 1.1, 1.6, '#fff1b0', 'glow', 0, 10);
   t.cone(x, WATER_Y + 19, z, 1.4, 0, 1.4, mix('#2f363d', HAZE, 0.3), undefined, 10);
 }
+
+/**
+ * The top of each ship's bridge at sea on every tier above low, where audio/scenery.ts sounds the ship horns:
+ * docksBackdrop's rng replayed (containers, then ships), so it must change with that loop (audio/scenery.test.ts
+ * checks it against the drawn hulls).
+ */
+export const DOCKS_SHIPS: [number, number, number][] = (() => {
+  const rng = new Rng(29);
+  for (let i = 0; i < 2 * 4 * 12; i++) {
+    if (rng.chance(0.2)) continue;
+    const levels = rng.int(1, 4);
+    for (let k = 0; k < levels; k++) rng.next();
+  }
+  const out: [number, number, number][] = [];
+  for (let i = 0; i < 4; i++) {
+    const x = rng.range(-150, 150);
+    const z = rng.range(130, 220);
+    const len = rng.range(18, 34);
+    for (let k = 0; k < 5; k++) rng.next();
+    out.push([x - len * 0.35, WATER_Y + len * 0.21, Math.abs(x) > SHORE.x - 12 && z < SHORE.z + 12 ? z + 70 : z]);
+  }
+  return out;
+})();

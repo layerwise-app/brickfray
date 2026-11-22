@@ -13,11 +13,18 @@ export interface TrackDef {
   level: number;
 }
 
+/** Each map's own music while the match is fought: quiet, and kept under footsteps at 15 m. */
+const PLAY_LEVEL = 0.08;
+
 export const TRACKS: Record<MusicTrack, TrackDef> = {
   menu: { file: 'menu.mp3', loop: [7.89, 120.39], level: 1 },
-  match: { file: 'warmup.mp3', loop: [3.055, 6.805], level: 0.55 },
+  match: { file: 'warmup.mp3', loop: [2.085, 17.085], level: 0.55 },
   intermission: { file: 'intermission.mp3', loop: [3.125, 41.525], level: 0.6 },
-  final: { file: 'final.mp3', loop: [1.805, 27.405], level: 0.42 }
+  final: { file: 'final.mp3', loop: [1.805, 27.405], level: 0.42 },
+  plaza: { file: 'map-plaza.mp3', loop: [3.269146, 40.192229], level: PLAY_LEVEL },
+  fortress: { file: 'map-fortress.mp3', loop: [3.075833, 44.814979], level: PLAY_LEVEL },
+  docks: { file: 'map-docks.mp3', loop: [2.722542, 35.826], level: PLAY_LEVEL },
+  temple: { file: 'map-temple.mp3', loop: [4.000354, 49.714646], level: PLAY_LEVEL }
 };
 
 /** In-match tracks, fetched once the menu theme has loaded so each is ready when its state comes. */

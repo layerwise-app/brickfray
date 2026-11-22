@@ -9,17 +9,24 @@ interface Layer {
 
 /**
  * Each map's bed, its recordings each played as their own random stretches. The main files are levelled to about
- * -22 LUFS (fortress -27, its wind dipped above 1.2 kHz; second layers -24): the gains put every map near -38 LUFS,
- * about 10 LU under the player's own footstep, with the second layer 10-16 dB under the first (fortress birds the
- * lowest: they sing where footsteps carry their detail).
+ * -27 LUFS (fortress -31, its wind dipped above 1.2 kHz; the docks water darkened; second layers -24): the gains put
+ * every map near -39 LUFS, about 10 LU under the player's own footstep. The second layer gives
+ * each map its own character: people in the plaza, a fishing port's engines and ropes on the docks, birds over the
+ * fortress (the lowest: they sing where footsteps carry their detail), water at the temple.
  */
 const BEDS: Record<MapId, readonly Layer[]> = {
-  plaza: [{ file: 'plaza', gain: 0.16 }],
+  plaza: [
+    { file: 'plaza', gain: 0.15 },
+    { file: 'plaza-people', gain: 0.04 }
+  ],
   fortress: [
     { file: 'fortress', gain: 0.27 },
     { file: 'fortress-birds', gain: 0.035 }
   ],
-  docks: [{ file: 'docks', gain: 0.16 }],
+  docks: [
+    { file: 'docks', gain: 0.12 },
+    { file: 'docks-port', gain: 0.09 }
+  ],
   temple: [
     { file: 'temple', gain: 0.16 },
     { file: 'temple-water', gain: 0.07 }

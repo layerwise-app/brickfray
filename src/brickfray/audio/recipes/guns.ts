@@ -1,5 +1,5 @@
 import type { WeaponId } from '../../weapons/defs';
-import type { SoundSpec } from '../catalog';
+import type { Falloff, SoundSpec } from '../catalog';
 import { clack, drive, gainNode, noise, rand, thump, tone, vary, type Synth } from '../synth';
 
 type GunIds = `fire:${WeaponId}` | `fireFar:${WeaponId}` | 'dryFire';
@@ -14,10 +14,13 @@ type GunIds = `fire:${WeaponId}` | `fireFar:${WeaponId}` | 'dryFire';
 interface GunVoice {
   duration: number;
   /**
-   * Loudness targets near / far: shotgun, sniper and cannon sit 3-4 dB over pistol, nailer and buzzer. Low enough
-   * that a recorded shot reaches them without the loader's limiter: the transient stays a transient.
+   * Loudness targets near / far: shotgun, sniper and cannon sit 3-4 dB over pistol, nailer and buzzer, the sniper the
+   * loudest of all and 3.5 dB over the rifle far away. Low enough that a recorded shot reaches them without the
+   * loader's limiter: the transient stays a transient.
    */
   loudness: [number, number];
+  /** The sniper carries further than the other guns (catalog FALLOFF.carry). */
+  falloff?: Falloff;
   mech(s: Synth): void;
   crack: { hp: number; decay: number; gain: number };
   blast: { cutoff: number; decay: number; gain: number };
@@ -65,7 +68,7 @@ const BASE = {
   },
   sniper: {
     duration: 1.6,
-    loudness: [-15.5, -17.5],
+    loudness: [-13.5, -15.5],
     mech: (s) => {
       clack(s, 0, { pitch: 2000, gain: 0.4, decay: 0.05 });
       tone(s, 0.004, { freq: 3700 * vary(s, 0.03), decay: 0.15, gain: 0.06 });
@@ -98,6 +101,7 @@ const BASE = {
 
 const VOICES: Record<WeaponId, GunVoice> = {
   ...BASE,
+  sniper: { ...BASE.sniper, falloff: 'carry' },
   // Nailer: rapid, light and snappy; a pneumatic hiss under the crack.
   nailer: {
     ...BASE.ar,
@@ -241,8 +245,8 @@ function gunEntries(): Record<GunIds, SoundSpec> {
   const out: Partial<Record<GunIds, SoundSpec>> = { dryFire: { category: 'mech', duration: 0.2, render: dryFire } };
   for (const id of Object.keys(VOICES) as WeaponId[]) {
     const g = VOICES[id];
-    out[`fire:${id}`] = { category: 'gun', duration: g.duration, loudness: g.loudness[0], render: nearShot(g) };
-    out[`fireFar:${id}`] = { category: 'gunFar', duration: g.far.duration, loudness: g.loudness[1], render: farShot(g) };
+    out[`fire:${id}`] = { category: 'gun', duration: g.duration, loudness: g.loudness[0], falloff: g.falloff, render: nearShot(g) };
+    out[`fireFar:${id}`] = { category: 'gunFar', duration: g.far.duration, loudness: g.loudness[1], falloff: g.falloff, render: farShot(g) };
   }
   return out as Record<GunIds, SoundSpec>;
 }

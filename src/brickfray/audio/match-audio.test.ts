@@ -159,7 +159,7 @@ describe('MatchAudio', () => {
     expect(ids()).toEqual(['respawn', 'grenadeReady']);
   });
 
-  it('keeps fighting free of music and plays it in the warm-up, the break, the final stretch and under the results', () => {
+  it('plays the warm-up music, the map\'s own while fighting, the final stretch and the results theme', () => {
     const music: (string | null)[] = [];
     const delays: number[] = [];
     const audio = { play: () => undefined, playMusic: (t: string | null, _l?: number, d = 0) => void (music.push(t), delays.push(d)) } as unknown as AudioEngine;
@@ -169,7 +169,7 @@ describe('MatchAudio', () => {
     sound.cues.setPhase('playing', 500, ffa);
     sound.cues.setPhase('playing', 29, ffa);
     sound.cues.setPhase('ended', 12, { ...ffa, outcome: 'won' });
-    expect(music).toEqual(['match', null, 'final', 'menu']);
+    expect(music).toEqual(['match', 'plaza', 'final', 'menu']);
     expect(delays.at(-1)).toBeGreaterThan(2);
   });
 

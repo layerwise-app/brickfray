@@ -6,6 +6,7 @@ import { CATEGORIES, inverseGain, type Category } from './catalog';
 import { applyMix, busInput, createMixer, outputPeak, setRoom, type Mixer } from './mixer';
 import { MATCH_TRACKS } from './music';
 import { MusicPlayer } from './music-player';
+import { distantOf, farShare } from './distance';
 import { audibility, behind, OCCLUDED, place } from './positional';
 import { renderBank, yieldToMain } from './render';
 import { ROOMS } from './rooms';
@@ -20,30 +21,10 @@ export const DEFAULT_MIX: AudioMix = { master: 0.9, effects: 0.85, music: 0.6, u
 /** Voices playing at once; a plaza firefight with six players, debris and gear layers peaks near 50. */
 export const VOICES = 64;
 
-/** How much of a sound `distance` m away is its distant recording: 0 up to `blend.from`, 1 past `blend.to`. */
-export function farShare(distance: number, blend: Blend = FAR_BLEND): number {
-  return Math.min(Math.max((distance - blend.from) / (blend.to - blend.from), 0), 1);
-}
-
-/** The distant recording of a sound that has one, and the distances (m) over which it takes over. */
-export function distantOf(id: SoundId): { id: SoundId; blend: Blend } | null {
-  if (id.startsWith('fire:')) return { id: id.replace('fire:', 'fireFar:') as SoundId, blend: FAR_BLEND };
-  if (id === 'explosion') return { id: 'explosionFar', blend: BOOM_BLEND };
-  return null;
-}
-
-interface Blend {
-  from: number;
-  to: number;
-}
-
 export function createAudioEngine(): AudioEngine {
   return new WebAudioEngine();
 }
 
-/** A gunshot cross-fades from its near to its distant recording over this range of distances (m); a blast further out. */
-const FAR_BLEND: Blend = { from: 20, to: 40 };
-const BOOM_BLEND: Blend = { from: 30, to: 70 };
 const SPEED_OF_SOUND = 343;
 const MAX_DELAY = 0.35;
 /** Loud enough to be heard from far away, so they arrive late by their distance. */
@@ -112,7 +93,7 @@ export class WebAudioEngine implements AudioEngine {
     this.ambience = new Ambience(ctx, this.graph.effectsIn);
     this.applyMix();
     this.music.attach(ctx, this.graph.music);
-    this.announcer = new Announcer(ctx, busInput(this.graph, 'marker'), (seconds) => this.music.duck(seconds));
+    this.announcer = new Announcer(ctx, this.graph, (seconds) => this.music.duck(seconds));
     this.syncScene();
     const started = performance.now();
     await renderBank({
@@ -174,7 +155,8 @@ export class WebAudioEngine implements AudioEngine {
     const occlusion = pos ? Math.min(Math.max(options.occlusion ?? 0, 0), 1) : 0;
     const volume = (options.volume ?? 1) * blend * (1 - (1 - OCCLUDED.gain) * occlusion);
     const offset = options.offset ?? 0;
-    const fade = pos ? audibility((SOUNDS[sound].loudness ?? cat.loudness) + 20 * Math.log10(Math.max(volume * inverseGain(cat.falloff, distance), 1e-6))) : 1;
+    const falloff = SOUNDS[sound].falloff ?? cat.falloff;
+    const fade = pos ? audibility((SOUNDS[sound].loudness ?? cat.loudness) + 20 * Math.log10(Math.max(volume * inverseGain(falloff, distance), 1e-6))) : 1;
     if (fade <= 0) return null;
     const now = ctx.currentTime;
     const start = now + travel + Math.max(options.delay ?? 0, 0);
@@ -205,7 +187,7 @@ export class WebAudioEngine implements AudioEngine {
     let out: AudioNode = amp;
     if (pos) {
       const tone = Math.min(Math.max(options.tone ?? 1, 0), 1);
-      const placed = place(ctx, amp, { pos, distance, occlusion, tone, rear: behind(this.listener, this.forward, pos), falloff: cat.falloff });
+      const placed = place(ctx, amp, { pos, distance, occlusion, tone, rear: behind(this.listener, this.forward, pos), falloff });
       nodes.push(...placed);
       out = placed[placed.length - 1]!;
     }
@@ -340,7 +322,10 @@ export class WebAudioEngine implements AudioEngine {
     if (!ctx || !graph) return;
     const map = this.scene;
     this.ambience?.set(map);
-    if (map) void this.announcer?.prefetch();
+    if (map) {
+      void this.announcer?.prefetch();
+      this.music.prefetch([map]);
+    }
     this.roomIndex = 0;
     graph.room.buffer = map ? roomSpace(ctx, map) : null;
     if (!map) {

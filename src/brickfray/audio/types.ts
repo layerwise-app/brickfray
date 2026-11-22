@@ -50,7 +50,15 @@ export type FoleyId =
   | 'gripOff'
   | 'pouch'
   | 'magScrape'
-  | 'regrip';
+  | 'regrip'
+  | 'gripOffSmall'
+  | 'pouchSmall'
+  | 'magScrapeSmall'
+  | 'regripSmall'
+  | 'gripOffTool'
+  | 'pouchTool'
+  | 'magScrapeTool'
+  | 'regripTool';
 
 /** What a character wears that sounds with each step: plate armour, a suit, or loose gear. */
 export type GearId = 'armour' | 'suit' | 'rattle';
@@ -101,13 +109,14 @@ export type SoundId =
   | 'matchStart'
   | 'waveStart'
   | MatchCue
+  | 'achievement'
   | 'countdown';
 
 /**
  * Music states: the menu theme (also under the results), `match` the warm-up before a match or a run, `intermission`
  * the solo upgrade pick and wave break, `final` the last half minute of a timed match. Fighting has no music.
  */
-export type MusicTrack = 'menu' | 'match' | 'intermission' | 'final';
+export type MusicTrack = 'menu' | 'match' | 'intermission' | 'final' | MapId;
 
 /** A looping sound started with `hold`: `stop` fades it out over `fade` seconds. */
 export interface HeldSound {

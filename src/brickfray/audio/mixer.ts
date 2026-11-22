@@ -12,6 +12,8 @@ export const MUFFLE_FLOOR = 1000;
  */
 export const LOW_HEALTH = { dip: 0.5, dull: -7, shelf: 2500 };
 const ROOM_FADE = 0.25;
+/** While the announcer speaks, the world and the player's own sounds dip by `depth` (4 dB) so the voice reads over a fight. */
+export const VOICE_DIP = { depth: 0.63, attack: 0.03, lead: 0.04, release: 0.25 };
 
 export type Bus = 'effects' | 'feedback' | 'marker' | 'ui';
 
@@ -31,6 +33,8 @@ export interface Mixer {
   feedback: GainNode;
   /** The feedback bus's input: the low-health shelf. */
   body: BiquadFilterNode;
+  /** The world and the player's own sounds pass these: they dip under the announcer (`dipUnderVoice`). */
+  dips: GainNode[];
   music: GainNode;
   ui: GainNode;
   /** Shared reverb send. */
@@ -61,7 +65,8 @@ export function createMixer(ctx: BaseAudioContext): Mixer {
   const master = ctx.createGain();
   master.connect(limiter);
   const effects = ctx.createGain();
-  effects.connect(master);
+  const worldDip = ctx.createGain();
+  effects.connect(worldDip).connect(master);
   const muffle = ctx.createBiquadFilter();
   muffle.type = 'lowpass';
   muffle.Q.value = -3;
@@ -75,7 +80,8 @@ export function createMixer(ctx: BaseAudioContext): Mixer {
   body.type = 'highshelf';
   body.frequency.value = LOW_HEALTH.shelf;
   body.gain.value = 0;
-  body.connect(feedback);
+  const ownDip = ctx.createGain();
+  body.connect(ownDip).connect(feedback);
   const reverb = ctx.createGain();
   const space = ctx.createConvolver();
   space.normalize = false;
@@ -95,7 +101,7 @@ export function createMixer(ctx: BaseAudioContext): Mixer {
   music.connect(master);
   const ui = ctx.createGain();
   ui.connect(master);
-  return { master, meter, effectsIn, muffle, effects, feedback, body, music, ui, reverb, space, room, outdoor, indoor, near };
+  return { master, meter, effectsIn, muffle, effects, feedback, body, dips: [worldDip, ownDip], music, ui, reverb, space, room, outdoor, indoor, near };
 }
 
 /** Where a voice of the given bus connects. */
@@ -125,6 +131,16 @@ export function setRoom(ctx: BaseAudioContext, m: Mixer, inside: number, outdoor
   const out = Math.cos((inside * Math.PI) / 2);
   m.outdoor.gain.setTargetAtTime(out + outdoor * (1 - out), t, ROOM_FADE / 3);
   m.indoor.gain.setTargetAtTime(Math.sin((inside * Math.PI) / 2), t, ROOM_FADE / 3);
+}
+
+/** Dips the world and the player's own sounds for a voice line from context time `at`, `seconds` long. */
+export function dipUnderVoice(ctx: BaseAudioContext, m: Mixer, at: number, seconds: number): void {
+  const now = ctx.currentTime;
+  for (const dip of m.dips) {
+    dip.gain.cancelScheduledValues(now);
+    dip.gain.setTargetAtTime(VOICE_DIP.depth, Math.max(now, at - VOICE_DIP.lead), VOICE_DIP.attack);
+    dip.gain.setTargetAtTime(1, at + seconds, VOICE_DIP.release / 3);
+  }
 }
 
 /** Output peak over the analyser window (~40 ms), after the limiter. */

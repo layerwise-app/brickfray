@@ -1,4 +1,5 @@
 import type { MatchPhase } from '../sim/types';
+import type { MapId } from '../world/types';
 import type { AudioEngine, MusicTrack, SoundId } from './types';
 
 /** How a match ended for the local player: won, lost, or a solo run that is over. */
@@ -22,9 +23,10 @@ const ONCE = 1.5;
 const OFFER_AFTER = 0.85;
 
 /**
- * The match's music and the one-shot cues that mark its flow: the warm-up countdown and start, wave starts, the
- * wave cleared, upgrade cards dealt and taken, a respawn, a grenade coming back, and the outcome. Every cue plays once
- * per occasion however many reports of it arrive.
+ * The match's music (the warm-up's, the map's own while fighting, the break's, the final stretch's) and the one-shot
+ * cues that mark its flow: the warm-up countdown and start, wave starts, the wave cleared, upgrade cards dealt and
+ * taken, a respawn, a grenade coming back, and the outcome. Every cue plays once per occasion however many reports of
+ * it arrive.
  */
 export class MatchCues {
   private clock = 0;
@@ -35,7 +37,10 @@ export class MatchCues {
   private grenadeCount = -1;
   private alive = false;
 
-  constructor(private readonly audio: AudioEngine) {}
+  constructor(
+    private readonly audio: AudioEngine,
+    private readonly map: MapId
+  ) {}
 
   frame(dt: number): void {
     this.clock += dt;
@@ -55,7 +60,7 @@ export class MatchCues {
         this.audio.play('countdown', { priority: 9, rate: 2 ** ((3 - second) / 12), variant: 3 - second });
       }
     }
-    if (phase === 'playing') this.setMusic(options.timed && left > 0 && left <= FINAL_STRETCH ? 'final' : null);
+    if (phase === 'playing') this.setMusic(options.timed && left > 0 && left <= FINAL_STRETCH ? 'final' : this.map);
     if (phase === this.phase) return;
     const was = this.phase;
     this.phase = phase;
@@ -72,9 +77,9 @@ export class MatchCues {
     }
   }
 
-  /** A wave begins: its call (a boss wave's own), the music of the break fading under it. */
+  /** A wave begins: its call (a boss wave's own), the break's music giving way to the map's. */
   wave(theme: string): void {
-    this.setMusic(null);
+    this.setMusic(this.map);
     this.once(BOSS_THEMES.has(theme) ? 'bossWave' : 'waveStart', { priority: 9 }, 'wave');
   }
 

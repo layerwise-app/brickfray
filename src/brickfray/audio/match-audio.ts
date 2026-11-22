@@ -80,6 +80,14 @@ const PROBES: readonly (readonly [number, number, number])[] = [
 ];
 /** A cached source's occlusion follows the probes with this time constant, so passing a corner fades the sound. */
 const OCCLUSION_GLIDE = 0.15;
+/** A scenery sound is drawn from this many places of its kind, the least hidden and nearest (one SPOT_REACH counts as a whole wall) winning. */
+const SPOT_TRIES = 4;
+const SPOT_REACH = 60;
+/** When every place of the drawn kind is behind a wall (occlusion at least SPOT_HIDDEN), another kind is drawn, up to SPOT_DRAWS in all. */
+const SPOT_DRAWS = 3;
+const SPOT_HIDDEN = 0.9;
+/** Scenery sits high and wide: what a wall hides of it still carries over the roofline, so a hidden one is softened (occlusion at most this), never muffled. */
+const SPOT_OCCLUSION = 0.5;
 
 export interface MatchAudioState {
   alive: boolean;
@@ -127,7 +135,7 @@ export class MatchAudio implements Ears {
     this.debris = new DebrisSounds(audio, this);
     this.remotes = new RemoteSounds(audio, this);
     this.heart = new Heartbeat(audio);
-    this.cues = new MatchCues(audio);
+    this.cues = new MatchCues(audio, map);
     this.cases = new CaseSounds(audio);
   }
 
@@ -298,7 +306,14 @@ export class MatchAudio implements Ears {
     this.nextSpot -= dt;
     if (this.nextSpot > 0) return;
     this.nextSpot = 5 + Math.random() * 10;
-    const { spot, position } = pickSpot(this.map, Math.random);
-    this.audio.play(`spot:${spot}`, { position, volume: 0.6 + Math.random() * 0.4, occlusion: this.occlusion(null, position) });
+    const l = this.listener;
+    const rank = (at: Vec3) => this.occlusion(null, at) + Math.hypot(at.x - l.x, at.y - l.y, at.z - l.z) / SPOT_REACH;
+    let pick = pickSpot(this.map, Math.random, rank, SPOT_TRIES);
+    let occlusion = this.occlusion(null, pick.position);
+    for (let draw = 1; draw < SPOT_DRAWS && occlusion >= SPOT_HIDDEN; draw++) {
+      pick = pickSpot(this.map, Math.random, rank, SPOT_TRIES);
+      occlusion = this.occlusion(null, pick.position);
+    }
+    this.audio.play(`spot:${pick.spot}`, { position: pick.position, volume: 0.6 + Math.random() * 0.4, occlusion: Math.min(occlusion, SPOT_OCCLUSION) });
   }
 }

@@ -66,7 +66,7 @@ function Reveal({ matchKey, unlocked, more }: { matchKey: string; unlocked: Unlo
   useEffect(() => {
     if (revealed.has(matchKey)) return;
     revealed.set(matchKey, Date.now());
-    unlocked.forEach((_, i) => game.audio.play('upgradeOffer', { priority: 8, volume: 0.75, delay: START + i * STEP, rate: 2 ** ((i * 2) / 12) }));
+    unlocked.forEach((_, i) => game.audio.play('achievement', { priority: 8, volume: 0.75, delay: START + i * STEP, rate: 2 ** ((i * 2) / 12) }));
   }, [matchKey, unlocked, game]);
 
   const at = (i: number) => ({ '--at': `${START + i * STEP - since}s` }) as CSSProperties;

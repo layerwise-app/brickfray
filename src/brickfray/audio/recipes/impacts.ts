@@ -250,7 +250,7 @@ const OTHER: Record<ImpactIds, SoundSpec> = {
       noise(s, 0.004, { attack: 0.004, decay: 0.08, gain: 0.25, filter: { type: 'highpass', freq: 5000, q: 0 } });
     }
   },
-  explosion: { category: 'boom', duration: 3.5, render: explosion },
+  explosion: { category: 'boom', duration: 3.5, loudness: -9.3, render: explosion },
   explosionFar: { category: 'boom', duration: 3.5, loudness: -14, render: explosion },
   ...MELEE
 };

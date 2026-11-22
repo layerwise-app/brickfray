@@ -18,7 +18,7 @@ export type Category =
   | 'ui'
   | 'stinger';
 
-export type Falloff = 'loud' | 'boom' | 'normal' | 'impact' | 'step' | 'handling' | 'quiet' | 'far';
+export type Falloff = 'loud' | 'carry' | 'boom' | 'normal' | 'impact' | 'step' | 'handling' | 'quiet' | 'far';
 
 export interface SoundSpec {
   category: Category;
@@ -27,6 +27,8 @@ export interface SoundSpec {
   variants?: number;
   /** Overrides the category loudness target (LUFS-like, 100 ms window). */
   loudness?: number;
+  /** Overrides the category falloff (the sniper carries further than the other guns). */
+  falloff?: Falloff;
   render(s: Synth, variant: number): void;
 }
 
@@ -72,7 +74,8 @@ export const CATEGORIES: Record<Category, CategoryMix> = {
 };
 
 /**
- * Inverse distance model parameters. `loud`: a gunshot at 60 m is quiet but clearly audible. `boom`: an explosion
+ * Inverse distance model parameters. `loud`: a gunshot at 60 m is quiet but clearly audible; `carry`: the sniper,
+ * about 1 dB over `loud` at 30 m and 2 dB at 60 m. `boom`: an explosion
  * at 3 m sits 6–8 dB above the player's own rifle. `step`: flatter than the physical law so another player is heard
  * coming: at 3 m their step is as loud as the player's own, at 15 m still clear of every map's bed, yet ~9 dB under
  * their rifle at any distance. `handling`: another player's reload carries a little further than their steps.
@@ -81,6 +84,7 @@ export const CATEGORIES: Record<Category, CategoryMix> = {
  */
 export const FALLOFF: Record<Falloff, { ref: number; rolloff: number }> = {
   loud: { ref: 2, rolloff: 0.45 },
+  carry: { ref: 2, rolloff: 0.35 },
   boom: { ref: 2.5, rolloff: 0.35 },
   normal: { ref: 2, rolloff: 1 },
   impact: { ref: 3, rolloff: 0.8 },

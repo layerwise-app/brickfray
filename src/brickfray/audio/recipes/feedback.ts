@@ -18,6 +18,7 @@ type FeedbackIds =
   | 'matchStart'
   | 'waveStart'
   | MatchCue
+  | 'achievement'
   | 'countdown';
 
 function tick(s: Synth, at: number, f: number, gain: number) {
@@ -131,7 +132,7 @@ export const FEEDBACK_SOUNDS: Record<FeedbackIds, SoundSpec> = {
     }
   },
   // Under the mix: felt more than heard, well below the player's own steps.
-  heartbeat: { category: 'player', duration: 0.6, variants: 3, loudness: -29, render: heartbeat },
+  heartbeat: { category: 'player', duration: 0.6, variants: 3, loudness: -28, render: heartbeat },
   respawn: { category: 'fx', duration: 2.3, variants: 3, render: respawn },
   uiHover: {
     category: 'ui',
@@ -195,6 +196,8 @@ export const FEEDBACK_SOUNDS: Record<FeedbackIds, SoundSpec> = {
     }
   },
   ...CUE_STANDINS,
+  // An achievement unlocked: a high "pling-PLING", brighter than the upgrade card's shimmer and the victory brass.
+  achievement: { category: 'stinger', duration: 1.4, variants: 1, loudness: -16, render: (s) => [101, 108].forEach((n, i) => glock(s, i * 0.075, midiHz(n), 0.7)) },
   countdown: {
     category: 'stinger',
     duration: 0.9,

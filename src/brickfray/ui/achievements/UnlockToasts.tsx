@@ -41,7 +41,7 @@ export function UnlockToasts({ outcome }: { outcome: Outcome | null }) {
     const since = first ? 0 : (Date.now() - started.get(key)!) / 1000;
     if (first) started.set(key, Date.now());
     if (since >= life) return;
-    if (first) game.audio.play('upgradeOffer', { priority: 8 });
+    if (first) game.audio.play('achievement', { priority: 8 });
     setLive({ key, since });
     const timer = setTimeout(() => setLive(null), (life - since) * 1000);
     return () => clearTimeout(timer);

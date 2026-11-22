@@ -13,7 +13,7 @@ export const HEART = {
   bpm: [66, 104],
   gap: [0.25, 0.18],
   level: [0.45, 1],
-  dub: 0.51,
+  dub: 0.5,
   /** Beat-to-beat wobble of the period (±), as a resting heart has. */
   wobble: 0.025,
   glide: 1,

@@ -59,7 +59,15 @@ export const FOLEY_STANDS_FOR: Record<FoleyId, HandlingCue> = {
   gripOff: 'cloth',
   pouch: 'draw',
   magScrape: 'magOut',
-  regrip: 'draw'
+  regrip: 'draw',
+  gripOffSmall: 'cloth',
+  pouchSmall: 'draw',
+  magScrapeSmall: 'magOut',
+  regripSmall: 'draw',
+  gripOffTool: 'cloth',
+  pouchTool: 'draw',
+  magScrapeTool: 'magOut',
+  regripTool: 'draw'
 };
 
 export function handlingSound(cue: HandlingCue, weapon: WeaponId | null): SoundId {
