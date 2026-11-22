@@ -47,7 +47,7 @@ export const en = {
   map: 'Map',
   timeLimit: 'Time limit',
   minutes: '{n} min',
-  bots: 'Bots',
+  seats: 'Players · bots fill in',
   start: 'Start',
   waitingForHost: 'Waiting for the host…',
   leave: 'Leave',

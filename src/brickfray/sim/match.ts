@@ -47,24 +47,42 @@ export class Match {
     this.state = { phase: 'warmup', phaseEnds: this.time + WARMUP, teamScore: [0, 0], wave: 0, winner: null, waveLeft: 0, theme: null, cause: null };
     this.offers.clear();
     this.sim.damageEnabled = false;
-    if (this.settings.mode !== 'solo') {
-      for (let i = 0; i < this.settings.bots; i++) this.addBot();
-    }
+    this.fill(false);
     for (const p of this.sim.players.values()) this.sim.spawn(p);
   }
 
   addHuman(name: string, character: CharacterId): HostPlayer {
+    // The bot leaves first, so the newcomer takes its side in a team match.
+    if (this.settings.mode !== 'solo' && this.humans().length + this.botCount() >= this.seats()) this.dropBot();
     const p = this.sim.addPlayer(name, character, null, this.teamFor());
-    if (this.settings.mode !== 'solo' && this.humans().length + this.botCount() > MATCH.maxPlayers) this.dropBot();
     if (this.state.phase === 'warmup' || this.state.phase === 'playing') this.sim.spawn(p);
     return p;
   }
 
   remove(id: number) {
+    const human = this.sim.players.get(id)?.bot === null;
+    this.drop(id);
+    if (human) this.fill(this.state.phase === 'warmup' || this.state.phase === 'playing');
+  }
+
+  private drop(id: number) {
     this.offers.delete(id);
     this.bots.remove(id);
     this.streaks.remove(id);
     this.sim.removePlayer(id);
+  }
+
+  private seats() {
+    return Math.min(this.settings.bots, MATCH.maxPlayers);
+  }
+
+  /** Bots take the seats no human holds. */
+  private fill(spawn: boolean) {
+    if (this.settings.mode === 'solo') return;
+    while (this.sim.players.size < this.seats()) {
+      const bot = this.addBot();
+      if (spawn) this.sim.spawn(bot);
+    }
   }
 
   private humans() {
@@ -98,7 +116,7 @@ export class Match {
 
   private dropBot() {
     const bot = [...this.sim.players.values()].reverse().find((p) => p.bot);
-    if (bot) this.remove(bot.id);
+    if (bot) this.drop(bot.id);
   }
 
   private onKill(victim: HostPlayer, killer: HostPlayer | null, weapon: KillCause, kill: Extract<GameEvent, { type: 'kill' }>) {

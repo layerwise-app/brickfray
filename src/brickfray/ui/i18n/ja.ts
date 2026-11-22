@@ -48,7 +48,7 @@ export const ja: Dictionary = {
   map: 'マップ',
   timeLimit: '制限時間',
   minutes: '{n}分',
-  bots: 'ボット',
+  seats: '人数 · ボットで補充',
   start: '開始',
   waitingForHost: 'ホストの開始を待っています…',
   leave: '退出',

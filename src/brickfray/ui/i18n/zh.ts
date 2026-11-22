@@ -48,7 +48,7 @@ export const zh: Dictionary = {
   map: '地图',
   timeLimit: '时长',
   minutes: '{n} 分钟',
-  bots: '机器人',
+  seats: '人数 · 机器人补位',
   start: '开始',
   waitingForHost: '等待房主开始…',
   leave: '离开',

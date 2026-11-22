@@ -48,7 +48,7 @@ export const de: Dictionary = {
   map: 'Karte',
   timeLimit: 'Zeitlimit',
   minutes: '{n} Min.',
-  bots: 'Bots',
+  seats: 'Spieler · Bots füllen auf',
   start: 'Starten',
   waitingForHost: 'Warte auf den Host …',
   leave: 'Verlassen',

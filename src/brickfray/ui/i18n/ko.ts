@@ -48,7 +48,7 @@ export const ko: Dictionary = {
   map: '맵',
   timeLimit: '제한 시간',
   minutes: '{n}분',
-  bots: '봇',
+  seats: '인원 · 봇으로 채움',
   start: '시작',
   waitingForHost: '방장이 시작하기를 기다리는 중…',
   leave: '나가기',

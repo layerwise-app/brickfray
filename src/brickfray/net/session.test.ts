@@ -23,7 +23,7 @@ const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 describe('host and client over a lossy loopback', () => {
   it('predicts movement that matches the host after reconciliation', async () => {
     Object.assign(netConditions, { latency: 80, jitter: 20, loss: 0.1 });
-    const host = new HostSession('solo', 'Host', { mode: 'ffa', map: 'plaza', minutes: 10, bots: 2, difficulty: 'normal' });
+    const host = new HostSession('solo', 'Host', { mode: 'ffa', map: 'plaza', minutes: 10, bots: 3, difficulty: 'normal' });
     await host.open();
     const client = new ClientSession(host.localChannel(), 'Me', 'vega', 'token-1');
     let started = false;

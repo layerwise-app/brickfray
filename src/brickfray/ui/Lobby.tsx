@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { ROSTER } from '../characters/roster';
+import { MATCH } from '../sim/constants';
 import { DIFFICULTIES, type MatchSettings } from '../sim/types';
 import { mapPreview } from './map-preview';
 import { useApp, useGame } from './App';
@@ -100,15 +101,15 @@ export function Lobby() {
                   ))}
                 </div>
               </Field>
-              <Field label={`${t('bots')} · ${s.bots}`}>
+              <Field label={`${t('seats')} · ${s.bots}`}>
                 <input
                   type='range'
                   className='bf-range mt-3'
-                  min={0}
-                  max={8}
+                  min={1}
+                  max={MATCH.maxPlayers}
                   value={s.bots}
                   disabled={!host}
-                  style={{ ['--fill' as string]: `${(s.bots / 8) * 100}%` }}
+                  style={{ ['--fill' as string]: `${((s.bots - 1) / (MATCH.maxPlayers - 1)) * 100}%` }}
                   onChange={(e) => set({ bots: Number(e.target.value) })}
                 />
               </Field>

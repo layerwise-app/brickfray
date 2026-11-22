@@ -68,7 +68,7 @@ export function defaultSettings(): Settings {
     autoResolution: true,
     difficulty: 'normal',
     soloMap: 'plaza',
-    room: { mode: 'ffa', map: 'plaza', minutes: 5, bots: 5 }
+    room: { mode: 'ffa', map: 'plaza', minutes: 5, bots: 6 }
   };
 }
 

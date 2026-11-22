@@ -48,7 +48,7 @@ export const fr: Dictionary = {
   map: 'Carte',
   timeLimit: 'Durée',
   minutes: '{n} min',
-  bots: 'Bots',
+  seats: 'Joueurs · complétés par des bots',
   start: 'Lancer',
   waitingForHost: 'En attente de l’hôte…',
   leave: 'Quitter',

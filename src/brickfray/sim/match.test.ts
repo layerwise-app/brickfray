@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { MapLayout } from '../world/types';
+import { CHARACTER_IDS } from '../characters/roster';
 import { TICK } from './constants';
 import { WEAPONS } from '../weapons/defs';
 import { Match } from './match';
@@ -226,5 +227,39 @@ describe('solo difficulty', () => {
       for (const p of match.sim.players.values()) if (p.bot && p.alive && match.time > 5) match.sim.damage(p, 999, { attacker: me.id, weapon: 'ar', kind: 'body', from: [0, 0, 0] });
     }
     expect(seen.slice(0, waveRoster('normal', 1).length + waveRoster('normal', 2).length)).toEqual([...waveRoster('normal', 1), ...waveRoster('normal', 2)]);
+  });
+});
+
+describe('room seats', () => {
+  const room = (bots: number) => {
+    const match = new Match(arena(), { mode: 'tdm', map: 'plaza', minutes: 3, bots, difficulty: 'normal' });
+    const host = match.addHuman('Host', CHARACTER_IDS[0]!);
+    match.start();
+    return { match, host };
+  };
+  const count = (match: Match) => {
+    const all = [...match.sim.players.values()];
+    return { humans: all.filter((p) => !p.bot).length, bots: all.filter((p) => p.bot).length, sides: [0, 1].map((t) => all.filter((p) => p.team === t).length) };
+  };
+
+  it('fills the room with bots up to its size', () => {
+    expect(count(room(6).match)).toEqual({ humans: 1, bots: 5, sides: [3, 3] });
+    expect(count(room(1).match)).toEqual({ humans: 1, bots: 0, sides: [1, 0] });
+  });
+
+  it('gives a bot seat to a human who joins and fills it again when they leave', () => {
+    const { match } = room(6);
+    const guest = match.addHuman('Guest', CHARACTER_IDS[1]!);
+    expect(count(match)).toEqual({ humans: 2, bots: 4, sides: [3, 3] });
+    match.remove(guest.id);
+    expect(count(match)).toEqual({ humans: 1, bots: 5, sides: [3, 3] });
+    expect([...match.sim.players.values()].every((p) => p.alive)).toBe(true);
+  });
+
+  it('lets humans in past the room size', () => {
+    const { match } = room(2);
+    match.addHuman('A', CHARACTER_IDS[1]!);
+    match.addHuman('B', CHARACTER_IDS[2]!);
+    expect(count(match)).toEqual({ humans: 3, bots: 0, sides: [2, 1] });
   });
 });
