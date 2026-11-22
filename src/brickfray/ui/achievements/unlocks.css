@@ -1,0 +1,248 @@
+/* The unlock toasts and the results strip (achievements.css holds what they share with the page). Sized by their own
+   boxes (container queries), never by the window. */
+
+/* The unlock toasts: top-left over the results screen (its podium leaves that corner free), top-right on a phone. */
+.bf-ach-hud {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  pointer-events: none;
+  container: ach-hud / size;
+}
+.bf-ach-toasts {
+  --from: -1;
+  position: absolute;
+  top: max(16px, env(safe-area-inset-top));
+  left: max(16px, env(safe-area-inset-left));
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+.bf-ach-toast {
+  display: flex;
+  min-width: 270px;
+  max-width: 380px;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 20px 8px 10px;
+  border-radius: 16px;
+  background: rgba(11, 18, 34, 0.93);
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.12),
+    inset 0 0 0 2px var(--ach-face, transparent),
+    0 6px 0 rgba(0, 0, 0, 0.35),
+    0 12px 26px rgba(0, 0, 0, 0.35);
+  animation: bf-ach-toast var(--stay) linear var(--in) both;
+}
+.bf-ach-toast-text {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 1px;
+}
+.bf-ach-toast-text small {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--bf-yellow);
+}
+.bf-ach-toast-text b {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 21px;
+  font-weight: 400;
+  line-height: 1.15;
+}
+.bf-ach-toast.bf-ach-toast-more {
+  min-width: 0;
+  padding: 6px 16px;
+  font-size: 16px;
+  color: var(--bf-muted);
+}
+@keyframes bf-ach-toast {
+  0% {
+    opacity: 0;
+    transform: translateX(calc(var(--from) * 48px)) scale(0.86);
+  }
+  4% {
+    opacity: 1;
+    transform: translateX(calc(var(--from) * -6px)) scale(1.04);
+  }
+  7% {
+    transform: none;
+  }
+  93% {
+    opacity: 1;
+    transform: none;
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(calc(var(--from) * 36px));
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bf-ach-toast {
+    animation-name: bf-ach-fade;
+  }
+  .bf-ach-got {
+    animation: none;
+  }
+}
+@keyframes bf-ach-fade {
+  0%,
+  100% {
+    opacity: 0;
+  }
+  5%,
+  93% {
+    opacity: 1;
+  }
+}
+.bf-ach-toast-count {
+  display: none;
+  margin-left: auto;
+  padding-left: 4px;
+  font-size: 17px;
+  color: var(--bf-yellow);
+}
+@container ach-hud (max-height: 520px) {
+  .bf-ach-toast:not(:first-child) {
+    display: none;
+  }
+  .bf-ach-toast-count {
+    display: block;
+  }
+  .bf-ach-toasts {
+    --from: 1;
+    top: max(8px, env(safe-area-inset-top));
+    right: max(10px, env(safe-area-inset-right));
+    left: auto;
+    align-items: flex-end;
+    gap: 6px;
+  }
+  .bf-ach-toast {
+    min-width: 200px;
+    gap: 9px;
+    padding: 5px 14px 5px 7px;
+    border-radius: 13px;
+  }
+  .bf-ach-toast .bf-ach-badge {
+    width: 34px;
+    height: 34px;
+  }
+  .bf-ach-toast-text small {
+    font-size: 10px;
+  }
+  .bf-ach-toast-text b {
+    font-size: 16px;
+  }
+}
+
+/* The results strip: badges and names of what unlocked, then the nearest goals. */
+.bf-ach-strip-box {
+  min-width: 0;
+  container: ach-strip / inline-size;
+}
+.bf-ach-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px 12px;
+}
+.bf-ach-strip-quiet {
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--bf-muted);
+}
+.bf-ach-got {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 12px 3px 4px;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.38);
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.08);
+  animation: bf-pop 0.42s cubic-bezier(0.2, 1.6, 0.4, 1) both;
+}
+.bf-ach-got:nth-child(2) {
+  animation-delay: 0.12s;
+}
+.bf-ach-got:nth-child(3) {
+  animation-delay: 0.24s;
+}
+.bf-ach-got:nth-child(4) {
+  animation-delay: 0.36s;
+}
+.bf-ach-got-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+.bf-ach-got-name .bf-display {
+  font-size: 16px;
+}
+.bf-ach-got-name b {
+  background: rgba(255, 255, 255, 0.16);
+}
+.bf-ach-strip-more {
+  font-size: 15px;
+  color: var(--bf-muted);
+}
+.bf-ach-goal {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.bf-ach-goal-bar {
+  display: flex;
+  width: 112px;
+  flex-direction: column;
+  gap: 3px;
+}
+.bf-ach-goal-bar .bf-ach-bar {
+  width: 100%;
+  flex: none;
+  height: 6px;
+  --ach-next: var(--bf-yellow);
+}
+.bf-ach-goal-bar .bf-ach-nums {
+  font-size: 12px;
+}
+
+@container ach-strip (max-width: 520px) {
+  .bf-ach-strip {
+    flex-wrap: nowrap;
+    gap: 6px 8px;
+    overflow: hidden;
+  }
+  .bf-ach-got {
+    padding: 0;
+    background: none;
+    box-shadow: none;
+  }
+  .bf-ach-got-name {
+    display: none;
+  }
+  .bf-ach-got .bf-ach-badge {
+    width: 34px;
+    height: 34px;
+  }
+  .bf-ach-strip-more {
+    flex-shrink: 0;
+    font-size: 14px;
+  }
+  .bf-ach-goal-bar {
+    width: 84px;
+  }
+}
+@container ach-strip (max-width: 340px) {
+  .bf-ach-goal {
+    display: none;
+  }
+}

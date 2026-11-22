@@ -2,6 +2,7 @@ import { CHARACTER_IDS } from '~/brickfray/characters/roster';
 import type { CharacterId } from '~/brickfray/characters/types';
 import type { HudState } from '~/brickfray/game/hud';
 import type { GameEvent, MatchSettings } from '~/brickfray/sim/types';
+import { fitFeats } from '../../achievements/feats';
 import type { MatchDetail, MatchReport, MatchResult, MatchStart } from '../contract';
 import { publishOutcome } from './outcome';
 
@@ -66,7 +67,7 @@ export class MatchTally {
     if (this.settings.mode === 'ffa') result = hud.winner === null ? 'draw' : hud.winner === me.id ? 'win' : 'loss';
     if (this.settings.mode === 'tdm') result = hud.winner === null ? 'draw' : hud.winner === me.team ? 'win' : 'loss';
     const seconds = solo ? this.played : (Date.now() - this.startedAt) / 1000;
-    return {
+    const report = {
       key: this.ticket?.key ?? crypto.randomUUID(),
       ticket: this.ticket?.ticket ?? null,
       mode: this.settings.mode,
@@ -86,6 +87,7 @@ export class MatchTally {
       result,
       detail: detail(this.settings.mode, hud)
     };
+    return { ...report, feats: fitFeats(hud.feats, report) };
   }
 }
 

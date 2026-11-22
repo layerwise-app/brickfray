@@ -14,6 +14,12 @@ export function standings(rows: readonly ScoreRow[], mode: MatchSettings['mode']
   return sorted;
 }
 
+/** The leaderboard moments: number one, the top 10, the top 100; nothing below. */
+export type RankTier = 'top1' | 'top10' | 'top100' | null;
+export function tierOf(rank: number): RankTier {
+  return rank === 1 ? 'top1' : rank <= 10 ? 'top10' : rank <= 100 ? 'top100' : null;
+}
+
 /** A place as each language writes it in "3rd of 8": English and French take a suffix, the rest the plain number. */
 export function ordinal(lang: Lang, n: number) {
   if (lang === 'fr') return n === 1 ? '1er' : `${n}e`;

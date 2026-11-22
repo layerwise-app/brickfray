@@ -5,6 +5,8 @@ import type { GameEvent, ShotTrace } from '../sim/types';
 import { magSize } from '../sim/arms';
 import { waveTuning } from '../sim/waves';
 import { WEAPONS } from '../weapons/defs';
+import { LOADOUTS } from '../weapons/loadouts';
+import { countChain, countKill, noFeats } from '../../lib/achievements/feats';
 import type { FeedEntry, ScoreRow } from './hud';
 import type { MatchView } from './match-view';
 
@@ -33,7 +35,7 @@ export class MatchEvents {
   private clock = 0;
   private hudTimer = 0;
   /** The local player's own record of the match for the HUD: headshot kills, shots fired and landed, seconds played. */
-  private mine = { headshots: 0, shots: 0, hit: 0, time: 0 };
+  private mine = { headshots: 0, shots: 0, hit: 0, time: 0, feats: noFeats() };
 
   constructor(private readonly mv: MatchView) {}
 
@@ -138,6 +140,15 @@ export class MatchEvents {
           }
           if (e.killer === me && e.victim !== me) {
             if (e.headshot) this.mine.headshots++;
+            const m = mv.me.move;
+            this.mine.feats = countKill(this.mine.feats, {
+              weapon: e.weapon,
+              sidearm: LOADOUTS[mv.me.character].secondary,
+              airborne: mv.me.alive && !m.grounded,
+              distance: victim ? Math.hypot(victim.position.x - m.x, victim.position.y - m.y, victim.position.z - m.z) : null,
+              bounty: e.bounty,
+              megabot: mv.session.roster.get(e.victim)?.bot === 'boss'
+            });
             mv.hud.pulse({ type: 'hit', kind: 'kill', amount: 0, at: null, headshot: e.headshot });
             mv.sound.kill(e.headshot);
           }
@@ -198,6 +209,7 @@ export class MatchEvents {
           if (last && last.killer === this.name(e.player)) last.chain = e.count;
           this.pushFeed();
           if (e.player === me) {
+            this.mine.feats = countChain(this.mine.feats, e.count);
             mv.hud.set({ multikill: { key: feedKey++, count: e.count } });
             this.multikillUntil = this.clock + MULTIKILL_LIFE;
             mv.audio.announce(e.count);
@@ -292,6 +304,7 @@ export class MatchEvents {
       shots: this.mine.shots,
       shotsHit: this.mine.hit,
       playTime: this.mine.time,
+      feats: this.mine.feats,
       bosses: this.bosses(),
       winner: match?.winner ?? null,
       rows: this.rows(),

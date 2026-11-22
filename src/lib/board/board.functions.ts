@@ -19,6 +19,8 @@ import {
   type ProfileView,
   type UploadResult
 } from './contract';
+import { countUpload } from '../achievements/store';
+import { matchTally } from '../achievements/tally';
 import { EMPTY_HISTORY, history, leaderboard, matchView, storeMatches } from './matches';
 import { matchRank } from './rank';
 import { cleanName } from './names';
@@ -72,7 +74,7 @@ export const uploadMatches = createServerFn({ method: 'POST' })
   .handler(async ({ data }): Promise<UploadResult> => {
     const now = Date.now();
     const n = data.matches.length;
-    if (!n) return { stored: [], refused: data.refused, limited: false };
+    if (!n) return { stored: [], refused: data.refused, limited: false, achievements: null };
     const ip = await caller();
     const ok = await allowAll(
       db,
@@ -84,7 +86,7 @@ export const uploadMatches = createServerFn({ method: 'POST' })
       now,
       n
     );
-    if (!ok) return { stored: [], refused: data.refused, limited: true };
+    if (!ok) return { stored: [], refused: data.refused, limited: true, achievements: null };
     const secret = ticketSecret();
     const admitted: MatchReport[] = [];
     const refused = [...data.refused];
@@ -96,9 +98,10 @@ export const uploadMatches = createServerFn({ method: 'POST' })
         refused.push(report.key);
       }
     }
-    if (!admitted.length) return { stored: [], refused, limited: false };
+    if (!admitted.length) return { stored: [], refused, limited: false, achievements: null };
     const player = await ensurePlayer(db, data.playerId, data.name, now);
-    return { stored: await storeMatches(db, player, admitted, now), refused, limited: false };
+    const stored = await storeMatches(db, player, admitted, now);
+    return { stored, refused, limited: false, achievements: await countUpload(db, player.profileId, admitted.map(matchTally), now) };
   });
 
 export const getLeaderboard = createServerFn({ method: 'GET' })

@@ -1,0 +1,162 @@
+/* Results screen extras: tooltips, confetti, reduced motion, and the Tab overlay's run numbers. */
+/* Words for an icon on hover, focus or a long press. */
+.bf-tip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  outline: none;
+  -webkit-touch-callout: none;
+}
+.bf-tip::after {
+  content: attr(data-tip);
+  position: absolute;
+  z-index: 30;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  padding: 5px 10px;
+  border-radius: 8px;
+  font: 600 13px/1.2 'Rubik Variable', system-ui, 'PingFang SC', sans-serif;
+  letter-spacing: 0;
+  white-space: nowrap;
+  color: #fff;
+  background: #0b1222;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.14),
+    0 6px 16px rgba(0, 0, 0, 0.45);
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, 4px);
+  transition:
+    opacity 0.12s,
+    transform 0.12s;
+}
+.bf-tip:focus-visible::after,
+.bf-tip[data-open]::after {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+/* Touch screens keep :hover on the last thing tapped; only a real pointer hovers. */
+@media (hover: hover) {
+  .bf-tip:hover::after {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+.bf-tip:focus-visible {
+  border-radius: 6px;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.7);
+}
+
+/* Brick confetti. */
+.bf-confetti {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  overflow: hidden;
+  pointer-events: none;
+}
+.bf-confetti i {
+  position: absolute;
+  top: -24px;
+  left: var(--x);
+  width: 12px;
+  height: 9px;
+  border-radius: 2px;
+  background: var(--c);
+  box-shadow: inset 0 -2px 0 rgba(0, 0, 0, 0.22);
+  animation: bf-confetti var(--t) cubic-bezier(0.25, 0.5, 0.55, 1) var(--d) both;
+}
+.bf-confetti i::before,
+.bf-confetti i[data-long]::after {
+  content: '';
+  position: absolute;
+  top: -3px;
+  left: 3px;
+  width: 6px;
+  height: 3px;
+  border-radius: 2px 2px 0 0;
+  background: var(--c);
+}
+.bf-confetti i[data-long] {
+  width: 22px;
+}
+.bf-confetti i[data-long]::after {
+  left: 13px;
+}
+@keyframes bf-confetti {
+  0% {
+    opacity: 1;
+    translate: 0 0;
+    rotate: 0deg;
+  }
+  85% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    translate: var(--dx) calc(100cqh + 40px);
+    rotate: var(--r);
+  }
+}
+
+/* The Tab overlay's labelled run numbers (Scoreboard), kept as they were. */
+.bf-results-caption {
+  margin-bottom: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--bf-muted);
+}
+.bf-run {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.bf-run-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+.bf-run-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 10px 6px 9px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.07);
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.12),
+    inset 0 -3px 0 rgba(0, 0, 0, 0.25),
+    0 3px 0 rgba(0, 0, 0, 0.35);
+}
+.bf-run-value {
+  font-size: 40px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.bf-run[data-compact] .bf-run-value {
+  font-size: 30px;
+}
+.bf-run-label {
+  margin-top: 5px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  text-align: center;
+  color: var(--bf-muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bf-results,
+  .bf-results *,
+  .bf-results *::before,
+  .bf-results *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+  .bf-confetti {
+    display: none;
+  }
+}

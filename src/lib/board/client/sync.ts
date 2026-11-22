@@ -1,3 +1,4 @@
+import { noteNews } from '../../achievements/client/news';
 import { uploadMatches } from '../board.functions';
 import { UPLOAD_BATCH, type MatchReport } from '../contract';
 import { addLocalMatch, localMatches, markUploads, pendingMatches } from './history';
@@ -19,6 +20,7 @@ async function send(name: string) {
     for (let left = pendingMatches(); left.length; left = pendingMatches()) {
       const result = await uploadMatches({ data: { playerId: getPlayerId(), name, matches: left.slice(0, UPLOAD_BATCH) } });
       markUploads(result.stored, 'stored');
+      if (result.achievements) noteNews(result.stored, result.achievements);
       markUploads(result.refused, 'refused');
       if (result.stored.length) markKnown();
       if (result.limited || (!result.stored.length && !result.refused.length)) return false;

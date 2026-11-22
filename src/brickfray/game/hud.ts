@@ -1,3 +1,4 @@
+import { noFeats, type MatchFeats } from '../../lib/achievements/feats';
 import type { BotKind, CharacterId } from '../characters/types';
 import { GRENADE_REFILL } from '../sim/constants';
 import type { KillCause, MatchPhase, MatchSettings, MatchState } from '../sim/types';
@@ -104,6 +105,8 @@ export interface HudState {
   bosses: { id: number; health: number; max: number }[];
   /** The local player's latest multi-kill (2 = a double kill) while its callout is up. */
   multikill: { key: number; count: number } | null;
+  /** The local player's kills sorted for achievements (sidearm, melee, chains…). */
+  feats: MatchFeats;
 }
 
 export type HudPulse =
@@ -157,7 +160,8 @@ export function initialHud(): HudState {
     shotsHit: 0,
     playTime: 0,
     bosses: [],
-    multikill: null
+    multikill: null,
+    feats: noFeats()
   };
 }
 

@@ -1,6 +1,7 @@
 import { CHARACTER_IDS } from '~/brickfray/characters/roster';
 import { MATCH } from '~/brickfray/sim/constants';
 import { botsThrough, secondsToReach } from '~/brickfray/sim/waves';
+import { parseFeats } from '../achievements/feats';
 import { BoardError, MODES, SOLO_LEVELS, UPLOAD_BATCH, type BoardMode, type LeaderboardQuery, type MatchReport, type MatchResult, type SoloLevel } from './contract';
 import { maxScore, OVER, parseDetail } from './detail';
 import { cleanName } from './names';
@@ -113,7 +114,7 @@ export function parseReport(raw: unknown, now: number): MatchReport {
     players,
     result
   };
-  return { ...report, detail: parseDetail(r.detail, report) };
+  return { ...report, detail: parseDetail(r.detail, report), feats: parseFeats(r.feats, report) };
 }
 
 /**

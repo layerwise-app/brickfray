@@ -1,5 +1,6 @@
 import { and, eq, isNull, notExists, sql } from 'drizzle-orm';
 import { boardAvatar, boardMatch, boardPlayer, boardProfile } from '~/db/schema';
+import { carryUnlocks } from '../achievements/store';
 import { avatarUrl, type ClaimResult, type ProfileView } from './contract';
 import { inOrder, newId, type BoardDb } from './db';
 import { DEFAULT_NAME } from './names';
@@ -89,6 +90,7 @@ export async function claimPlayer(db: BoardDb, playerId: string, userId: string,
     await inOrder(db, [
       db.update(boardPlayer).set({ profileId: own.id, lastSeenAt: now }).where(eq(boardPlayer.id, id)),
       db.update(boardMatch).set({ profileId: own.id }).where(eq(boardMatch.playerId, id)),
+      carryUnlocks(db, current.profileId, own.id),
       ...(adopt
         ? [
             db.update(boardAvatar).set({ profileId: own.id }).where(eq(boardAvatar.profileId, old.id)),

@@ -2,6 +2,7 @@ import { boardFr } from './board/fr';
 import { touchFr } from './touch/fr';
 import { hudFr } from './hud/fr';
 import { streaksFr } from './streaks/fr';
+import { achievementsFr } from './achievements/fr';
 import type { Dictionary } from './en';
 
 export const fr: Dictionary = {
@@ -9,6 +10,7 @@ export const fr: Dictionary = {
   ...touchFr,
   ...hudFr,
   ...streaksFr,
+  ...achievementsFr,
   play: 'Jouer',
   playCaption: 'Partie en ligne',
   solo: 'Solo',

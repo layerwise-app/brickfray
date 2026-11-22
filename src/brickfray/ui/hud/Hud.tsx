@@ -19,6 +19,7 @@ import { UpgradePick } from './UpgradePick';
 import { Ammo, Health, LOW_HEALTH } from './Vitals';
 import { TouchLayer } from '../touch/TouchLayer';
 import { useTouchMode } from '../touch/useInputMode';
+import { ResultsAchievements } from '../achievements/ResultsAchievements';
 
 export function Hud() {
   const hud = useHud();
@@ -35,9 +36,9 @@ export function Hud() {
       {hud.alive && playing && <Crosshair hidden={hud.scoped || hud.aiming || (!!hud.offer && !hud.offer.picked)} />}
       <KillConfirm />
       <MultiKill />
-      <TopBar />
-      <KillFeed />
-      {hud.alive && (
+      {hud.phase !== 'ended' && <TopBar />}
+      {hud.phase !== 'ended' && <KillFeed />}
+      {hud.alive && hud.phase !== 'ended' && (
         <>
           <Health health={hud.health} max={hud.maxHealth} armor={hud.armor} />
           <Ammo />
@@ -51,6 +52,7 @@ export function Hud() {
       {hud.scoreboard && hud.phase !== 'ended' && <Scoreboard />}
       <UpgradePick />
       {hud.phase === 'ended' && <Results />}
+      {hud.phase === 'ended' && <ResultsAchievements />}
       {hud.hint && (
         <div className='bf-pop absolute left-1/2 top-24 -translate-x-1/2 rounded-xl bg-black/70 px-4 py-2 text-sm font-medium'>{t('ctrlHint')}</div>
       )}

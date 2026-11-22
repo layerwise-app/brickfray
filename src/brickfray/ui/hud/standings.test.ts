@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { ScoreRow } from '../../game/hud';
 import { awardMedals } from './Medal';
-import { clock, ordinal, standings } from './standings';
+import { clock, ordinal, standings, tierOf } from './standings';
 
 function row(id: number, kills: number, assists: number, score = kills * 100 + assists * 50): ScoreRow {
   return { id, name: `P${id}`, character: 'rivet', team: -1, kills, deaths: 0, assists, score, ping: 0, me: id === 1, bot: id !== 1 };
@@ -35,6 +35,12 @@ describe('standings', () => {
     const rows = [row(2, 9, 8), row(1, 10, 0), row(3, 2, 1)];
     expect(standings(rows, 'ffa', 1).map((r) => r.id)).toEqual([1, 2, 3]);
     expect(standings(rows, 'tdm', 0).map((r) => r.id)).toEqual([2, 1, 3]);
+  });
+});
+
+describe('leaderboard tiers', () => {
+  it('marks number one, the top 10 and the top 100, and nothing past it', () => {
+    expect([1, 2, 10, 11, 100, 101].map(tierOf)).toEqual(['top1', 'top10', 'top10', 'top100', 'top100', null]);
   });
 });
 

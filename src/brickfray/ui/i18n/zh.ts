@@ -2,6 +2,7 @@ import { boardZh } from './board/zh';
 import { touchZh } from './touch/zh';
 import { hudZh } from './hud/zh';
 import { streaksZh } from './streaks/zh';
+import { achievementsZh } from './achievements/zh';
 import type { Dictionary } from './en';
 
 export const zh: Dictionary = {
@@ -9,6 +10,7 @@ export const zh: Dictionary = {
   ...touchZh,
   ...hudZh,
   ...streaksZh,
+  ...achievementsZh,
   play: '开战',
   playCaption: '在线对战',
   solo: '单人',

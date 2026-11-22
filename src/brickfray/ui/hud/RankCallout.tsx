@@ -9,6 +9,8 @@ import { BOARD, usePlayerId } from '../board/me';
 import { TrophyIcon } from '../board/icons';
 import { useT, type MessageKey } from '../i18n';
 import { CrownIcon } from '../icons';
+import { Confetti, UnrankedIcon } from './results-art';
+import { tierOf, type RankTier } from './standings';
 
 /** The finished match's outcome, once its report is made: only the one that belongs to `settings`' match. */
 export function useOutcome(settings: MatchSettings | null): Outcome | null {
@@ -16,17 +18,13 @@ export function useOutcome(settings: MatchSettings | null): Outcome | null {
   return outcome && outcome.settings === settings ? outcome : null;
 }
 
-type Tier = 'top1' | 'top10' | 'top100' | null;
-function tierOf(rank: number): Tier {
-  return rank === 1 ? 'top1' : rank <= 10 ? 'top10' : rank <= 100 ? 'top100' : null;
-}
-
 /**
- * The player's all-time rank on the match's board once the server has it: how this match moved it, and a
- * celebration from the top 100 up (stronger for the top 10 and number one). Until then, or when the match cannot be
- * ranked, one quiet line says why.
+ * The player's all-time rank on the match's board as one badge: the cup, "#19", and how far this match moved it
+ * ("▲35", or "new" for a first ranked match). From the top 100 up the badge turns gold with its tier, and a new
+ * place there throws confetti. While the rank loads the cup waits quietly; a match that cannot be ranked gets one
+ * short muted line (the full reason on hover or focus).
  */
-export function RankCallout({ outcome }: { outcome: Outcome | null }) {
+export function RankBadge({ outcome }: { outcome: Outcome | null }) {
   const { t } = useT();
   const playerId = usePlayerId();
   const report = outcome?.report;
@@ -37,68 +35,54 @@ export function RankCallout({ outcome }: { outcome: Outcome | null }) {
     staleTime: Infinity,
     retry: 2
   });
-  if (!outcome) return <Quiet text={t('rank.none')} />;
-  if (outcome.upload === 'local' || outcome.upload === 'refused' || outcome.upload === 'waiting') return <Quiet text={t(`rank.${outcome.upload}`)} />;
-  if (outcome.upload === 'sending' || rank.isLoading) return <Quiet text={t('rank.checking')} busy />;
+  if (!outcome) return <Unranked short='rank.short.none' long='rank.none' />;
+  if (outcome.upload === 'local' || outcome.upload === 'refused' || outcome.upload === 'waiting') return <Unranked short={`rank.short.${outcome.upload}`} long={`rank.${outcome.upload}`} />;
+  if (outcome.upload === 'sending' || rank.isLoading) {
+    return (
+      <span className='bf-rank' data-busy role='status' aria-label={t('rank.checking')} title={t('rank.checking')}>
+        <TrophyIcon size={20} />
+        <span className='bf-rank-dots' aria-hidden />
+      </span>
+    );
+  }
   const data = rank.data;
-  if (!data || 'refused' in data) return <Quiet text={t('rank.failed')} />;
+  if (!data || 'refused' in data) return <Unranked short='rank.short.failed' long='rank.failed' />;
   return <Ranked rank={data} solo={outcome.report.mode === 'solo'} />;
 }
 
-function Quiet({ text, busy }: { text: string; busy?: boolean }) {
+function Unranked({ short, long }: { short: MessageKey; long: MessageKey }) {
+  const { t } = useT();
   return (
-    <p className='bf-rank-quiet' role='status' data-busy={busy || undefined}>
-      {busy && <span className='bf-rank-dots' aria-hidden />}
-      {text}
-    </p>
+    <span className='bf-rank-off' role='status' title={t(long)}>
+      <UnrankedIcon size={18} />
+      {t(short)}
+    </span>
   );
 }
 
 function Ranked({ rank, solo }: { rank: MatchRank; solo: boolean }) {
   const { t, lang } = useT();
   const tier = tierOf(rank.rank);
-  const moved = rank.before === null || rank.before > rank.rank;
+  const first = rank.before === null;
+  const up = !first && rank.before! > rank.rank ? rank.before! - rank.rank : 0;
   const board = solo && rank.difficulty ? `${t('board.mode.solo')} · ${t(`difficulty.${rank.difficulty}`)}` : t(`board.mode.${rank.mode}`);
-  const n = (v: number) => `#${number(lang, v)}`;
-  const tierText: Record<Exclude<Tier, null>, MessageKey> = { top1: 'rank.top1', top10: 'rank.top10', top100: 'rank.top100' };
+  const detail = [`${t('board.title')} · ${board}`, `#${number(lang, rank.rank)} ${t('rank.total', { n: number(lang, rank.total) })}`];
+  if (rank.run !== rank.rank) detail.push(t(solo ? 'rank.runSolo' : 'rank.runRoom', { n: number(lang, rank.run) }));
+  const tierText: Record<Exclude<RankTier, null>, MessageKey> = { top1: 'rank.top1', top10: 'rank.top10', top100: 'rank.top100' };
   return (
-    <div className='bf-rank' data-tier={tier ?? undefined} data-new={(tier && moved) || undefined} role='status'>
-      <div className='bf-rank-label'>
-        <TrophyIcon size={15} />
-        <span>
-          {t('board.title')} · {board}
-        </span>
-      </div>
+    <span className='bf-rank bf-in' data-tier={tier ?? undefined} role='status' title={detail.join('\n')} aria-label={detail.join('. ')}>
       {tier && (
-        <div className='bf-rank-badge bf-display'>
-          {tier === 'top1' ? <CrownIcon size={30} /> : <TrophyIcon size={26} />}
-          <span>{t(tierText[tier])}</span>
-        </div>
+        <span className='bf-rank-tier bf-display'>
+          {tier === 'top1' ? <CrownIcon size={22} /> : <TrophyIcon size={19} />}
+          {t(tierText[tier])}
+        </span>
       )}
-      <div className='bf-rank-line'>
-        {rank.before === null ? (
-          <span className='bf-rank-main'>
-            <span className='bf-rank-tag'>{t(solo ? 'rank.firstSolo' : 'rank.firstRoom')}</span>
-            <span className='bf-display bf-rank-num'>{n(rank.rank)}</span>
-          </span>
-        ) : moved ? (
-          <span className='bf-rank-main'>
-            <span className='bf-display bf-rank-from'>{n(rank.before)}</span>
-            <span className='bf-rank-arrow' aria-hidden>
-              →
-            </span>
-            <span className='bf-display bf-rank-num'>{n(rank.rank)}</span>
-            <span className='bf-rank-up'>▲ {number(lang, rank.before - rank.rank)}</span>
-          </span>
-        ) : (
-          <span className='bf-rank-main'>
-            <span className='bf-rank-tag'>{t('rank.kept')}</span>
-            <span className='bf-display bf-rank-num'>{n(rank.rank)}</span>
-          </span>
-        )}
-        <span className='bf-rank-total'>{t('rank.total', { n: number(lang, rank.total) })}</span>
-      </div>
-      {rank.run !== rank.rank && <div className='bf-rank-run'>{t(solo ? 'rank.runSolo' : 'rank.runRoom', { n: number(lang, rank.run) })}</div>}
-    </div>
+      <span className='bf-rank-num bf-display'>
+        {!tier && <TrophyIcon size={19} className='bf-rank-cup' />}
+        {tier !== 'top1' && <span>#{number(lang, rank.rank)}</span>}
+        {first ? <span className='bf-rank-new'>{t('rank.new')}</span> : up > 0 && <span className='bf-rank-up'>▲{number(lang, up)}</span>}
+      </span>
+      {tier && (first || up > 0) && <Confetti pieces={26} />}
+    </span>
   );
 }

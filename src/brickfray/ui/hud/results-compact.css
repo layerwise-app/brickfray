@@ -1,0 +1,164 @@
+/* Results in a short box (phones held sideways, small windows): the headline, podium or wave and actions on the
+   left, the standings or the run's numbers on the right. In an upright box (tablets held upright): one column. */
+@container bf-results (max-height: 560px) {
+  .bf-results-grid {
+    --u: clamp(0.48px, min(calc(100cqw / 1180), calc(100cqh / 590)), 1px);
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.12fr);
+    grid-template-rows: auto minmax(0, 1fr) auto auto;
+    grid-template-areas: 'top side' 'hero side' 'unlocks side' 'actions side';
+    gap: 0 18px;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+  }
+  .bf-results[data-mode='tdm'] .bf-results-grid {
+    grid-template-areas: 'top teams' 'hero side' 'unlocks side' 'actions side';
+  }
+  .bf-teams {
+    width: 100%;
+    align-self: center;
+    margin-top: 0;
+  }
+  .bf-results-hero,
+  .bf-results-unlocks,
+  .bf-results-actions {
+    margin-top: 8px;
+  }
+  .bf-results-side {
+    margin-top: 0;
+  }
+  .bf-results[data-mode='tdm'] .bf-results-side {
+    margin-top: 8px;
+  }
+  .bf-ribbon {
+    --h: max(36px, calc(66 * var(--u)));
+  }
+  .bf-results-hero {
+    gap: 10px;
+  }
+  .bf-pod {
+    --fig: calc(124 * var(--u));
+    --block: calc(136 * var(--u));
+    --pk: 0.66;
+  }
+  .bf-pod-stand {
+    padding: 0 6px;
+    gap: 6px;
+  }
+  .bf-pod-mark {
+    top: -14px;
+  }
+  .bf-mine {
+    gap: 6px 14px;
+    padding: 6px 12px;
+    border-radius: 14px;
+  }
+  .bf-mine-medal svg {
+    width: max(26px, calc(44 * var(--u)));
+    height: max(32.5px, calc(55 * var(--u)));
+  }
+  .bf-mine-stats {
+    gap: 12px;
+  }
+  .bf-results-side {
+    justify-content: center;
+  }
+  .bf-table {
+    --cols: max(20px, calc(34 * var(--u))) minmax(0, 1fr) max(30px, calc(54 * var(--u))) max(22px, calc(42 * var(--u))) max(22px, calc(42 * var(--u))) max(22px, calc(42 * var(--u))) max(40px, calc(74 * var(--u)));
+    --row: clamp(26px, calc((100cqh - 34px) / var(--n) - 5px), 44px);
+    gap: 4px;
+  }
+  .bf-table-group {
+    gap: 4px;
+  }
+  .bf-table-group + .bf-table-group {
+    margin-top: 4px;
+  }
+  .bf-table-head,
+  .bf-table-row {
+    column-gap: 4px;
+    padding: 0 8px 0 4px;
+  }
+  .bf-table-row {
+    border-radius: 8px;
+  }
+  .bf-results-actions {
+    gap: 8px;
+    flex-wrap: nowrap;
+  }
+  .bf-results-actions .bf-btn {
+    min-width: 44px;
+    padding: 0 14px;
+    gap: 7px;
+    white-space: nowrap;
+  }
+  .bf-results[data-mode='solo'] .bf-results-actions .bf-btn:not(.bf-btn-primary) {
+    width: 48px;
+    padding: 0;
+  }
+  .bf-results[data-mode='solo'] .bf-results-actions .bf-btn:not(.bf-btn-primary) span {
+    display: none;
+  }
+  .bf-lobby-ring {
+    padding: 0 4px;
+    background: none;
+    box-shadow: none;
+  }
+  .bf-lobby-ring > svg {
+    display: none;
+  }
+  .bf-results[data-mode='solo'] .bf-results-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr) auto auto;
+    grid-template-areas: 'top side' 'hero side' 'unlocks side' 'actions side';
+    width: 100%;
+  }
+  .bf-results[data-mode='solo'] .bf-results-side {
+    justify-content: center;
+    margin-top: 0;
+  }
+
+  .bf-run-hero {
+    gap: 12px;
+  }
+  .bf-wave {
+    width: calc(300 * var(--u));
+    height: calc(300 * var(--u));
+  }
+  .bf-wave-num {
+    font-size: calc(184 * var(--u));
+  }
+  .bf-chip b {
+    font-size: max(21px, calc(40 * var(--u)));
+  }
+  .bf-chip {
+    min-width: 0;
+    flex: 1 1 0;
+    padding: 8px 6px 7px;
+    border-radius: 12px;
+  }
+  .bf-chips {
+    flex-wrap: nowrap;
+    width: 100%;
+    gap: 6px;
+  }
+}
+
+@container bf-results (orientation: portrait) {
+  .bf-results-grid {
+    --u: clamp(0.5px, min(calc(100cqw / 860), calc(100cqh / 1250)), 1.15px);
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: 'top' 'teams' 'hero' 'side' 'unlocks' 'actions';
+    grid-template-rows: repeat(6, auto);
+    gap: 0;
+    width: min(calc(760 * var(--u)), 100%);
+    max-height: 100%;
+    min-height: 0;
+    overflow-y: auto;
+    scrollbar-width: none;
+    padding-bottom: 12px;
+  }
+  .bf-table {
+    --row: clamp(30px, calc(50 * var(--u)), 50px);
+  }
+}

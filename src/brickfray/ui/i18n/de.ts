@@ -2,6 +2,7 @@ import { boardDe } from './board/de';
 import { touchDe } from './touch/de';
 import { hudDe } from './hud/de';
 import { streaksDe } from './streaks/de';
+import { achievementsDe } from './achievements/de';
 import type { Dictionary } from './en';
 
 export const de: Dictionary = {
@@ -9,6 +10,7 @@ export const de: Dictionary = {
   ...touchDe,
   ...hudDe,
   ...streaksDe,
+  ...achievementsDe,
   play: 'Spielen',
   playCaption: 'Online-Match',
   solo: 'Solo',

@@ -14,6 +14,7 @@ import {
   type MatchView,
   type RankedEntry
 } from './contract';
+import { matchTally } from '../achievements/tally';
 import { inOrder, type BoardDb } from './db';
 import type { PlayerRef } from './players';
 
@@ -22,12 +23,13 @@ export async function storeMatches(db: BoardDb, player: PlayerRef, reports: Matc
   // One statement per match: D1 caps the bound values of a single statement.
   await inOrder(
     db,
-    reports.map(({ key, ticket: _, detail, ...r }) =>
-      db
+    reports.map((report) => {
+      const { key, ticket: _, detail, feats: __, ...r } = report;
+      return db
         .insert(boardMatch)
-        .values({ ...r, detail: detail && JSON.stringify(detail), matchKey: key, playerId: player.id, profileId: player.profileId, createdAt: now })
-        .onConflictDoNothing({ target: [boardMatch.playerId, boardMatch.matchKey] })
-    )
+        .values({ ...r, detail: detail && JSON.stringify(detail), tally: JSON.stringify(matchTally(report)), matchKey: key, playerId: player.id, profileId: player.profileId, createdAt: now })
+        .onConflictDoNothing({ target: [boardMatch.playerId, boardMatch.matchKey] });
+    })
   );
   return reports.map((r) => r.key);
 }

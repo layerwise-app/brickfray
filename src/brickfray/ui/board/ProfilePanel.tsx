@@ -5,6 +5,7 @@ import type { CharacterId } from '../../characters/types';
 import { saveProfile, uploadAvatar } from '../../../lib/board/board.functions';
 import { getPlayerId, markKnown } from '../../../lib/board/client/identity';
 import type { Avatar as AvatarData, ProfileView } from '../../../lib/board/contract';
+import { AchievementsRow } from '../achievements/ProfileRow';
 import { useT } from '../i18n';
 import { HistoryIcon } from '../icons';
 import { useRefreshBoard } from './account';
@@ -19,7 +20,7 @@ import './profile.css';
 type Saved = ProfileView | { refused: 'rate' | 'invalid' };
 
 /** The profile element's menu, under its button in the menu's corner: name, picture, own matches and sign-in. */
-export default function ProfilePanel({ character, onClose, onMatches }: { character: CharacterId; onClose: () => void; onMatches: () => void }) {
+export default function ProfilePanel({ character, onClose, onMatches, onAchievements }: { character: CharacterId; onClose: () => void; onMatches: () => void; onAchievements: () => void }) {
   const { t } = useT();
   const account = useAccount();
   const panel = useRef<HTMLElement>(null);
@@ -88,6 +89,7 @@ export default function ProfilePanel({ character, onClose, onMatches }: { charac
             <span>{t('board.myMatches')}</span>
             <ChevronIcon size={16} flip />
           </button>
+          <AchievementsRow onOpen={onAchievements} />
           <SignIn account={data} />
         </div>
       </section>

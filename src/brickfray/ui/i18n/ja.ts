@@ -2,6 +2,7 @@ import { boardJa } from './board/ja';
 import { touchJa } from './touch/ja';
 import { hudJa } from './hud/ja';
 import { streaksJa } from './streaks/ja';
+import { achievementsJa } from './achievements/ja';
 import type { Dictionary } from './en';
 
 export const ja: Dictionary = {
@@ -9,6 +10,7 @@ export const ja: Dictionary = {
   ...touchJa,
   ...hudJa,
   ...streaksJa,
+  ...achievementsJa,
   play: 'プレイ',
   playCaption: 'オンライン対戦',
   solo: 'ソロ',

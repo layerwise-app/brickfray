@@ -2,12 +2,14 @@ import { boardEn } from './board/en';
 import { touchEn } from './touch/en';
 import { hudEn } from './hud/en';
 import { streaksEn } from './streaks/en';
+import { achievementsEn } from './achievements/en';
 
 export const en = {
   ...boardEn,
   ...touchEn,
   ...hudEn,
   ...streaksEn,
+  ...achievementsEn,
   play: 'Play',
   playCaption: 'Online match',
   solo: 'Solo',

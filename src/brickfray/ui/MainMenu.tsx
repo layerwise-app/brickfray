@@ -28,9 +28,10 @@ const CONTROLS = 'button, input, a, select, textarea, label, nav, [data-cover], 
 
 const BoardPanel = lazy(() => import('./board/BoardPanel'));
 const ProfilePanel = lazy(() => import('./board/ProfilePanel'));
+const AchievementsPage = lazy(() => import('./achievements/AchievementsPage'));
 
 /** What covers the menu: one dialog at a time. */
-type Overlay = 'rooms' | 'ranks' | 'history' | 'profile' | 'credits';
+type Overlay = 'rooms' | 'ranks' | 'history' | 'profile' | 'credits' | 'achievements';
 
 export function MainMenu({ openSettings }: { openSettings: () => void }) {
   const game = useGame();
@@ -208,7 +209,12 @@ export function MainMenu({ openSettings }: { openSettings: () => void }) {
       )}
       {overlay === 'profile' && (
         <Suspense fallback={null}>
-          <ProfilePanel character={character} onClose={close} onMatches={() => open('history')} />
+          <ProfilePanel character={character} onClose={close} onMatches={() => open('history')} onAchievements={() => open('achievements')} />
+        </Suspense>
+      )}
+      {overlay === 'achievements' && (
+        <Suspense fallback={null}>
+          <AchievementsPage onClose={() => back('profile')} />
         </Suspense>
       )}
       {overlay === 'credits' && <Credits onClose={close} />}

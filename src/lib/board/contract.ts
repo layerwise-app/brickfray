@@ -1,4 +1,6 @@
 import type { UpgradeId } from '~/brickfray/sim/upgrades';
+import type { AchievementNews } from '../achievements/contract';
+import type { MatchFeats } from '../achievements/feats';
 
 // What the leaderboard client and server exchange. Shared by both sides, so nothing here touches the database or the DOM.
 
@@ -45,6 +47,8 @@ export interface MatchReport {
   result: MatchResult | null;
   /** What the end-of-match screen showed; null from a client older than it. */
   detail: MatchDetail | null;
+  /** The match's kills sorted for achievements (lib/achievements/feats.ts); null from a client older than them. */
+  feats: MatchFeats | null;
 }
 
 /** One player on a room's final scoreboard. */
@@ -196,6 +200,8 @@ export interface UploadResult {
   refused: string[];
   /** Over the rate limit: the rest waits for a later upload. */
   limited: boolean;
+  /** Tiers the stored matches unlocked and the nearest goals they moved; null when nothing was stored. */
+  achievements: AchievementNews | null;
 }
 
 export interface ClaimResult {

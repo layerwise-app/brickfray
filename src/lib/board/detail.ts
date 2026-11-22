@@ -13,7 +13,7 @@ export const OVER = 5;
 const MAX_PLAYERS = MATCH.maxPlayers;
 const UPGRADE_CAP = UPGRADE_IDS.reduce((sum, id) => sum + maxLevel(id), 0);
 
-type Report = Omit<MatchReport, 'detail'>;
+type Report = Omit<MatchReport, 'detail' | 'feats'>;
 
 /** Most kills and assists can score: a kill 100 (150 to the head) plus, in a room, the bounty its victim carried; an assist 50. */
 export function maxScore(mode: BoardMode, kills: number, assists: number) {

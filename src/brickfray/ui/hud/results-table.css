@@ -1,0 +1,287 @@
+/* The results standings table and the leaderboard badge. */
+
+/* Standings: one plate per player. */
+.bf-table {
+  --cols: calc(34 * var(--u)) minmax(0, 1fr) calc(56 * var(--u)) calc(44 * var(--u)) calc(44 * var(--u)) calc(44 * var(--u)) calc(78 * var(--u));
+  --row: clamp(26px, min(calc(48 * var(--u)), calc((100cqh - 300 * var(--u)) / var(--n) - 7 * var(--u))), 48px);
+  display: flex;
+  flex-direction: column;
+  gap: calc(7 * var(--u));
+  min-width: 0;
+}
+.bf-table-head,
+.bf-table-row {
+  display: grid;
+  grid-template-columns: var(--cols);
+  align-items: center;
+  column-gap: calc(6 * var(--u));
+}
+.bf-table-head {
+  position: relative;
+  z-index: 3;
+  padding: 0 calc(14 * var(--u)) 0 calc(10 * var(--u));
+  color: var(--bf-muted);
+}
+.bf-table-icon {
+  display: flex;
+  justify-content: center;
+}
+.bf-table-icon[data-end] {
+  justify-content: flex-end;
+}
+.bf-table-icon svg {
+  width: max(14px, calc(19 * var(--u)));
+  height: max(14px, calc(19 * var(--u)));
+}
+.bf-table-head .bf-tip::after {
+  bottom: auto;
+  top: calc(100% + 8px);
+}
+.bf-table-group {
+  display: flex;
+  flex-direction: column;
+  gap: calc(7 * var(--u));
+}
+.bf-table-group + .bf-table-group {
+  margin-top: calc(8 * var(--u));
+}
+.bf-table-row {
+  height: var(--row);
+  padding: 0 calc(14 * var(--u)) 0 calc(10 * var(--u));
+  border-radius: calc(11 * var(--u));
+  color: #fff;
+  background: #22304f;
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.14),
+    inset 0 -3px 0 rgba(0, 0, 0, 0.25),
+    0 3px 0 rgba(0, 0, 0, 0.35);
+  animation: bf-row-in 0.4s cubic-bezier(0.2, 1.2, 0.4, 1) calc(0.35s + var(--i) * 0.05s) both;
+}
+.bf-table-group[data-team] .bf-table-row:not([data-me]) {
+  background: color-mix(in srgb, var(--team) 38%, #121c34);
+}
+.bf-table-group[data-team] .bf-table-row {
+  box-shadow:
+    inset calc(5 * var(--u)) 0 0 var(--team),
+    inset 0 2px 0 rgba(255, 255, 255, 0.14),
+    inset 0 -3px 0 rgba(0, 0, 0, 0.25),
+    0 3px 0 rgba(0, 0, 0, 0.35);
+}
+.bf-table-row[data-me] {
+  color: #2a1a00;
+  background: var(--bf-yellow);
+}
+@keyframes bf-row-in {
+  from {
+    opacity: 0;
+    transform: translateX(40px);
+  }
+}
+.bf-table-place {
+  display: grid;
+  place-items: center;
+  width: calc(30 * var(--u));
+  height: calc(30 * var(--u));
+  min-width: 20px;
+  min-height: 20px;
+  border-radius: calc(8 * var(--u));
+  font-size: max(13px, calc(18 * var(--u)));
+  line-height: 1;
+  background: rgba(255, 255, 255, 0.13);
+  box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.22);
+}
+.bf-table-row[data-me] .bf-table-place {
+  background: rgba(255, 255, 255, 0.45);
+}
+.bf-table-place[data-place='1'] {
+  color: #5a3a00;
+  background: linear-gradient(#ffe680, #f0b400) !important;
+}
+.bf-table-place[data-place='2'] {
+  color: #3a4458;
+  background: linear-gradient(#f4f8ff, #b9c4d6) !important;
+}
+.bf-table-place[data-place='3'] {
+  color: #4a2408;
+  background: linear-gradient(#f7b98a, #c8743c) !important;
+}
+.bf-table-name {
+  display: flex;
+  align-items: center;
+  gap: calc(9 * var(--u));
+  min-width: 0;
+  font-size: max(12px, calc(17 * var(--u)));
+  font-weight: 700;
+}
+.bf-table-av {
+  --av: max(20px, min(calc(32 * var(--u)), calc(var(--row) - 8px))) !important;
+  border-radius: 26%;
+}
+.bf-table-medals {
+  display: flex;
+  justify-content: center;
+  gap: 1px;
+}
+.bf-table-medals svg {
+  width: max(14px, calc(21 * var(--u)));
+  height: max(17.5px, calc(26.25 * var(--u)));
+}
+.bf-table-num,
+.bf-table-score {
+  font-size: max(14px, calc(22 * var(--u)));
+  font-weight: 400;
+  line-height: 1;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.bf-table-num[data-soft] {
+  opacity: 0.78;
+}
+.bf-table-score {
+  text-align: right;
+  font-size: max(16px, calc(25 * var(--u)));
+}
+
+/* Leaderboard badge: the cup and the rank, gold with its tier from the top 100 up. */
+.bf-rank,
+.bf-rank-off {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  height: max(32px, calc(46 * var(--u)));
+  border-radius: calc(12 * var(--u));
+}
+.bf-rank {
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.09);
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.12),
+    0 4px 0 rgba(0, 0, 0, 0.35);
+  --in-d: 0.9s;
+}
+.bf-rank[data-busy] {
+  gap: 6px;
+  padding: 0 14px;
+  color: var(--bf-muted);
+  animation: none;
+}
+.bf-rank-dots {
+  width: 22px;
+  height: 6px;
+  background: radial-gradient(circle, currentColor 2.2px, transparent 2.8px) 0 0 / 7.33px 6px repeat-x;
+  clip-path: inset(0 100% 0 0);
+  animation: bf-dots 1s steps(3) infinite;
+}
+@keyframes bf-dots {
+  to {
+    clip-path: inset(0 -10% 0 0);
+  }
+}
+.bf-rank-tier {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  gap: calc(7 * var(--u));
+  height: 100%;
+  padding: 0 calc(13 * var(--u)) 0 calc(11 * var(--u));
+  font-size: max(15px, calc(21 * var(--u)));
+  white-space: nowrap;
+  color: #3a2400;
+  background: linear-gradient(180deg, #ffe680, #ffc21a);
+  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.55);
+}
+.bf-rank-tier svg {
+  width: max(15px, calc(21 * var(--u)));
+  height: max(15px, calc(21 * var(--u)));
+  flex: none;
+}
+.bf-rank[data-tier='top10'] .bf-rank-tier::after,
+.bf-rank[data-tier='top1'] .bf-rank-tier::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 35%, rgba(255, 255, 255, 0.75) 50%, transparent 65%);
+  transform: translateX(-120%);
+  animation: bf-shine 2.6s ease-in-out 1.2s infinite;
+}
+@keyframes bf-shine {
+  45%,
+  100% {
+    transform: translateX(120%);
+  }
+}
+.bf-rank-num {
+  display: flex;
+  align-items: center;
+  gap: calc(9 * var(--u));
+  padding: 0 calc(15 * var(--u));
+  font-size: max(19px, calc(28 * var(--u)));
+  line-height: 1;
+  white-space: nowrap;
+  color: #fff;
+}
+.bf-rank-num:empty {
+  display: none;
+}
+.bf-rank-cup {
+  width: max(15px, calc(20 * var(--u)));
+  height: max(15px, calc(20 * var(--u)));
+  color: var(--bf-muted);
+}
+.bf-rank-up {
+  font: 800 max(12px, calc(17 * var(--u))) 'Rubik Variable', system-ui, sans-serif;
+  color: #5fe08a;
+}
+.bf-rank-new {
+  padding: 2px calc(8 * var(--u)) 3px;
+  border-radius: 6px;
+  font: 800 max(10px, calc(13 * var(--u))) 'Rubik Variable', system-ui, 'PingFang SC', sans-serif;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #0f2a17;
+  background: #5fe08a;
+}
+.bf-rank[data-tier] {
+  box-shadow:
+    inset 0 0 0 2px rgba(255, 210, 70, 0.7),
+    0 4px 0 rgba(0, 0, 0, 0.35),
+    0 0 calc(28 * var(--u)) rgba(255, 196, 30, 0.3);
+}
+.bf-rank[data-tier='top10'] {
+  height: max(36px, calc(52 * var(--u)));
+  box-shadow:
+    inset 0 0 0 3px #ffd84f,
+    0 4px 0 rgba(0, 0, 0, 0.35),
+    0 0 calc(34 * var(--u)) rgba(255, 200, 40, 0.5);
+}
+.bf-rank[data-tier='top10'] .bf-rank-tier {
+  font-size: max(17px, calc(24 * var(--u)));
+}
+.bf-rank[data-tier='top1'] {
+  height: max(38px, calc(56 * var(--u)));
+  box-shadow:
+    inset 0 0 0 3px #fff0a8,
+    0 4px 0 #b07c00,
+    0 0 calc(46 * var(--u)) rgba(255, 200, 40, 0.7);
+  background: linear-gradient(180deg, #ffe680, #ffb800);
+}
+.bf-rank[data-tier='top1'] .bf-rank-tier {
+  font-size: max(19px, calc(28 * var(--u)));
+  background: none;
+}
+.bf-rank[data-tier='top1'] .bf-rank-num {
+  padding-left: 0;
+  color: #3a2400;
+}
+.bf-rank[data-tier='top1'] .bf-rank-up {
+  color: #1d7a3a;
+}
+.bf-rank-off {
+  gap: 7px;
+  padding: 0 12px;
+  font-size: max(12px, calc(14 * var(--u)));
+  font-weight: 600;
+  color: var(--bf-muted);
+  background: rgba(255, 255, 255, 0.05);
+}

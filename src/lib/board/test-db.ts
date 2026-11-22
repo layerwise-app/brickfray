@@ -36,6 +36,7 @@ export function report(over: Partial<MatchReport> = {}): MatchReport {
     players: 6,
     result: 'win',
     detail: null,
+    feats: null,
     ...over
   };
 }

@@ -2,6 +2,7 @@ import { boardEs } from './board/es';
 import { touchEs } from './touch/es';
 import { hudEs } from './hud/es';
 import { streaksEs } from './streaks/es';
+import { achievementsEs } from './achievements/es';
 import type { Dictionary } from './en';
 
 export const es: Dictionary = {
@@ -9,6 +10,7 @@ export const es: Dictionary = {
   ...touchEs,
   ...hudEs,
   ...streaksEs,
+  ...achievementsEs,
   play: 'Jugar',
   playCaption: 'Partida en línea',
   solo: 'Solo',
