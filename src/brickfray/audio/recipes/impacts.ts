@@ -110,6 +110,7 @@ type ImpactIds =
   | 'shell'
   | `whiz:${WhizClass}`
   | 'grenadeBounce'
+  | 'grenadeFuse'
   | 'explosion'
   | 'explosionFar'
   | `meleeHit:${MeleeHit}`
@@ -138,12 +139,14 @@ const meleeSwing = (peak: number): SoundSpec => ({
 
 const MELEE: Record<`meleeHit:${MeleeHit}` | `meleeSwing:${MeleeClass}`, SoundSpec> = {
   'meleeHit:blade': meleeHit(2600, 140, 0),
+  'meleeHit:slash': meleeHit(1800, 100, 3200),
   'meleeHit:chop': meleeHit(1200, 110, 0),
   'meleeHit:iron': meleeHit(600, 55, 1400),
   'meleeHit:mallet': meleeHit(500, 70, 0),
   'meleeHit:clank': meleeHit(1500, 90, 2600),
   'meleeSwing:blunt': meleeSwing(750),
   'meleeSwing:blade': meleeSwing(1900),
+  'meleeSwing:sword': meleeSwing(1100),
   'meleeSwing:heavy': meleeSwing(520)
 };
 
@@ -235,6 +238,16 @@ const OTHER: Record<ImpactIds, SoundSpec> = {
       clack(s, 0, { pitch: 750, gain: 0.7, decay: 0.07, bright: 0.6 });
       thump(s, 0, { from: 180, to: 110, glide: 0.03, decay: 0.07, gain: 0.45 });
       clack(s, 0.011, { pitch: 2400, gain: 0.15, decay: 0.02 });
+    }
+  },
+  // A cooked grenade's fuse in the hand, one tick of it (MatchAudio repeats it faster as the cook goes on).
+  grenadeFuse: {
+    category: 'mech',
+    duration: 0.14,
+    loudness: -25,
+    render: (s) => {
+      clack(s, 0, { pitch: 3200 * vary(s, 0.04), gain: 0.5, decay: 0.012 });
+      noise(s, 0.004, { attack: 0.004, decay: 0.08, gain: 0.25, filter: { type: 'highpass', freq: 5000, q: 0 } });
     }
   },
   explosion: { category: 'boom', duration: 3.5, render: explosion },

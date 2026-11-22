@@ -164,6 +164,7 @@ export class MatchEvents {
         case 'spawn':
           if (e.player === me) {
             mv.hud.set({ death: null });
+            mv.sound.cues.respawn();
           }
           break;
         case 'melee':
@@ -177,6 +178,7 @@ export class MatchEvents {
         case 'wave':
           mv.hud.set({ banner: { key: feedKey++, text: 'wave', sub: String(e.wave) }, wave: e.wave });
           this.bannerUntil = this.clock + 3;
+          mv.sound.cues.wave(e.theme);
           break;
         case 'upgradeOffer':
           if (e.player === me) this.dealt(e);
@@ -195,6 +197,7 @@ export class MatchEvents {
   /** Solo: the upgrade cards after a cleared wave. */
   private dealt(e: Extract<GameEvent, { type: 'upgradeOffer' }>) {
     this.mv.hud.set({ offer: { key: feedKey++, wave: e.wave, options: e.options, levels: e.levels, picked: null } });
+    this.mv.sound.cues.offer();
   }
 
   /** The pick landed: the cards hold the choice a moment, then leave. An idle player's card is picked with the same click. */
@@ -203,6 +206,7 @@ export class MatchEvents {
     const offer = hud.state.offer;
     hud.set({ offer: offer && { ...offer, picked: e.id }, upgrades: { ...hud.state.upgrades, [e.id]: e.level }, upgradesTaken: [...hud.state.upgradesTaken, e.id] });
     this.offerUntil = this.clock + 0.9;
+    this.mv.sound.cues.upgradeTaken();
   }
 
   private pushFeed() {
@@ -236,6 +240,8 @@ export class MatchEvents {
     const mode = mv.settings.mode;
     const won = match?.winner === (mode === 'tdm' ? mv.myTeam : mv.session.you);
     const outcome = phase !== 'ended' ? null : mode === 'solo' ? 'over' : won ? 'won' : 'lost';
+    mv.sound.cues.setPhase(phase, match?.phaseEnds ? Math.max(0, match.phaseEnds - now) : 0, { solo: mode === 'solo', timed: mode !== 'solo', outcome });
+    mv.sound.cues.grenades(p.arms.grenades, p.alive);
     const info = mv.renderer.renderer.info.render;
     const self = mv.session.snapshots.at(-1)?.self;
     const weapon = p.arms.next ?? p.arms.weapon;

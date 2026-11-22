@@ -157,7 +157,7 @@ const GEAR_SOUNDS: Record<`gear:${GearId}`, SoundSpec> = {
   'gear:rattle': gear((s) => grains(s, 0, { count: 6, spread: 0.06, gain: 0.3, freq: 3600, q: 2, decay: 0.012 }))
 };
 
-const MOVE_SOUNDS: Record<'jump' | 'land' | 'slide', SoundSpec> = {
+const MOVE_SOUNDS: Record<'jump' | 'land' | 'slide' | 'slideLoop', SoundSpec> = {
   jump: {
     category: 'move',
     duration: 0.35,
@@ -190,6 +190,16 @@ const MOVE_SOUNDS: Record<'jump' | 'land' | 'slide', SoundSpec> = {
       });
       grains(s, 0, { count: 30, spread: 0.5, gain: 0.18, freq: 2800, q: 1.4, decay: 0.008 });
       rustle(s, 0, { dur: 0.3, gain: 0.2 });
+    }
+  },
+  // Held under a slide for as long as it lasts (MatchAudio): an even scrape with no attack of its own.
+  slideLoop: {
+    category: 'move',
+    duration: 1.2,
+    variants: 1,
+    render: (s) => {
+      noise(s, 0, { attack: 0.001, hold: 1.2, decay: 0.001, gain: 0.35, filter: { type: 'bandpass', freq: 1300, q: 0.8 } });
+      grains(s, 0, { count: 60, spread: 1.2, gain: 0.12, freq: 2600, q: 1.4, decay: 0.008 });
     }
   }
 };

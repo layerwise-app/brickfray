@@ -5,9 +5,9 @@ import type { ViewCue } from '../weapons/types';
 
 /** How a melee weapon sounds: mallet-like, edged, or a lump of metal. */
 /** What a melee weapon's swing sounds like through the air. */
-export type MeleeClass = 'blunt' | 'blade' | 'heavy';
+export type MeleeClass = 'blunt' | 'blade' | 'sword' | 'heavy';
 /** What a melee weapon sounds like striking: blade ring, wood chop, heavy iron, rubber mallet, wrench clank. */
-export type MeleeHit = 'blade' | 'chop' | 'iron' | 'mallet' | 'clank';
+export type MeleeHit = 'blade' | 'slash' | 'chop' | 'iron' | 'mallet' | 'clank';
 /** The kind of round passing the listener. */
 export type WhizClass = 'small' | 'rifle' | 'crack' | 'energy' | 'spear';
 
@@ -56,7 +56,10 @@ export type FoleyId =
 export type GearId = 'armour' | 'suit' | 'rattle';
 
 /** One-shots scattered around the listener on top of a map's ambience bed. */
-export type AmbientSpot = 'bird' | 'crow' | 'pigeon' | 'bell' | 'flag' | 'gull' | 'creak' | 'horn';
+export type AmbientSpot = 'bird' | 'crow' | 'pigeon' | 'bell' | 'flag' | 'gull' | 'creak' | 'horn' | 'gong' | 'chime' | 'jungle' | 'water' | 'bamboo';
+
+/** Match and solo-run cues of one musical family: the waves, the upgrade cards, the grenade coming back, the outcome. */
+export type MatchCue = 'waveClear' | 'bossWave' | 'upgradeOffer' | 'upgradeTaken' | 'grenadeReady' | 'victory' | 'defeat' | 'runOver';
 
 export type SoundId =
   | `fire:${WeaponId}`
@@ -83,6 +86,8 @@ export type SoundId =
   | 'shell'
   | `whiz:${WhizClass}`
   | 'grenadeBounce'
+  | 'grenadeFuse'
+  | 'slideLoop'
   | 'explosion'
   | 'explosionFar'
   | `meleeHit:${MeleeHit}`
@@ -94,11 +99,22 @@ export type SoundId =
   | 'uiClick'
   | 'uiBack'
   | 'matchStart'
-  | 'matchEnd'
   | 'waveStart'
+  | MatchCue
   | 'countdown';
 
-export type MusicTrack = 'menu' | 'match';
+/**
+ * Music states: the menu theme (also under the results), `match` the warm-up before a match or a run, `intermission`
+ * the solo upgrade pick and wave break, `final` the last half minute of a timed match. Fighting has no music.
+ */
+export type MusicTrack = 'menu' | 'match' | 'intermission' | 'final';
+
+/** A looping sound started with `hold`: `stop` fades it out over `fade` seconds. */
+export interface HeldSound {
+  stop(fade?: number): void;
+  /** Volume multiplier on top of the start volume, glided. */
+  level(volume: number): void;
+}
 
 export interface PlayOptions {
   /** World position; omit for 2D (own player, UI). */
@@ -133,14 +149,19 @@ export interface AudioEngine {
   /** Call from a user gesture; resolves when sounds are rendered and ready. */
   unlock(): Promise<void>;
   play(id: SoundId, options?: PlayOptions): void;
+  /** Loops a sound (2D or placed) until stopped; null when it could not start (not rendered yet, no free voice). */
+  hold(id: SoundId, options?: PlayOptions): HeldSound | null;
   setListener(position: THREE.Vector3, forward: THREE.Vector3, up: THREE.Vector3): void;
   setMix(mix: AudioMix): void;
   /** Muffle the world (low health), 0…1. */
   setMuffle(amount: number): void;
   /** Pause everything while the tab is hidden. */
   setSuspended(suspended: boolean): void;
-  /** Crossfade to a looping track on the music bus at `level` (0…1, default 1); null fades music out. Starts once rendered. */
-  playMusic(track: MusicTrack | null, level?: number): void;
+  /**
+   * Crossfade to a looping track on the music bus at `level` (0…1, default 1), fading in `delay` s from now; null fades
+   * music out. Starts once loaded.
+   */
+  playMusic(track: MusicTrack | null, level?: number, delay?: number): void;
   /** The map being played: its ambience bed and its reverb. null in menus. */
   setScene(map: MapId | null): void;
   dispose(): void;

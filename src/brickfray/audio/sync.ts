@@ -28,6 +28,7 @@ export const PEAK_AT: Partial<Record<SoundId, number>> = {
   'cue:throw': 0.012,
   'meleeSwing:blunt': 0.045,
   'meleeSwing:blade': 0.045,
+  'meleeSwing:sword': 0.045,
   'meleeSwing:heavy': 0.045,
   'foley:pouch': 0.03,
   'foley:magScrape': 0.06,

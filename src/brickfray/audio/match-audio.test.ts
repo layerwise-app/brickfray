@@ -8,14 +8,23 @@ import type { AudioEngine, PlayOptions, SoundId } from './types';
 
 function setup(clear: (ax: number, ay: number, az: number, bx: number, by: number, bz: number) => boolean = () => true) {
   const played: { id: SoundId; options?: PlayOptions }[] = [];
-  const audio = { play: (id: SoundId, options?: PlayOptions) => void played.push({ id, options }) } as unknown as AudioEngine;
+  const held: { id: SoundId; stopped: boolean }[] = [];
+  const audio = {
+    play: (id: SoundId, options?: PlayOptions) => void played.push({ id, options }),
+    playMusic: () => undefined,
+    hold: (id: SoundId) => {
+      const h = { id, stopped: false };
+      held.push(h);
+      return { stop: () => void (h.stopped = true), level: () => undefined };
+    }
+  } as unknown as AudioEngine;
   const state: MatchAudioState = { alive: true, health: 100, sliding: false, surface: 'plastic', listener: { x: 0, y: 1.6, z: 0 } };
   const sound = new MatchAudio(audio, 'docks', clear);
   const ids = () => played.map((p) => p.id).filter((id) => !id.startsWith('spot:'));
   const run = (seconds: number, patch: Partial<MatchAudioState> = {}) => {
     for (let t = 0; t < seconds; t += 1 / 60) sound.frame(1 / 60, { ...state, ...patch });
   };
-  return { sound, played, ids, run };
+  return { sound, played, held, ids, run };
 }
 
 describe('MatchAudio', () => {
@@ -101,18 +110,67 @@ describe('MatchAudio', () => {
     expect(audio.map((p) => p.id)).toEqual(['foley:gripOff']);
   });
 
-  it('counts down the last three seconds of warmup a semitone higher each second, then plays the start and end stingers once', () => {
+  it('counts down the last three seconds of warmup a semitone higher each second, then plays the start and the outcome once', () => {
     const { sound, played, ids } = setup();
-    for (const left of [5, 3.4, 2.95, 2.5, 2.05, 1.9, 1.2, 0.9, 0.3]) sound.setPhase('warmup', left);
-    sound.setPhase('playing', 0);
-    sound.setPhase('playing', 0);
-    sound.setPhase('ended', 0);
-    expect(ids()).toEqual(['countdown', 'countdown', 'countdown', 'matchStart', 'matchEnd']);
+    const ffa = { solo: false, timed: true, outcome: null };
+    for (const left of [5, 3.4, 2.95, 2.5, 2.05, 1.9, 1.2, 0.9, 0.3]) sound.cues.setPhase('warmup', left, ffa);
+    sound.cues.setPhase('playing', 600, ffa);
+    sound.cues.setPhase('playing', 599, ffa);
+    sound.cues.setPhase('ended', 0, { ...ffa, outcome: 'lost' });
+    sound.cues.setPhase('ended', 0, { ...ffa, outcome: 'lost' });
+    expect(ids()).toEqual(['countdown', 'countdown', 'countdown', 'matchStart', 'defeat']);
     const rates = played.filter((p) => p.id === 'countdown').map((p) => p.options?.rate ?? 1);
     expect(rates[0]).toBe(1);
     expect(rates[1]! / rates[0]!).toBeCloseTo(2 ** (1 / 12), 4);
     expect(rates[2]! / rates[1]!).toBeCloseTo(2 ** (1 / 12), 4);
     expect(played.filter((p) => p.id === 'countdown').map((p) => p.options?.variant)).toEqual([0, 1, 2]);
+  });
+
+  it('opens a solo run with the wave call alone and gives the waves, the cards and the outcome their own cues', () => {
+    const { sound, ids, run } = setup();
+    const solo = { solo: true, timed: false, outcome: null };
+    sound.cues.setPhase('warmup', 0.5, solo);
+    sound.cues.wave('opening');
+    sound.cues.setPhase('playing', 0, solo);
+    run(2);
+    sound.cues.setPhase('intermission', 30, solo);
+    sound.cues.offer();
+    sound.cues.upgradeTaken();
+    run(2);
+    sound.cues.wave('boss');
+    sound.cues.setPhase('playing', 0, solo);
+    run(2);
+    sound.cues.setPhase('ended', 12, { ...solo, outcome: 'over' });
+    expect(ids()).toEqual(['countdown', 'waveStart', 'waveClear', 'upgradeOffer', 'upgradeTaken', 'bossWave', 'runOver']);
+  });
+
+  it('plays one respawn cue per spawn and the grenade cue only when a grenade comes back', () => {
+    const { sound, ids, run } = setup();
+    sound.cues.respawn();
+    sound.cues.respawn();
+    sound.cues.grenades(2, true);
+    run(0.5);
+    sound.cues.grenades(1, true);
+    run(9);
+    sound.cues.grenades(2, true);
+    run(1);
+    sound.cues.grenades(0, false);
+    sound.cues.grenades(2, true);
+    expect(ids()).toEqual(['respawn', 'grenadeReady']);
+  });
+
+  it('keeps fighting free of music and plays it in the warm-up, the break, the final stretch and under the results', () => {
+    const music: (string | null)[] = [];
+    const delays: number[] = [];
+    const audio = { play: () => undefined, playMusic: (t: string | null, _l?: number, d = 0) => void (music.push(t), delays.push(d)) } as unknown as AudioEngine;
+    const sound = new MatchAudio(audio, 'plaza', () => true);
+    const ffa = { solo: false, timed: true, outcome: null };
+    sound.cues.setPhase('warmup', 4, ffa);
+    sound.cues.setPhase('playing', 500, ffa);
+    sound.cues.setPhase('playing', 29, ffa);
+    sound.cues.setPhase('ended', 12, { ...ffa, outcome: 'won' });
+    expect(music).toEqual(['match', null, 'final', 'menu']);
+    expect(delays.at(-1)).toBeGreaterThan(2);
   });
 
   it('beats faster as health runs out and stays silent above the threshold', () => {
@@ -145,12 +203,30 @@ describe('MatchAudio', () => {
     expect(played[2]!.options!.tone!).toBeGreaterThan(played[0]!.options!.tone!);
   });
 
-  it('plays the slide once per slide, with the ground under it', () => {
-    const { ids, run } = setup();
+  it('plays the slide once per slide with the ground under it, holds its scrape as long as it lasts, and keeps the own steps quiet', () => {
+    const { sound, held, ids, run } = setup();
     run(0.5, { sliding: true });
+    sound.footstep('plastic', 'rivet', null, 0.45, 2);
+    expect(held.map((h) => h.stopped)).toEqual([false]);
     run(0.2);
+    expect(held.map((h) => h.stopped)).toEqual([true]);
     run(0.5, { sliding: true });
     expect(ids()).toEqual(['slide', 'step:plastic', 'slide', 'step:plastic']);
+    expect(held.map((h) => h.id)).toEqual(['slideLoop', 'slideLoop']);
+  });
+
+  it('ticks a cooked grenade from the pin pull, faster the longer it is held, and stops at the throw', () => {
+    const { sound, ids, run } = setup();
+    sound.action({ type: 'grenadeCook' }, 'ar');
+    run(0.35);
+    expect(ids()).toEqual([]);
+    run(2.15);
+    const ticks = ids().filter((id) => id === 'grenadeFuse').length;
+    expect(ticks).toBeGreaterThanOrEqual(6);
+    expect(ticks).toBeLessThanOrEqual(9);
+    sound.action({ type: 'grenadeThrow', low: false }, 'ar');
+    run(1);
+    expect(ids().filter((id) => id === 'grenadeFuse').length).toBeLessThanOrEqual(ticks + 1);
   });
 
   it('grades occlusion by how many rays round the source a wall blocks, and glides a cached source', () => {
@@ -187,7 +263,7 @@ describe('MatchAudio', () => {
     const { sound, played } = setup();
     sound.melee('vega', true, null, true);
     sound.melee('clack', true, null, true);
-    expect(played.map((p) => p.id)).toEqual(['meleeHit:blade', 'meleeHit:blade']);
+    expect(played.map((p) => p.id)).toEqual(['meleeHit:blade', 'meleeHit:slash']);
     const melee = LOADOUTS.vega.melee;
     expect(MELEE_CONTACT[melee] - MELEES[melee].windup).toBeGreaterThan(0);
     expect(played[0]!.options?.delay).toBeCloseTo(MELEE_CONTACT[melee] - MELEES[melee].windup);

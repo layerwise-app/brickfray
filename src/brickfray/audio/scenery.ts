@@ -28,11 +28,22 @@ const FORTRESS_TREES: [number, number, number][] = [[-25.6, 6, -22.4], [25.6, 6,
 const HARBOUR_SKY: [number, number, number][] = [[-20, 12, 34], [15, 15, 44], [36, 10, 28], [0, 18, 60], [-42, 14, 22], [0, 10, -21], [28, 9, 16]];
 const MOORINGS: [number, number, number][] = [[-8, 1, 23.4], [8, 1, 23.4], [-24, 0.5, 20], [0, 0.5, 20], [24, 0.5, 20]];
 const SHIPS: [number, number, number][] = [[-70, 10, 150], [85, 10, 170], [15, 10, 210]];
-/** Temple: gongs in the two bell towers, banners on the shrine, birds in the jungle round the ruins, crows on the rows' roofs. */
+/**
+ * Temple: gongs in the two bell towers, wind chimes and banners on the shrine, jungle birds and bamboo round the
+ * ruins, the streams along both banks and the lotus pools' fountains, crows on the rows' roofs.
+ */
 const GONGS: [number, number, number][] = [[3.2, 9.6, -16], [-3.2, 9.6, 16]];
 const BANNERS: [number, number, number][] = [[T.shrine, 6, T.shrine], [-T.shrine, 6, -T.shrine], [T.shrine, 6, -T.shrine], [-T.shrine, 6, T.shrine]];
 const JUNGLE: [number, number, number][] = [[-30, 9, -27], [30, 9, 27], [-27, 8, 18], [27, 8, -18], [-8, 10, -33], [8, 10, 33], [-37, 10, -6], [37, 10, 6]];
 const TEMPLE_ROOFS: [number, number, number][] = [[-14, T.hallTop, -14], [14, T.hallTop, 14], [13, 7.7, -16], [-13, 7.7, 16]];
+const BAMBOO: [number, number, number][] = JUNGLE.map(([x, , z]): [number, number, number] => [x, 4, z]);
+const WATER: [number, number, number][] = [
+  ...[-1, 1].flatMap((side) => [-22, -8, 8, 22].map((z): [number, number, number] => [side * (T.edge + 1.2), T.water + 0.4, z])),
+  [-13.6, 0.4, -5.6],
+  [13.6, 0.4, 5.6],
+  [0.8, 0.4, -22.4],
+  [-0.8, 0.4, 22.4]
+];
 
 /** Scenery one-shots per map: what, how often against each other, and from where. */
 export const SPOTS: Record<MapId, readonly Spot[]> = {
@@ -53,10 +64,14 @@ export const SPOTS: Record<MapId, readonly Spot[]> = {
     { spot: 'horn', weight: 0.5, at: SHIPS }
   ],
   temple: [
-    { spot: 'bird', weight: 5, at: JUNGLE, roam: 3 },
-    { spot: 'flag', weight: 2, at: BANNERS },
-    { spot: 'crow', weight: 1, at: TEMPLE_ROOFS, roam: 2 },
-    { spot: 'bell', weight: 0.4, at: GONGS }
+    { spot: 'jungle', weight: 4, at: JUNGLE, roam: 3 },
+    { spot: 'bird', weight: 1.5, at: JUNGLE, roam: 3 },
+    { spot: 'bamboo', weight: 2, at: BAMBOO, roam: 3 },
+    { spot: 'water', weight: 1.5, at: WATER, roam: 1 },
+    { spot: 'chime', weight: 1, at: BANNERS },
+    { spot: 'flag', weight: 1, at: BANNERS },
+    { spot: 'crow', weight: 0.5, at: TEMPLE_ROOFS, roam: 2 },
+    { spot: 'gong', weight: 0.4, at: GONGS }
   ]
 };
 

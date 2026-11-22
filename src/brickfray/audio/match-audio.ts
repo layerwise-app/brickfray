@@ -1,23 +1,23 @@
 import type { BotKind, CharacterId } from '../characters/types';
-import type { MatchPhase } from '../sim/types';
 import { MELEES, type MeleeId, type WeaponId } from '../weapons/defs';
 import { LOADOUTS } from '../weapons/loadouts';
 import { MELEE_CONTACT } from '../weapons/view/clips-melee';
 import type { ViewAction } from '../weapons/types';
-import { cycleClip, loadsShells, reloadClip } from '../weapons/view/clips-guns';
 import type { MapId, Surface } from '../world/types';
 import { BulletSounds, DebrisSounds, SURFACES, type Ears, type Vec3 } from './bullet-sounds';
+import { CaseSounds } from './cases';
 import { gearOf } from './gear';
 import { Heartbeat } from './heartbeat';
+import { MatchCues } from './match-cues';
 import { reloadLayers, type ReloadLayer } from './reload-layers';
 import { GROUND, RemoteSounds } from './remote-sounds';
 import { pickSpot } from './scenery';
-import type { AudioEngine, MeleeClass, MeleeHit, SoundId } from './types';
+import type { AudioEngine, HeldSound, MeleeClass, MeleeHit, SoundId } from './types';
 
 /** Each melee weapon's swing through the air and its strike. */
 const MELEE_SOUND: Record<MeleeId, { swing: MeleeClass; hit: MeleeHit }> = {
   mallet: { swing: 'blunt', hit: 'mallet' },
-  sword: { swing: 'blade', hit: 'blade' },
+  sword: { swing: 'sword', hit: 'slash' },
   knife: { swing: 'blade', hit: 'blade' },
   hatchet: { swing: 'blade', hit: 'chop' },
   anchor: { swing: 'heavy', hit: 'iron' },
@@ -53,15 +53,19 @@ const HURT = { volume: 0.8, ducked: 0.3, quiet: 0.25, gap: 0.15 };
 /** A headshot kill rings the headshot ping this many seconds in front of the kill sound, which stays the same. */
 const HEADSHOT_LEAD = 0.07;
 
+/**
+ * A cooked grenade's fuse ticks from the pin pull (`from` s into the cook) until the throw, the gap closing from
+ * `gap[0]` to `gap[1]` s by the longest cook (`full` s), so the hand hears how long it has held.
+ */
+const FUSE = { from: 0.45, full: 2.5, gap: [0.42, 0.16], volume: 0.75 } as const;
+/** A slide: the push-off one-shot, then a scrape held as long as the slide lasts. */
+const SLIDE = { volume: 0.7, scrape: 0.55, fade: 0.14 };
+
 /** View actions that end a reload before its layers have played. */
 const INTERRUPTS: ReadonlySet<ViewAction['type']> = new Set(['cancelReload', 'switch', 'melee', 'grenadeCook', 'grenadeThrow']);
 /** Reload layers are handed to the engine this long before they are due, with the rest as a delay: sample-exact timing. */
 const LAYER_LEAD = 0.05;
 
-/** Seconds an ejected case takes to reach the floor. */
-const FALL = 0.48;
-/** Auto fire drops at most one audible case per this many seconds. */
-const CASE_GAP = 0.11;
 const OCCLUSION_TTL = 0.22;
 /**
  * Rays from the ear to points around a source, [up, sideways] in metres, with their share of the occlusion: the
@@ -77,28 +81,6 @@ const PROBES: readonly (readonly [number, number, number])[] = [
 /** A cached source's occlusion follows the probes with this time constant, so passing a corner fades the sound. */
 const OCCLUSION_GLIDE = 0.15;
 
-/** Guns that throw a case with every shot (CASING in weapons/view/rig.ts); the others eject while the pump or bolt is worked. */
-const CASE_ON_FIRE: ReadonlySet<WeaponId> = new Set(['ar', 'pistol', 'buzzer']);
-
-/** When the clip the view model plays for a worked action or reload throws a case out, read from the clip itself. */
-function ejection(action: ViewAction, weapon: WeaponId): { id: 'casing' | 'shell'; at: number } | null {
-  const clip =
-    action.type === 'cycle' ? cycleClip(weapon, action.duration) : action.type === 'reload' && !loadsShells(weapon) ? reloadClip(weapon, action.empty, action.duration) : null;
-  const event = clip?.events.find(([, e]) => e === 'eject' || e === 'shellEject');
-  return clip && event ? { id: event[1] === 'shellEject' ? 'shell' : 'casing', at: event[0] * clip.duration } : null;
-}
-
-/** How a case sounds where it lands: [volume, rate]. Foliage swallows it; water gets a small plip instead. */
-const LANDING: Record<Surface, readonly [number, number]> = {
-  plastic: [0.5, 1],
-  stone: [0.55, 0.96],
-  metal: [0.55, 1.08],
-  glass: [0.5, 1.12],
-  wood: [0.4, 0.88],
-  foliage: [0.1, 0.8],
-  water: [0.12, 1.6]
-};
-
 export interface MatchAudioState {
   alive: boolean;
   health: number;
@@ -108,16 +90,10 @@ export interface MatchAudioState {
   listener: { x: number; y: number; z: number };
 }
 
-interface Pending {
-  at: number;
-  id: SoundId;
-  volume: number;
-  rate: number;
-}
-
 /**
- * The parts of a match's sound that no single game event carries: low-health heartbeat, slide, countdown and
- * match stingers, falling cases, scenery around the listener, and how much wall sits in front of a source.
+ * The parts of a match's sound that no single game event carries: low-health heartbeat, slide scrape, a cooked
+ * grenade's fuse, the match's cues and music (cues), falling cases, scenery around the listener, and how much wall
+ * sits in front of a source.
  */
 export class MatchAudio implements Ears {
   readonly listener = { x: 0, y: 0, z: 0 };
@@ -125,19 +101,19 @@ export class MatchAudio implements Ears {
   readonly debris: DebrisSounds;
   readonly remotes: RemoteSounds;
   private clock = 0;
-  private readonly pending: Pending[] = [];
   /** The running reload's layers, `at` on this clock. */
   private layers: ReloadLayer[] = [];
-  private lastCase = -1;
   private wasSliding = false;
-  private phase: MatchPhase | null = null;
-  private counted = 0;
+  private scrape: HeldSound | null = null;
+  /** Clock time the grenade in hand was pressed, and of its next fuse tick; null when none is cooking. */
+  private cook: { at: number; tick: number } | null = null;
   private heardStep = -Infinity;
   private lastHit = -Infinity;
   private lastHurt = -Infinity;
   private nextSpot = 4 + Math.random() * 6;
   private readonly heart: Heartbeat;
-  private surface: Surface = 'plastic';
+  readonly cues: MatchCues;
+  private readonly cases: CaseSounds;
   private readonly occluded = new Map<number, { until: number; at: number; value: number }>();
 
   constructor(
@@ -151,6 +127,8 @@ export class MatchAudio implements Ears {
     this.debris = new DebrisSounds(audio, this);
     this.remotes = new RemoteSounds(audio, this);
     this.heart = new Heartbeat(audio);
+    this.cues = new MatchCues(audio);
+    this.cases = new CaseSounds(audio);
   }
 
   /**
@@ -158,14 +136,12 @@ export class MatchAudio implements Ears {
    * schedules the hand and magazine sounds between its cues.
    */
   action(action: ViewAction, weapon: WeaponId): void {
-    if (action.type === 'fire') {
-      if (CASE_ON_FIRE.has(weapon)) this.dropCase('casing', FALL);
-      return;
-    }
+    this.cases.action(action, weapon, this.clock);
+    if (action.type === 'fire') return;
+    if (action.type === 'grenadeCook') this.cook = { at: this.clock, tick: this.clock + FUSE.from };
+    else if (action.type === 'grenadeThrow' || action.type === 'switch' || action.type === 'melee') this.cook = null;
     if (action.type === 'reload') this.layers = reloadLayers(weapon, action.empty, action.duration).layers.map((l) => ({ at: this.clock + l.at, id: l.id }));
     else if (INTERRUPTS.has(action.type)) this.layers = [];
-    const eject = ejection(action, weapon);
-    if (eject) this.dropCase(eject.id, eject.at + FALL);
   }
 
   /**
@@ -173,6 +149,7 @@ export class MatchAudio implements Ears {
    * The player's own steps sit a little back, and further while someone else walks within OWN_STEP.near metres.
    */
   footstep(surface: Surface, character: CharacterId | BotKind | undefined, at: { x: number; y: number; z: number } | null, volume: number, priority: number, occlusion = 0, source?: number): void {
+    if (!at && this.wasSliding) return;
     const position = at ? { x: at.x, y: at.y, z: at.z } : undefined;
     if (at && Math.hypot(at.x - this.listener.x, at.y - this.listener.y, at.z - this.listener.z) < OWN_STEP.near) this.heardStep = this.clock;
     const level = at ? volume : volume * (this.clock - this.heardStep < OWN_STEP.hold ? OWN_STEP.ducked : OWN_STEP.level);
@@ -244,22 +221,6 @@ export class MatchAudio implements Ears {
     this.audio.play(`meleeHit:${kind.hit}`, { position, volume: WALL_HIT.weapon, tone: WALL_HIT.tone, priority: 5, delay: late, occlusion });
   }
 
-  /** Countdown ticks over the last three seconds of warmup, each its own take a semitone higher, then the start and end stingers. */
-  setPhase(phase: MatchPhase, left: number): void {
-    if (phase === 'warmup' && left > 0 && left <= 3) {
-      const second = Math.ceil(left);
-      if (second !== this.counted) {
-        this.counted = second;
-        this.audio.play('countdown', { priority: 9, rate: 2 ** ((3 - second) / 12), variant: 3 - second });
-      }
-    }
-    if (phase === this.phase) return;
-    if (this.phase === 'warmup' && phase === 'playing') this.audio.play('matchStart', { priority: 9 });
-    if (this.phase !== null && phase === 'ended') this.audio.play('matchEnd', { priority: 9 });
-    this.phase = phase;
-    this.counted = 0;
-  }
-
   /**
    * How much solid world sits between the listener and a source, 0…1: the weighted share of PROBES rays that are
    * blocked. `lift` raises a position given at the feet. Cached per `key` (a player id) for a few frames and glided
@@ -284,42 +245,53 @@ export class MatchAudio implements Ears {
 
   frame(dt: number, state: MatchAudioState): void {
     this.clock += dt;
-    this.surface = state.surface;
     Object.assign(this.listener, state.listener);
-    for (let i = this.pending.length - 1; i >= 0; i--) {
-      const p = this.pending[i]!;
-      if (p.at > this.clock) continue;
-      this.pending.splice(i, 1);
-      this.land(p);
-    }
+    this.cases.frame(this.clock, state.surface);
     if (!state.alive) this.layers = [];
     while (this.layers.length && this.layers[0]!.at <= this.clock + LAYER_LEAD) {
       const layer = this.layers.shift()!;
       this.audio.play(layer.id, { volume: 0.8, priority: 5, delay: Math.max(layer.at - this.clock, 0) });
     }
-    if (state.sliding && !this.wasSliding && state.alive) this.movement('slide', state.surface, null, 0.7, 4);
-    this.wasSliding = state.sliding;
+    this.slide(state.sliding && state.alive, state.surface);
+    this.fuse(state.alive);
     this.heart.frame(dt, state.alive, state.health);
+    this.cues.frame(dt);
     this.scenery(dt);
   }
 
   dispose(): void {
-    this.pending.length = 0;
+    this.cases.dispose();
     this.layers = [];
+    this.scrape?.stop();
+    this.scrape = null;
+    this.cook = null;
     this.occluded.clear();
     this.remotes.clear();
   }
 
-  private dropCase(id: 'casing' | 'shell', delay: number): void {
-    if (this.clock - this.lastCase < CASE_GAP) return;
-    this.lastCase = this.clock;
-    this.pending.push({ at: this.clock + delay + Math.random() * 0.08, id, volume: 1, rate: 1 });
+  private slide(sliding: boolean, surface: Surface): void {
+    if (sliding && !this.wasSliding) {
+      this.movement('slide', surface, null, SLIDE.volume, 4);
+      this.scrape = this.audio.hold('slideLoop', { volume: SLIDE.scrape, priority: 4 });
+    } else if (!sliding && this.wasSliding) {
+      this.scrape?.stop(SLIDE.fade);
+      this.scrape = null;
+    }
+    this.wasSliding = sliding;
   }
 
-  private land(p: Pending): void {
-    const [volume, rate] = LANDING[this.surface];
-    if (this.surface === 'water') this.audio.play('impact:water', { volume, rate, priority: 1 });
-    else this.audio.play(p.id, { volume: p.volume * volume, rate: p.rate * rate, priority: 2 });
+  private fuse(alive: boolean): void {
+    const cook = this.cook;
+    if (!cook) return;
+    if (!alive) {
+      this.cook = null;
+      return;
+    }
+    while (cook.tick <= this.clock + LAYER_LEAD) {
+      this.audio.play('grenadeFuse', { volume: FUSE.volume, priority: 6, delay: Math.max(cook.tick - this.clock, 0) });
+      const held = Math.min((cook.tick - cook.at - FUSE.from) / (FUSE.full - FUSE.from), 1);
+      cook.tick += FUSE.gap[0] + (FUSE.gap[1] - FUSE.gap[0]) * held;
+    }
   }
 
   private scenery(dt: number): void {

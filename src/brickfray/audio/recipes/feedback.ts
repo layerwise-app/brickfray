@@ -2,6 +2,7 @@ import type { SoundSpec } from '../catalog';
 import { clack, drive, gainNode, noise, rand, thump, tone, vary, midiHz, type Synth } from '../synth';
 import { brass, crash, glock, kick, marimba } from './instruments';
 import { bounces } from './parts';
+import type { MatchCue } from '../types';
 
 type FeedbackIds =
   | 'hitmarker'
@@ -15,8 +16,8 @@ type FeedbackIds =
   | 'uiClick'
   | 'uiBack'
   | 'matchStart'
-  | 'matchEnd'
   | 'waveStart'
+  | MatchCue
   | 'countdown';
 
 function tick(s: Synth, at: number, f: number, gain: number) {
@@ -51,6 +52,30 @@ function respawn(s: Synth) {
     filter: { type: 'bandpass', freq: 2000, q: 1.5, sweep: [[t, 6000]] }
   });
 }
+
+/** A short brass call over a kick: stand-in for the recorded cue family when a recording fails to load. */
+function call(notes: readonly number[], step: number, duration: number): SoundSpec {
+  return {
+    category: 'stinger',
+    duration,
+    variants: 1,
+    render: (s) => {
+      notes.forEach((n, i) => brass(s, i * step, midiHz(n), step * 0.9, 0.5));
+      kick(s, 0, 0.6);
+    }
+  };
+}
+
+const CUE_STANDINS: Record<MatchCue, SoundSpec> = {
+  waveClear: call([72, 77, 81, 84], 0.11, 1.6),
+  bossWave: call([50, 53, 56], 0.2, 1.8),
+  upgradeOffer: { category: 'stinger', duration: 1.2, variants: 1, loudness: -24, render: (s) => [84, 89, 93, 96].forEach((n, i) => glock(s, i * 0.06, midiHz(n), 0.4)) },
+  upgradeTaken: { category: 'stinger', duration: 1, variants: 1, loudness: -21, render: (s) => [77, 81, 84, 89].forEach((n, i) => marimba(s, i * 0.05, midiHz(n), 0.6)) },
+  grenadeReady: { category: 'marker', duration: 0.3, variants: 1, loudness: -22, render: (s) => { clack(s, 0, { pitch: 2600, gain: 0.5, decay: 0.03 }); glock(s, 0.04, midiHz(89), 0.3); } },
+  victory: call([72, 77, 81, 84, 89], 0.14, 3),
+  defeat: call([69, 65, 62, 57], 0.22, 3),
+  runOver: call([77, 74, 70, 65], 0.3, 3.2)
+};
 
 export const FEEDBACK_SOUNDS: Record<FeedbackIds, SoundSpec> = {
   hitmarker: { category: 'marker', duration: 0.12, loudness: -18.5, render: (s) => tick(s, 0, 4200 * vary(s, 0.01), 1) },
@@ -106,7 +131,7 @@ export const FEEDBACK_SOUNDS: Record<FeedbackIds, SoundSpec> = {
     }
   },
   // Under the mix: felt more than heard, well below the player's own steps.
-  heartbeat: { category: 'player', duration: 0.6, variants: 3, loudness: -31, render: heartbeat },
+  heartbeat: { category: 'player', duration: 0.6, variants: 3, loudness: -29, render: heartbeat },
   respawn: { category: 'fx', duration: 2.3, variants: 3, render: respawn },
   uiHover: {
     category: 'ui',
@@ -149,17 +174,6 @@ export const FEEDBACK_SOUNDS: Record<FeedbackIds, SoundSpec> = {
       crash(s, 0.18, 0.18);
     }
   },
-  matchEnd: {
-    category: 'stinger',
-    duration: 2.6,
-    variants: 3,
-    render: (s) => {
-      for (const n of [58, 62, 65, 70]) brass(s, 0, midiHz(n), 0.35, 0.4);
-      for (const n of [57, 60, 65, 69]) brass(s, 0.45, midiHz(n), 0.8, 0.45);
-      for (const [i, n] of [89, 84, 81, 77].entries()) glock(s, 0.45 + i * 0.09, midiHz(n), 0.3);
-      kick(s, 0.45, 0.6);
-    }
-  },
   waveStart: {
     category: 'stinger',
     duration: 1.6,
@@ -180,6 +194,7 @@ export const FEEDBACK_SOUNDS: Record<FeedbackIds, SoundSpec> = {
       }
     }
   },
+  ...CUE_STANDINS,
   countdown: {
     category: 'stinger',
     duration: 0.9,

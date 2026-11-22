@@ -1,6 +1,7 @@
 import { analyze, spectrum, type SoundStats } from './analysis';
 import type { Category } from './catalog';
-import { renderSound, renderTrack, yieldToMain } from './render';
+import { fetchTrack, TRACKS } from './music';
+import { renderSound, yieldToMain } from './render';
 import { SOUNDS, SOUND_IDS } from './sounds';
 import type { MusicTrack, SoundId } from './types';
 
@@ -35,13 +36,21 @@ export async function analyzeAll(sampleRate = 48000): Promise<SoundReport[]> {
   return out;
 }
 
+async function loadTrack(track: MusicTrack, sampleRate: number): Promise<AudioBuffer> {
+  return fetchTrack(new OfflineAudioContext(2, 1, sampleRate), track);
+}
+
+/** `raw` holds the largest sample jump across the loop seam. */
 export async function analyzeMusic(track: MusicTrack, sampleRate = 48000): Promise<SoundReport> {
-  const buffer = await renderTrack(track, sampleRate);
+  const buffer = await loadTrack(track, sampleRate);
   const mid = mixDown(buffer);
   const stats = analyze(mid, sampleRate);
-  const right = buffer.getChannelData(1);
-  const left = buffer.getChannelData(0);
-  const seam = Math.max(Math.abs(left[0]! - left[left.length - 1]!), Math.abs(right[0]! - right[right.length - 1]!));
+  const [a, b] = TRACKS[track].loop.map((t) => Math.round(t * sampleRate));
+  let seam = 0;
+  for (let ch = 0; ch < buffer.numberOfChannels; ch++) {
+    const data = buffer.getChannelData(ch);
+    seam = Math.max(seam, Math.abs(data[a!]! - data[b! - 1]!));
+  }
   return { id: `music:${track}`, category: 'music', target: NaN, limit: Infinity, variants: [{ ...stats, raw: seam }] };
 }
 
@@ -149,12 +158,12 @@ export async function plotSound(id: SoundId, sampleRate = 48000): Promise<string
 }
 
 export async function plotMusic(track: MusicTrack, sampleRate = 48000): Promise<string> {
-  const buffer = await renderTrack(track, sampleRate);
+  const buffer = await loadTrack(track, sampleRate);
   const mid = mixDown(buffer);
   const secs = buffer.duration;
   const head = mid.subarray(0, Math.round(Math.min(8, secs) * sampleRate));
   return plotClips(
-    `music:${track}  (${secs.toFixed(1)} s seamless loop)`,
+    `music:${track}  (${secs.toFixed(1)} s, loop ${TRACKS[track].loop.join('-')} s)`,
     [
       { label: 'full loop', data: mid },
       { label: 'first 8 s', data: head, seconds: 8 }

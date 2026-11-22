@@ -60,7 +60,6 @@ function Cards({ offer }: { offer: UpgradeOffer }) {
       if (!id || performance.now() - shown < GRACE_MS) return;
       hover(i);
       setChosen(id);
-      game.audio.play('uiClick', { priority: 9 });
       game.pickUpgrade(id);
     };
     const under = () =>

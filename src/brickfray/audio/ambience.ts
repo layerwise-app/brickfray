@@ -1,10 +1,30 @@
 import type { MapId } from '../world/types';
 import { mulberry32 } from './synth';
 
-/** Maps that play another map's bed: the jungle temple's leaves in the wind are the fortress countryside's. */
-const BED_FILE: Partial<Record<MapId, MapId>> = { temple: 'fortress' };
-/** The bed files are levelled to about -22 LUFS; this puts them near -38, about 10 LU under the player's own footstep. */
-const BED_GAIN = 0.16;
+/** One recording in a map's bed (public/audio/ambience/bed-<file>.mp3) and its level. */
+interface Layer {
+  file: string;
+  gain: number;
+}
+
+/**
+ * Each map's bed, its recordings each played as their own random stretches. The main files are levelled to about
+ * -22 LUFS (fortress -27, its wind dipped above 1.2 kHz; second layers -24): the gains put every map near -38 LUFS,
+ * about 10 LU under the player's own footstep, with the second layer 10-16 dB under the first (fortress birds the
+ * lowest: they sing where footsteps carry their detail).
+ */
+const BEDS: Record<MapId, readonly Layer[]> = {
+  plaza: [{ file: 'plaza', gain: 0.16 }],
+  fortress: [
+    { file: 'fortress', gain: 0.27 },
+    { file: 'fortress-birds', gain: 0.035 }
+  ],
+  docks: [{ file: 'docks', gain: 0.16 }],
+  temple: [
+    { file: 'temple', gain: 0.16 },
+    { file: 'temple-water', gain: 0.07 }
+  ]
+};
 const FADE_IN = 2.5;
 const FADE_OUT = 1.2;
 /** Encoder padding at both ends of a decoded file, never played. */
@@ -29,6 +49,7 @@ export interface Stretch {
 }
 
 interface Bed {
+  layer: Layer;
   buffer: AudioBuffer;
   gain: GainNode;
   /** Context time the bed started. */
@@ -38,14 +59,14 @@ interface Bed {
 }
 
 /**
- * A map's ambience bed (public/audio/ambience/bed-<map>.mp3), fetched when the map is first entered. The recording
- * is not looped end to end: random stretches of it are cross-faded into each other, so a bird or a clink in it
- * never comes round on a fixed period.
+ * A map's ambience bed (BEDS), each recording fetched when the map is first entered. A recording is not looped end to
+ * end: random stretches of it are cross-faded into each other, so a bird or a clink in it never comes round on a
+ * fixed period, and the layers of a bed drift against each other.
  */
 export class Ambience {
   private want: MapId | null = null;
-  private bed: Bed | null = null;
-  private readonly beds = new Map<MapId, AudioBuffer>();
+  private playing: Bed[] = [];
+  private readonly buffers = new Map<string, AudioBuffer>();
   /** Every bed plays through the walls of the room the listener is in: quieter and duller indoors. */
   private readonly input: GainNode;
   private readonly walls: BiquadFilterNode;
@@ -67,9 +88,11 @@ export class Ambience {
     this.want = map;
     this.stop();
     if (!map) return;
-    const ready = this.beds.get(map);
-    if (ready) this.start(ready);
-    else void this.load(map);
+    for (const layer of BEDS[map]) {
+      const ready = this.buffers.get(layer.file);
+      if (ready) this.start(layer, ready);
+      else void this.load(map, layer);
+    }
   }
 
   /** `inside` 0 outdoors .. 1 deep in a room whose walls leave the bed at `bed.gain` below `bed.cutoff` Hz. */
@@ -82,33 +105,35 @@ export class Ambience {
   dispose(): void {
     this.want = null;
     this.stop();
-    this.beds.clear();
+    this.buffers.clear();
   }
 
-  private async load(map: MapId): Promise<void> {
-    let bed: AudioBuffer;
-    const file = BED_FILE[map] ?? map;
+  private async load(map: MapId, layer: Layer): Promise<void> {
+    const file = `audio/ambience/bed-${layer.file}.mp3`;
+    let buffer: AudioBuffer;
     try {
-      const response = await fetch(`${import.meta.env.BASE_URL}audio/ambience/bed-${file}.mp3`);
-      if (!response.ok) throw new Error(`audio/ambience/bed-${file}.mp3: HTTP ${response.status}`);
-      bed = await this.ctx.decodeAudioData(await response.arrayBuffer());
+      const response = await fetch(`${import.meta.env.BASE_URL}${file}`);
+      if (!response.ok) throw new Error(`${file}: HTTP ${response.status}`);
+      buffer = await this.ctx.decodeAudioData(await response.arrayBuffer());
     } catch (error) {
-      console.error(`Ambience ${map} falls back to generated wind`, error);
-      bed = wind(this.ctx);
+      const main = BEDS[map][0] === layer;
+      console.error(main ? `Ambience ${map} falls back to generated wind` : `Ambience ${map} plays without ${layer.file}`, error);
+      if (!main) return;
+      buffer = wind(this.ctx);
     }
-    this.beds.set(map, bed);
-    if (this.want === map && !this.bed) this.start(bed);
+    this.buffers.set(layer.file, buffer);
+    if (this.want === map && !this.playing.some((bed) => bed.layer === layer)) this.start(layer, buffer);
   }
 
-  private start(buffer: AudioBuffer): void {
+  private start(layer: Layer, buffer: AudioBuffer): void {
     const now = this.ctx.currentTime;
     const gain = this.ctx.createGain();
     gain.gain.setValueAtTime(0, now);
-    gain.gain.linearRampToValueAtTime(BED_GAIN, now + FADE_IN);
+    gain.gain.linearRampToValueAtTime(layer.gain, now + FADE_IN);
     gain.connect(this.input);
     const first = nextStretch(buffer.duration, null, Math.random);
-    const bed: Bed = { buffer, gain, t0: now, last: first, sources: new Set() };
-    this.bed = bed;
+    const bed: Bed = { layer, buffer, gain, t0: now, last: first, sources: new Set() };
+    this.playing.push(bed);
     this.play(bed, first);
     this.extend(bed);
   }
@@ -130,20 +155,20 @@ export class Ambience {
     source.onended = () => {
       fade.disconnect();
       bed.sources.delete(source);
-      if (this.bed === bed) this.extend(bed);
+      if (this.playing.includes(bed)) this.extend(bed);
       else if (bed.sources.size === 0) bed.gain.disconnect();
     };
   }
 
   private stop(): void {
-    const bed = this.bed;
-    if (!bed) return;
-    this.bed = null;
     const now = this.ctx.currentTime;
-    bed.gain.gain.cancelScheduledValues(now);
-    bed.gain.gain.setValueAtTime(bed.gain.gain.value, now);
-    bed.gain.gain.linearRampToValueAtTime(0, now + FADE_OUT);
-    for (const source of bed.sources) source.stop(now + FADE_OUT + 0.1);
+    for (const bed of this.playing) {
+      bed.gain.gain.cancelScheduledValues(now);
+      bed.gain.gain.setValueAtTime(bed.gain.gain.value, now);
+      bed.gain.gain.linearRampToValueAtTime(0, now + FADE_OUT);
+      for (const source of bed.sources) source.stop(now + FADE_OUT + 0.1);
+    }
+    this.playing = [];
   }
 }
 

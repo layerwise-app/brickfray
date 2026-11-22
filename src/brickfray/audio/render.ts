@@ -1,11 +1,10 @@
 import { audibleLength, loudness, peakOf } from './analysis';
 import { CATEGORIES, DEFAULT_VARIANTS } from './catalog';
-import { SONGS, renderMusic } from './music';
 import { SAMPLES } from './samples';
 import { SOUNDS, SOUND_IDS } from './sounds';
 import { PEAK_AT, alignPeak } from './sync';
 import { hashString, mulberry32, whiteNoise } from './synth';
-import type { MusicTrack, SoundId } from './types';
+import type { SoundId } from './types';
 
 export interface RenderedSound {
   buffers: AudioBuffer[];
@@ -14,12 +13,9 @@ export interface RenderedSound {
   target: number;
 }
 
-export type RenderJob = { kind: 'sound'; id: SoundId } | { kind: 'music'; track: MusicTrack };
-
 export interface BankOptions {
   sampleRate: number;
   onSound(id: SoundId, sound: RenderedSound): void;
-  onMusic(track: MusicTrack, buffer: AudioBuffer): void;
   cancelled(): boolean;
   /** Parallel offline renders in flight. */
   concurrency?: number;
@@ -31,14 +27,10 @@ const CEILING = 0.89;
 const MAX_DRIVE = 2.2;
 const FIRST: readonly SoundId[] = ['uiClick', 'uiHover', 'uiBack'];
 
-/** UI first so menus click right away, then menu music, gameplay sounds, and in-match music last. */
-export const RENDER_ORDER: readonly RenderJob[] = [
-  ...FIRST.map((id) => ({ kind: 'sound', id }) as const),
-  { kind: 'music', track: 'menu' },
-  ...SOUND_IDS.filter((id) => !FIRST.includes(id))
-    .sort((a, b) => CATEGORIES[SOUNDS[b].category].priority - CATEGORIES[SOUNDS[a].category].priority)
-    .map((id) => ({ kind: 'sound', id }) as const),
-  { kind: 'music', track: 'match' }
+/** UI first so menus click right away, then gameplay sounds by priority. Music is not rendered: music-player.ts fetches it. */
+export const RENDER_ORDER: readonly SoundId[] = [
+  ...FIRST,
+  ...SOUND_IDS.filter((id) => !FIRST.includes(id)).sort((a, b) => CATEGORIES[SOUNDS[b].category].priority - CATEGORIES[SOUNDS[a].category].priority)
 ];
 
 /** Yields to the event loop without timer clamping (keeps working in background tabs). */
@@ -158,30 +150,13 @@ async function synthesize(id: SoundId, sampleRate: number): Promise<RenderedSoun
   return { buffers, raw, target };
 }
 
-export async function renderTrack(track: MusicTrack, sampleRate: number): Promise<AudioBuffer> {
-  const buffer = await renderMusic(track, sampleRate, yieldToMain);
-  const left = buffer.getChannelData(0);
-  const right = buffer.getChannelData(1);
-  const mid = new Float32Array(left.length);
-  for (let i = 0; i < mid.length; i++) mid[i] = (left[i]! + right[i]!) * 0.5;
-  await yieldToMain();
-  const raw = loudness(mid, sampleRate);
-  let gain = 10 ** ((SONGS[track].loudness - raw) / 20);
-  const peak = Math.max(peakOf(left), peakOf(right));
-  if (peak * gain > CEILING) gain = CEILING / peak;
-  await yieldToMain();
-  for (const ch of [left, right]) for (let i = 0; i < ch.length; i++) ch[i]! *= gain;
-  return buffer;
-}
-
 /** Renders the whole bank a few jobs at a time, yielding between jobs so frames keep flowing. */
-export async function renderBank(o: BankOptions, jobs: readonly RenderJob[] = RENDER_ORDER): Promise<void> {
+export async function renderBank(o: BankOptions, jobs: readonly SoundId[] = RENDER_ORDER): Promise<void> {
   const queue = [...jobs];
   const worker = async () => {
-    for (let job = queue.shift(); job && !o.cancelled(); job = queue.shift()) {
+    for (let id = queue.shift(); id && !o.cancelled(); id = queue.shift()) {
       await yieldToMain();
-      if (job.kind === 'sound') o.onSound(job.id, await renderSound(job.id, o.sampleRate));
-      else o.onMusic(job.track, await renderTrack(job.track, o.sampleRate));
+      o.onSound(id, await renderSound(id, o.sampleRate));
     }
   };
   await Promise.all(Array.from({ length: o.concurrency ?? 3 }, worker));

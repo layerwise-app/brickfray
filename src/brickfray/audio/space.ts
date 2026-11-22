@@ -11,20 +11,18 @@ interface SpaceDef {
   wet: number;
   /** Generated stand-in when the recording fails to load. */
   fallback: { t60: number; bright: [number, number] };
-  /** Another map's recording to reuse (public/audio/space/<file>.mp3); the map's own by default. */
-  file?: MapId;
 }
 
 /**
  * One impulse response per map, cut from real outdoor gunshot tails (public/audio/space, see CREDITS-ambience.md):
  * plaza is a short slap off nearby buildings, fortress a long dense stone courtyard, docks a late echo across
- * open water with a metal colour.
+ * open water with a metal colour, temple close reflections off the ruin walls in a short tail the jungle darkens.
  */
 export const SPACES: Record<MapId, SpaceDef> = {
   plaza: { predelay: 0.045, wet: 1, fallback: { t60: 0.75, bright: [9000, 2600] } },
   fortress: { predelay: 0.022, wet: 1.3, fallback: { t60: 1.65, bright: [11000, 1800] } },
   docks: { predelay: 0.12, wet: 0.5, fallback: { t60: 1.05, bright: [12000, 2400] } },
-  temple: { file: 'fortress', predelay: 0.03, wet: 1.15, fallback: { t60: 1.5, bright: [10000, 1900] } }
+  temple: { predelay: 0.03, wet: 1.15, fallback: { t60: 1.05, bright: [7500, 1400] } }
 };
 
 /** The listener's room response (see rooms.ts), not normalised: its reflections and tail are set against the dry sound. */
@@ -59,10 +57,9 @@ export function neutralSpace(ctx: BaseAudioContext): AudioBuffer {
 
 export async function loadSpace(ctx: BaseAudioContext, map: MapId): Promise<AudioBuffer> {
   const def = SPACES[map];
-  const file = def.file ?? map;
   try {
-    const response = await fetch(`${import.meta.env.BASE_URL}audio/space/${file}.mp3`);
-    if (!response.ok) throw new Error(`audio/space/${file}.mp3: HTTP ${response.status}`);
+    const response = await fetch(`${import.meta.env.BASE_URL}audio/space/${map}.mp3`);
+    if (!response.ok) throw new Error(`audio/space/${map}.mp3: HTTP ${response.status}`);
     return shape(ctx, await ctx.decodeAudioData(await response.arrayBuffer()), def.predelay, def.wet);
   } catch (error) {
     console.error(`Space ${map} falls back to a generated impulse`, error);

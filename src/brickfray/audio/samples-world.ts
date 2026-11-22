@@ -21,6 +21,8 @@ export const WORLD_SAMPLES: SampleMap = {
   land: ['world/land-1.mp3', 'world/land-2.mp3', 'world/land-3.mp3', 'world/land-4.mp3', 'world/land-5.mp3'],
   jump: ['world/jump-1.mp3', 'world/jump-2.mp3', 'world/jump-3.mp3', 'world/jump-4.mp3', 'world/jump-5.mp3'],
   slide: ['world/slide-1.mp3', 'world/slide-2.mp3', 'world/slide-3.mp3', 'world/slide-4.mp3', 'world/slide-5.mp3'],
+  // One seamless loop, held for the length of a slide (engine.hold): the file carries HELD_MARGIN of each end.
+  slideLoop: ['world/slide-loop.mp3'],
   'gear:armour': ['world/gear-armour-1.mp3', 'world/gear-armour-2.mp3', 'world/gear-armour-3.mp3', 'world/gear-armour-4.mp3'],
   'gear:suit': ['world/gear-suit-1.mp3', 'world/gear-suit-2.mp3', 'world/gear-suit-3.mp3', 'world/gear-suit-4.mp3'],
   'gear:rattle': ['world/gear-rattle-1.mp3', 'world/gear-rattle-2.mp3', 'world/gear-rattle-3.mp3', 'world/gear-rattle-4.mp3'],
