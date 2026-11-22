@@ -16,9 +16,13 @@ const APPROACH = [-0.016, -0.03, -0.25, -0.12, 0.1, 0];
 const ALIGN = [0, 0, -0.2, 0, 0, 0];
 const HALF = [0, 0, -0.14, 0, 0, 0];
 const REGRIP = [0, 0, -0.132, 0, 0, 0];
-/** The spear in the hand, in view space: out of frame at the quiver, then swinging up toward the muzzle. */
-const QUIVER = [-0.2, -0.52, -0.3, 1.2, 0.7, -0.3];
-const RISE = [-0.27, -0.26, -0.43, 0.8, 0.88, -0.3];
+/**
+ * The spear in the hand, in view space: drawn up tip-down out of the quiver at the left hip, brought round the left
+ * edge of the frame still hanging (hand first, so the spear never shows on its own), then swung up level toward the muzzle.
+ */
+const QUIVER = [-0.24, -0.5, -0.22, -1.23, 0.3, -0.3];
+const OUT = [-0.44, -0.2, -0.34, -1.1, 0.35, -0.3];
+const RISE = [-0.3, -0.15, -0.45, -0.1, 0.64, -0.3];
 
 /** Seconds the gun is left alone after the shot, so its recoil reads (and an aimed shot stays in the sights) before the reload takes it. */
 const RECOIL = 0.12;
@@ -46,7 +50,7 @@ export function harpoonReload(_empty: boolean, duration: number): Clip {
     const seat = g.spearSeat!;
     const hold = g.spear!.node;
     if (!path) {
-      path = [[FETCH, QUIVER], [FETCH + 0.14, RISE], [SEAT - 0.07, viewOf(c, MEET, seat, hold, APPROACH)], [SEAT, viewOf(c, MEET, seat, hold, ALIGN)]];
+      path = [[FETCH, QUIVER], [FETCH + 0.07, OUT], [FETCH + 0.15, RISE], [SEAT - 0.07, viewOf(c, MEET, seat, hold, APPROACH)], [SEAT, viewOf(c, MEET, seat, hold, ALIGN)]];
       fetch = viewGoal(c, QUIVER, g.spear!);
     }
     f.gun(track(t, gun));

@@ -19,19 +19,20 @@ const YANK = [0.03, 0.025, 0.035, 0.1, -0.1, -0.12];
 const THUMB_OUT: FingerPose = { ...FINGERS.trigger, thumb: 0, oppose: 0.55 };
 const THUMB_SHUT: FingerPose = { ...FINGERS.trigger, thumb: 0.55, oppose: 0.7 };
 /** Pin out: the bomb hand's thumb swung across the back of the bomb, pressing the spoon flat. */
-const SPOON: FingerPose = { ...FINGERS.ball, thumb: 0.25, oppose: 0.9 };
+const SPOON: FingerPose = { ...FINGERS.ball, thumb: 0.35, oppose: 0.9, index: 0.55, middle: 0.62, ring: 0.68, pinky: 0.74, spread: 0.7 };
 
 const PRESENT: Pose = [[0, 0, 0], [0.05, 1, 0.15], [0.6, 0, -0.8]];
 /** How far the bomb is snatched off the pin, from where it was presented: down and ahead, across the thumb. */
 const TUG = [-0.06, -0.07, -0.07] as const;
 const TUGGED: Pose = [[0, 0, 0], [-0.3, 0.95, 0.1], [0.6, 0, -0.8]];
-const COCKED: Pose = [[-0.2, 0.05, -0.41], [0.88, 0.3, 0.35], [-0.08, 0.9, -0.25]];
+/** Cocked beside the head: the bomb in the palm, fingers round its far side, palm turned in toward the middle of the screen. */
+const COCKED: Pose = open([-0.2, 0.06, -0.41], [0, 0.85, -0.5], [0.8, 0.15, 0.55]);
 /** Just under the frame below the gun hand: where a throw let go before the bomb was fetched takes it up on the way, its ring sweeping past the gun hand's thumb. */
 const SNATCH: Pose = [[0.11, -0.31, -0.4], [-0.6, 0.3, -0.75], [0.2, -0.6, -0.75]];
 
 /** Cook beats in seconds: hand at the belt, bomb presented with its ring on the thumb, the snatch starts, hands apart, pin flicked, arm cocked. */
-const GRAB = 0.16;
-const UP = 0.35;
+const GRAB = 0.15;
+const UP = 0.3;
 const PULL = 0.43;
 const APART = 0.51;
 const FLICK = 0.59;
@@ -45,16 +46,20 @@ export function grenadeGoals(view: THREE.Object3D): Record<string, Goal> {
   return {
     grenadeCocked: held(view, COCKED),
     grenadeSnatch: held(view, SNATCH),
-    overWind: held(view, [[-0.185, 0.055, -0.29], [0.75, 0.3, 0.6], [-0.05, 0.75, 0.45]]),
-    overRelease: held(view, [[-0.07, 0.09, -0.52], [1, 0, 0], [0, 0.7, -0.7]]),
-    overFollow: held(view, [[0.05, -0.19, -0.43], [0.9, 0.1, 0.35], [0.35, -0.35, -0.87]]),
+    // Overhand: drawn back beside the head, wrist cocked; the bent arm brings the hand over the shoulder, the forearm
+    // turning over so the palm faces the throw at the release; the wrist snaps the fingers down, and the arm comes down across the body.
+    overWind: held(view, open([-0.21, 0.07, -0.3], [0.05, 0.9, 0.42], [0.9, -0.1, -0.2])),
+    overRelease: held(view, open([-0.1, 0.11, -0.42], [0.05, 0.75, -0.65], [0.2, -0.65, -0.73])),
+    overSnap: held(view, open([-0.07, 0.05, -0.46], [0.1, -0.4, -0.9], [0.15, -0.9, 0.4])),
+    overFollow: held(view, open([0.05, -0.24, -0.42], [0.3, -0.6, -0.75], [0.7, -0.45, 0.55])),
     // Underhand: the arm drops down the left edge and swings back into the lower left corner, the bomb still in the frame,
-    // then swings through low in the middle and out after the bomb, and drops out of the frame to come up to the gun from below.
+    // then swings through low in the middle, palm to the throw, on up after the bomb with the hand turned on its side, and
+    // drops out of the frame to come up to the gun from below.
     underDrop: held(view, open([-0.235, -0.07, -0.36], [-0.25, -0.2, -0.95], [0.75, 0.6, -0.3])),
     underWind: held(view, open([-0.215, -0.15, -0.33], [0.05, -0.75, -0.66], [0.25, 0.6, -0.76])),
-    underRelease: held(view, open([-0.1, -0.19, -0.47], [0.2, -0.12, -0.97], [0.3, 0.94, 0.1])),
-    underFollow: held(view, open([-0.04, -0.21, -0.58], [0.2, -0.3, -0.93], [0.88, 0.42, -0.2])),
-    underBack: held(view, open([0.05, -0.32, -0.44], [0.2, 0.25, -0.95], [0.3, 0.9, 0.3]))
+    underRelease: held(view, open([-0.1, -0.19, -0.47], [0.15, -0.55, -0.82], [0.1, 0.82, -0.56])),
+    underFollow: held(view, open([-0.07, -0.16, -0.55], [0.12, 0.2, -0.97], [0.97, 0.05, 0.11])),
+    underBack: held(view, open([-0.03, -0.42, -0.42], [0.05, -0.75, -0.65], [0.97, 0.1, -0.04]))
   };
 }
 
@@ -146,10 +151,10 @@ export function throwClip(low: boolean, cooked: number): Clip {
     f.gun(track(u, [[0, scaled(DOWN, sag)], [out, DOWN.map((v, i) => (v + [0.012, -0.012, 0.015, -0.05, -0.06, -0.05][i]!) * sag)], [0.6, [-0.004, 0.01, -0.01, 0.045, 0.015, 0.03]], [0.78, [0.001, -0.003, 0.002, -0.012, -0.003, -0.007]], [0.96, Z]]));
     const lead: [number, Goal][] = cocked ? [[0, g.leftFrom!], [wind, back]] : fetched ? [[0, g.leftFrom!]] : [[0, g.leftFrom!], [fetch, g.grenadeSnatch!]];
     if (cocked && low) lead.splice(1, 0, [wind * 0.42, g.underDrop!]);
-    const after: [number, Goal][] = low ? [[out + 0.11, follow], [out + 0.27, g.underBack!]] : [[out + 0.15, follow]];
+    const after: [number, Goal][] = low ? [[out + 0.08, follow], [out + 0.2, g.underBack!]] : [[out + 0.045, g.overSnap!], [out + 0.16, follow]];
     f.left = hand(u, [...lead, [out, release], ...after, [landed, g.leftRest!]]);
     // The underhand lets the bomb roll off long fingers, which curl as the arm comes back round.
-    const opened: [number, FingerShape | FingerPose][] = low ? [[out + 0.02, TOSSED], [out + 0.05, TOSSED], [out + 0.12, 'relaxed']] : [[out + 0.03, 'open'], [out + 0.16, 'relaxed']];
+    const opened: [number, FingerShape | FingerPose][] = low ? [[out + 0.02, TOSSED], [out + 0.045, TOSSED], [out + 0.1, 'relaxed']] : [[out + 0.025, 'open'], [out + 0.05, TOSSED], [out + 0.16, 'relaxed']];
     f.leftFingers = u < landed ? fingers(u, [[0, fetched ? spoon : 'relaxed'], [fetched ? out - 0.03 : fetch, fetched ? spoon : 'ball'], [out - 0.03, 'ball'], ...opened, [landed, c.tuning.fingers.left]]) : null;
     f.show.grenade = u < out + 0.01 && (fetched || u >= fetch) ? 1 : 0;
     if (!low) f.leftLift = (cocked ? 0.4 + 0.6 * seg(u, 0, out * 0.8) : seg(u, 0, out * 0.7)) * (1 - seg(u, out + 0.04, out + 0.2));

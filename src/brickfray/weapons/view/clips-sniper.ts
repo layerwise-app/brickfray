@@ -119,9 +119,10 @@ export function sniperReload(empty: boolean, duration: number): Clip {
     f.gun([0, -0.003, -0.01, -0.03, 0, 0.04], jolt(t - 2.71));
     mag(t, f, c);
     work(f, c, track(t, bolt));
-    f.right = hand(t, [[0, g.rightRest!], [0.13, g.rightRest!], [0.3, g.bolt!], [0.5, g.bolt!], [0.76, g.rightRest!], [2.34, g.rightRest!], [2.58, g.bolt!], [2.81, g.bolt!], [3.04, g.rightRest!]]);
-    if ((t > 0.13 && t < 0.76) || (t > 2.34 && t < 3.04)) {
-      f.rightFingers = fingers(t, [[0.13, 'trigger'], [0.22, 'relaxed'], [0.3, KNOB], [0.5, KNOB], [0.62, 'relaxed'], [0.76, 'trigger'], [2.34, 'trigger'], [2.46, 'relaxed'], [2.58, KNOB], [2.81, KNOB], [2.92, 'relaxed'], [3.04, 'trigger']]);
+    // The firing hand stays on the open bolt through the magazine change, in view, and runs it home after.
+    f.right = hand(t, [[0, g.rightRest!], [0.13, g.rightRest!], [0.3, g.bolt!], [2.81, g.bolt!], [3.04, g.rightRest!]]);
+    if (t > 0.13 && t < 3.04) {
+      f.rightFingers = fingers(t, [[0.13, 'trigger'], [0.22, 'relaxed'], [0.3, KNOB], [2.81, KNOB], [2.92, 'relaxed'], [3.04, 'trigger']]);
     }
     f.left = hand(t, [[0, g.leftRest!], [0.62, g.leftRest!], [0.92, g.mag!], [2.2, g.mag!], [2.6, g.leftRest!]]);
     if (t > 0.62 && t < 2.6) f.leftFingers = fingers(t, [[0.62, c.tuning.fingers.left], [0.78, 'open'], [0.94, 'magazine'], [2.14, 'magazine'], [2.36, 'relaxed'], [2.6, c.tuning.fingers.left]]);

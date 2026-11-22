@@ -87,6 +87,8 @@ export interface ViewModel {
   /** Instantly show this weapon (spawn). */
   equip(id: WeaponId): void;
   act(action: ViewAction): void;
+  /** The game's word on the player's last melee strike: a landed blow catches in the target, a whiff follows straight through. */
+  meleeLanded(hit: boolean): void;
   update(dt: number, input: ViewInput): void;
   /** Muzzle position in the view camera's space (for tracers and flash). */
   muzzleViewPosition(out: THREE.Vector3): THREE.Vector3;

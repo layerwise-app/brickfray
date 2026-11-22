@@ -47,9 +47,11 @@ function vertexInside(mesh: THREE.Mesh) {
   return false;
 }
 
-/** Whether a model, as last posed, has nothing left inside the camera's frame. */
-export function outOfFrame(root: THREE.Object3D, camera: THREE.Camera) {
-  viewProj.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+const widen = new THREE.Matrix4();
+
+/** Whether a model, as last posed, has nothing left inside the camera's frame, grown `margin` times about its center. */
+export function outOfFrame(root: THREE.Object3D, camera: THREE.Camera, margin = 1) {
+  viewProj.multiplyMatrices(widen.makeScale(1 / margin, 1 / margin, 1), camera.projectionMatrix).multiply(camera.matrixWorldInverse);
   frustum.setFromProjectionMatrix(viewProj);
   let seen = false;
   root.traverseVisible((o) => {

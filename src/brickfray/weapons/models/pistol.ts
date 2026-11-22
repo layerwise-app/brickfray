@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { T, type ModelBuilder } from '../builder';
 import { box, prism, slab, tube } from '../shapes';
-import { screw, shade, sidePanel, slot, studSide } from './details';
+import { screw, shade, sidePanel, slot, studSide, wear } from './details';
 
 const C = {
   frame: '#a4885e',
@@ -45,7 +45,11 @@ export function buildPistol(b: ModelBuilder) {
     b.add(slab(SLIDE_STOP, 0.003, lod, 0.0015), C.dark, 'satin', T(-0.0145, 0, 0));
     b.add(box(0.0024, 0.004, 0.009, 0.0008), C.dark, 'satin', T(-0.0141, 0.04, -0.066));
     for (const s of [1, -1]) b.add(box(0.0012, 0.0012, 0.15, 0.0003), shade(C.frame, 0.6), 'dark', T(s * 0.0131, 0.0438, -0.04));
+    // Front strap finger grooves and a flared lip at the magazine well.
+    for (let i = 0; i < 2; i++) b.add(box(0.026, 0.004, 0.006, 0.002), shade(C.frame, 0.94), 'satin', T(0, -0.022 - i * 0.021, -0.006 + i * 0.0045, -0.2));
+    b.add(slab([[0.003, -0.063], [0.024, -0.069], [0.057, -0.064], [0.057, -0.058], [0.024, -0.062], [0.006, -0.057]], 0.033, lod, 0.002), shade(C.frame, 0.9), 'satin');
   }
+  wear(b, -0.0128, 0.0446, -0.12, -0.03, C.frame, 1.25, 'plastic');
 
   // Barrel crown peeking out of the slide.
   b.add(tube(0.0064, 0.012, lod.segSmall + 2, 0.0008), C.barrel, 'metal', T(0, BORE, -0.127));
@@ -62,6 +66,14 @@ export function buildPistol(b: ModelBuilder) {
     b.add(box(0.0012, 0.0012, 0.15, 0.0003), shade(C.slide, 0.5), 'dark', T(s * 0.0131, 0.0578, -0.045));
   }
   b.add(box(0.008, 0.003, 0.03, 0.0008), C.barrel, 'metal', T(0.003, 0.0808, -0.024));
+  // What the eye sees most: a matte sighting rib down the slide top, a cover plate on its rear face with the striker
+  // indicator, and the slide's top corners rubbed bright.
+  if (d >= 1) {
+    b.add(box(0.0046, 0.0008, 0.11, 0.0002), shade(C.slide, 0.55), 'dark', T(0, 0.0823, -0.055));
+    b.add(box(0.019, 0.022, 0.0016, 0.0006), shade(C.slide, 0.62), 'satin', T(0, 0.0605, 0.0485));
+    b.add(tube(0.0018, 0.0012, 8), C.accent, 'plastic', T(0, 0.0605, 0.0494));
+  }
+  for (const s of [1, -1]) wear(b, s * 0.0127, 0.0743, 0.046, -0.124, C.slide, 1.22, 'chrome');
   const grooves = d >= 1 ? 7 : 3;
   for (const s of b.minor ? [1, -1] : []) {
     for (let i = 0; i < grooves; i++) b.add(box(0.0012, 0.026, 0.0022), shade(C.slide, 0.42), 'dark', T(s * 0.0131, 0.061, 0.014 + i * (0.028 / (grooves - 1)), 0.18));

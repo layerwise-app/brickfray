@@ -14,7 +14,7 @@ const OPEN = 0.13;
 const SWING = 0.9;
 const PUSH = 0.7;
 /** Seconds a shot's flash and its smoke last in the lens. */
-const FLASH = 0.07;
+const FLASH = 0.05;
 const SMOKE = 0.7;
 
 const VERTEX = /* glsl */ `
@@ -66,8 +66,14 @@ void main() {
   layer(vec3(0.0), (shadow * shadow * 0.92 + 0.12 * edge * edge) * inside);
   float fringe = exp(-pow((edge - 0.985) / 0.009, 2.0));
   layer(mix(vec3(0.9, 0.45, 0.1), vec3(0.15, 0.4, 0.9), smoothstep(0.975, 0.995, edge)), 0.1 * fringe * inside);
-  float low = smoothstep(0.3, -1.0, q.y / R);
-  layer(vec3(1.0, 0.62, 0.28), uFlash * (0.12 + 0.3 * low) * inside);
+  // The flash: a white-hot core low in the glass, where the muzzle is under the line of sight, throwing short spikes up
+  // and out, with a warm bloom round it; the rest of the picture stays clear and the reticle is drawn over it.
+  vec2 m = (q - vec2(0.0, -0.8 * R)) / R;
+  float core = exp(-dot(m, m) / 0.035);
+  float spikes = pow(abs(cos(atan(m.x, m.y) * 3.5)), 10.0) * exp(-length(m) / 0.38) * step(-0.1, m.y);
+  float bloom = exp(-dot(m, m) / 0.5);
+  float hot = min(1.0, core * 1.5 + spikes);
+  layer(mix(vec3(1.0, 0.58, 0.2), vec3(1.0, 0.96, 0.86), hot), uFlash * min(1.0, hot + bloom * 0.32) * inside);
   float curl = 0.5 + 0.5 * sin(q.x * 11.0 / R + uTime * 1.7 + 2.0 * sin(q.y * 7.0 / R - uTime * 2.3));
   layer(vec3(0.6, 0.6, 0.58), uSmoke * 0.22 * curl * smoothstep(0.9, -0.9, q.y / R + (1.0 - uSmoke) * 0.8) * inside);
 
@@ -164,7 +170,7 @@ export class ScopeOverlay {
     u.uSurround!.value = 0.985;
     u.uOpen!.value = open;
     u.uKick!.value = Math.min(1, (Math.abs(turn.x) + Math.abs(turn.y)) * 6);
-    u.uFlash!.value = this.sinceShot < FLASH ? 1 - this.sinceShot / FLASH : 0;
+    u.uFlash!.value = this.sinceShot < FLASH ? (1 - this.sinceShot / FLASH) ** 2 : 0;
     u.uSmoke!.value = this.sinceShot < SMOKE ? Math.sin((Math.PI * this.sinceShot) / SMOKE) ** 0.6 * (1 - this.sinceShot / SMOKE) : 0;
     u.uTime!.value = this.time;
   }

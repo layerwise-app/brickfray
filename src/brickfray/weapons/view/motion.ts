@@ -35,6 +35,9 @@ const RUN = { side: 0.0085, yaw: 0.018, roll: 0.014, lift: 0.0052, pitch: 0.007,
 const SPRINT_AMP = 2.3;
 /** Phase of the bob (radians, 2π per two steps) at which a foot lands and the gun bottoms out; footstep sounds fire on it (audio/step-triggers.ts STRIKE_PHASE). */
 const PLANT = 0.735 * Math.PI;
+/** Least weight a hit's flinch has, and the share of it an aimed gun keeps (the sight picture is barely knocked). */
+const HURT_MIN = 0.5;
+const AIMED_FLINCH = 0.4;
 
 const v = new THREE.Vector3();
 const q = new THREE.Quaternion();
@@ -51,8 +54,8 @@ export class Motion {
   /** Sprint pose weight (0…1) and step phase (radians, one cycle per two steps). */
   sprint = 0;
   phase = 0;
-  /** Critically damped, so the gun leaves and reaches the sprint carry without a kick at either end. */
-  private readonly carry = new Spring3(225, 1);
+  /** Critically damped, so the gun leaves and reaches the sprint carry without a kick at either end, and soft enough that the turn into it is eased over several frames. */
+  private readonly carry = new Spring3(150, 1);
   private readonly swayPos = new Spring3(150, 0.7);
   private readonly swayRot = new Spring3(150, 0.68);
   private readonly recoilPos = new Spring3(560, 0.62);
@@ -164,7 +167,7 @@ export class Motion {
       this.rot.setComponent(i, this.rot.getComponent(i) + SLIDE_ROT[i]! * lean + shake * SCRAPE[1] * (i === 1 ? 0.4 : 1));
     }
     this.pos.add(this.swayPos.value).add(this.recoilPos.value);
-    this.rot.add(this.swayRot.value).add(this.recoilRot.value).add(this.flinch.value);
+    this.rot.add(this.swayRot.value).add(this.recoilRot.value).addScaledVector(this.flinch.value, 1 - (1 - AIMED_FLINCH) * ads);
   }
 
   /** Where the gun sits before any clip or shake: at the hip, in the sights (its `sight` point on the camera axis), or in the sprint carry. */
@@ -200,10 +203,18 @@ export class Motion {
     this.land.impulse(1.3 * k, -3.6 * k, 0);
   }
 
+  /** A landed melee blow jars the gun in the other hand. */
+  knock(weight: number) {
+    this.flinch.impulse(-0.6 * weight, -0.5 * weight, 0.7 * weight);
+  }
+
+  /** A hit (`strength` 0…1): the gun is knocked down and over to one side and shoved back, never too little to see. */
   hurt(strength: number) {
-    const k = Math.min(2, Math.max(0.2, strength));
-    const rnd = () => Math.random() * 2 - 1;
-    this.flinch.impulse(rnd() * 2.2 * k, rnd() * 2.6 * k, rnd() * 3.4 * k);
+    const k = HURT_MIN + Math.min(1, Math.max(0, strength));
+    const side = Math.random() < 0.5 ? -1 : 1;
+    const r = Math.random();
+    this.flinch.impulse(-(1.6 + 0.6 * r) * k, side * (0.9 + 0.5 * r) * k, side * (2.2 + 0.8 * r) * k);
+    this.land.impulse(0.5 * k, -1.2 * k, 0);
   }
 
   reset() {

@@ -1,6 +1,8 @@
 import * as THREE from 'three';
-import { track, type Clip, type ClipEvent } from './clip';
+import { hand, track, type Clip, type ClipEvent } from './clip';
 import { SIDEARMS, type WeaponId } from '../defs';
+import { jolt } from './clips-kit';
+import { fingers } from './fingers';
 import { goal, holdQuat, type Goal, type V3 } from './goals';
 import { seg } from './springs';
 
@@ -26,7 +28,7 @@ export function scaled(v: readonly number[], k: number) {
  * clip cut in (the view model keeps it current), so a clip can lead the hand on from there instead of from the gun.
  */
 export function extraGoals(view: THREE.Object3D): Record<string, Goal> {
-  return { low: held(view, [[-0.24, -0.5, -0.28], [0.2, 1, -0.2], [1, 0, -0.3]]), leftFrom: goal(view, [0, 0, 0], new THREE.Quaternion()) };
+  return { low: held(view, [[-0.2, -0.33, -0.3], [0.2, 1, -0.2], [1, 0, -0.3]]), leftFrom: goal(view, [0, 0, 0], new THREE.Quaternion()) };
 }
 
 /** A gun's switch arc, each pose [x, y, z, pitch, yaw, roll] off its rest: where it is halfway out, where it has just left the frame, and what it overshoots to as a draw brings it up over `rise` seconds. */
@@ -52,40 +54,70 @@ const SLUNG_GUNS = new Set<WeaponId>(['sniper', 'shotgun', 'harpoon']);
 /** The way a gun leaves for `to`, and the way `to` comes in after `from`: each pair of classes has its own. */
 const outArc = (from: WeaponId, to: WeaponId | null) => (SIDEARMS.has(from) ? HIP : to && SIDEARMS.has(to) ? SLING : SLUNG_GUNS.has(from) ? SLUNG : RIFLE);
 const inArc = (from: WeaponId | null, to: WeaponId) => (SIDEARMS.has(to) ? HIP : from && SIDEARMS.has(from) ? SLING : SLUNG_GUNS.has(to) ? SLUNG : RIFLE);
-/** How far along its way in (away to mid) a drawn gun starts: at the frame's edge, as the old gun has just left it (the view model swaps then). */
+/** How far along its way in (away to mid) a gun brought straight back up starts. */
 const EDGE = 0.5;
+
+/** Grown frame a drawn gun must start wholly outside of, so not even a corner of it shows before its hands. */
+export const DRAW_MARGIN = 1.05;
+
+/**
+ * Where along its way in (away 0, mid 1) a gun drawn after `from` starts: the furthest in at which `outside` (the gun
+ * at that clip offset) still finds it wholly out of the picture, so the first frame it shows it is already moving in.
+ */
+export function drawEdge(from: WeaponId, to: WeaponId, stow: number, outside: (offset: readonly number[]) => boolean) {
+  const a = inArc(from, to);
+  const k = SIDEARMS.has(to) ? 1 : stow;
+  let edge = -0.7;
+  for (let e = -0.65; e < 0.85; e += 0.05) {
+    if (!outside(a.away.map((x, i) => (x + (a.mid[i]! - x) * e) * k))) break;
+    edge = e;
+  }
+  return edge;
+}
+
+/** The knock the gun takes as the support hand lands on it at the end of a draw. */
+const SEAT_KNOCK = [0.001, -0.005, 0.003, -0.02, 0.004, 0.012];
+
+/** How far past its `away` pose a holster has the gun by its end: a quick holster still has it wholly out of the picture when the swap comes. */
+const HOLSTER_END = 1.15;
 
 /** The gun takes its arc out of the frame, still speeding up as it leaves; the cross-fade from the firing pose is its ease-in. */
 export function holsterClip(duration: number, to: WeaponId | null = null): Clip {
   return clip('holster', duration, [[0, 'holster'], [1, 'swap']], (u, f, c) => {
     const a = outArc(c.id, to);
     const k = c.tuning.stow ?? 1;
-    f.gun(track(u, [[-0.4, scaled(a.away, -0.2 * k)], [0, Z], [0.45, scaled(a.mid, k)], [1, scaled(a.away, k)], [1.5, scaled(a.away, 1.7 * k)]]));
+    f.gun(track(u, [[-0.4, scaled(a.away, -0.2 * k)], [0, Z], [0.45, scaled(a.mid, k)], [1, scaled(a.away, HOLSTER_END * k)], [1.5, scaled(a.away, 1.7 * k)]]));
     f.busy = 1;
   });
 }
 
-const HANDS_ON = 0.04;
-
-/** Gun comes up its arc already moving, both hands on it, overshoots, drops back and settles; a slow draw spends the rest settling, not below the frame. */
-export function drawClip(duration: number, sidearm = false, from: WeaponId | null = null): Clip {
-  const draw = clip('draw', duration, [[0, 'draw'], [0.15, 'cloth']], (u, f, c) => {
-    // Every gun comes up from the full drop: a small gun's slide starting higher would show before the hand on its grip.
+/**
+ * Gun comes up its arc already moving in the firing hand, overshoots, drops back and settles; a slow draw spends the
+ * rest settling, not below the frame. Drawn after `from` it starts at `edge` (see drawEdge) with the support hand hanging
+ * off it, which comes up and takes its grip as the gun lands: the ready beat. Without `from` (the same gun brought back
+ * mid-holster) it comes straight back up from wherever it was.
+ */
+export function drawClip(duration: number, sidearm = false, from: WeaponId | null = null, edge = EDGE): Clip {
+  return clip('draw', duration, [[0, 'draw'], [0.15, 'cloth']], (u, f, c) => {
     const a = inArc(from, c.id);
     const k = sidearm ? 1 : (c.tuning.stow ?? 1);
     const rise = Math.min(0.56, a.rise / duration);
     const settle = rise + (1 - rise) * 0.55;
-    const edge = a.away.map((x, i) => x + (a.mid[i]! - x) * EDGE);
+    const start = a.away.map((x, i) => x + (a.mid[i]! - x) * edge);
     if (sidearm) {
       // Flourish: turned up out of the hip, the wrist snaps it past square, canted in and muzzle high, and it settles; a revolver's cylinder spins down.
-      f.gun(track(u, [[-rise, scaled(a.away, 1.7)], [0, edge], [rise * 0.85, a.up], [settle, [0.001, -0.004, 0.003, -0.02, 0, -0.04]], [1, Z]]));
+      f.gun(track(u, [[-rise, scaled(a.away, 1.7)], [0, start], [rise * 0.85, a.up], [settle, [0.001, -0.004, 0.003, -0.02, 0, -0.04]], [1, Z]]));
       if (c.id === 'cannon') f.part('cylinder', [0, 0, 0, 0, 0, -Math.PI * 4 * (1 - (1 - seg(u, 0, settle)) ** 2)]);
-    } else f.gun(track(u, [[-rise, scaled(a.away, 1.7 * k)], [0, scaled(edge, k)], [rise * 0.4, scaled(a.mid, k)], [rise, a.up], [settle, [0.001, -0.005, 0.004, -0.02, -0.005, -0.01]], [1, Z]]));
+    } else f.gun(track(u, [[-rise, scaled(a.away, 1.7 * k)], [0, scaled(start, k)], [rise * 0.4, scaled(a.mid, k)], [rise, a.up], [settle, [0.001, -0.005, 0.004, -0.02, -0.005, -0.01]], [1, Z]]));
     f.busy = 1 - seg(u, rise, 1);
+    if (!from) return;
+    const seat = rise + (settle - rise) * 0.45;
+    f.gun(SEAT_KNOCK, jolt((u - seat) * duration));
+    if (u >= seat) return;
+    const g = c.goals;
+    f.left = hand(u, [[0, g.leftOff!], [rise * 0.55, g.leftOff!], [seat, g.leftRest!]]);
+    f.leftFingers = fingers(u, [[0, 'relaxed'], [rise * 0.55, 'reach'], [seat, c.tuning.fingers.left]]);
   });
-  // A sidearm's hands are all at its grip, right under the slide: they slide over from the old gun under the frame and
-  // are on it before it shows. A long gun's hands come up with it at the usual pace.
-  return sidearm ? { ...draw, fade: HANDS_ON } : draw;
 }
 
 /** Ease back to the idle pose from wherever the last clip left off (cross-fade does the work). */

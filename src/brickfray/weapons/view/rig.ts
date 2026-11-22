@@ -7,6 +7,7 @@ import type { FlashStyle } from './flash';
 import type { CasingKind } from './fx';
 import { goal, gripQuat, type Goal, type V3 } from './goals';
 import { SHELL_HOLD } from './held';
+import { liftDarks } from './low-tone';
 import { TUNING, type Tuning } from './tuning';
 
 /** A first-person gun with everything the view model animates. */
@@ -65,6 +66,7 @@ const SHELL_INSIDE: V3 = [0, 0.029, -0.04];
 
 export function buildGunRig(id: WeaponId, kit: Kit): GunRig {
   const rigged = createRiggedModel(id, kit, 'first');
+  liftDarks(rigged.model.root, kit);
   const tuning = TUNING[id];
   const root = rigged.model.root;
   const node = (name: string) => rigged.nodes.get(name) ?? root;

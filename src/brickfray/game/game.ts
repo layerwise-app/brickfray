@@ -301,6 +301,7 @@ export class Game {
       events: (events) => {
         this.tally?.events(events, client.you);
         this.match?.events.handle(events);
+        for (const e of events) if (e.type === 'melee' && e.player === client.you) this.view.meleeLanded(e.hit);
       },
       snapshot: (s) => this.match?.receive(s),
       roster: () => this.match?.remotes.syncRoster(client.roster),

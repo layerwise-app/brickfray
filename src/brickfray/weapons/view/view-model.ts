@@ -3,7 +3,7 @@ import { ROSTER } from '../../characters/roster';
 import type { CharacterId } from '../../characters/types';
 import type { Kit } from '../../engine/kit';
 import type { Atmosphere } from '../../engine/renderer';
-import { MELEES, SIDEARMS, type WeaponId } from '../defs';
+import { MELEES, type WeaponId } from '../defs';
 import { aimLenses } from '../surface';
 import { LOADOUTS } from '../loadouts';
 import type { ViewAction, ViewCue, ViewInput, ViewModel } from '../types';
@@ -14,11 +14,11 @@ import { ClipPlayer, Frame, type Clip, type ClipCtx, type ClipEvent } from './cl
 import { Drops } from './drops';
 import { cycleClip, loadsShells, reloadClip, shotgunLoadOut, shotgunShell } from './clips-guns';
 import { reseatClip, reseats } from './clips-rifles';
-import { drawClip, extraGoals, holsterClip, restClip } from './clips-extra';
-import { outOfFrame } from './frame-out';
+import { extraGoals, restClip } from './clips-extra';
 import { blueHull, Saddle } from './saddle';
 import { cookClip, grenadeGoals, throwClip } from './clips-grenade';
-import { meleeClip, meleeGoals } from './clips-melee';
+import { MELEE_CONTACT, meleeClip, meleeGoals, meleeWeight } from './clips-melee';
+import { HitStop } from './hit-stop';
 import { ViewFx } from './fx';
 import { THUMB_JOINT } from './hand';
 import { Held } from './held';
@@ -30,6 +30,7 @@ import { GunRack } from './rack';
 import { ScopeOverlay } from './scope';
 import type { GunRig } from './rig';
 import { smooth01 } from './springs';
+import { Switcher } from './switching';
 
 export function createViewModel(kit: Kit, character: CharacterId = 'rivet'): ViewModel {
   return new FirstPersonView(kit, character);
@@ -37,13 +38,10 @@ export function createViewModel(kit: Kit, character: CharacterId = 'rivet'): Vie
 
 /** Seconds a clip takes over from the one it cuts in on, unless it names its own. */
 const FADE = 0.12;
-/** A shot fired from a gun held far off its firing pose (out of a shell-by-shell reload) waits SNAP seconds while the gun swings back over SNAP_SPAN, most of the way there when it goes off. */
-const SNAP = 0.06;
-const SNAP_SPAN = 0.1;
+/** A shot fired from a gun held far off its firing pose (out of a shell-by-shell reload) goes off on the same frame, its flash riding the muzzle as the gun swings back up over SNAP_SPAN. */
+const SNAP_SPAN = 0.08;
 /** How far off (radians of clip offset, or a quarter as many meters) counts as far. */
 const ASTRAY = 0.32;
-/** A switch re-issued mid-holster gets the old gun out of the picture within this many seconds. */
-const HURRY = 0.08;
 const BUSY_RAMP = 0.08;
 const CARRY_LEAD = 0.3;
 /** Seconds per radian (or quarter meter) the gun is off its rest that a strike takes to tuck it away. */
@@ -70,21 +68,16 @@ class FirstPersonView implements ViewModel {
   private readonly drops: Drops;
   private readonly extra: ReturnType<typeof extraGoals>;
   private readonly ctx: ClipCtx;
-  private pendingDraw = 0;
-  private pendingWeapon: WeaponId | null = null;
-  /** A switch asked for while a bomb is still in the hand: it waits for the release beat of that throw. */
-  private waiting: { clip: Clip; release: number; to: WeaponId; holster: number; draw: number; since: number } | null = null;
+  private readonly switcher: Switcher;
   private loading = false;
   private readonly saddle = new Saddle();
   private readonly action = new GunAction();
   private sprintCue = false;
   private adsCue = false;
   private readonly carry = new Carry();
-  /** Seconds until a snapped shot shows, and whether it emptied the gun. */
-  private snap = 0;
-  private snapEmpty = false;
   private readonly pose: ViewPose;
   private readonly scope: ScopeOverlay;
+  private readonly hitStop = new HitStop();
   private hidden = false;
   private readonly tmpV = new THREE.Vector3();
 
@@ -104,6 +97,19 @@ class FirstPersonView implements ViewModel {
     this.pose = new ViewPose(this.arms, this.held, this.carry, this.motion, this.parts, this.action, this.camera);
     this.rack = new GunRack(kit, this.scene);
     this.scope = new ScopeOverlay(this.scene, this.camera);
+    this.switcher = new Switcher({
+      player: this.player,
+      camera: this.camera,
+      gun: () => this.gun,
+      play: (clip) => this.play(clip),
+      setGun: (id) => this.setGun(id),
+      outside: (rig, offset, margin) => this.pose.outside(rig, offset, margin),
+      fresh: () => {
+        this.carry.reset();
+        this.parts.reset();
+        this.held.reset();
+      }
+    });
     this.setCharacter(character);
     this.equip(LOADOUTS[character].primary);
   }
@@ -118,13 +124,13 @@ class FirstPersonView implements ViewModel {
   equip(id: WeaponId) {
     this.player.stop();
     this.loading = false;
-    this.snap = this.busy = this.carrying = 0;
+    this.busy = this.carrying = 0;
     this.action.reset();
     this.carry.reset();
     this.parts.reset();
     this.held.reset();
     this.drops.clear();
-    this.pendingWeapon = this.waiting = null;
+    this.switcher.reset();
     this.setGun(id);
     this.motion.reset();
   }
@@ -139,17 +145,14 @@ class FirstPersonView implements ViewModel {
     this.ctx.id = id;
     this.ctx.tuning = rig.tuning;
     this.ctx.goals = { ...rig.goals, ...this.extra };
+    return rig;
   }
 
   act(action: ViewAction) {
     const g = this.gun;
     switch (action.type) {
       case 'fire':
-        if (this.snap <= 0 && (this.carry.gunRot.value.length() > ASTRAY || this.carry.gunPos.value.length() > ASTRAY / 4)) {
-          this.snap = SNAP;
-          this.snapEmpty = action.empty;
-          return this.play(restClip(0.2));
-        }
+        if (this.carry.gunRot.value.length() > ASTRAY || this.carry.gunPos.value.length() > ASTRAY / 4) this.play(restClip(0.2), SNAP_SPAN);
         return this.shoot(action.empty);
       case 'reload':
         this.ctx.flags.empty = action.empty;
@@ -180,7 +183,8 @@ class FirstPersonView implements ViewModel {
       }
       case 'melee': {
         const melee = MELEES[this.held.meleeId];
-        return this.play(meleeClip(melee.id, melee.cooldown * 0.75, melee.windup));
+        this.play(meleeClip(melee.id, melee.cooldown * 0.75, melee.windup));
+        return this.hitStop.strike(this.player.clip!, MELEE_CONTACT[melee.id]);
       }
       case 'grenadeCook':
         return this.play(cookClip());
@@ -188,7 +192,8 @@ class FirstPersonView implements ViewModel {
         // The host throws on release, so a quick tap skips the rest of the cook and goes straight into the throw.
         return this.play(throwClip(action.low, this.player.clip?.name === 'cook' ? this.player.time : Infinity));
       case 'switch':
-        return this.switchTo(action.to, action.holster, action.draw);
+        this.loading = false;
+        return this.switcher.request(action.to, action.holster, action.draw);
       case 'land':
         return this.motion.landImpulse(action.impact);
       case 'hurt':
@@ -208,31 +213,8 @@ class FirstPersonView implements ViewModel {
     if (g.casing && g.rigged.model.ejectPort) this.fx.eject(g.casing, g.rigged.model.ejectPort, 1, this.lastAds);
   }
 
-  private switchTo(to: WeaponId, holster: number, draw: number) {
-    const clip = this.player.clip;
-    const release = clip?.name === 'throw' ? (clip.events.find((e) => e[1] === 'release')?.[0] ?? 0) : 0;
-    if (clip && this.player.u < release) {
-      this.waiting = { clip, release, to, holster, draw, since: this.player.time };
-      return;
-    }
-    this.loading = false;
-    if (this.player.clip?.name === 'holster' && this.pendingWeapon) {
-      // Re-issued while the old gun is still on its way down: it comes straight back up if it is wanted again, else it hurries out.
-      if (to === this.gun.id) {
-        this.pendingWeapon = null;
-        return this.play(drawClip(Math.max(0.05, draw)));
-      }
-      this.player.hurry(HURRY);
-      this.pendingWeapon = to;
-      this.pendingDraw = draw - this.player.left;
-      return;
-    }
-    this.pendingWeapon = to;
-    this.pendingDraw = draw;
-    this.play(holsterClip(Math.max(0.05, holster), to));
-  }
-
-  private play(clip: Clip) {
+  /** `swing`: seconds the gun takes to come over to the new clip, when not the usual. */
+  private play(clip: Clip, swing?: number) {
     // Whatever the cut-off clip left in the left hand is let go: a shell, a magazine or a spear falls, a melee weapon goes down with the hand.
     if (this.frame.show.shell && !this.held.thumbHome(this.ctx.goals.shellInside)) this.fx.eject('shell', this.held.shell, 0.22);
     this.frame.show.shell = 0;
@@ -241,7 +223,7 @@ class FirstPersonView implements ViewModel {
     const span = clip.fade ?? FADE;
     // A strike cutting in on a gun held far off its rest (a reload, a bolt cycle) tucks it away over a few frames, not one.
     const tuck = clip.instant ? TUCK * (this.carry.gunRot.value.length() + 4 * this.carry.gunPos.value.length()) : 0;
-    this.carry.cut(span, this.snap > 0 ? SNAP_SPAN : Math.max(FADE, span, tuck), clip.instant);
+    this.carry.cut(span, swing ?? Math.max(FADE, span, tuck), clip.instant);
     const from = this.extra.leftFrom!;
     this.carry.left.matrix.decompose(from.pos, from.quat, this.tmpV);
     this.player.play(clip);
@@ -258,18 +240,7 @@ class FirstPersonView implements ViewModel {
         if (g.rigged.model.ejectPort) this.fx.eject('shell', g.rigged.model.ejectPort, 0.9, this.lastAds);
         return;
       case 'swap':
-        if (this.pendingWeapon) {
-          // The holster's tail, after the old gun is out of the picture, goes to the draw.
-          const from = this.gun.id;
-          const draw = this.pendingDraw + this.player.left;
-          this.setGun(this.pendingWeapon);
-          this.pendingWeapon = null;
-          this.play(drawClip(Math.max(0.05, draw), SIDEARMS.has(this.gun.id), from));
-          this.carry.resetGun();
-          this.parts.reset();
-          this.held.reset();
-        }
-        return;
+        return this.switcher.swap();
       case 'slideForward':
         this.action.release(g);
         break;
@@ -303,16 +274,11 @@ class FirstPersonView implements ViewModel {
   update(dt: number, input: ViewInput = IDLE) {
     const f = this.frame;
     f.reset();
-    this.player.update(dt, this.onEvent);
+    this.player.update(this.hitStop.step(dt, this.player), this.onEvent);
+    if (this.hitStop.started) this.motion.knock(meleeWeight(this.held.meleeId));
     // The new gun comes in on the frame after the old one has left the picture, whenever along its holster that is.
-    if (this.pendingWeapon && this.player.clip?.name === 'holster' && outOfFrame(this.gun.rigged.model.root, this.camera)) this.onEvent('swap');
+    this.switcher.update();
     if (!this.player.clip && this.parts.lacks('magazine') && this.parts.refilled.has('magazine')) this.play(reseatClip(this.gun.id));
-    const w = this.waiting;
-    if (w && (this.player.clip !== w.clip || this.player.u >= w.release)) {
-      // The holster makes up the wait, so the new gun is still up when the game expects it.
-      this.waiting = null;
-      this.switchTo(w.to, w.holster - Math.max(0, this.player.time - w.since), w.draw);
-    }
     this.ctx.ads = input.ads;
     this.player.clip?.sample(this.player.u, f, this.ctx);
     this.action.update(dt);
@@ -335,10 +301,13 @@ class FirstPersonView implements ViewModel {
     this.saddle.show(this.gun);
     this.pose.gun(this.gun, f, ads, dt);
     this.pose.hands(this.gun, f, this.ctx.goals, dt);
-    if (this.snap > 0 && (this.snap -= dt) <= 0) this.shoot(this.snapEmpty);
     this.fx.update(dt);
     this.drops.update(dt);
     this.camera.updateMatrixWorld();
+  }
+
+  meleeLanded(hit: boolean) {
+    this.hitStop.land(hit);
   }
 
   muzzleViewPosition(out: THREE.Vector3) {

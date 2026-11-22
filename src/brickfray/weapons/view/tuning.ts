@@ -54,13 +54,19 @@ const GRIP = {
   tube: { ...FINGERS.support, thumb: 0.62, hook: 0.3, oppose: 0.75, index: 0.6, middle: 0.68, ring: 0.7, pinky: 0.7, spread: 0.12 }
 } satisfies Record<string, FingerPose>;
 
+/** A handgun at the hip is turned in to show its left flank, frame and grip, past the hands wrapped round it. */
+const SIDEARM_TURN: V3 = [0.03, 0.2, -0.02];
+
 /** The support hand on a handgun: palm heel filling the side of the grip the firing hand leaves bare, fingers wrapped over the firing fingers, thumb forward under the slide. */
-const SIDEARM_SUPPORT: Tuning['left'] = { pos: [-0.006, -0.03, -0.004], back: [-0.98, 0.1, 0.12], axis: [0.06, 0.94, 0.3] };
+const SIDEARM_SUPPORT: Tuning['left'] = { pos: [-0.006, -0.038, -0.004], back: [-0.98, 0.1, 0.12], axis: [0.06, 0.94, 0.3] };
 
 /** Both arms on a handgun: shoulders drawn in and down so the forearms run up to the grip in line with the wrists (extension under 45 degrees), not up from the side. */
 const SIDEARM_ARMS: ArmFit = { right: { shoulder: [-0.12, -0.12, 0.06] }, left: { shoulder: [-0.04, -0.12, 0.1] } };
 /** A support hand round an upright grip: the elbow out to the side, so the forearm comes in level instead of up from under the fist. */
 const UPRIGHT_ELBOW: V3 = [-0.8, 0.8, 0];
+
+/** A short front grip close to the body: the shoulder brought in and the elbow tucked down, so the forearm rises to the grip at an angle instead of lying across the screen. */
+const TUCKED_SUPPORT: ArmFit['left'] = { pole: [-0.35, -0.9, 0.15], shoulder: [0.05, -0.05, -0.02] };
 
 /** A handgun held high: the hand turned round the grip so the palm heel and the web of the thumb cover the backstrap. */
 const HIGH_GRIP: V3 = [0.85, 0, 0.53];
@@ -73,8 +79,9 @@ const BASE = {
     hip: [0.19, -0.215, -0.37],
     hipRot: [0.03, 0.05, -0.04],
     eye: 0.205,
-    sprint: [0.08, -0.25, -0.28],
-    sprintRot: [0.3, 0.55, 0.85],
+    // Carried low on the right, muzzle down and in, not stood up across the lane ahead.
+    sprint: [0.16, -0.265, -0.3],
+    sprintRot: [-0.3, 0.5, 0.35],
     recoil: { back: 1.8, rise: 5.1, roll: 2.6, yaw: 1.7, side: 0.117, up: 0.091, adsBack: 0.54, adsRise: 0.344 },
     spring: [720, 0.52],
     right: [0, 0.002, 0.012],
@@ -88,7 +95,7 @@ const BASE = {
     eye: 0.12,
     sprint: [0.04, -0.25, -0.28],
     sprintRot: [0.55, 0.75, 0.9],
-    recoil: { back: 2.6, rise: 9.5, roll: 2.4, yaw: 1.4, side: 0.12, up: 0.18 },
+    recoil: { back: 2.6, rise: 9.5, roll: 2.4, yaw: 1.4, side: 0.12, up: 0.18, adsBack: 0.3 },
     spring: [300, 0.6],
     irons: true,
     right: [0, 0.002, 0.012],
@@ -114,7 +121,7 @@ const BASE = {
   },
   pistol: {
     hip: [0.1, -0.12, -0.4],
-    hipRot: [0.03, 0.1, -0.02],
+    hipRot: SIDEARM_TURN,
     eye: 0.27,
     sprint: [0.08, -0.14, -0.34],
     sprintRot: [0.4, 0.55, 0.5],
@@ -125,7 +132,6 @@ const BASE = {
     rightBack: HIGH_GRIP,
     left: SIDEARM_SUPPORT,
     fingers: { right: FINGERS.trigger, left: FINGERS.wrap },
-    stow: 0.85,
     weight: 0.8,
     arms: SIDEARM_ARMS,
   }
@@ -178,7 +184,7 @@ export const TUNING: Record<WeaponId, Tuning> = {
   },
   cannon: {
     hip: [0.1, -0.127, -0.41],
-    hipRot: [0.03, 0.09, -0.02],
+    hipRot: SIDEARM_TURN,
     eye: 0.27,
     sprint: [0.075, -0.145, -0.36],
     sprintRot: [0.4, 0.55, 0.5],
@@ -208,6 +214,6 @@ export const TUNING: Record<WeaponId, Tuning> = {
     fingers: { right: NEAR_TRIGGER, left: FINGERS.handle },
     stow: 0.8,
     weight: 0.75,
-    arms: { right: { shoulder: [-0.13, -0.1, 0.08] }, left: { pole: UPRIGHT_ELBOW } },
+    arms: { right: { shoulder: [-0.13, -0.1, 0.08] }, left: TUCKED_SUPPORT },
   }
 };

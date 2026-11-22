@@ -76,6 +76,15 @@ export function screw(b: ModelBuilder, x: number, y: number, z: number, axis: 'x
   b.add(slot, '#1c2229', 'dark', T(x, y, z));
 }
 
+/**
+ * Worn edge: a hairline of bare, lighter material along an edge at (x, y) running from z0 to z1, where hands and holsters
+ * rub the finish off; only on the detailed tiers.
+ */
+export function wear(b: ModelBuilder, x: number, y: number, z0: number, z1: number, color: string, k = 1.75, surface: Surface = 'metal') {
+  if (b.detail < 1) return;
+  b.add(box(0.0013, 0.0013, Math.abs(z1 - z0)), shade(color, k), surface, T(x, y, (z0 + z1) / 2));
+}
+
 /** A dark recessed-looking slot: a thin dark plate standing proud of a face. */
 export function slot(b: ModelBuilder, x: number, y: number, z: number, w: number, h: number, d: number, color = '#20262c') {
   b.add(box(w, h, d), color, 'dark', T(x, y, z));

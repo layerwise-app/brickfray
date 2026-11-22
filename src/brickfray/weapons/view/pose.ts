@@ -3,6 +3,7 @@ import type { GunAction } from './action';
 import type { ArmFit, Arms } from './arms';
 import type { Carry } from './blend';
 import type { Frame } from './clip';
+import { outOfFrame } from './frame-out';
 import { followPath, goalMatrix, type Goal, type V3 } from './goals';
 import type { Held } from './held';
 import type { Motion } from './motion';
@@ -15,9 +16,11 @@ const UNSTOW = 0.12;
  * A throwing arm raised (Frame.leftLift): the shoulder comes up and the elbow is led high and out to the left, so the
  * arm bends where it shows instead of reaching up from below the frame as one straight tube.
  */
-const LIFT_POLE: V3 = [-0.8, 1.2, 0.2];
-const LIFT_SHOULDER: V3 = [-0.05, 0.08, 0.03];
+const LIFT_POLE: V3 = [-0.6, 0.3, 0.1];
+const LIFT_SHOULDER: V3 = [-0.07, 0.14, -0.13];
 const NONE: V3 = [0, 0, 0];
+/** Share of an aimed shot's pitch and yaw an optic-sighted gun leaves to the camera (the rest rocks the housing about the dot). */
+const OPTIC_STEADY = 0.75;
 
 /**
  * Places the gun and both hands each frame: the clip's offsets through the cut blend, the procedural motion, the sight
@@ -52,12 +55,12 @@ export class ViewPose {
     const kick = this.motion.kickRot;
     const eye = ads * (rig.tuning.recoil.adsEye ?? 0);
     this.tmpV.copy(this.carry.gunRot.apply(f.gunRot, dt)).add(this.motion.rot).addScaledVector(kick, -eye);
-    if (rig.tuning.irons) {
-      // A rear and a front sight stay lined up on the eye only while the gun neither pitches nor yaws: aimed, a shot
-      // drives the gun back along the sight line and rolls it about that line, and the climb is the camera's.
-      this.tmpV.x -= (kick.x + this.motion.climbTurn) * ads;
-      this.tmpV.y -= kick.y * ads;
-    }
+    // A rear and a front sight stay lined up on the eye only while the gun neither pitches nor yaws: aimed, a shot drives
+    // the gun back along the sight line and rolls it about that line, and the climb is the camera's. An optic keeps a
+    // little of the rock (its housing turns about the pinned dot), not enough to bounce round the reticle.
+    const steady = rig.tuning.irons ? 1 : eye > 0 ? 0 : OPTIC_STEADY;
+    this.tmpV.x -= (kick.x + this.motion.climbTurn) * ads * steady;
+    this.tmpV.y -= kick.y * ads * steady;
     root.quaternion.copy(this.baseQuat).multiply(this.tmpQ.setFromEuler(this.tmpE.set(this.tmpV.x, this.tmpV.y, this.tmpV.z)));
 
     // Moving parts: clip offsets, or the action a shot sets off (slide kick, hammer and cylinder).
@@ -76,6 +79,17 @@ export class ViewPose {
       root.updateMatrixWorld(true);
     }
     this.parts.settle(rig, dt, this.camera);
+  }
+
+  /** Whether the gun, held at its hip rest plus the clip offset `offset`, would lie wholly outside the frame grown `margin` times. */
+  outside(rig: GunRig, offset: readonly number[], margin: number) {
+    this.motion.rest(rig.sight, 0, this.basePos, this.baseQuat);
+    const root = rig.rigged.model.root;
+    const m = this.motion;
+    root.position.set(offset[0] ?? 0, offset[1] ?? 0, offset[2] ?? 0).add(this.basePos).add(m.pos);
+    root.quaternion.copy(this.baseQuat).multiply(this.tmpQ.setFromEuler(this.tmpE.set((offset[3] ?? 0) + m.rot.x, (offset[4] ?? 0) + m.rot.y, (offset[5] ?? 0) + m.rot.z)));
+    root.updateMatrixWorld(true);
+    return outOfFrame(root, this.camera, margin);
   }
 
   hands(rig: GunRig, f: Frame, goals: Record<string, Goal>, dt: number) {

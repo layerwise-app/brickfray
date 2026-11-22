@@ -10,6 +10,9 @@ const STROKE = 0.078;
 const PULLED = [0, -0.008, 0.02, 0.06, 0.045, -0.12];
 const PUSHED = [0, 0.005, -0.01, -0.028, 0.015, -0.03];
 const REBOUND = [0, -0.001, 0.003, 0.008, 0, 0.012];
+/** The jar as the forend hits the back of its stroke, and as it slams home. */
+const HAUL_JOLT = [0, 0.002, 0.008, 0.03, 0, -0.02];
+const SLAM_JOLT = [0, -0.003, -0.008, -0.035, 0, 0.02];
 /** Loading port rolled up toward the left hand; the gun dips between shells and rises to meet each one. */
 const LOAD = [-0.1, 0.1, -0.05, 0.36, 0.55, -0.55];
 const LOAD_LOW = [-0.09, 0.085, -0.04, 0.28, 0.52, -0.47];
@@ -17,8 +20,16 @@ const LOAD_MEET = [-0.106, 0.108, -0.054, 0.39, 0.55, -0.59];
 
 /** How far a pump stroke takes the gun out of the sights: it is worked in the shoulder, the bead dipping rather than leaving the eye. */
 const AIMED_PUMP = 0.06;
-/** Share of the stroke's haul and roll the gun still makes when fully aimed. */
+/** Share of the stroke's haul and roll the gun still makes when fully aimed, and of its pitch and yaw (which would take the bead off the rear ring). */
 const AIMED_HAUL = 0.45;
+const AIMED_TURN = 0.12;
+
+/** A pump offset as worked in the shoulder at aim blend `ads`: hauled and rolled, barely turned. */
+function aimed(v: readonly number[], ads: number) {
+  const haul = 1 - (1 - AIMED_HAUL) * ads;
+  const turn = 1 - (1 - AIMED_TURN) * ads;
+  return v.map((x, i) => x * (i === 3 || i === 4 ? turn : haul));
+}
 
 /**
  * No two shells go in alike: per shell, how high the gun rises to meet it [x, y, z, rx, ry, rz], how long the hand
@@ -61,10 +72,10 @@ export function shotgunPump(duration: number, eject: boolean): Clip {
   const events: Events = [[0.19, 'pumpBack'], [0.325, 'pumpForward']];
   if (eject) events.push([0.215, 'shellEject']);
   return clip('pump', duration, 0.44, events, (t, f, c) => {
-    f.gun(track(t, gun), 1 - (1 - AIMED_HAUL) * c.ads);
-    f.gun([0, 0.002, 0.008, 0.03, 0, -0.02], jolt(t - 0.21));
+    f.gun(aimed(track(t, gun), c.ads));
+    f.gun(aimed(HAUL_JOLT, c.ads), jolt(t - 0.21));
     // The slam's rebound is still ringing when the clip ends; it is let out first, so the gun does not jump.
-    f.gun([0, -0.003, -0.008, -0.035, 0, 0.02], jolt(t - 0.33) * (1 - seg(t, 0.38, 0.44)));
+    f.gun(aimed(SLAM_JOLT, c.ads), jolt(t - 0.33) * (1 - seg(t, 0.38, 0.44)));
     f.part('pump', track(t, pump));
     f.busy = env(t, 0, 0.1, 0.34, 0.43) * AIMED_PUMP;
   });

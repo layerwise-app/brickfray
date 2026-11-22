@@ -6,6 +6,7 @@ import { surfaceMaterial } from '../surface';
 import type { Frame } from './clip';
 import { FINGERS, type FingerPose } from './fingers';
 import { goal, goalMatrix, type Goal } from './goals';
+import { liftDarks } from './low-tone';
 import { smooth01 } from './springs';
 
 /** Where a tool handle's axis sits in the left hand's frame once the fingers close on it. */
@@ -73,6 +74,7 @@ export class Held {
   ) {
     this.melee = this.take('mallet');
     this.grenade = createRiggedModel('grenade', kit, 'first');
+    liftDarks(this.grenade.model.root, kit);
     hand.add(this.grenade.model.root);
     this.grenade.model.root.position.set(0.0165, 0.016, -0.002);
     this.shell = new THREE.Mesh(redShell, surfaceMaterial(kit.materials));
@@ -100,6 +102,7 @@ export class Held {
 
   private take(id: MeleeId) {
     const melee = createRiggedModel(id, this.kit, 'first');
+    liftDarks(melee.model.root, this.kit);
     melee.model.root.position.copy(HANDLE_IN_FIST);
     melee.model.root.scale.setScalar(IN_HAND[id] ?? 1);
     this.hand.add(melee.model.root);

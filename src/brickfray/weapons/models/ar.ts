@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { T, type ModelBuilder } from '../builder';
 import { box, gear, latheZ, pipe, prism, rounder, slab, torus, tube } from '../shapes';
-import { railSide, railTop, screw, shade, slot, studGrid, studSide } from './details';
+import { railSide, railTop, screw, shade, slot, studGrid, studSide, wear } from './details';
 
 const C = {
   receiver: '#3a4149',
@@ -28,6 +28,8 @@ export function buildAr(b: ModelBuilder) {
     C.receiver,
     'satin'
   );
+  // Flared lip round the mouth of the magazine well, a separate moulding standing out of the receiver's sides.
+  b.add(prism([[-0.017, 0.038], [0.017, 0.038], [0.0212, 0.023], [-0.0212, 0.023]], 0.092, lod, lod.bevel), shade(C.receiver, 0.92), 'satin', T(0, 0, -0.123));
   // Trigger guard loop and trigger blade.
   b.add(slab([[-0.08, 0.052], [-0.012, 0.052], [-0.014, 0.014], [-0.08, 0.017]], 0.009, lod, 0.006, [[[-0.073, 0.05], [-0.021, 0.05], [-0.022, 0.022], [-0.073, 0.024]]]), C.receiver, 'satin');
   b.add(slab([[-0.049, 0.052], [-0.04, 0.052], [-0.041, 0.038], [-0.045, 0.027], [-0.052, 0.025], [-0.049, 0.037]], 0.0055, lod, 0.002), C.accent, 'plastic');
@@ -64,8 +66,11 @@ export function buildAr(b: ModelBuilder) {
   if (d >= 1) {
     for (const sd of [1, -1]) {
       b.add(box(0.0012, 0.0022, 0.226), '#15191d', 'dark', T(sd * 0.0166, 0.0965, -0.052));
-      b.add(box(0.0044, 0.026, 0.058, 0.0019), shade(C.receiver, 1.12), 'satin', T(sd * 0.0166, 0.072, -0.117));
-      b.add(box(0.0042, 0.022, 0.1, 0.0019), shade(C.receiver, 1.08), 'satin', T(sd * 0.0162, 0.118, -0.115));
+      // Anodised metal plates on the polymer receiver: they catch the light where the receiver stays matte.
+      b.add(box(0.0044, 0.026, 0.058, 0.0019), shade(C.receiver, 1.6), 'metal', T(sd * 0.0166, 0.072, -0.117));
+      b.add(box(0.0042, 0.022, 0.1, 0.0019), shade(C.receiver, 1.55), 'metal', T(sd * 0.0162, 0.118, -0.115));
+      // A stepped rib where the upper receiver tapers in toward the handguard.
+      b.add(box(0.003, 0.005, 0.15, 0.001), shade(C.receiver, 0.85), 'satin', T(sd * 0.0168, 0.1, -0.075));
     }
   }
   if (d >= 2) {
@@ -73,13 +78,19 @@ export function buildAr(b: ModelBuilder) {
       for (const [y, z] of [[0.081, -0.094], [0.063, -0.14], [0.126, -0.075], [0.11, -0.155]] as const) screw(b, sd * 0.0189, y, z, 'x', 0.0019);
     }
   }
+  // Worn edges where the hands and the sling rub: the upper's top corners, the lower's belly, the magwell lip.
+  for (const sd of [1, -1]) wear(b, sd * 0.0159, 0.1349, 0.058, -0.166, C.receiver, 2.2);
+  wear(b, -0.0167, 0.0505, 0.058, -0.064, C.receiver, 2);
+  wear(b, -0.0212, 0.0232, -0.08, -0.166, C.receiver, 2);
   // Selector, mag release, bolt catch, takedown pins.
   if (b.minor) {
     b.add(box(0.004, 0.006, 0.016, 0.001), C.accent, 'plastic', T(-0.0185, 0.077, 0.022, 0.4));
     b.add(tube(0.0042, 0.004, lod.segSmall), C.accent, 'plastic', T(0.0185, 0.074, -0.066, 0, Math.PI / 2));
   }
   if (d >= 1) {
-    b.add(box(0.003, 0.012, 0.008, 0.001), C.dark, 'satin', T(-0.0178, 0.092, -0.074));
+    // Bolt release: a ribbed metal paddle on the left of the receiver, over the magazine well.
+    b.add(box(0.0034, 0.017, 0.009, 0.0012), C.barrel, 'metal', T(-0.0186, 0.086, -0.073, 0.22));
+    for (const y of [0.08, 0.086, 0.092]) b.add(box(0.0012, 0.0016, 0.0094), shade(C.barrel, 0.6), 'dark', T(-0.0205, y, -0.0735 + (y - 0.086) * 0.22));
     for (const s of [1, -1]) for (const z of [0.045, -0.15]) b.add(tube(0.0032, 0.0016, lod.segSmall), C.barrel, 'metal', T(s * 0.0172, 0.09, z, 0, Math.PI / 2));
   }
 
@@ -98,6 +109,7 @@ export function buildAr(b: ModelBuilder) {
       railSide(b, s, s * 0.024, 0.112, -0.37, -0.438, 0.014, C.dark);
     }
     b.add(box(0.018, 0.012, 0.016, 0.003), C.accent, 'plastic', T(0, 0.083, -0.268, -0.35));
+    for (const s of [1, -1]) wear(b, s * 0.0232, 0.1362, -0.176, -0.443, C.furniture, 1.16, 'plastic');
   }
   if (d >= 2) {
     for (const s of [1, -1]) for (const z of [-0.18, -0.44]) screw(b, s * 0.0242, 0.126, z, 'x', 0.0024);
@@ -149,28 +161,29 @@ export function buildAr(b: ModelBuilder) {
   }
 
   // Red-dot optic: mount, hooded tube, glass and the glowing dot.
-  b.add(box(0.026, 0.013, 0.052, lod.bevel), C.optic, 'satin', T(0, 0.1445, -0.076));
-  b.add(box(0.016, 0.008, 0.03, lod.bevel), C.optic, 'satin', T(0, 0.148, -0.078));
-  // The tube fills the eye at ADS: rounder than the rest of the gun, so it never shows its facets.
+  b.add(box(0.026, 0.013, 0.044, lod.bevel), C.optic, 'satin', T(0, 0.1445, -0.08));
+  b.add(box(0.014, 0.008, 0.026, lod.bevel), C.optic, 'satin', T(0, 0.148, -0.084));
+  // The tube fills the eye at ADS: rounder than the rest of the gun, so it never shows its facets. Short and thin-walled,
+  // so aimed its housing is a slim ring round a wide window instead of a pipe to look down.
   const ring = lod.third ? lod.seg : Math.max(24, lod.seg * 2);
   rounder(ring, () => {
-    b.add(b.minor ? pipe(0.0195, 0.0163, 0.056, ring) : tube(0.0195, 0.056, ring), C.optic, 'satin', T(0, SIGHT_Y, -0.078));
-    if (b.minor) b.add(pipe(0.0215, 0.0175, 0.008, ring), C.optic, 'satin', T(0, SIGHT_Y, -0.104));
-    b.glass(tube(0.0164, 0.0014, ring), C.lens, T(0, SIGHT_Y, -0.1));
+    b.add(b.minor ? pipe(0.018, 0.0167, 0.03, ring) : tube(0.018, 0.03, ring), C.optic, 'satin', T(0, SIGHT_Y, -0.085));
+    if (b.minor) b.add(pipe(0.0188, 0.0167, 0.004, ring), C.optic, 'satin', T(0, SIGHT_Y, -0.099));
+    b.glass(tube(0.0168, 0.0014, ring), C.lens, T(0, SIGHT_Y, -0.097));
     // Circle-dot reticle: a dot the eye finds on any background inside a ring that frames the target.
     if (b.minor) {
       b.add(tube(0.0016, 0.0006, 12), C.dot, 'glow', T(0, SIGHT_Y, -0.0985));
       b.add(torus(0.0068, 0.0006, 28), C.dot, 'glow', T(0, SIGHT_Y, -0.0985));
     }
   });
-  if (b.minor) b.add(gear(0.0058, 0.0066, d >= 2 ? 14 : 8, 0.009), C.accent, 'plastic', T(0.0235, SIGHT_Y - 0.002, -0.072, 0, Math.PI / 2));
+  if (b.minor) b.add(gear(0.0058, 0.0066, d >= 2 ? 14 : 8, 0.009), C.accent, 'plastic', T(0.0222, SIGHT_Y - 0.002, -0.084, 0, Math.PI / 2));
   if (d >= 1) {
     b.add(box(0.003, 0.006, 0.026, 0.001), C.accent, 'plastic', T(-0.0145, 0.145, -0.07));
-    b.add(tube(0.0062, 0.008, lod.segSmall, 0.0015), C.optic, 'satin', T(0, SIGHT_Y + 0.021, -0.07, Math.PI / 2));
+    b.add(tube(0.0062, 0.008, lod.segSmall, 0.0015), C.optic, 'satin', T(0, SIGHT_Y + 0.0195, -0.084, Math.PI / 2));
   }
   if (d >= 2) {
     for (const z of [-0.06, -0.092]) screw(b, 0.0131, 0.1445, z, 'x', 0.0021);
-    b.add(box(0.018, 0.0015, 0.0015), shade(C.optic, 1.8), 'satin', T(0, SIGHT_Y + 0.0196, -0.1));
+    b.add(box(0.016, 0.0015, 0.0015), shade(C.optic, 1.8), 'satin', T(0, SIGHT_Y + 0.0182, -0.098));
   }
 
   // Bolt carrier (animated, cycles on every shot): chrome in the ejection port and a left-side track with its orange knob.

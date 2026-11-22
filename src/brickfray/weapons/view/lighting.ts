@@ -42,9 +42,11 @@ export class ViewLighting {
       this.hemi.groundColor.copy(l.ground);
       this.hemi.intensity = l.hemi;
     }
-    // A soft camera-side fill keeps the shadowed side of the gun from going flat black.
+    // A soft camera-side fill keeps the shadowed side of the gun from going flat black. Without reflections (no PBR) it
+    // is all a dark receiver has to show its faces and edges by, so it is stronger there.
     this.fill.color.set(a.horizon);
-    this.fill.intensity = pbr ? 0.35 : 0.3;
+    if (!pbr) this.fill.color.lerp(WHITE, 0.6);
+    this.fill.intensity = pbr ? 0.35 : LOW_FILL;
     this.fill.position.set(-0.6, 0.3, 1).multiplyScalar(5);
     this.envTexture?.dispose();
     this.envTexture = pbr ? skyTexture(a) : null;
@@ -65,6 +67,9 @@ export class ViewLighting {
     this.group.removeFromParent();
   }
 }
+
+const LOW_FILL = 1;
+const WHITE = new THREE.Color(1, 1, 1);
 
 /** Brightness (linear) of the high softbox panels and of the horizon strip in the view layer's reflections. */
 const PANEL = 3.5;

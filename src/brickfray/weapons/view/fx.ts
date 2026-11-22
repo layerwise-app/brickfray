@@ -31,7 +31,8 @@ export class ViewFx {
     this.flash = new MuzzleFlash(scene);
 
     const material = surfaceMaterial(kit.materials);
-    const seg = kit.profile.detail >= 1 ? 12 : 8;
+    // Casings tumble close to the eye: round on every tier (a few dozen instanced triangles more), never visible prisms.
+    const seg = 12;
     const make = (geo: THREE.BufferGeometry) => {
       const mesh = new THREE.InstancedMesh(geo, material, MAX_CASINGS);
       mesh.frustumCulled = false;

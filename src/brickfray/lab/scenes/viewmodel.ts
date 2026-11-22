@@ -65,6 +65,7 @@ export default function setup(ctx: LabContext) {
       setCharacter: (id: unknown) => view.setCharacter(id as CharacterId),
       equip: (id: unknown) => view.equip(id as WeaponId),
       act: (action: unknown) => view.act(action as ViewAction),
+      meleeLanded: (hit: unknown) => view.meleeLanded(Boolean(hit)),
       setInput: (partial: unknown) => {
         Object.assign(input, partial as Partial<ViewInput>);
         // Specs written before the flag existed slide by crouching at speed.

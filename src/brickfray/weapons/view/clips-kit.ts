@@ -111,6 +111,8 @@ const SETTLE = [0.005, 0.009, 0.005, 0.045, 0.026, 0.06];
 const sway = [0, 0, 0, 0, 0, 0];
 /** Halfway through the fetch the gun hand takes a fresh grip: the gun sags and rolls toward level, then is hitched back up. */
 const REGRIP = [0.008, -0.022, 0.01, -0.07, -0.05, 0.2];
+/** The support gone, the muzzle droops under its own weight and the gun sinks a little until the hand comes back. */
+const DROOP = [0.004, -0.016, 0.006, -0.06, 0.02, 0.05];
 const SAG_TIME = 0.09;
 const HITCH_TIME = 0.16;
 
@@ -154,6 +156,7 @@ export function magSwap(o: Swap) {
     f.gun(o.slam, jolt(t - a[9] + 0.01));
     if (o.twist) f.gun([0, 0.004, 0, 0.012, 0.02, -0.03], jolt(t - a[9] - TWIST));
     settleGun(f, t - a[2], env(t, a[2], a[3], a[5], a[6]));
+    f.gun(DROOP, env(t, a[2], a[3] + 0.12, a[5], a[6]) * c.tuning.weight ** 2);
     regripGun(f, t, (a[3] + a[4]) / 2);
     const k = seg(t, a[1] + 0.03, a[2] + 0.04) * (1 - seg(t, a[5] + 0.06, a[6] + 0.02));
     carry(f, c, 'magazine', seat, hold, track(t, local), track(t, path), k);

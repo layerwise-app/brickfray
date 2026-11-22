@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { T, type ModelBuilder } from '../builder';
 import { ball, box, gear, latheZ, pipe, prism, slab, torus, tube } from '../shapes';
-import { screw, shade, slot, studSide } from './details';
+import { screw, shade, slot, studSide, wear } from './details';
 
 const C = {
   receiver: '#31373e',
@@ -61,6 +61,10 @@ export function buildShotgun(b: ModelBuilder) {
     for (const s of [1, -1]) for (const y of [0.0545, 0.1215]) b.add(box(0.0012, 0.0016, 0.2, 0.0004), shade(C.receiver, 0.55), 'dark', T(s * 0.0201, y, -0.05));
   }
   if (d >= 2) for (const [y, z] of [[0.112, 0.014], [0.112, -0.114], [0.088, 0.014], [0.088, -0.114]] as const) screw(b, -0.0219, y, z, 'x', 0.002);
+  // The receiver steps down to a narrower nose where barrel and magazine tube leave it, and its edges are worn bright.
+  b.add(prism([[-0.0172, 0.05], [0.0172, 0.05], [0.0172, 0.124], [-0.0172, 0.124]], 0.012, lod, 0.004), shade(C.receiver, 0.9), 'satin', T(0, 0, -0.171));
+  for (const s of [1, -1]) wear(b, s * 0.0197, 0.1265, 0.028, -0.163, C.receiver, 2.1);
+  wear(b, -0.0199, 0.0475, 0.06, -0.163, C.receiver, 1.9);
   // Receiver top as the aiming eye sees it: a matte serrated rib between two polished flats, leading to the barrel rib.
   b.add(box(0.0135, 0.0026, 0.186, lod.bevel * 0.5), C.dark, 'rubber', T(0, 0.1291, -0.07));
   if (d >= 1) {
@@ -97,6 +101,10 @@ export function buildShotgun(b: ModelBuilder) {
   if (d >= 1) {
     for (const s of [1, -1] as const) studSide(b, s, s * 0.021, 0.075, 0.2, 3, 0.022, 0.0058, C.wood);
     b.add(box(0.0014, 0.038, 0.11, 0.0006), shade(C.wood, 0.7), 'dark', T(-0.0212, 0.06, 0.22, 0.2));
+    // A glossy raised panel on each side of the stock and a sling stud: the stock reads as moulded, not one flat block.
+    b.add(slab([[0.13, 0.05], [0.16, 0.072], [0.285, 0.068], [0.3, 0.052], [0.3, 0.012], [0.285, 0.004], [0.2, 0.032]], 0.045, lod, 0.003, [], 0.002), shade(C.wood, 1.08), 'plastic');
+    b.add(tube(0.0042, 0.006, lod.segSmall, 0.001), C.barrel, 'metal', T(0, -0.008, 0.3, Math.PI / 2));
+    wear(b, -0.0205, 0.0965, 0.11, 0.31, C.wood, 1.2, 'plastic');
   }
   if (d >= 2) for (let i = 0; i < 5; i++) b.add(box(0.047, 0.003, 0.0026, 0.0006), shade(C.dark, 1.4), 'rubber', T(0, 0.0 + i * 0.022, 0.3425));
 
@@ -118,12 +126,14 @@ export function buildShotgun(b: ModelBuilder) {
   if (d >= 1) b.add(box(0.004, 0.008, 0.08, 0.001), C.receiver, 'satin', T(-0.0255, 0.066, -0.09));
   // Its shells are parts of their own (a reload in first person takes them out one by one); slot nodes mark where each sits.
   const shells = d >= 1 ? 4 : b.minor ? 3 : 2;
+  // The carrier sits right under the eye in first person: round hulls on every tier there.
+  const hullSeg = lod.third ? lod.segSmall : Math.max(12, lod.segSmall);
   for (let i = 0; i < shells; i++) {
     const z = saddleZ(i, shells);
     b.part(`saddle${i}`, new THREE.Vector3(SADDLE_X, 0.094, z));
     const hull = i % 2 === 0 ? C.hull : C.hull2;
-    b.add(tube(0.0098, 0.044, lod.segSmall, 0.0015), hull, 'plastic', T(SADDLE_X, 0.088, z, Math.PI / 2));
-    b.add(tube(0.0102, 0.012, lod.segSmall, 0.001), C.brass, 'metal', T(SADDLE_X, 0.116, z, Math.PI / 2));
+    b.add(tube(0.0098, 0.044, hullSeg, 0.0015), hull, 'plastic', T(SADDLE_X, 0.088, z, Math.PI / 2));
+    b.add(tube(0.0102, 0.012, hullSeg, 0.001), C.brass, 'metal', T(SADDLE_X, 0.116, z, Math.PI / 2));
     if (d >= 2) b.add(tube(0.0028, 0.002, 8), shade(C.brass, 0.7), 'metal', T(SADDLE_X, 0.1225, z, Math.PI / 2));
   }
   b.part('body');
