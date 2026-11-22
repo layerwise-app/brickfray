@@ -193,5 +193,8 @@ export const fr: Dictionary = {
   'action.weapon2': 'Arme de poing',
   'action.scoreboard': 'Tableau des scores',
   'action.chat': 'Discussion',
-  fullscreen: 'Plein écran'
+  fullscreen: 'Plein écran',
+  credits: 'Crédits',
+  'credits.madeBy': 'Créé par',
+  'credits.builtWith': 'Développé avec {tool}'
 };

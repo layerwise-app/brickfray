@@ -1,0 +1,114 @@
+/* Credits card over the main menu (Credits.tsx). */
+.bf-credits-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  background: rgba(11, 18, 34, 0.65);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  cursor: default;
+}
+.bf-credits {
+  display: flex;
+  width: min(100%, 360px);
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px 22px 24px;
+  outline: none;
+}
+.bf-credits-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.bf-credits-head .bf-btn {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+}
+.bf-credits-title {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 30px;
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bf-credits-block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.bf-credits-label {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--bf-muted);
+}
+/* The maker's link: a raised plate, like the menu's tiles. */
+.bf-credits-author {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.28);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.09),
+    0 4px 0 rgba(0, 0, 0, 0.3);
+  color: var(--bf-muted);
+  transition:
+    background 0.12s ease,
+    transform 0.08s ease;
+}
+.bf-credits-author:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--bf-text);
+}
+.bf-credits-author:active {
+  transform: translateY(2px);
+}
+.bf-credits-author:focus-visible {
+  outline: 3px solid #fff;
+  outline-offset: 2px;
+}
+.bf-credits-who {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+}
+.bf-credits-name {
+  font-size: 32px;
+  line-height: 1;
+  color: var(--bf-yellow);
+}
+.bf-credits-url {
+  font-size: 14px;
+  font-weight: 600;
+}
+.bf-credits-tool {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--bf-muted);
+}
+.bf-credits-tool b {
+  font-weight: 700;
+  color: var(--bf-text);
+}
+
+@media (min-width: 1800px) and (min-height: 1040px) {
+  .bf-credits {
+    zoom: 1.2;
+  }
+}
+@media (min-width: 2400px) and (min-height: 1400px) {
+  .bf-credits {
+    zoom: 1.6;
+  }
+}

@@ -193,5 +193,8 @@ export const de: Dictionary = {
   'action.weapon2': 'Seitenwaffe',
   'action.scoreboard': 'Punktetafel',
   'action.chat': 'Chat',
-  fullscreen: 'Vollbild'
+  fullscreen: 'Vollbild',
+  credits: 'Credits',
+  'credits.madeBy': 'Ein Spiel von',
+  'credits.builtWith': 'Entwickelt mit {tool}'
 };

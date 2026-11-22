@@ -193,5 +193,8 @@ export const zh: Dictionary = {
   'action.weapon2': '副武器',
   'action.scoreboard': '计分板',
   'action.chat': '聊天',
-  fullscreen: '全屏'
+  fullscreen: '全屏',
+  credits: '制作人员',
+  'credits.madeBy': '制作人',
+  'credits.builtWith': '使用 {tool} 开发'
 };

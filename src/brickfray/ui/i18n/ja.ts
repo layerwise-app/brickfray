@@ -193,5 +193,8 @@ export const ja: Dictionary = {
   'action.weapon2': 'サブ武器',
   'action.scoreboard': 'スコアボード',
   'action.chat': 'チャット',
-  fullscreen: '全画面'
+  fullscreen: '全画面',
+  credits: 'クレジット',
+  'credits.madeBy': '制作',
+  'credits.builtWith': '{tool} で開発'
 };

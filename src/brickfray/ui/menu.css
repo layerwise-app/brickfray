@@ -16,6 +16,9 @@
   --card: calc(96 * var(--u));
   --name: calc(50 * var(--u));
   --nav: calc(264 * var(--u));
+  /* The header's buttons; by touch none is smaller than a fingertip (44 px). */
+  --tool: calc(48 * var(--u));
+  --tool-h: max(var(--tool), var(--tool-min, 0px));
   position: absolute;
   inset: 0;
   display: flex;
@@ -38,10 +41,59 @@
   user-select: none;
   cursor: default;
 }
+/* The top-right corner: the tool buttons, then the player's own button at the very corner. */
+.bf-menu-corner {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  gap: calc(18 * var(--u));
+}
 .bf-menu-tools {
   display: flex;
   flex-shrink: 0;
   gap: calc(12 * var(--u));
+}
+.bf-menu-corner .bf-btn {
+  height: var(--tool-h);
+}
+.bf-menu-corner .bf-icon-btn {
+  width: var(--tool-h);
+}
+html.bf-touch .bf-menu {
+  --tool-min: 44px;
+}
+html.bf-touch .bf-menu-lang-item {
+  min-height: 44px;
+}
+
+/* The player: picture, name and #tag; the name gives way (ellipsis) before the corner crowds the logo. */
+.bf-btn.bf-menu-me {
+  min-width: 0;
+  max-width: calc(300 * var(--u));
+  justify-content: flex-start;
+  gap: calc(10 * var(--u));
+  padding: 0 calc(16 * var(--u)) 0 calc(4 * var(--u));
+}
+.bf-menu-me .bf-av {
+  --av: calc(var(--tool-h) - 8px) !important;
+  border-radius: calc(10 * var(--u));
+  box-shadow: none;
+}
+.bf-menu-me-name {
+  min-width: 0;
+  overflow: hidden;
+  font-size: calc(16 * var(--u));
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bf-menu-me-tag {
+  flex-shrink: 0;
+  margin-left: calc(-6 * var(--u));
+  font-size: calc(14 * var(--u));
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: rgba(255, 255, 255, 0.55);
 }
 
 .bf-menu-sheet {
@@ -204,51 +256,6 @@
 .bf-menu-pick:hover .bf-menu-pick-name,
 .bf-menu-pick[aria-pressed='true'] .bf-menu-pick-name {
   color: #fff;
-}
-
-/* The player's name: a field that reads as one on any backdrop. */
-.bf-menu-callsign {
-  display: flex;
-  width: min(100%, calc(260 * var(--u)));
-  height: calc(44 * var(--u));
-  align-items: center;
-  gap: calc(9 * var(--u));
-  padding: 0 calc(14 * var(--u));
-  border: 2px solid rgba(255, 255, 255, 0.34);
-  border-radius: calc(12 * var(--u));
-  background: rgba(8, 12, 26, 0.72);
-  color: rgba(255, 255, 255, 0.7);
-  cursor: text;
-  transition:
-    border-color 0.12s ease,
-    background 0.12s ease;
-}
-.bf-menu-callsign:hover {
-  border-color: rgba(255, 255, 255, 0.55);
-}
-.bf-menu-callsign:focus-within {
-  border-color: var(--bf-yellow);
-  background: rgba(8, 12, 26, 0.88);
-  color: var(--bf-yellow);
-}
-.bf-menu-callsign svg {
-  flex-shrink: 0;
-}
-.bf-menu-callsign input {
-  min-width: 0;
-  flex: 1;
-  border: 0;
-  outline: none;
-  background: none;
-  color: var(--bf-text);
-  font: inherit;
-  font-weight: 600;
-  user-select: text;
-  -webkit-user-select: text;
-}
-.bf-menu-callsign input::placeholder {
-  color: rgba(255, 255, 255, 0.5);
-  font-weight: 500;
 }
 
 .bf-menu-nav {

@@ -193,5 +193,8 @@ export const es: Dictionary = {
   'action.weapon2': 'Arma secundaria',
   'action.scoreboard': 'Marcador',
   'action.chat': 'Chat',
-  fullscreen: 'Pantalla completa'
+  fullscreen: 'Pantalla completa',
+  credits: 'Créditos',
+  'credits.madeBy': 'Creado por',
+  'credits.builtWith': 'Hecho con {tool}'
 };

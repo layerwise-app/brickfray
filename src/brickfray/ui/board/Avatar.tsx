@@ -2,6 +2,7 @@ import { CHARACTER_IDS, ROSTER } from '../../characters/roster';
 import type { CharacterId } from '../../characters/types';
 import type { Avatar as AvatarData } from '../../../lib/board/contract';
 import { useApp } from '../App';
+import './avatar.css';
 
 function hero(id: string | null | undefined): CharacterId {
   return CHARACTER_IDS.includes(id as CharacterId) ? (id as CharacterId) : 'rivet';

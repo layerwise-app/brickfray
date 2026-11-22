@@ -44,9 +44,6 @@
     justify-content: space-between;
     gap: 6px 0;
   }
-  .bf-menu-callsign {
-    width: var(--column);
-  }
 }
 
 @media (min-width: 1280px) {
@@ -87,19 +84,14 @@
   .bf-menu-logo.bf-logo {
     font-size: calc(104 * var(--u));
   }
-  .bf-menu-tools {
-    gap: calc(12 * var(--u));
+  .bf-menu-corner .bf-btn {
+    border-radius: calc(14 * var(--u));
   }
   .bf-menu-tools .bf-btn {
-    height: calc(48 * var(--u));
     gap: calc(10 * var(--u));
-    border-radius: calc(14 * var(--u));
   }
   .bf-menu-tools .bf-btn.\!px-3 {
     padding-inline: calc(12 * var(--u)) !important;
-  }
-  .bf-menu-tools .bf-icon-btn {
-    width: calc(48 * var(--u));
   }
   .bf-menu-tools svg {
     width: calc(22 * var(--u));
@@ -108,13 +100,6 @@
   .bf-menu-tools .text-sm {
     font-size: calc(14 * var(--u));
     line-height: calc(20 * var(--u));
-  }
-  .bf-menu-callsign {
-    font-size: calc(16 * var(--u));
-  }
-  .bf-menu-callsign svg {
-    width: calc(18 * var(--u));
-    height: calc(18 * var(--u));
   }
   .bf-btn.bf-big-btn {
     border-radius: calc(14 * var(--u));

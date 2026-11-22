@@ -60,6 +60,7 @@
     --card: 104px;
     --name: 30px;
     --nav: 204px;
+    --tool: 38px;
   }
   .bf-menu-picker {
     gap: 2px;
@@ -93,22 +94,14 @@
     content: '';
     pointer-events: none;
   }
+  .bf-menu-corner {
+    gap: 12px;
+  }
   .bf-menu-tools {
     gap: 6px;
   }
-  .bf-menu-tools .bf-btn {
-    height: 38px;
-  }
-  .bf-menu-tools .bf-icon-btn {
-    width: 38px;
-  }
   .bf-menu-sheet {
     gap: 12px;
-  }
-  .bf-menu-callsign {
-    width: min(100%, 220px);
-    height: 34px;
-    font-size: 14px;
   }
   .bf-menu-nav {
     gap: 9px;

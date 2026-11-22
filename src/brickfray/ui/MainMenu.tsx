@@ -8,12 +8,13 @@ import { useApp, useGame } from './App';
 import { LANGUAGES, setLang, useT } from './i18n';
 import { MELEES, WEAPONS } from '../weapons/defs';
 import { LOADOUTS } from '../weapons/loadouts';
-import { BotIcon, FullscreenIcon, GearIcon, GlobeIcon, PlayIcon, UsersIcon, WeaponIcon } from './icons';
+import { BotIcon, CreditsIcon, ExitFullscreenIcon, FullscreenIcon, GearIcon, GlobeIcon, PlayIcon, UsersIcon, WeaponIcon } from './icons';
 import { RoomsPanel } from './RoomsPanel';
+import { Credits } from './Credits';
+import { useFullscreen } from './fullscreen';
 import { TrophyIcon } from './board/icons';
-import { useAccount, useProfileSaved } from './board/me';
-import { NAME_MAX, nameText } from '../../lib/board/names';
-import { queueRename } from '../../lib/board/client/rename';
+import { ProfileChip } from './board/ProfileChip';
+import { canFullscreen, setFullscreen } from '../game/touch-screen';
 import { flushMatches } from '../../lib/board/client/sync';
 import './menu.css';
 import './menu-wide.css';
@@ -24,22 +25,23 @@ import './menu-stacked.css';
 const CONTROLS = 'button, input, a, select, textarea, label, nav, [data-cover], .bf-panel';
 
 const BoardPanel = lazy(() => import('./board/BoardPanel'));
+const ProfilePanel = lazy(() => import('./board/ProfilePanel'));
+
+/** What covers the menu: one dialog at a time. */
+type Overlay = 'rooms' | 'ranks' | 'history' | 'profile' | 'credits';
 
 export function MainMenu({ openSettings }: { openSettings: () => void }) {
   const game = useGame();
   const app = useApp();
   const { t, lang } = useT();
   const [character, setCharacter] = useState<CharacterId>(game.settings.character);
-  const [name, setName] = useState(game.settings.name);
-  const tag = useAccount().data?.profile?.tag ?? null;
-  const profileSaved = useProfileSaved();
-  const [rooms, setRooms] = useState(false);
-  const [board, setBoard] = useState(false);
+  const [overlay, setOverlay] = useState<Overlay | null>(null);
   const [turning, setTurning] = useState(false);
   const info = ROSTER[character];
   const root = useRef<HTMLDivElement>(null);
   const logo = useRef<HTMLHeadingElement>(null);
   const controls = useRef<HTMLDivElement>(null);
+  const me = useRef<HTMLButtonElement>(null);
   const sheet = useRef<HTMLDivElement>(null);
   const nav = useRef<HTMLElement>(null);
   const drag = useRef<{ pointer: number; x: number; at: number } | null>(null);
@@ -51,12 +53,12 @@ export function MainMenu({ openSettings }: { openSettings: () => void }) {
       // Side by side, the figure stands between the columns and each block bounds it on its own; stacked, the sheet is one floor.
       const stacked = getComputedStyle(root.current!).getPropertyValue('--bf-stage').trim() === 'stacked';
       coverStage({
-        header: [logo.current!.getBoundingClientRect(), controls.current!.getBoundingClientRect()],
+        header: [logo.current!.getBoundingClientRect(), controls.current!.getBoundingClientRect(), me.current!.getBoundingClientRect()],
         panels: stacked ? [sheet.current!.getBoundingClientRect()] : [...blocks, nav.current!].map(clearance)
       });
     };
     const observer = new ResizeObserver(report);
-    for (const el of [root.current!, logo.current!, controls.current!, sheet.current!, nav.current!, ...blocks]) observer.observe(el);
+    for (const el of [root.current!, logo.current!, controls.current!, me.current!, sheet.current!, nav.current!, ...blocks]) observer.observe(el);
     report();
     return () => {
       observer.disconnect();
@@ -97,18 +99,20 @@ export function MainMenu({ openSettings }: { openSettings: () => void }) {
     game.audio.play('uiHover', { volume: 0.6 });
   };
 
-  // While an input method composes (pinyin, kana), its text shows as typed; the name rule applies once it is committed.
-  const rename = (value: string, composing = false) => {
-    if (composing) return setName(value);
-    const clean = nameText(value);
-    setName(clean);
-    game.applySettings({ ...game.settings, name: clean });
-    queueRename(clean, profileSaved);
+  const open = (next: Overlay) => {
+    game.audio.play('uiClick');
+    setOverlay(next);
+  };
+  const close = () => back(null);
+  /** Back out of a dialog: My matches returns to the profile menu it was opened from. */
+  const back = (to: Overlay | null) => {
+    game.audio.play('uiBack');
+    setOverlay(to);
   };
 
   const grab = (e: React.PointerEvent<HTMLDivElement>) => {
     const target = e.target as Element;
-    if (rooms || board || drag.current || e.button !== 0 || target.closest(CONTROLS)) return;
+    if (overlay || drag.current || e.button !== 0 || target.closest(CONTROLS)) return;
     if (sheet.current!.contains(target) && getComputedStyle(root.current!).getPropertyValue('--bf-stage').trim() === 'stacked') return;
     drag.current = { pointer: e.pointerId, x: e.clientX, at: e.timeStamp };
     e.currentTarget.setPointerCapture(e.pointerId);
@@ -131,32 +135,29 @@ export function MainMenu({ openSettings }: { openSettings: () => void }) {
 
   return (
     <div ref={root} className='bf-menu' data-turning={turning} onPointerDown={grab} onPointerMove={turn} onPointerUp={drop} onPointerCancel={drop}>
-      <header className='bf-menu-header' inert={board}>
+      <header className='bf-menu-header' inert={!!overlay}>
         <h1 ref={logo} className='bf-logo bf-menu-logo'>
           BRICKFRAY
         </h1>
-        <div ref={controls} className='bf-menu-tools'>
-          <LanguageButton />
-          <button className='bf-btn bf-btn-ghost bf-icon-btn' onClick={() => void document.documentElement.requestFullscreen?.()} aria-label={t('fullscreen')}>
-            <FullscreenIcon size={22} />
-          </button>
-          <button
-            className='bf-btn bf-btn-ghost bf-icon-btn'
-            onClick={() => {
-              game.audio.play('uiClick');
-              setBoard(true);
-            }}
-            aria-label={t('board.title')}
-          >
-            <TrophyIcon size={22} />
-          </button>
-          <button className='bf-btn bf-btn-ghost bf-icon-btn' onClick={openSettings} aria-label={t('settings')}>
-            <GearIcon size={24} />
-          </button>
+        <div className='bf-menu-corner'>
+          <div ref={controls} className='bf-menu-tools'>
+            <LanguageButton />
+            <FullscreenButton />
+            <button className='bf-btn bf-btn-ghost bf-icon-btn' onClick={() => open('ranks')} aria-label={t('board.title')} title={t('board.title')}>
+              <TrophyIcon size={22} />
+            </button>
+            <button className='bf-btn bf-btn-ghost bf-icon-btn' onClick={() => open('credits')} aria-label={t('credits')} title={t('credits')}>
+              <CreditsIcon size={22} />
+            </button>
+            <button className='bf-btn bf-btn-ghost bf-icon-btn' onClick={openSettings} aria-label={t('settings')} title={t('settings')}>
+              <GearIcon size={24} />
+            </button>
+          </div>
+          <ProfileChip ref={me} character={character} open={overlay === 'profile'} onOpen={() => open('profile')} />
         </div>
       </header>
 
-      <div ref={sheet} className='bf-menu-sheet' inert={board}>
+      <div ref={sheet} className='bf-menu-sheet' inert={!!overlay}>
         <section className='bf-menu-info'>
           <div className='bf-menu-swap' key={character}>
             <div data-cover className='bf-menu-title'>
@@ -178,20 +179,6 @@ export function MainMenu({ openSettings }: { openSettings: () => void }) {
               </button>
             ))}
           </div>
-          <label data-cover className='bf-menu-callsign'>
-            <TagIcon />
-            <input
-              placeholder={t('namePlaceholder')}
-              aria-label={t('namePlaceholder')}
-              value={name}
-              maxLength={NAME_MAX}
-              spellCheck={false}
-              autoComplete='off'
-              onChange={(e) => rename(e.target.value, (e.nativeEvent as InputEvent).isComposing)}
-              onCompositionEnd={(e) => rename(e.currentTarget.value)}
-            />
-            {tag !== null && <span className='shrink-0 text-[0.875em] font-semibold tabular-nums text-white/45'>#{tag}</span>}
-          </label>
         </section>
 
         <nav ref={nav} className='bf-menu-nav'>
@@ -203,7 +190,7 @@ export function MainMenu({ openSettings }: { openSettings: () => void }) {
             caption={t('roomsCaption')}
             onClick={() =>
               begin(async () => {
-                setRooms(true);
+                setOverlay('rooms');
                 void game.browse();
               })
             }
@@ -211,25 +198,18 @@ export function MainMenu({ openSettings }: { openSettings: () => void }) {
           />
         </nav>
       </div>
-      {board && (
+      {(overlay === 'ranks' || overlay === 'history') && (
         <Suspense fallback={null}>
-          <BoardPanel
-            onClose={() => {
-              game.audio.play('uiBack');
-              setBoard(false);
-            }}
-            onName={setName}
-          />
+          <BoardPanel key={overlay} view={overlay} onClose={overlay === 'history' ? () => back('profile') : close} />
         </Suspense>
       )}
-      {rooms && (
-        <RoomsPanel
-          onClose={() => {
-            game.audio.play('uiBack');
-            setRooms(false);
-          }}
-        />
+      {overlay === 'profile' && (
+        <Suspense fallback={null}>
+          <ProfilePanel character={character} onClose={close} onMatches={() => open('history')} />
+        </Suspense>
       )}
+      {overlay === 'credits' && <Credits onClose={close} />}
+      {overlay === 'rooms' && <RoomsPanel onClose={close} />}
     </div>
   );
 }
@@ -241,16 +221,6 @@ function clearance(el: Element) {
   if (!name) return box;
   const air = 0.45 * parseFloat(getComputedStyle(name).fontSize);
   return { left: box.left, top: box.top, right: box.right + air, bottom: box.bottom };
-}
-
-/** A name tag: marks the field under the picker as the player's own name. */
-function TagIcon() {
-  return (
-    <svg width={18} height={18} viewBox='0 0 24 24' fill='currentColor' aria-hidden>
-      <circle cx='12' cy='8' r='4' />
-      <path d='M4 20.5c.6-4.6 3.9-7 8-7s7.4 2.4 8 7z' />
-    </svg>
-  );
 }
 
 /** A roster color as text on the dark menu: the same hue, lifted until it reads. */
@@ -299,6 +269,18 @@ function BigButton(props: { primary?: boolean; icon: React.ReactNode; label: str
   );
 }
 
+/** Left out where the browser has no fullscreen (iPhone Safari). */
+function FullscreenButton() {
+  const { t } = useT();
+  const on = useFullscreen();
+  if (!canFullscreen()) return null;
+  return (
+    <button className='bf-btn bf-btn-ghost bf-icon-btn' onClick={() => void setFullscreen(!on, false)} aria-pressed={on} aria-label={t('fullscreen')} title={t('fullscreen')}>
+      {on ? <ExitFullscreenIcon size={22} /> : <FullscreenIcon size={22} />}
+    </button>
+  );
+}
+
 function LanguageButton() {
   const { lang, t } = useT();
   const [open, setOpen] = useState(false);
@@ -309,11 +291,11 @@ function LanguageButton() {
         <span className='text-sm font-semibold uppercase'>{lang}</span>
       </button>
       {open && (
-        <div className='bf-panel bf-fade-in absolute right-0 top-14 z-20 flex w-44 flex-col p-1.5'>
+        <div className='bf-panel bf-fade-in absolute right-0 z-20 flex w-44 flex-col p-1.5' style={{ top: 'calc(var(--tool-h) + 8px)' }}>
           {LANGUAGES.map((l) => (
             <button
               key={l.code}
-              className={`rounded-lg px-3 py-2 text-left font-medium hover:bg-white/10 ${l.code === lang ? 'text-[var(--bf-yellow)]' : ''}`}
+              className={`bf-menu-lang-item rounded-lg px-3 py-2 text-left font-medium hover:bg-white/10 ${l.code === lang ? 'text-[var(--bf-yellow)]' : ''}`}
               onClick={() => {
                 setLang(l.code);
                 setOpen(false);

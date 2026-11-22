@@ -6,17 +6,10 @@ import { freshPlayer, getPlayerId, markKnown, setPlayerId } from '../../../lib/b
 import { flushMatches } from '../../../lib/board/client/sync';
 import type { ProfileView } from '../../../lib/board/contract';
 import type { Game } from '../../game/game';
-import { BOARD } from './me';
-
-/** The menu's name field and the game's settings follow the profile's name. */
-export function adoptName(game: Game, name: string, onName: (name: string) => void) {
-  if (name === game.settings.name) return;
-  game.applySettings({ ...game.settings, name });
-  onName(name);
-}
+import { BOARD, setLocalName } from './me';
 
 /** After a sign-in: this browser's player and its matches join the account, and the account's name comes here. */
-export async function joinAccount(game: Game, onName: (name: string) => void): Promise<ProfileView> {
+export async function joinAccount(game: Game): Promise<ProfileView> {
   const result = await claimAccount({ data: { playerId: getPlayerId(), name: game.settings.name } });
   if ('refused' in result) throw new Error(result.refused);
   if (result.playerId !== getPlayerId()) {
@@ -24,18 +17,18 @@ export async function joinAccount(game: Game, onName: (name: string) => void): P
     setPlayerId(result.playerId);
   }
   markKnown();
-  adoptName(game, result.profile.name, onName);
+  setLocalName(game, result.profile.name);
   await flushMatches(result.profile.name);
   return result.profile;
 }
 
 /** Signing out leaves a new guest behind: a fresh id, no local matches, no name. The account keeps its copy. */
-export async function leaveAccount(game: Game, onName: (name: string) => void) {
+export async function leaveAccount(game: Game) {
   await flushMatches(game.settings.name);
   await authClient.signOut();
   clearLocalMatches();
   freshPlayer();
-  adoptName(game, '', onName);
+  setLocalName(game, '');
 }
 
 export function useRefreshBoard() {

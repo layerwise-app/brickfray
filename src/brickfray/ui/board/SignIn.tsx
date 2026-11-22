@@ -19,7 +19,7 @@ function codeError(code: string | undefined): MessageKey {
 }
 
 /** Optional email sign-in with a one-time code, or the signed-in account and its sign-out. */
-export function SignIn({ account, onName }: { account: AccountView | undefined; onName: (name: string) => void }) {
+export function SignIn({ account }: { account: AccountView | undefined }) {
   const game = useGame();
   const { t } = useT();
   const refresh = useRefreshBoard();
@@ -46,7 +46,7 @@ export function SignIn({ account, onName }: { account: AccountView | undefined; 
       const { error } = await authClient.signIn.emailOtp({ email: sentTo!, otp: code.trim() });
       if (error) throw new Error(error.code ?? 'otp');
       // Signed in but not joined yet: the panel joins again the next time it reads the account.
-      await joinAccount(game, onName).catch(() => {
+      await joinAccount(game).catch(() => {
         throw new Error('JOIN');
       });
     },
@@ -58,15 +58,14 @@ export function SignIn({ account, onName }: { account: AccountView | undefined; 
     onError: (e) => setError(codeError(e.message))
   });
   const leave = useMutation({
-    mutationFn: () => leaveAccount(game, onName),
+    mutationFn: () => leaveAccount(game),
     onSuccess: () => refresh()
   });
 
   if (account?.signedIn) {
     return (
-      <section className='bf-board-account'>
-        <h3 className='bf-board-label'>{t('board.signIn')}</h3>
-        <p className='bf-board-signed'>
+      <section className='bf-me-account'>
+        <p className='bf-me-signed' title={account.email ?? undefined}>
           <MailIcon size={18} />
           <span className='truncate'>{t('board.signedInAs', { email: account.email ?? '' })}</span>
         </p>
@@ -74,19 +73,19 @@ export function SignIn({ account, onName }: { account: AccountView | undefined; 
           <PendingButton className='bf-btn-ghost !h-11' pending={leave.isPending} onClick={() => leave.mutate()}>
             {t('board.signOut')}
           </PendingButton>
-          <span className='bf-board-hint'>{t('board.signOutHint')}</span>
+          <span className='bf-me-hint'>{t('board.signOutHint')}</span>
         </div>
       </section>
     );
   }
 
   return (
-    <section className='bf-board-account'>
-      <h3 className='bf-board-label'>{t('board.signIn')}</h3>
-      <p className='bf-board-hint'>{t('board.signInWhy')}</p>
+    <section className='bf-me-account'>
+      <h3 className='bf-me-label'>{t('board.signIn')}</h3>
+      <p className='bf-me-hint'>{t('board.signInWhy')}</p>
       {!sentTo ? (
         <form
-          className='bf-board-form'
+          className='bf-me-form'
           onSubmit={(e) => {
             e.preventDefault();
             const to = email.trim().toLowerCase();
@@ -110,16 +109,16 @@ export function SignIn({ account, onName }: { account: AccountView | undefined; 
         </form>
       ) : (
         <>
-          <p className='bf-board-hint'>{t('board.codeSent', { email: sentTo })}</p>
+          <p className='bf-me-hint'>{t('board.codeSent', { email: sentTo })}</p>
           <form
-            className='bf-board-form'
+            className='bf-me-form'
             onSubmit={(e) => {
               e.preventDefault();
               if (code.trim().length === 6) verify.mutate();
             }}
           >
             <input
-              className='bf-input bf-display bf-board-code'
+              className='bf-input bf-display bf-me-code'
               inputMode='numeric'
               autoComplete='one-time-code'
               pattern='[0-9]*'
@@ -135,11 +134,11 @@ export function SignIn({ account, onName }: { account: AccountView | undefined; 
             </PendingButton>
           </form>
           <div className='flex flex-wrap gap-x-4 gap-y-1'>
-            <button className='bf-board-link' disabled={send.isPending} onClick={() => send.mutate(sentTo)}>
+            <button className='bf-me-link' disabled={send.isPending} onClick={() => send.mutate(sentTo)}>
               {t('board.resend')}
             </button>
             <button
-              className='bf-board-link'
+              className='bf-me-link'
               onClick={() => {
                 setSentTo(null);
                 setError(null);
@@ -151,7 +150,7 @@ export function SignIn({ account, onName }: { account: AccountView | undefined; 
         </>
       )}
       {error && (
-        <p className='bf-board-error' role='alert'>
+        <p className='bf-me-error' role='alert'>
           {t(error)}
         </p>
       )}

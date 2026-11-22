@@ -7,18 +7,33 @@
     --gap: 10px;
     --thumb: 46px;
     --name: 36px;
+    --tool: 42px;
   }
   .bf-menu-logo.bf-logo {
     font-size: clamp(28px, 7.6vw, 64px);
   }
+  /* Too narrow for the logo, the tools and the player in one row: the player keeps the corner, the tools go under it. */
+  .bf-menu-header {
+    display: grid;
+    grid-template-areas: 'logo me' 'tools tools';
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 8px 12px;
+  }
+  .bf-menu-logo {
+    grid-area: logo;
+  }
+  .bf-menu-corner {
+    display: contents;
+  }
+  .bf-btn.bf-menu-me {
+    grid-area: me;
+    max-width: 100%;
+    justify-self: end;
+  }
   .bf-menu-tools {
+    grid-area: tools;
+    justify-self: end;
     gap: 6px;
-  }
-  .bf-menu-tools .bf-btn {
-    height: 42px;
-  }
-  .bf-menu-tools .bf-icon-btn {
-    width: 42px;
   }
   .bf-menu-sheet {
     flex-direction: column;
@@ -51,12 +66,6 @@
   .bf-menu-pick {
     flex: 1 1 0;
     width: auto;
-  }
-  .bf-menu-callsign {
-    width: 100%;
-    height: 40px;
-    background: rgba(255, 255, 255, 0.05);
-    border-color: rgba(255, 255, 255, 0.24);
   }
   .bf-menu-nav {
     display: grid;
@@ -120,19 +129,11 @@
     --gap: 8px;
     /* As wide as six tiles across the sheet allow, so the faces stay apart. */
     --thumb: clamp(40px, (100vw - 2 * var(--pad) - 46px) / 6, 56px);
-  }
-  .bf-menu-tools .bf-btn {
-    height: 38px;
-  }
-  .bf-menu-tools .bf-icon-btn {
-    width: 38px;
+    --tool: 38px;
   }
   .bf-menu-sheet {
     gap: 9px;
     padding-top: 12px;
-  }
-  .bf-menu-callsign {
-    height: 38px;
   }
   .bf-menu-nav {
     gap: 8px;
@@ -152,20 +153,12 @@
     --gap: 7px;
     --thumb: clamp(40px, (100vw - 2 * var(--pad) - 46px) / 6, 48px);
     --name: 32px;
-  }
-  .bf-menu-tools .bf-btn {
-    height: 38px;
-  }
-  .bf-menu-tools .bf-icon-btn {
-    width: 38px;
+    --tool: 38px;
   }
   .bf-menu-sheet {
     gap: 9px;
     padding-top: 10px;
     border-radius: 18px 18px 0 0;
-  }
-  .bf-menu-callsign {
-    height: 36px;
   }
   .bf-menu-nav {
     gap: 7px;

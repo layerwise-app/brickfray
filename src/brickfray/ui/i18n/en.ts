@@ -192,7 +192,10 @@ export const en = {
   'action.weapon2': 'Sidearm',
   'action.scoreboard': 'Scoreboard',
   'action.chat': 'Chat',
-  fullscreen: 'Fullscreen'
+  fullscreen: 'Fullscreen',
+  credits: 'Credits',
+  'credits.madeBy': 'Made by',
+  'credits.builtWith': 'Built with {tool}'
 } as const;
 
 export type MessageKey = keyof typeof en;

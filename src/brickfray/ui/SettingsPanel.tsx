@@ -1,10 +1,13 @@
 import { useEffect, useState } from 'react';
 import type { Action } from '../game/input';
 import type { Settings } from '../game/settings';
-import { useGame } from './App';
+import { useApp, useGame } from './App';
+import { useFullscreen } from './fullscreen';
 import { LANGUAGES, setLang, useT, type MessageKey } from './i18n';
 import { BackIcon } from './icons';
+import { Range, SwitchRow } from './SettingControls';
 import { touchCapable } from '../game/input-mode';
+import { canFullscreen, setFullscreen } from '../game/touch-screen';
 import { TouchSettings } from './touch/TouchSettings';
 import { useTouchMode } from './touch/useInputMode';
 
@@ -20,6 +23,8 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
   const [s, setS] = useState<Settings>(game.settings);
   const [binding, setBinding] = useState<Action | null>(null);
   const touchMode = useTouchMode();
+  const fullscreen = useFullscreen();
+  const playing = useApp().screen === 'match';
 
   const update = (next: Settings) => {
     setS(next);
@@ -48,37 +53,15 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
   }, [binding]);
 
   const slider = (label: MessageKey, value: number, min: number, max: number, step: number, apply: (v: number) => Settings, format = (v: number) => v.toFixed(step < 1 ? 2 : 0)) => (
-    <label className='bf-setting grid grid-cols-[1fr_auto] items-center gap-x-4 gap-y-2'>
+    <label key={label} className='bf-setting grid shrink-0 grid-cols-[1fr_auto] items-center gap-x-4 gap-y-2'>
       <span className='font-medium'>{t(label)}</span>
       <span className='bf-display text-lg tabular-nums'>{format(value)}</span>
-      <input
-        type='range'
-        className='bf-range col-span-2'
-        min={min}
-        max={max}
-        step={step}
-        value={value}
-        style={{ ['--fill' as string]: `${((value - min) / (max - min)) * 100}%` }}
-        onChange={(e) => update(apply(Number(e.target.value)))}
-      />
+      <Range value={value} min={min} max={max} step={step} onValue={(v) => update(apply(v))} />
     </label>
   );
 
   const toggle = (label: MessageKey, value: boolean, apply: (v: boolean) => Settings, hint?: MessageKey) => (
-    <label className='bf-setting flex cursor-pointer items-center gap-4'>
-      <span className='flex flex-1 flex-col'>
-        <span className='font-medium'>{t(label)}</span>
-        {hint && <span className='text-sm text-[var(--bf-muted)]'>{t(hint)}</span>}
-      </span>
-      <button
-        role='switch'
-        aria-checked={value}
-        onClick={() => update(apply(!value))}
-        className={`relative h-8 w-14 shrink-0 rounded-full transition-colors ${value ? 'bg-[var(--bf-yellow)]' : 'bg-white/15'}`}
-      >
-        <span className={`absolute left-1 top-1 h-6 w-6 rounded-full bg-white shadow transition-transform ${value ? 'translate-x-6' : 'translate-x-0'}`} />
-      </button>
-    </label>
+    <SwitchRow label={t(label)} hint={hint && t(hint)} on={value} onChange={(v) => update(apply(v))} />
   );
 
   return (
@@ -100,6 +83,7 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
         <div className='bf-scroll flex flex-col gap-5 overflow-y-auto pr-1'>
           {tab === 'graphics' && (
             <>
+              {canFullscreen() && <SwitchRow label={t('fullscreen')} on={fullscreen} onChange={(on) => void setFullscreen(on, playing)} />}
               <div className='flex flex-col gap-2'>
                 <span className='font-medium'>{t('quality')}</span>
                 <div className='bf-seg'>

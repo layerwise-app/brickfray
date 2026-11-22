@@ -1,0 +1,39 @@
+/* Avatars: a portrait on its character's colors, clipped to a rounded tile, or an uploaded square. */
+.bf-av {
+  position: relative;
+  display: block;
+  width: var(--av);
+  height: var(--av);
+  flex-shrink: 0;
+  overflow: hidden;
+  border-radius: 28%;
+  background: #1c2a48;
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.3);
+}
+.bf-av img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.bf-av-hero::before {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 50% 42%, rgba(16, 22, 44, 0.08) 13%, rgba(8, 11, 26, 0.55) 100%);
+  content: '';
+}
+.bf-av-hero img {
+  top: auto;
+  height: auto;
+  object-fit: initial;
+}
+.bf-av-spin {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  border: 2.5px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: bf-spin 0.7s linear infinite;
+}

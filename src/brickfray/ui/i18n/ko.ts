@@ -193,5 +193,8 @@ export const ko: Dictionary = {
   'action.weapon2': '보조무기',
   'action.scoreboard': '점수판',
   'action.chat': '채팅',
-  fullscreen: '전체 화면'
+  fullscreen: '전체 화면',
+  credits: '크레딧',
+  'credits.madeBy': '제작',
+  'credits.builtWith': '{tool}로 개발'
 };

@@ -312,3 +312,35 @@ export const LockIcon = (p: IconProps) => (
     <path d='M8 10V7a4 4 0 1 1 8 0v3' fill='none' stroke='currentColor' strokeWidth='2.4' />
   </Svg>
 );
+
+export const ExitFullscreenIcon = (p: IconProps) => (
+  <Svg {...p} fill='none'>
+    <path d='M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5' stroke='currentColor' strokeWidth='2.5' strokeLinecap='round' strokeLinejoin='round' fill='none' />
+  </Svg>
+);
+
+/** An "i" on a filled disc: who made the game. */
+export const CreditsIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path fillRule='evenodd' d='M12 2.5a9.5 9.5 0 1 1 0 19 9.5 9.5 0 0 1 0-19zM10.6 10.2h2.8v7.3h-2.8zM12 5.9a1.65 1.65 0 1 1 0 3.3 1.65 1.65 0 0 1 0-3.3z' />
+  </Svg>
+);
+
+/** A clock with its hands: the player's past matches. */
+export const HistoryIcon = (p: IconProps) => (
+  <Svg {...p} fill='none'>
+    <g stroke='currentColor' strokeWidth='2.4' strokeLinecap='round' strokeLinejoin='round' fill='none'>
+      <circle cx='12' cy='12' r='8.5' />
+      <path d='M12 7.5V12l3 2' />
+    </g>
+  </Svg>
+);
+
+/** A link that leaves the game for another site. */
+export const ExternalIcon = (p: IconProps) => (
+  <Svg {...p} fill='none'>
+    <g stroke='currentColor' strokeWidth='2.4' strokeLinecap='round' strokeLinejoin='round' fill='none'>
+      <path d='M13 5h6v6M19 5l-8.5 8.5M17 14v4.5a1.5 1.5 0 0 1-1.5 1.5h-10A1.5 1.5 0 0 1 4 18.5v-10A1.5 1.5 0 0 1 5.5 7H10' />
+    </g>
+  </Svg>
+);
