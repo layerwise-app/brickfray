@@ -24,7 +24,7 @@ export function buildPistol(b: ModelBuilder) {
   const d = b.detail;
 
   // Frame with dust-cover rail, trigger guard and a raked, stud-stippled grip.
-  b.add(slab([[-0.122, 0.0446], [0.044, 0.0446], [0.058, 0.035], [0.046, 0.026], [-0.06, 0.03], [-0.122, 0.031]], 0.026, lod, [0.003, 0.004, 0.008, 0.004, 0.004, 0.003], [], d >= 1 ? 0.0022 : 0), C.frame, 'satin');
+  b.add(slab([[-0.122, 0.0446], [0.044, 0.0446], [0.058, 0.035], [0.046, 0.026], [-0.06, 0.03], [-0.122, 0.031]], 0.026, lod, [0.003, 0.004, 0.008, 0.004, 0.004, 0.003], [], d >= 1 ? 0.0035 : 0), C.frame, 'satin');
   b.add(slab([[-0.078, 0.034], [-0.012, 0.034], [-0.013, -0.002], [-0.066, -0.004], [-0.079, 0.008]], 0.009, lod, [0.002, 0.004, 0.008, 0.006, 0.006], [[[-0.07, 0.032], [-0.02, 0.032], [-0.021, 0.005], [-0.064, 0.004], [-0.071, 0.012]]]), C.frame, 'satin');
   b.add(slab([[-0.045, 0.034], [-0.037, 0.034], [-0.038, 0.022], [-0.042, 0.013], [-0.049, 0.011], [-0.046, 0.021]], 0.006, lod, 0.002), C.accent, 'plastic');
   const grip: [number, number][] = [[-0.022, 0.032], [0.036, 0.032], [0.056, -0.068], [0.02, -0.075], [0.001, -0.068], [-0.01, -0.02]];
@@ -54,7 +54,7 @@ export function buildPistol(b: ModelBuilder) {
   // Slide (animated): tapered top, serrations, ejection port and glow sights.
   b.part('slide', new THREE.Vector3(0, BORE, 0));
   const slideSection: [number, number][] = [[-0.013, 0.0445], [0.013, 0.0445], [0.013, 0.074], [0.0085, 0.082], [-0.0085, 0.082], [-0.013, 0.074]];
-  b.add(prism(slideSection, 0.176, lod, [0.001, 0.001, 0.003, 0.002, 0.002, 0.003]), C.slide, 'metal', T(0, 0, -0.04));
+  b.add(prism(slideSection, 0.176, lod, [0.001, 0.001, 0.003, 0.002, 0.002, 0.003], [], 0.0045), C.slide, 'metal', T(0, 0, -0.04));
   slot(b, 0.0062, 0.081, -0.024, 0.009, 0.0024, 0.034);
   // A lighter milled flat along the lower slide, split from the upper by a line.
   if (d >= 1) for (const s of [1, -1]) {

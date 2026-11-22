@@ -27,11 +27,11 @@ export function buildBuzzer(b: ModelBuilder) {
   const d = b.detail;
 
   // Frame: long dust cover under the compensator, trigger guard, stippled grip.
-  b.add(slab([[-0.14, 0.0446], [0.044, 0.0446], [0.058, 0.035], [0.046, 0.026], [-0.06, 0.029], [-0.128, 0.029], [-0.14, 0.034]], 0.026, lod, [0.003, 0.004, 0.008, 0.004, 0.004, 0.006, 0.004], [], d >= 1 ? 0.0022 : 0), C.frame, 'satin');
+  b.add(slab([[-0.14, 0.0446], [0.044, 0.0446], [0.058, 0.035], [0.046, 0.026], [-0.06, 0.029], [-0.128, 0.029], [-0.14, 0.034]], 0.026, lod, [0.003, 0.004, 0.008, 0.004, 0.004, 0.006, 0.004], [], d >= 1 ? 0.0035 : 0), C.frame, 'satin');
   b.add(slab([[-0.08, 0.034], [-0.012, 0.034], [-0.013, -0.002], [-0.07, -0.004], [-0.081, 0.006]], 0.009, lod, [0.002, 0.004, 0.008, 0.004, 0.004], [[[-0.072, 0.032], [-0.02, 0.032], [-0.021, 0.005], [-0.066, 0.004], [-0.073, 0.01]]]), C.frame, 'satin');
   b.add(slab([[-0.045, 0.034], [-0.037, 0.034], [-0.038, 0.022], [-0.042, 0.013], [-0.049, 0.011], [-0.046, 0.021]], 0.006, lod, 0.002), C.orange, 'plastic');
   const grip: [number, number][] = [[-0.022, 0.032], [0.036, 0.032], [0.056, -0.068], [0.02, -0.075], [0.001, -0.068], [-0.01, -0.02]];
-  b.add(slab(grip, 0.03, lod, [0.004, 0.012, 0.01, 0.008, 0.01, 0.012], [], d >= 1 ? 0.0025 : 0), C.frame, 'satin');
+  b.add(slab(grip, 0.03, lod, [0.004, 0.012, 0.01, 0.008, 0.01, 0.012], [], d >= 1 ? 0.004 : 0), C.frame, 'satin');
   if (d >= 1) {
     // Rubber grip panels stand proud of the frame, stippled along the rake of the grip.
     sidePanel(b, GRIP_PANEL, 0.03, shade(C.frame, 1.3));
@@ -60,7 +60,7 @@ export function buildBuzzer(b: ModelBuilder) {
 
   // Compensator: charcoal block with top ports, brass collar and face.
   const compSection: [number, number][] = [[-0.0125, 0.0446], [0.0125, 0.0446], [0.0125, 0.0715], [0.009, 0.0775], [-0.009, 0.0775], [-0.0125, 0.0715]];
-  b.add(prism(compSection, 0.042, lod, [0.001, 0.001, 0.003, 0.002, 0.002, 0.003]), C.comp, 'satin', T(0, 0, -0.119));
+  b.add(prism(compSection, 0.042, lod, [0.001, 0.001, 0.003, 0.002, 0.002, 0.003], [], 0.004), C.comp, 'satin', T(0, 0, -0.119));
   b.add(prism(compSection.map(([x, y]) => [x * 1.06, BORE + (y - BORE) * 1.08] as [number, number]), 0.005, lod, 0.002), C.brass, 'metal', T(0, 0, -0.098));
   b.add(prism(compSection.map(([x, y]) => [x * 1.04, BORE + (y - BORE) * 1.05] as [number, number]), 0.004, lod, 0.002), C.brass, 'metal', T(0, 0, MUZZLE + 0.002));
   b.add(tube(0.0052, 0.0016, lod.segSmall), '#0a0c0e', 'dark', T(0, BORE, MUZZLE - 0.0004));
@@ -74,7 +74,7 @@ export function buildBuzzer(b: ModelBuilder) {
   // Stubby slide (animated): serrations, ejection port and glow sights.
   b.part('slide', new THREE.Vector3(0, BORE, 0));
   const slideSection: [number, number][] = [[-0.0135, 0.0445], [0.0135, 0.0445], [0.0135, 0.0735], [0.0095, 0.081], [-0.0095, 0.081], [-0.0135, 0.0735]];
-  b.add(prism(slideSection, 0.122, lod, [0.001, 0.001, 0.003, 0.002, 0.002, 0.003]), C.slide, 'satin', T(0, 0, -0.02));
+  b.add(prism(slideSection, 0.122, lod, [0.001, 0.001, 0.003, 0.002, 0.002, 0.003], [], 0.0045), C.slide, 'satin', T(0, 0, -0.02));
   slot(b, 0.0064, 0.0798, -0.026, 0.009, 0.0024, 0.03);
   b.add(box(0.008, 0.003, 0.026, 0.0008), C.brass, 'metal', T(0.0034, 0.0796, -0.026));
   const grooves = d >= 1 ? 6 : 3;

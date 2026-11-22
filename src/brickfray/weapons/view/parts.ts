@@ -50,6 +50,13 @@ export class Parts {
   private readonly missing = new Set<string>();
   private fade = 0;
   private homing = 0;
+  /** Carried parts a clip of their own brings back (a rifle's magazine dropped by a cut-off reload): never put back unseen. */
+  readonly refilled = new Set<string>();
+
+  /** Whether a carried part is out of the gun and not yet brought back. */
+  lacks(name: string) {
+    return this.missing.has(name);
+  }
 
   /** A new clip starts on `rig`: remember where every part is now, and let anything out of its seat fall. Returns whether a magazine at the mouth of its well was pushed home. */
   capture(rig: GunRig, drops: Drops) {
@@ -114,7 +121,7 @@ export class Parts {
       point.setFromMatrixPosition(part.matrixWorld);
       if (dt > 0) t.speed.subVectors(point, t.at).divideScalar(dt);
       t.at.copy(point);
-      if (!this.missing.has(name)) continue;
+      if (!this.missing.has(name) || this.refilled.has(name)) continue;
       // Rounds go back into a cylinder as it shuts on them; anything else once its seat is out of the picture.
       const shut = RIDES[name] !== undefined && this.fade <= 0 && seatShift(rig, name).lengthSq() < 1e-8;
       if (shut || unseen(part, t.box, CARRIED[name]!, camera)) this.missing.delete(name);

@@ -39,6 +39,8 @@ export class Frame {
   /** A shell going into the loading port: its seat on the gun this frame, and how far it has left the fingers for it (0…1). */
   shellSeat: Goal | null = null;
   shellIn = 0;
+  /** 0…1: how far the left arm is raised to throw (shoulder up, elbow led high and out). */
+  leftLift = 0;
   /** 0…1: how much the clip overrides aiming and sprint posing. */
   busy = 0;
 
@@ -54,6 +56,7 @@ export class Frame {
     this.pin.fly = -1;
     this.shellSeat = null;
     this.shellIn = 0;
+    this.leftLift = 0;
     this.busy = 0;
   }
 

@@ -18,6 +18,8 @@ export interface FlashStyle {
 type Tint = readonly [number, number, number];
 const FIRE: Tint = [1, 0.82, 0.55];
 const HOT: Tint = [1, 0.95, 0.85];
+/** The glow behind a shotgun's fireball: additive, so it has to start deep orange to stay coloured. */
+const EMBER: Tint = [0.95, 0.42, 0.12];
 const ENERGY: Tint = [0.35, 0.9, 1];
 const SPARK: Tint = [1, 0.88, 0.45];
 /** The hard-edged cards carry their own colour bands. */
@@ -162,13 +164,16 @@ export class MuzzleFlash {
         break;
       }
       case 'blast': {
-        card(facing(star, -0.01), Cell.Star, FIRE, 9, 0, 0.034);
-        card(facing(star * 0.45, -0.02), Cell.Core, HOT, 4, 0, 0.018);
+        // A fireball, not a white star: a deep orange glow behind fat banded flame tongues fanned round the line of fire,
+        // and a banded four-lobed bloom (orange rim, yellow, white core) over their roots.
+        card(facing(star * 1.2, -0.004), Cell.Star, EMBER, 8, 0, 0.045);
         const turn = Math.random() * Math.PI;
         for (let i = 0; i < s.prongs; i++) {
           const a = turn + (i / s.prongs) * Math.PI + rnd(-0.25, 0.25);
-          card(along(s.petal * rnd(0.6, 0.9), s.width * rnd(0.8, 1.2), a, rnd(0.18, 0.32)), Cell.Petal, FIRE, -3, 16, 0.05);
+          card(along(s.petal * rnd(0.55, 0.85), s.width * rnd(1, 1.4), a, rnd(0.18, 0.32)), Cell.Tongue, PLAIN, -3, 12, rnd(0.04, 0.055));
         }
+        const stretch = rnd(0.85, 1.15);
+        card(facing(star * 0.75, -0.01).map((p) => p.set(p.x * stretch, p.y / stretch, p.z)), Math.random() < 0.5 ? Cell.Bloom4 : Cell.Bloom4b, PLAIN, -3, 0, 0.036);
         break;
       }
       case 'long': {

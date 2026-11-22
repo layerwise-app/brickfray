@@ -13,7 +13,10 @@ import { Carry } from './blend';
 import { ClipPlayer, Frame, type Clip, type ClipCtx, type ClipEvent } from './clip';
 import { Drops } from './drops';
 import { cycleClip, loadsShells, reloadClip, shotgunLoadOut, shotgunShell } from './clips-guns';
+import { reseatClip, reseats } from './clips-rifles';
 import { drawClip, extraGoals, holsterClip, restClip } from './clips-extra';
+import { outOfFrame } from './frame-out';
+import { blueHull, Saddle } from './saddle';
 import { cookClip, grenadeGoals, throwClip } from './clips-grenade';
 import { meleeClip, meleeGoals } from './clips-melee';
 import { ViewFx } from './fx';
@@ -24,6 +27,7 @@ import { Motion } from './motion';
 import { Parts } from './parts';
 import { ViewPose } from './pose';
 import { GunRack } from './rack';
+import { ScopeOverlay } from './scope';
 import type { GunRig } from './rig';
 import { smooth01 } from './springs';
 
@@ -43,7 +47,7 @@ const HURRY = 0.08;
 const BUSY_RAMP = 0.08;
 const CARRY_LEAD = 0.3;
 /** Seconds per radian (or quarter meter) the gun is off its rest that a strike takes to tuck it away. */
-const TUCK = 0.24;
+const TUCK = 0.34;
 const IDLE: ViewInput = { speed: 0, sprint: false, grounded: true, crouch: 0, sliding: false, ads: 0, look: { yaw: 0, pitch: 0 }, time: 0 };
 
 class FirstPersonView implements ViewModel {
@@ -71,6 +75,7 @@ class FirstPersonView implements ViewModel {
   /** A switch asked for while a bomb is still in the hand: it waits for the release beat of that throw. */
   private waiting: { clip: Clip; release: number; to: WeaponId; holster: number; draw: number; since: number } | null = null;
   private loading = false;
+  private readonly saddle = new Saddle();
   private readonly action = new GunAction();
   private sprintCue = false;
   private adsCue = false;
@@ -79,6 +84,8 @@ class FirstPersonView implements ViewModel {
   private snap = 0;
   private snapEmpty = false;
   private readonly pose: ViewPose;
+  private readonly scope: ScopeOverlay;
+  private hidden = false;
   private readonly tmpV = new THREE.Vector3();
 
   constructor(
@@ -90,12 +97,13 @@ class FirstPersonView implements ViewModel {
     this.arms = new Arms(kit);
     this.scene.add(this.arms.root);
     this.fx = new ViewFx(this.scene, kit);
-    this.held = new Held(kit, this.scene, this.arms.left.hand, this.arms.right.joints[THUMB_JOINT + 2]!, this.fx.shellGeometry);
+    this.held = new Held(kit, this.scene, this.arms.left.hand, this.arms.right.joints[THUMB_JOINT + 2]!, this.fx.shellGeometry, this.fx.blueShell);
     this.drops = new Drops(this.scene);
     this.extra = { ...extraGoals(this.scene), ...meleeGoals(this.scene), ...grenadeGoals(this.scene), ring: this.held.ringSeat(), ringHook: this.held.ringHook() };
     this.ctx = { id: 'ar', tuning: null!, view: this.scene, goals: {}, flags: { empty: false }, ads: 0 };
     this.pose = new ViewPose(this.arms, this.held, this.carry, this.motion, this.parts, this.action, this.camera);
     this.rack = new GunRack(kit, this.scene);
+    this.scope = new ScopeOverlay(this.scene, this.camera);
     this.setCharacter(character);
     this.equip(LOADOUTS[character].primary);
   }
@@ -125,6 +133,9 @@ class FirstPersonView implements ViewModel {
     const rig = this.rack.swap(this.gun, id);
     this.gun = rig;
     this.motion.setTuning(rig.tuning);
+    this.saddle.reset();
+    this.parts.refilled.clear();
+    if (reseats(id)) this.parts.refilled.add('magazine');
     this.ctx.id = id;
     this.ctx.tuning = rig.tuning;
     this.ctx.goals = { ...rig.goals, ...this.extra };
@@ -143,11 +154,16 @@ class FirstPersonView implements ViewModel {
       case 'reload':
         this.ctx.flags.empty = action.empty;
         this.loading = loadsShells(g.id);
-        return this.play(reloadClip(g.id, action.empty, action.duration));
-      case 'reloadShell':
+        return this.play(reloadClip(g.id, action.empty, action.duration, this.saddle.slot(g, 0)));
+      case 'reloadShell': {
         if (!loadsShells(g.id)) return;
         this.loading = true;
-        return this.play(shotgunShell(action.duration));
+        const take = this.saddle.slot(g, 0);
+        this.held.shellHull(blueHull(take));
+        this.play(shotgunShell(action.duration, take, this.saddle.slot(g, 1)));
+        if (take !== null) this.saddle.take();
+        return;
+      }
       case 'reloadEnd':
       case 'cancelReload':
         if (this.loading) {
@@ -186,6 +202,8 @@ class FirstPersonView implements ViewModel {
     if (spear?.visible && !this.action.gone(g, 'spear')) this.fx.launch(spear, g.rigged.model.muzzle);
     this.action.fire(g, empty);
     this.motion.kick(this.lastAds);
+    // Through the scope the shot is the lens's own flash and smoke; the put-away gun shows nothing.
+    if (this.scope.up) return this.scope.fire();
     this.fx.fire(g.rigged.model.muzzle, g.flash, this.lastAds);
     if (g.casing && g.rigged.model.ejectPort) this.fx.eject(g.casing, g.rigged.model.ejectPort, 1, this.lastAds);
   }
@@ -211,7 +229,7 @@ class FirstPersonView implements ViewModel {
     }
     this.pendingWeapon = to;
     this.pendingDraw = draw;
-    this.play(holsterClip(Math.max(0.05, holster)));
+    this.play(holsterClip(Math.max(0.05, holster), to));
   }
 
   private play(clip: Clip) {
@@ -234,16 +252,19 @@ class FirstPersonView implements ViewModel {
     switch (e) {
       case 'eject':
         // A revolver's empties leave on the moon clip its reload carries; its eject only cues the sound.
-        if (g.rigged.model.ejectPort && !g.rest.has('speedloader')) this.fx.eject(g.id === 'sniper' ? 'long' : 'brass', g.rigged.model.ejectPort, 0.8);
+        if (g.rigged.model.ejectPort && !this.scope.up && !g.rest.has('speedloader')) this.fx.eject(g.id === 'sniper' ? 'long' : 'brass', g.rigged.model.ejectPort, 0.8);
         return;
       case 'shellEject':
         if (g.rigged.model.ejectPort) this.fx.eject('shell', g.rigged.model.ejectPort, 0.9, this.lastAds);
         return;
       case 'swap':
         if (this.pendingWeapon) {
+          // The holster's tail, after the old gun is out of the picture, goes to the draw.
+          const from = this.gun.id;
+          const draw = this.pendingDraw + this.player.left;
           this.setGun(this.pendingWeapon);
           this.pendingWeapon = null;
-          this.play(drawClip(Math.max(0.05, this.pendingDraw), SIDEARMS.has(this.gun.id)));
+          this.play(drawClip(Math.max(0.05, draw), SIDEARMS.has(this.gun.id), from));
           this.carry.resetGun();
           this.parts.reset();
           this.held.reset();
@@ -283,6 +304,9 @@ class FirstPersonView implements ViewModel {
     const f = this.frame;
     f.reset();
     this.player.update(dt, this.onEvent);
+    // The new gun comes in on the frame after the old one has left the picture, whenever along its holster that is.
+    if (this.pendingWeapon && this.player.clip?.name === 'holster' && outOfFrame(this.gun.rigged.model.root, this.camera)) this.onEvent('swap');
+    if (!this.player.clip && this.parts.lacks('magazine') && this.parts.refilled.has('magazine')) this.play(reseatClip(this.gun.id));
     const w = this.waiting;
     if (w && (this.player.clip !== w.clip || this.player.u >= w.release)) {
       // The holster makes up the wait, so the new gun is still up when the game expects it.
@@ -306,6 +330,9 @@ class FirstPersonView implements ViewModel {
     if (sprinting && !this.sprintCue) this.onCue?.('cloth');
     this.sprintCue = sprinting;
 
+    this.scope.update(dt, this.gun.id, input.ads, this.motion.rot, this.motion.pos.z);
+    this.showGun();
+    this.saddle.show(this.gun);
     this.pose.gun(this.gun, f, ads, dt);
     this.pose.hands(this.gun, f, this.ctx.goals, dt);
     if (this.snap > 0 && (this.snap -= dt) <= 0) this.shoot(this.snapEmpty);
@@ -319,8 +346,15 @@ class FirstPersonView implements ViewModel {
   }
 
   setHidden(hidden: boolean) {
-    this.gun.rigged.model.root.visible = !hidden;
-    this.arms.root.visible = !hidden;
+    this.hidden = hidden;
+    this.showGun();
+  }
+
+  /** The gun and hands are put away for the scope picture on the frame it comes up, and back on the frame it goes. */
+  private showGun() {
+    const shown = !this.hidden && !this.scope.up;
+    this.gun.rigged.model.root.visible = shown;
+    this.arms.root.visible = shown;
   }
 
   orient(worldCameraQuaternion: THREE.Quaternion) {
@@ -339,6 +373,7 @@ class FirstPersonView implements ViewModel {
   dispose() {
     this.lighting.dispose();
     this.fx.dispose();
+    this.scope.dispose();
     this.drops.clear();
     this.arms.mesh.geometry.dispose();
     this.rack.dispose();

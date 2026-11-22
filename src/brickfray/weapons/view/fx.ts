@@ -21,6 +21,8 @@ export class ViewFx {
   private flight: { body: THREE.Object3D; velocity: THREE.Vector3; age: number } | null = null;
   private readonly casings: Record<CasingKind, { mesh: THREE.InstancedMesh; live: Casing[] }>;
   readonly shellGeometry: THREE.BufferGeometry;
+  /** A shell in the other hull colour the side carrier holds every second one of. */
+  readonly blueShell: THREE.BufferGeometry;
 
   constructor(
     private readonly scene: THREE.Scene,
@@ -39,6 +41,7 @@ export class ViewFx {
       return { mesh, live: [] as Casing[] };
     };
     this.shellGeometry = shellGeometry(seg);
+    this.blueShell = shellGeometry(seg, '#2f6fd0');
     this.casings = { brass: make(brassGeometry(seg)), shell: make(this.shellGeometry), long: make(longGeometry(seg)) };
   }
 
@@ -110,6 +113,7 @@ export class ViewFx {
       set.mesh.geometry.dispose();
       set.mesh.dispose();
     }
+    this.blueShell.dispose();
   }
 }
 
@@ -139,8 +143,8 @@ function longGeometry(seg: number) {
 }
 
 /** Shotgun shell: colored hull, brass head. */
-function shellGeometry(seg: number) {
+function shellGeometry(seg: number, color = '#d3302a') {
   const hull = tube(0.0098, 0.05, seg, 0.0015).clone().translate(0, 0, -0.006);
   const head = tube(0.0104, 0.014, seg, 0.001).clone().translate(0, 0, 0.025);
-  return merged([[hull, '#d3302a', 'plastic'], [head, '#d4a443', 'metal']]);
+  return merged([[hull, color, 'plastic'], [head, '#d4a443', 'metal']]);
 }

@@ -136,7 +136,7 @@ export function buildAr(b: ModelBuilder) {
   b.add(tube(0.0145, 0.19, lod.seg, 0.002), C.dark, 'satin', T(0, BORE, 0.158));
   if (d >= 1) b.add(gear(0.0155, 0.0172, 8, 0.008), C.barrel, 'metal', T(0, BORE, 0.07));
   const stock: [number, number][] = [[0.122, 0.139], [0.284, 0.143], [0.298, 0.131], [0.298, 0.033], [0.285, 0.024], [0.256, 0.03], [0.206, 0.071], [0.15, 0.09], [0.122, 0.092]];
-  b.add(slab(stock, 0.042, lod, [0.008, 0.008, 0.008, 0.008, 0.008, 0.02, 0.02, 0.02, 0.008]), C.furniture, 'plastic');
+  b.add(slab(stock, 0.042, lod, [0.008, 0.008, 0.008, 0.008, 0.008, 0.02, 0.02, 0.02, 0.008], [], 0.009), C.furniture, 'plastic');
   b.add(slab([[0.297, 0.146], [0.311, 0.146], [0.311, 0.021], [0.297, 0.021]], 0.045, lod, 0.004), C.dark, 'rubber');
   if (b.minor) b.add(box(0.008, 0.008, 0.022, 0.002), C.accent, 'plastic', T(0, 0.089, 0.15, 0.12));
   if (d >= 1) {

@@ -51,6 +51,12 @@ const CASING: Record<WeaponId, CasingKind | null> = {
 const CHARGE_GRIP = { pos: [-0.045, 0, -0.004], back: [-0.25, 0.45, 0.85], axis: [1, 0, 0] } as const;
 
 const SLIDE_GRIP: V3 = [0, 0.008, 0.015];
+/** How far a carrier shell is drawn down out of its slot before the hand takes it to the port. */
+const SADDLE_PULL = 0.05;
+const SADDLE_BACK: V3 = [-0.6, -1, 0.1];
+const SADDLE_AXIS: V3 = [0.1, 0.2, -1];
+/** Where the fingers take a carrier shell, from its slot: low on the hull, under the gun's roll. */
+const SADDLE_PICK: V3 = [0, -0.016, 0];
 
 /** A loaded shell's center from the loading port node: under the opening, through it, and in the tube. */
 const SHELL_MOUTH: V3 = [0, -0.0115, 0.002];
@@ -128,6 +134,16 @@ export function buildGunRig(id: WeaponId, kit: Kit): GunRig {
     goals.port = goal(port, mouth, q);
     goals.portNear = goal(port, [mouth[0] - 0.004, mouth[1] - 0.054, mouth[2] + 0.03], q);
     goals.portIn = goal(port, [mouth[0] + (SHELL_UP[0] - SHELL_MOUTH[0]) * 0.8, mouth[1] + (SHELL_UP[1] - SHELL_MOUTH[1]) * 0.8, mouth[2] + (SHELL_UP[2] - SHELL_MOUTH[2]) * 0.8], q);
+  }
+  // The side carrier: each slot (the shell standing in it), and the left hand come up under the rolled receiver, back of
+  // the hand down, pinching that shell low, then drawing it down and out like the port's shells, the forearm out of view below.
+  const pinch = L(SADDLE_BACK, SADDLE_AXIS);
+  const reach = SHELL_HOLD.pos.clone().applyQuaternion(pinch);
+  for (let i = 0; rigged.nodes.has(`saddle${i}`); i++) {
+    const slot = anchor(`saddle${i}`, [SADDLE_PICK[0] - reach.x, SADDLE_PICK[1] - reach.y, SADDLE_PICK[2] - reach.z]);
+    goals[`saddle${i}`] = goal(node(`saddle${i}`), [0, 0, 0], new THREE.Quaternion());
+    goals[`saddleHand${i}`] = goal(slot, [0, 0, 0], pinch);
+    goals[`saddleOut${i}`] = goal(slot, [-0.015, -SADDLE_PULL, 0.01], pinch);
   }
   if (rigged.nodes.has('spearHold')) {
     // Underhand on the shaft, wrist below and to the left, index toward the tip.

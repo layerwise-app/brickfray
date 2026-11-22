@@ -94,7 +94,7 @@ export interface ViewModel {
   readonly stepPhase: number;
   /** Called on animation beats. */
   onCue: ((cue: ViewCue) => void) | null;
-  /** Hide gun while the sniper scope overlay is up. */
+  /** Hide the gun and hands (the player is dead); the view model puts them away for a scope picture itself. */
   setHidden(hidden: boolean): void;
   /** World camera orientation each frame, so view-layer light and reflections match the world sun. */
   orient(worldCameraQuaternion: THREE.Quaternion): void;

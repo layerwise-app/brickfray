@@ -1,9 +1,9 @@
 import * as THREE from 'three';
 import type { GunAction } from './action';
-import type { Arms } from './arms';
+import type { ArmFit, Arms } from './arms';
 import type { Carry } from './blend';
 import type { Frame } from './clip';
-import { followPath, goalMatrix, type Goal } from './goals';
+import { followPath, goalMatrix, type Goal, type V3 } from './goals';
 import type { Held } from './held';
 import type { Motion } from './motion';
 import type { Parts } from './parts';
@@ -11,6 +11,13 @@ import type { GunRig } from './rig';
 
 /** Seconds the left hand takes to come off a stowed melee weapon onto the gun. */
 const UNSTOW = 0.12;
+/**
+ * A throwing arm raised (Frame.leftLift): the shoulder comes up and the elbow is led high and out to the left, so the
+ * arm bends where it shows instead of reaching up from below the frame as one straight tube.
+ */
+const LIFT_POLE: V3 = [-0.8, 1.2, 0.2];
+const LIFT_SHOULDER: V3 = [-0.05, 0.08, 0.03];
+const NONE: V3 = [0, 0, 0];
 
 /**
  * Places the gun and both hands each frame: the clip's offsets through the cut blend, the procedural motion, the sight
@@ -24,6 +31,7 @@ export class ViewPose {
   private readonly tmpE = new THREE.Euler();
   private readonly tmpM = new THREE.Matrix4();
   private stowing = false;
+  private readonly lift: ArmFit = {};
 
   constructor(
     private readonly arms: Arms,
@@ -44,6 +52,12 @@ export class ViewPose {
     const kick = this.motion.kickRot;
     const eye = ads * (rig.tuning.recoil.adsEye ?? 0);
     this.tmpV.copy(this.carry.gunRot.apply(f.gunRot, dt)).add(this.motion.rot).addScaledVector(kick, -eye);
+    if (rig.tuning.irons) {
+      // A rear and a front sight stay lined up on the eye only while the gun neither pitches nor yaws: aimed, a shot
+      // drives the gun back along the sight line and rolls it about that line, and the climb is the camera's.
+      this.tmpV.x -= (kick.x + this.motion.climbTurn) * ads;
+      this.tmpV.y -= kick.y * ads;
+    }
     root.quaternion.copy(this.baseQuat).multiply(this.tmpQ.setFromEuler(this.tmpE.set(this.tmpV.x, this.tmpV.y, this.tmpV.z)));
 
     // Moving parts: clip offsets, or the action a shot sets off (slide kick, hammer and cylinder).
@@ -76,7 +90,15 @@ export class ViewPose {
     left.decompose(hand.position, hand.quaternion, hand.scale);
     hand.updateMatrixWorld(true);
     const right = this.carry.right.apply(f.right ? followPath(f.right, this.tmpM) : goalMatrix(goals.rightRest!, this.tmpM), dt);
-    this.arms.pose(right, left, this.tmpV.copy(this.motion.pos).multiplyScalar(0.4));
+    this.arms.pose(right, left, this.tmpV.copy(this.motion.pos).multiplyScalar(0.4), f.leftLift > 0 ? this.lifted(rig.tuning.arms, f.leftLift) : rig.tuning.arms);
     this.held.settle(f);
+  }
+
+  private lifted(fit: ArmFit = {}, k: number): ArmFit {
+    const pole = fit.left?.pole ?? NONE;
+    const shoulder = fit.left?.shoulder ?? NONE;
+    this.lift.right = fit.right;
+    this.lift.left = { pole: [pole[0] + LIFT_POLE[0] * k, pole[1] + LIFT_POLE[1] * k, pole[2] + LIFT_POLE[2] * k], shoulder: [shoulder[0] + LIFT_SHOULDER[0] * k, shoulder[1] + LIFT_SHOULDER[1] * k, shoulder[2] + LIFT_SHOULDER[2] * k] };
+    return this.lift;
   }
 }

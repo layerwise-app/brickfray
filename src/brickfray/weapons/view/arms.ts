@@ -7,6 +7,7 @@ import { paint, surfaceMaterial } from '../surface';
 import { FINGERS, mixFingers, type FingerPose } from './fingers';
 import { createHandBones, poseFingers } from './fingers-rig';
 import { padColor } from './glove';
+import type { V3 } from './goals';
 import { forearmPieces, handPieces, upperArmPieces, WRIST, type ArmPiece, type Slot } from './hand';
 
 export const UPPER = 0.34;
@@ -37,6 +38,12 @@ interface Side {
   aimPole: THREE.Vector3;
   aimTrail: number;
   wrist: THREE.Vector3;
+}
+
+/** A gun's own fit of the arms: where each elbow is pushed (added to the elbow hint) and each shoulder moved, so the wrists stay within what a wrist does on that grip. */
+export interface ArmFit {
+  right?: { pole?: V3; shoulder?: V3 };
+  left?: { pole?: V3; shoulder?: V3 };
 }
 
 /** A wrist this close to the view axis (m, sideways) and this high (m, below the eye) counts as aimed; the arm eases over between the pairs. */
@@ -143,9 +150,9 @@ export class Arms {
   }
 
   /** Place each hand (pose in the arms' space) and bend the arms to reach it. */
-  pose(rightHand: THREE.Matrix4, leftHand: THREE.Matrix4, shoulderShift: THREE.Vector3) {
-    solve(this.right, rightHand, shoulderShift);
-    solve(this.left, leftHand, shoulderShift);
+  pose(rightHand: THREE.Matrix4, leftHand: THREE.Matrix4, shoulderShift: THREE.Vector3, fit: ArmFit = {}) {
+    solve(this.right, rightHand, shoulderShift, fit.right);
+    solve(this.left, leftHand, shoulderShift, fit.left);
   }
 }
 
@@ -155,19 +162,22 @@ const elbow = new THREE.Vector3();
 const dir = new THREE.Vector3();
 const normal = new THREE.Vector3();
 const pole = new THREE.Vector3();
+const nudge = new THREE.Vector3();
 const UP = new THREE.Vector3(0, 1, 0);
 const bx = new THREE.Vector3();
 const by = new THREE.Vector3();
 const bz = new THREE.Vector3();
 const basis = new THREE.Matrix4();
 
-function solve(side: Side, hand: THREE.Matrix4, shift: THREE.Vector3) {
+function solve(side: Side, hand: THREE.Matrix4, shift: THREE.Vector3, fit: { pole?: V3; shoulder?: V3 } = {}) {
   hand.decompose(side.hand.position, side.hand.quaternion, side.hand.scale);
   wrist.copy(side.wrist).applyMatrix4(hand);
   const aim = ramp(Math.abs(wrist.x), AIM_SIDE) * ramp(wrist.y, AIM_HEIGHT);
   const trail = side.trail + (side.aimTrail - side.trail) * aim;
   pole.copy(side.pole).lerp(side.aimPole, aim);
+  if (fit.pole) pole.add(nudge.set(...fit.pole));
   shoulder.copy(side.shoulder).setZ(Math.min(side.back + (side.aimBack - side.back) * aim, Math.max(side.shoulder.z, wrist.z + trail))).add(shift);
+  if (fit.shoulder) shoulder.add(nudge.set(...fit.shoulder));
   dir.subVectors(wrist, shoulder);
   let dist = dir.length();
   dir.divideScalar(dist);

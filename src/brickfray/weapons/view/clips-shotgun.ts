@@ -42,6 +42,8 @@ const CUP: FingerPose = { thumb: 0.3, index: 0.46, middle: 0.52, ring: 0.58, pin
 const SHELL = 0.5;
 /** Beat by which the shell is all the way into the tube, out of sight. */
 const IN = 0.32;
+/** Beat by which a carrier shell is drawn up clear of its slot. */
+const DRAW = 0.08;
 
 const pouches = new WeakMap<object, Goal>();
 
@@ -68,19 +70,25 @@ export function shotgunPump(duration: number, eject: boolean): Clip {
   });
 }
 
-/** Shotgun: roll the port up while the left hand drops for the first shell. Holds. */
-export function shotgunLoadIn(duration: number): Clip {
+/** Where the hand takes shell `slot` of the side carrier from (pinching it in its slot), or the belt when the carrier is empty. */
+const source = (c: ClipCtx, slot: number | null) => (slot === null ? pouch(c) : c.goals[`saddleHand${slot}`]!);
+
+/** Shotgun: roll the port up while the left hand goes for the first shell (carrier `slot`, or the belt). Holds. */
+export function shotgunLoadIn(duration: number, slot: number | null): Clip {
   shellCount = 0;
   return clip('loadIn', duration, 0.2, [[0.02, 'cloth']], (t, f, c) => {
     f.gun(track(t, [[0, Z], [0.2, LOAD_LOW]]));
-    f.left = hand(t, [[0, c.goals.leftRest!], [0.2, pouch(c)]]);
+    f.left = hand(t, [[0, c.goals.leftRest!], [0.2, source(c, slot)]]);
     f.leftFingers = fingers(t, [[0, c.tuning.fingers.left], [0.2, 'pinch']]);
     f.busy = seg(t, 0, 0.1);
   }, true);
 }
 
-/** One shell: up from below, thumbed forward into the port, hand already dropping for the next. Holds below. */
-export function shotgunShell(duration: number): Clip {
+/**
+ * One shell: drawn up out of carrier slot `take` (or brought up from the belt once the carrier is empty), thumbed
+ * forward into the port, the hand already on its way to the next one (`next`). Holds there.
+ */
+export function shotgunShell(duration: number, take: number | null, next: number | null): Clip {
   const index = shellCount++;
   const v = SHELLS[index % SHELLS.length]!;
   const add = (base: readonly number[], k: number) => base.map((x, i) => x + v.meet[i]! * k);
@@ -96,13 +104,20 @@ export function shotgunShell(duration: number): Clip {
     const away = 1 - seg(t, 0.02, near) + seg(t, out + 0.03, SHELL);
     settleGun(f, index * SHELL + t, away * (index === 0 ? seg(t, 0, 0.08) : 1));
     regripGun(f, t, Math.min(out + 0.02, SHELL - 0.16), 0.5 + 0.5 * v.follow, 0.6);
-    f.left = hand(t, [[0, pouch(c)], [near, g.portNear!], [0.27, g.port!], [0.31, g.portIn!], [out, g.portIn!], [SHELL, pouch(c)]]);
+    const from = source(c, take);
+    const lead: [number, Goal][] = take === null ? [[0, from]] : [[0, from], [DRAW, g[`saddleOut${take}`]!]];
+    f.left = hand(t, [...lead, [near, g.portNear!], [0.27, g.port!], [0.31, g.portIn!], [out, g.portIn!], [SHELL, source(c, next)]]);
     f.leftFingers = fingers(t, [[0, 'pinch'], [0.27, 'pinch'], [0.31, PUSH], [out + 0.04, PUSH], [out + 0.12, LOOSE], [SHELL, 'pinch']]);
     // The shell settles under the opening as the hand gets there, then the thumb drives it up through the port and on into the tube.
     seat ??= { node: g.shellMouth!.node, pos: new THREE.Vector3(), quat: g.shellMouth!.quat };
     seat.pos.copy(g.shellMouth!.pos).lerp(g.shellUp!.pos, seg(t, 0.27, 0.295)).lerp(g.shellInside!.pos, seg(t, 0.29, IN));
     f.shellSeat = seat;
     f.shellIn = seg(t, near, 0.27);
+    if (take !== null && t < DRAW) {
+      // Taken out of its slot: drawn exactly where the carrier's shell sat, then it rides the fingers.
+      f.shellSeat = g[`saddle${take}`]!;
+      f.shellIn = 1 - seg(t, 0.01, DRAW * 0.8);
+    }
     f.show.shell = t < IN ? 1 : 0;
     f.busy = 1;
   }, true);
@@ -113,7 +128,7 @@ export function shotgunLoadOut(duration: number, rack: boolean): Clip {
   if (!rack) {
     return clip('loadOut', duration, 0.32, [[0.04, 'cloth']], (t, f, c) => {
       f.gun(track(t, [[0, LOAD_LOW], [0.22, [0.004, -0.006, 0.003, -0.015, -0.01, 0.05]], [0.32, Z]]));
-      f.left = hand(t, [[0, pouch(c)], [0.26, c.goals.leftRest!]]);
+      f.left = hand(t, [[0, c.goals.leftFrom!], [0.26, c.goals.leftRest!]]);
       if (t < 0.26) f.leftFingers = fingers(t, [[0, 'relaxed'], [0.14, CUP], [0.26, c.tuning.fingers.left]]);
       f.busy = 1 - seg(t, 0.08, 0.3);
     });
@@ -125,7 +140,7 @@ export function shotgunLoadOut(duration: number, rack: boolean): Clip {
     f.gun([0, 0.002, 0.008, 0.03, 0, -0.02], jolt(t - 0.435));
     f.gun([0, -0.003, -0.008, -0.035, 0, 0.02], jolt(t - 0.58));
     f.part('pump', track(t, pump));
-    f.left = hand(t, [[0, pouch(c)], [0.29, c.goals.leftRest!]]);
+    f.left = hand(t, [[0, c.goals.leftFrom!], [0.29, c.goals.leftRest!]]);
     if (t < 0.29) f.leftFingers = fingers(t, [[0, 'relaxed'], [0.16, CUP], [0.29, c.tuning.fingers.left]]);
     f.busy = 1 - seg(t, 0.56, 0.74);
   });

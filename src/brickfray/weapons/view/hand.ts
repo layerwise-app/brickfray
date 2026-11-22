@@ -1,5 +1,7 @@
 import * as THREE from 'three';
-import { box, latheZ, tube } from '../shapes';
+import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
+import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { ball, box, latheZ, tube } from '../shapes';
 import type { Surface } from '../surface';
 
 /** Color slots the character palette fills in: sleeve = primary, trim = secondary. */
@@ -67,17 +69,19 @@ export const HAND_JOINTS: readonly HandJoint[] = (() => {
 /** Thickness of the cuff over its width: a wrist is an oval, flat like the palm. */
 const CUFF_FLAT = 0.8;
 
-const ARC = [0, 0.25, 0.5, 0.75, 1].map((t) => t * Math.PI);
+const ARC = [0, 1, 2, 3, 4, 5, 6].map((t) => (t / 6) * Math.PI);
+/** Quarter turns of the rounded edge between a segment's side and its flat faces. */
+const EDGE = [0, 1, 2, 3].map((t) => (t / 3) * (Math.PI / 2));
 const inside = new THREE.Vector3();
 const ea = new THREE.Vector3();
 const eb = new THREE.Vector3();
 const en = new THREE.Vector3();
 
 /**
- * One finger segment: a bevelled block from its joint down -Z whose two ends
- * are rounded about the joints, so neighbours overlap at any bend.
+ * One finger segment from its joint down -Z: both ends rounded about the joints, so neighbours overlap at any bend,
+ * and its sides rounded into its flat faces (a cushioned, not a boxy, finger), smooth shaded.
  */
-function phalanx(len: number, rA: number, rB: number, width: number, bevel: number): THREE.BufferGeometry {
+function phalanx(len: number, rA: number, rB: number, width: number, round: number): THREE.BufferGeometry {
   const ring = (inset: number, y: number) => {
     const a = rA - inset;
     const b = rB - inset;
@@ -87,10 +91,12 @@ function phalanx(len: number, rA: number, rB: number, width: number, bevel: numb
     ];
   };
   const h = width / 2;
-  const rings = [ring(bevel, -h), ring(0, -h + bevel), ring(0, h - bevel), ring(bevel, h)];
-  const faces: THREE.Vector3[][] = [rings[0]!, rings[3]!];
+  const r = Math.min(round, h * 0.9, rB * 0.8);
+  const rings: THREE.Vector3[][] = [];
+  for (const side of [-1, 1]) for (const t of side < 0 ? [...EDGE].reverse() : EDGE) rings.push(ring(r * (1 - Math.cos(t)), side * (h - r + r * Math.sin(t))));
+  const faces: THREE.Vector3[][] = [rings[0]!, rings[rings.length - 1]!];
   const n = rings[0]!.length;
-  for (let k = 0; k < 3; k++) {
+  for (let k = 0; k < rings.length - 1; k++) {
     for (let i = 0; i < n; i++) {
       const j = (i + 1) % n;
       faces.push([rings[k]![i]!, rings[k]![j]!, rings[k + 1]![j]!, rings[k + 1]![i]!]);
@@ -98,7 +104,6 @@ function phalanx(len: number, rA: number, rB: number, width: number, bevel: numb
   }
   inside.set(0, 0, -len / 2);
   const positions: number[] = [];
-  const normals: number[] = [];
   for (const face of faces) {
     en.crossVectors(ea.subVectors(face[1]!, face[0]!), eb.subVectors(face[2]!, face[0]!)).normalize();
     const flip = en.dot(ea.subVectors(face[0]!, inside)) < 0;
@@ -106,14 +111,26 @@ function phalanx(len: number, rA: number, rB: number, width: number, bevel: numb
     for (let i = 1; i < face.length - 1; i++) {
       for (const p of flip ? [face[0]!, face[i + 1]!, face[i]!] : [face[0]!, face[i]!, face[i + 1]!]) {
         positions.push(p.x, p.y, p.z);
-        normals.push(en.x, en.y, en.z);
       }
     }
   }
-  const g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-  g.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
-  return g;
+  const flat = new THREE.BufferGeometry();
+  flat.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  const g = mergeVertices(flat, 1e-7);
+  flat.dispose();
+  g.computeVertexNormals();
+  const out = g.index ? g.toNonIndexed() : g.clone();
+  g.dispose();
+  return out;
+}
+
+/** A box rounded off at every edge and corner, smooth shaded: the padded glove over the palm. */
+function soft(w: number, h: number, d: number, r: number): THREE.BufferGeometry {
+  const g = new RoundedBoxGeometry(w, h, d, 3, r);
+  g.deleteAttribute('uv');
+  const out = g.index ? g.toNonIndexed() : g.clone();
+  g.dispose();
+  return out;
 }
 
 const at = (x: number, y: number, z: number, ry = 0) => new THREE.Matrix4().makeRotationY(ry).setPosition(x, y, z);
@@ -122,12 +139,12 @@ function digit(out: ArmPiece[], d: Digit, first: number, fingers: boolean) {
   for (let k = 0; k < 3; k++) {
     const len = d.len[k]!;
     const w = d.width[k]!;
-    out.push({ geometry: phalanx(len, d.r[k]!, d.r[k + 1]!, w, 0.0034), matrix: new THREE.Matrix4(), slot: 'glove', surface: 'satin', joint: first + k });
+    out.push({ geometry: phalanx(len, d.r[k]!, d.r[k + 1]!, w, 0.0068), matrix: new THREE.Matrix4(), slot: 'glove', surface: 'satin', joint: first + k });
     if (fingers || k > 0) {
       // Armour plate over most of the back of the segment, clear of both joints: it outlines the finger on a glove-coloured gun.
       const r = (d.r[k]! + d.r[k + 1]!) / 2;
       const long = k === 2 ? 0.55 : 0.74;
-      out.push({ geometry: box(0.0036, w * 0.86, len * long, 0.0013), matrix: at(r + 0.0006, 0, -len * (k === 2 ? 0.42 : 0.5)), slot: 'pad', surface: 'rubber', joint: first + k });
+      out.push({ geometry: box(0.0036, w * 0.78, len * long, 0.0017), matrix: at(r + 0.0002, 0, -len * (k === 2 ? 0.42 : 0.5)), slot: 'pad', surface: 'rubber', joint: first + k });
     }
   }
 }
@@ -137,13 +154,17 @@ export function handPieces(): ArmPiece[] {
   const out: ArmPiece[] = [];
   const glove = (geometry: THREE.BufferGeometry, matrix: THREE.Matrix4) => out.push({ geometry, matrix, slot: 'glove', surface: 'satin' });
   const pad = (geometry: THREE.BufferGeometry, matrix: THREE.Matrix4) => out.push({ geometry, matrix, slot: 'pad', surface: 'rubber' });
-  // Palm slab from the heel to the knuckle line, the pinky edge a touch shorter.
-  glove(box(0.0235, 0.058, 0.078, 0.0105), at(0.0282, 0.0095, 0.0175));
-  glove(box(0.0225, 0.03, 0.07, 0.0075), at(0.0274, -0.024, 0.0205));
+  // Palm slab from the heel to the knuckle line, the pinky edge a touch shorter; the back is domed up a little behind the knuckles.
+  glove(soft(0.0265, 0.058, 0.078, 0.0115), at(0.0297, 0.0095, 0.0175));
+  glove(soft(0.0245, 0.03, 0.07, 0.0095), at(0.0284, -0.024, 0.0205));
+  // The fleshy pads either side of the heel, the thumb's the larger: from outside the palm has the depth of a hand, not a plate.
+  const pad3 = (x: number, y: number, z: number, sx: number, sy: number, sz: number) => new THREE.Matrix4().compose(new THREE.Vector3(x, y, z), new THREE.Quaternion(), new THREE.Vector3(sx, sy, sz));
+  glove(ball(1, 14), pad3(0.0215, 0.017, 0.031, 0.0085, 0.0145, 0.021));
+  glove(ball(1, 14), pad3(0.0215, -0.025, 0.036, 0.0075, 0.0105, 0.02));
   // Heel of the hand and the pad under the knuckles: the hollow between them takes the held object.
-  glove(box(0.013, 0.036, 0.036, 0.0055), at(0.0205, -0.019, 0.0385));
-  glove(box(0.009, 0.07, 0.013, 0.004), at(0.0185, 0, -0.0185));
-  pad(box(0.0055, 0.042, 0.029, 0.0034), at(0.041, 0.003, 0.022));
+  glove(soft(0.013, 0.036, 0.036, 0.006), at(0.0205, -0.019, 0.0385));
+  glove(soft(0.009, 0.07, 0.013, 0.0044), at(0.0185, 0, -0.0185));
+  pad(box(0.0055, 0.042, 0.029, 0.0026), at(0.0438, 0.003, 0.022));
   FINGERS.forEach((f, i) => {
     digit(out, f, fingerJoint(i, 0), true);
     pad(box(0.0075, f.width[0] * 0.82, 0.0155, 0.003), at(f.base[0] + 0.0092, f.base[1], f.base[2] + 0.0035));

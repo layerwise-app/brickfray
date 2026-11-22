@@ -7,12 +7,23 @@ import { fingers, type FingerShape } from './fingers';
 import type { Goal } from './goals';
 import { env } from './springs';
 
-/** Magwell rolled up and in toward the left hand. */
-const PRESENT = [-0.09, 0.12, -0.02, 0.26, 0.34, -0.8];
-/** The gun easing while the hand is away: first held, then sagging, so it never freezes. */
-const WAIT = [-0.08, 0.105, -0.015, 0.21, 0.32, -0.72];
-const SAG = [-0.06, 0.075, 0, 0.13, 0.27, -0.48];
-const MEET = [-0.092, 0.126, -0.022, 0.27, 0.34, -0.82];
+/** How a rifle is held while its magazine is changed: presented to the left hand, eased (held, then sagging) while the hand is away, and met as the fresh one comes up. */
+interface Stance {
+  present: readonly number[];
+  wait: readonly number[];
+  sag: readonly number[];
+  meet: readonly number[];
+}
+const STANCE: Record<Feed, Stance> = {
+  // Box magazine: the magwell rolled up and in toward the left hand.
+  box: { present: [-0.09, 0.12, -0.02, 0.26, 0.34, -0.8], wait: [-0.08, 0.105, -0.015, 0.21, 0.32, -0.72], sag: [-0.06, 0.075, 0, 0.13, 0.27, -0.48], meet: [-0.092, 0.126, -0.022, 0.27, 0.34, -0.82] },
+  // Nail strip: muzzle tipped down and swung in, hardly rolled, so the raked strip slides out down its rake past the drum.
+  strip: { present: [-0.07, 0.08, -0.03, -0.14, 0.5, -0.36], wait: [-0.062, 0.07, -0.026, -0.11, 0.46, -0.32], sag: [-0.045, 0.05, -0.015, -0.06, 0.36, -0.22], meet: [-0.072, 0.083, -0.032, -0.15, 0.52, -0.38] },
+  // Energy cell: lifted muzzle-high and turned broadside, the cell port facing the eye, for the twist.
+  cell: { present: [-0.1, 0.105, 0.01, 0.4, 0.6, -0.22], wait: [-0.09, 0.095, 0.012, 0.35, 0.56, -0.2], sag: [-0.065, 0.07, 0.01, 0.24, 0.45, -0.14], meet: [-0.102, 0.108, 0.01, 0.41, 0.61, -0.23] }
+};
+/** A magazine brought back after a cut-off reload: the rifle only canted toward the hand. */
+const TILT = [-0.045, 0.05, -0.01, 0.12, 0.16, -0.4];
 /** Rear of the receiver brought up toward the middle and canted over to the left hand, the handle on top facing it. */
 const CHARGE = [-0.04, 0.07, -0.11, 0.3, 0.1, 0.15];
 const DIP = [0.005, -0.012, 0.006, -0.03, -0.02, 0.06];
@@ -20,7 +31,7 @@ const OVER = [0.006, -0.008, 0.004, -0.02, -0.012, 0.05];
 
 const BOLT = 0.068;
 
-type Feed = 'box' | 'strip' | 'cell';
+export type Feed = 'box' | 'strip' | 'cell';
 const FEED: Partial<Record<WeaponId, Feed>> = { nailer: 'strip', pulse: 'cell' };
 /** Magazine offsets in the well's frame per feed: a box mag drops straight, the raked nail strip slides out down and forward along its rake. */
 const PATH: Record<Feed, { tug: number[]; clear: number[]; under: number[]; mouth: number[] }> = {
@@ -32,19 +43,24 @@ const PATH: Record<Feed, { tug: number[]; clear: number[]; under: number[]; mout
 const CELL_TWIST = 0.9;
 const TAP = 0.05;
 
-/** The magazine change every rifle reload shares, `s` scaling its pace. */
+const LEAVE = [-0.17, -0.34, -0.4, 0.6, 0.3, -1.05];
+const POUCH = [-0.25, -0.47, -0.26, 0.9, 0.3, -1.2];
+const BACK = [-0.15, -0.33, -0.42, 0.5, 0.32, -1.0];
+const SLAM = [0.004, 0.016, 0, 0.05, 0, 0.04];
+
+/** The magazine change of a rifle reload, `s` scaling its pace. */
 const swap = (s: number, feed: Feed) =>
   magSwap({
-    present: PRESENT,
-    meet: MEET,
+    present: STANCE[feed].present,
+    meet: STANCE[feed].meet,
     ...PATH[feed],
     twist: feed === 'cell' ? CELL_TWIST : undefined,
-    leave: [-0.17, -0.34, -0.4, 0.6, 0.3, -1.05],
-    pouch: [-0.25, -0.47, -0.26, 0.9, 0.3, -1.2],
-    back: [-0.15, -0.33, -0.42, 0.5, 0.32, -1.0],
+    leave: LEAVE,
+    pouch: POUCH,
+    back: BACK,
     at: [0.4 * s, 0.44 * s, 0.52 * s, 0.66 * s, 0.77 * s, 0.89 * s, 1.08 * s, 1.2 * s, 1.24 * s, 1.285 * s],
     rip: [-0.006, -0.014, 0, -0.03, 0, -0.05],
-    slam: [0.004, 0.016, 0, 0.05, 0, 0.04]
+    slam: SLAM
   });
 
 const taps = new WeakMap<Goal, Goal>();
@@ -65,8 +81,9 @@ function finish(feed: Feed, at: number, mag: Goal): { hand: [number, Goal][]; fi
 /** Rifle reload: roll to present the well, rip the mag out and away, bring a fresh one up and slam it home; empty adds the charging handle. The nail strip gets a slap up into the feed, the energy cell a locking twist. */
 export function arReload(id: WeaponId, empty: boolean, duration: number): Clip {
   const feed = FEED[id] ?? 'box';
+  const { present, wait, sag, meet } = STANCE[feed];
   if (!empty) {
-    const gun: Keys = [[0, Z], [0.09, DIP], [0.36, PRESENT], [0.6, WAIT], [0.84, SAG], [1.16, MEET], [1.4, WAIT], [1.68, OVER], [1.84, Z], [1.9, Z]];
+    const gun: Keys = [[0, Z], [0.09, DIP], [0.36, present], [0.6, wait], [0.84, sag], [1.16, meet], [1.4, wait], [1.68, OVER], [1.84, Z], [1.9, Z]];
     const mag = swap(1, feed);
     return clip('arReload', duration, 1.9, [[0.02, 'cloth'], [0.46, 'magOut'], [1.28, 'magIn'], [1.5, 'cloth']], (t, f, c) => {
       const g = c.goals;
@@ -81,7 +98,7 @@ export function arReload(id: WeaponId, empty: boolean, duration: number): Clip {
     });
   }
   const s = 0.96;
-  const gun: Keys = [[0, Z], [0.08, DIP], [0.34, PRESENT], [0.58, WAIT], [0.8, SAG], [1.11, MEET], [1.3, WAIT], [1.58, CHARGE], [1.82, CHARGE], [2.14, OVER], [2.32, Z], [2.4, Z]];
+  const gun: Keys = [[0, Z], [0.08, DIP], [0.34, present], [0.58, wait], [0.8, sag], [1.11, meet], [1.3, wait], [1.58, CHARGE], [1.82, CHARGE], [2.14, OVER], [2.32, Z], [2.4, Z]];
   const bolt: Keys = [[1.59, Z], [1.62, [0, 0, -0.003]], [1.73, [0, 0, BOLT]], [1.765, [0, 0, BOLT]], [1.79, Z]];
   // The carrier sits locked back since the last shot and runs home with the released handle.
   const carrier: Keys = [[1.77, [0, 0, SLIDE_LOCK]], [1.79, Z]];
@@ -103,5 +120,29 @@ export function arReload(id: WeaponId, empty: boolean, duration: number): Clip {
       f.leftFingers = fingers(t, [[0.07, rest], [0.2, 'open'], [0.36, 'magazine'], ...done.fingers, [done.free + 0.12, 'relaxed'], [1.56, 'hook'], [1.78, 'hook'], [2.02, 'handle'], [2.16, rest]]);
     }
     f.busy = env(t, 0, 0.16, 2.1, 2.34);
+  });
+}
+
+/** Rifles whose magazine a cut-off reload drops: the next free moment brings another up from the belt (reseatClip). */
+export const reseats = (id: WeaponId) => id === 'ar' || id in FEED;
+
+/**
+ * A reload cut off with the magazine out of the gun let it fall; once the hands are free the left one goes down to the
+ * belt and comes back with another, seats it (slapped or twisted like a reload's) and returns to the fore-end.
+ */
+export function reseatClip(id: WeaponId): Clip {
+  const feed = FEED[id] ?? 'box';
+  const mag = magSwap({ present: TILT, meet: TILT, ...PATH[feed], twist: feed === 'cell' ? CELL_TWIST : undefined, leave: LEAVE, pouch: POUCH, back: BACK, at: [-0.5, -0.46, -0.42, -0.3, -0.12, 0.14, 0.3, 0.4, 0.425, 0.46], rip: Z, slam: SLAM });
+  const gun: Keys = [[0, Z], [0.24, TILT], [0.46, TILT], [0.62, OVER], [0.72, Z]];
+  return clip('reseat', 0.72, 0.72, [[0.02, 'cloth'], [0.46, 'magIn']], (t, f, c) => {
+    const g = c.goals;
+    const done = finish(feed, 0.48, g.mag!);
+    f.gun(track(t, gun));
+    if (feed === 'strip') f.gun([0.002, 0.012, 0, 0.035, 0, 0.02], jolt(t - 0.48 - TAP * 2));
+    mag(t, f, c);
+    const back = done.free + 0.18;
+    f.left = hand(t, [[0, g.mag!], ...done.hand, [back, g.leftRest!]]);
+    if (t < back) f.leftFingers = fingers(t, [[0, 'magazine'], ...done.fingers, [done.free + 0.1, 'relaxed'], [back, c.tuning.fingers.left]]);
+    f.busy = 0.5 * env(t, 0, 0.08, back - 0.1, back);
   });
 }

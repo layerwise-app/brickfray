@@ -22,6 +22,11 @@ const RING_Z = -0.06;
 const PORT: [number, number][] = [[-0.058, 0.1165], [-0.112, 0.1165], [-0.112, 0.0955], [-0.058, 0.0955]];
 const PORT_FRAME: [number, number][] = [[-0.048, 0.1225], [-0.122, 0.1225], [-0.122, 0.0895], [-0.048, 0.0895]];
 
+/** The side carrier's shells: their column, and the turn of each slot about the shell's own axis (how a hand meets it). */
+const SADDLE_X = -0.0355;
+const SADDLE_SPIN = 0;
+const saddleZ = (i: number, n: number) => -0.06 - i * (0.064 / Math.max(1, n - 1));
+
 /** Snapgun: chunky pump shotgun with a ribbed toy-wood forend and a side shell carrier. */
 export function buildShotgun(b: ModelBuilder) {
   const { lod } = b;
@@ -85,7 +90,7 @@ export function buildShotgun(b: ModelBuilder) {
 
   // Fixed stock with a rubber pad; its comb drops well under the sight line, so the aiming eye looks over it.
   const stock: [number, number][] = [[0.055, 0.114], [0.105, 0.1], [0.312, 0.094], [0.327, 0.084], [0.327, -0.002], [0.307, -0.013], [0.2, 0.03], [0.12, 0.058], [0.055, 0.064]];
-  b.add(slab(stock, 0.042, lod, [0.006, 0.02, 0.01, 0.01, 0.01, 0.02, 0.03, 0.02, 0.01]), C.wood, 'satin');
+  b.add(slab(stock, 0.042, lod, [0.006, 0.02, 0.01, 0.01, 0.01, 0.02, 0.03, 0.02, 0.01], [], 0.011), C.wood, 'satin');
   // Rubber cheek pad on the comb.
   if (d >= 1) b.add(slab([[0.13, 0.083], [0.27, 0.087], [0.27, 0.1], [0.255, 0.104], [0.145, 0.1], [0.13, 0.094]], 0.044, lod, 0.004), C.dark, 'rubber');
   b.add(slab([[0.325, 0.098], [0.342, 0.098], [0.342, -0.016], [0.325, -0.016]], 0.045, lod, 0.004), C.dark, 'rubber');
@@ -110,15 +115,19 @@ export function buildShotgun(b: ModelBuilder) {
 
   // Side shell carrier on the left of the receiver.
   b.add(box(0.006, 0.046, 0.074, lod.bevel), C.dark, 'satin', T(-0.023, 0.088, -0.09));
+  if (d >= 1) b.add(box(0.004, 0.008, 0.08, 0.001), C.receiver, 'satin', T(-0.0255, 0.066, -0.09));
+  // Its shells are parts of their own (a reload in first person takes them out one by one); slot nodes mark where each sits.
   const shells = d >= 1 ? 4 : b.minor ? 3 : 2;
   for (let i = 0; i < shells; i++) {
-    const z = -0.06 - i * (0.064 / Math.max(1, shells - 1));
+    const z = saddleZ(i, shells);
+    b.part(`saddle${i}`, new THREE.Vector3(SADDLE_X, 0.094, z));
     const hull = i % 2 === 0 ? C.hull : C.hull2;
-    b.add(tube(0.0098, 0.044, lod.segSmall, 0.0015), hull, 'plastic', T(-0.0355, 0.088, z, Math.PI / 2));
-    b.add(tube(0.0102, 0.012, lod.segSmall, 0.001), C.brass, 'metal', T(-0.0355, 0.116, z, Math.PI / 2));
-    if (d >= 2) b.add(tube(0.0028, 0.002, 8), shade(C.brass, 0.7), 'metal', T(-0.0355, 0.1225, z, Math.PI / 2));
+    b.add(tube(0.0098, 0.044, lod.segSmall, 0.0015), hull, 'plastic', T(SADDLE_X, 0.088, z, Math.PI / 2));
+    b.add(tube(0.0102, 0.012, lod.segSmall, 0.001), C.brass, 'metal', T(SADDLE_X, 0.116, z, Math.PI / 2));
+    if (d >= 2) b.add(tube(0.0028, 0.002, 8), shade(C.brass, 0.7), 'metal', T(SADDLE_X, 0.1225, z, Math.PI / 2));
   }
-  if (d >= 1) b.add(box(0.004, 0.008, 0.08, 0.001), C.receiver, 'satin', T(-0.0255, 0.066, -0.09));
+  b.part('body');
+  for (let i = 0; i < shells; i++) b.node(`saddle${i}`, SADDLE_X, 0.094, saddleZ(i, shells), -Math.PI / 2, 0, SADDLE_SPIN);
 
   // Ribbed pump forend (animated) with its action bars.
   b.part('pump', new THREE.Vector3(0, TUBE_Y, -0.335));

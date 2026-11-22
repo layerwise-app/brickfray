@@ -25,7 +25,7 @@ const PRESENT: Pose = [[0, 0, 0], [0.05, 1, 0.15], [0.6, 0, -0.8]];
 /** How far the bomb is snatched off the pin, from where it was presented: down and ahead, across the thumb. */
 const TUG = [-0.06, -0.07, -0.07] as const;
 const TUGGED: Pose = [[0, 0, 0], [-0.3, 0.95, 0.1], [0.6, 0, -0.8]];
-const COCKED: Pose = [[-0.15, 0.04, -0.34], [0.88, 0.3, 0.35], [-0.08, 0.9, -0.25]];
+const COCKED: Pose = [[-0.2, 0.05, -0.41], [0.88, 0.3, 0.35], [-0.08, 0.9, -0.25]];
 /** Just under the frame below the gun hand: where a throw let go before the bomb was fetched takes it up on the way, its ring sweeping past the gun hand's thumb. */
 const SNATCH: Pose = [[0.11, -0.31, -0.4], [-0.6, 0.3, -0.75], [0.2, -0.6, -0.75]];
 
@@ -37,6 +37,8 @@ const APART = 0.51;
 const FLICK = 0.59;
 const READY = 0.88;
 const COOK = GRENADE.maxCook + 0.7;
+/** Amplitude (m) of the cocked hand's tremor. */
+const TREMOR = 0.0014;
 
 /** View-space hand goals of the throw. */
 export function grenadeGoals(view: THREE.Object3D): Record<string, Goal> {
@@ -95,7 +97,14 @@ export function cookClip(): Clip {
       live.tugged.pos.set(...TUG).add(live.present.pos);
     }
     const alive = seg(t, READY - 0.25, READY + 0.35);
-    live.cocked.pos.set(COCKED[0][0] + Math.sin(t * 2.1) * 0.009 * alive, COCKED[0][1] + Math.sin(t * 1.6 + 1) * 0.015 * alive, COCKED[0][2] + Math.cos(t * 1.3) * 0.01 * alive + 0.02 * seg(t, READY, COOK));
+    // Held cocked, the arm breathes and the tension shows as a fine tremor that grows as the fuse runs down.
+    const tense = alive * (0.4 + 0.6 * seg(t, READY, GRENADE.maxCook));
+    const shake = (a: number, b: number) => (Math.sin(t * a) + 0.6 * Math.sin(t * b + 1.3)) * TREMOR * tense;
+    live.cocked.pos.set(
+      COCKED[0][0] + Math.sin(t * 2.1) * 0.012 * alive + shake(53, 79),
+      COCKED[0][1] + Math.sin(t * 1.6 + 1) * 0.018 * alive + shake(61, 89),
+      COCKED[0][2] + Math.cos(t * 1.3) * 0.012 * alive + 0.02 * seg(t, READY, COOK) + shake(47, 71)
+    );
 
     const meet = [MEET_AT[0] - c.tuning.hip[0], MEET_AT[1] - c.tuning.hip[1], MEET_AT[2] - c.tuning.hip[2], ...MEET_ROT];
     f.gun(track(u, [[0, Z], [at(GRAB * 0.7), SAG], [at(UP - 0.03), meet], [at(PULL), meet], [at(PULL + 0.07), meet.map((v, i) => v + YANK[i]!)], [at(READY - 0.04), DOWN]]));
@@ -106,6 +115,7 @@ export function cookClip(): Clip {
     f.rightFingers = t > UP - 0.16 && t < FLICK + 0.22 ? fingers(u, [[at(UP - 0.16), 'trigger'], [at(UP - 0.04), THUMB_OUT], [at(UP + 0.01), THUMB_OUT], [at(PULL - 0.01), THUMB_SHUT], [at(FLICK - 0.02), THUMB_SHUT], [at(FLICK + 0.03), THUMB_OUT], [at(FLICK + 0.22), 'trigger']]) : null;
 
     f.show.grenade = t > GRAB - 0.04 ? 1 : 0;
+    f.leftLift = 0.4 * seg(t, APART, READY);
     f.pin.hook = t >= PULL ? 1 : 0;
     f.pin.fly = t - FLICK;
     f.busy = seg(t, 0, 0.2);
@@ -142,6 +152,7 @@ export function throwClip(low: boolean, cooked: number): Clip {
     const opened: [number, FingerShape | FingerPose][] = low ? [[out + 0.02, TOSSED], [out + 0.05, TOSSED], [out + 0.12, 'relaxed']] : [[out + 0.03, 'open'], [out + 0.16, 'relaxed']];
     f.leftFingers = u < landed ? fingers(u, [[0, fetched ? spoon : 'relaxed'], [fetched ? out - 0.03 : fetch, fetched ? spoon : 'ball'], [out - 0.03, 'ball'], ...opened, [landed, c.tuning.fingers.left]]) : null;
     f.show.grenade = u < out + 0.01 && (fetched || u >= fetch) ? 1 : 0;
+    if (!low) f.leftLift = (cocked ? 0.4 + 0.6 * seg(u, 0, out * 0.8) : seg(u, 0, out * 0.7)) * (1 - seg(u, out + 0.04, out + 0.2));
     f.show.pin = true;
     if (fetched) f.pin.fly = Math.max(0, cooked - FLICK) + u * 0.75;
     else {

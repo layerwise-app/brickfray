@@ -42,13 +42,23 @@ const RIFLE: Arc = { mid: [0.012, -0.03, 0.012, -0.1, -0.05, -0.72], away: [0.05
 const SLUNG: Arc = { mid: [0.01, -0.025, 0.02, -0.42, -0.03, -0.1], away: [0.055, -0.17, 0.06, -0.5, -0.07, -0.28], rise: 0.21, up: [-0.004, 0.012, -0.012, 0.05, 0.02, 0.04] };
 /** A sidearm turns muzzle down and out toward the hip. */
 const HIP: Arc = { mid: [0.01, -0.04, 0.02, -0.12, 0.15, -0.4], away: [0.04, -0.19, 0.07, -0.35, 0.4, -0.95], rise: 0.11, up: [-0.01, 0.024, -0.02, 0.17, 0.06, 0.26] };
+/**
+ * A long gun traded for a sidearm is let go to hang on its sling: it falls away to the lower left, muzzle dropping and
+ * rolling over, while the sidearm comes out of the other side. Back from a sidearm it is swung up off the sling the same
+ * way and overshoots the other way as it lands in the hands.
+ */
+const SLING: Arc = { mid: [-0.02, -0.06, 0.02, -0.3, 0.14, 0.42], away: [-0.06, -0.19, 0.05, -0.62, 0.28, 0.8], rise: 0.15, up: [0.006, 0.018, -0.018, 0.09, -0.05, -0.16] };
 const SLUNG_GUNS = new Set<WeaponId>(['sniper', 'shotgun', 'harpoon']);
-const arc = (id: WeaponId) => (SIDEARMS.has(id) ? HIP : SLUNG_GUNS.has(id) ? SLUNG : RIFLE);
+/** The way a gun leaves for `to`, and the way `to` comes in after `from`: each pair of classes has its own. */
+const outArc = (from: WeaponId, to: WeaponId | null) => (SIDEARMS.has(from) ? HIP : to && SIDEARMS.has(to) ? SLING : SLUNG_GUNS.has(from) ? SLUNG : RIFLE);
+const inArc = (from: WeaponId | null, to: WeaponId) => (SIDEARMS.has(to) ? HIP : from && SIDEARMS.has(from) ? SLING : SLUNG_GUNS.has(to) ? SLUNG : RIFLE);
+/** How far along its way in (away to mid) a drawn gun starts: at the frame's edge, as the old gun has just left it (the view model swaps then). */
+const EDGE = 0.5;
 
 /** The gun takes its arc out of the frame, still speeding up as it leaves; the cross-fade from the firing pose is its ease-in. */
-export function holsterClip(duration: number): Clip {
+export function holsterClip(duration: number, to: WeaponId | null = null): Clip {
   return clip('holster', duration, [[0, 'holster'], [1, 'swap']], (u, f, c) => {
-    const a = arc(c.id);
+    const a = outArc(c.id, to);
     const k = c.tuning.stow ?? 1;
     f.gun(track(u, [[-0.4, scaled(a.away, -0.2 * k)], [0, Z], [0.45, scaled(a.mid, k)], [1, scaled(a.away, k)], [1.5, scaled(a.away, 1.7 * k)]]));
     f.busy = 1;
@@ -58,18 +68,19 @@ export function holsterClip(duration: number): Clip {
 const HANDS_ON = 0.04;
 
 /** Gun comes up its arc already moving, both hands on it, overshoots, drops back and settles; a slow draw spends the rest settling, not below the frame. */
-export function drawClip(duration: number, sidearm = false): Clip {
+export function drawClip(duration: number, sidearm = false, from: WeaponId | null = null): Clip {
   const draw = clip('draw', duration, [[0, 'draw'], [0.15, 'cloth']], (u, f, c) => {
     // Every gun comes up from the full drop: a small gun's slide starting higher would show before the hand on its grip.
-    const a = arc(c.id);
+    const a = inArc(from, c.id);
     const k = sidearm ? 1 : (c.tuning.stow ?? 1);
     const rise = Math.min(0.56, a.rise / duration);
     const settle = rise + (1 - rise) * 0.55;
+    const edge = a.away.map((x, i) => x + (a.mid[i]! - x) * EDGE);
     if (sidearm) {
       // Flourish: turned up out of the hip, the wrist snaps it past square, canted in and muzzle high, and it settles; a revolver's cylinder spins down.
-      f.gun(track(u, [[-rise, scaled(a.away, 1.7)], [0, a.away], [rise, a.up], [settle, [0.001, -0.004, 0.003, -0.02, 0, -0.04]], [1, Z]]));
+      f.gun(track(u, [[-rise, scaled(a.away, 1.7)], [0, edge], [rise * 0.85, a.up], [settle, [0.001, -0.004, 0.003, -0.02, 0, -0.04]], [1, Z]]));
       if (c.id === 'cannon') f.part('cylinder', [0, 0, 0, 0, 0, -Math.PI * 4 * (1 - (1 - seg(u, 0, settle)) ** 2)]);
-    } else f.gun(track(u, [[-rise, scaled(a.away, 1.7 * k)], [0, scaled(a.away, k)], [rise * 0.5, scaled(a.mid, k)], [rise, a.up], [settle, [0.001, -0.005, 0.004, -0.02, -0.005, -0.01]], [1, Z]]));
+    } else f.gun(track(u, [[-rise, scaled(a.away, 1.7 * k)], [0, scaled(edge, k)], [rise * 0.4, scaled(a.mid, k)], [rise, a.up], [settle, [0.001, -0.005, 0.004, -0.02, -0.005, -0.01]], [1, Z]]));
     f.busy = 1 - seg(u, rise, 1);
   });
   // A sidearm's hands are all at its grip, right under the slide: they slide over from the old gun under the frame and

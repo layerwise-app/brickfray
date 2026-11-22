@@ -66,7 +66,17 @@ export class ViewLighting {
   }
 }
 
-/** Equirectangular HDR sky (gradient, sun, a soft key panel); three.js prefilters it on first use. */
+/** Brightness (linear) of the high softbox panels and of the horizon strip in the view layer's reflections. */
+const PANEL = 3.5;
+const STRIP = 1.6;
+
+/** 1 between latitudes `from` and `to` (radians), easing to 0 over `soft` either side. */
+function band(lat: number, from: number, to: number, soft: number) {
+  const t = (x: number) => Math.min(1, Math.max(0, x));
+  return t((lat - from + soft) / (2 * soft)) * t((to + soft - lat) / (2 * soft));
+}
+
+/** Equirectangular HDR sky (gradient, sun, softbox panels); three.js prefilters it on first use. */
 function skyTexture(a: Atmosphere): THREE.DataTexture {
   const w = 128;
   const h = 64;
@@ -85,6 +95,12 @@ function skyTexture(a: Atmosphere): THREE.DataTexture {
       const up = dir.y;
       if (up >= 0) c.copy(horizon).lerp(zenith, Math.pow(Math.min(1, up / 0.62), 0.8));
       else c.copy(horizon).lerp(ground, Math.min(1, -up / 0.12));
+      // Softboxes: a bright band high round the sky, broken into panels, and a thin strip just over the horizon. A gun's
+      // flat faces reflect the plain sky; its bevels and rounded edges sweep across these and catch crisp highlights.
+      const panel = band(lat, 0.6, 0.86, 0.04) * (0.55 + 0.45 * Math.cos(lon * 3)) * PANEL + band(lat, 0.07, 0.12, 0.015) * STRIP;
+      c.r += panel;
+      c.g += panel;
+      c.b += panel * 0.97;
       const s = Math.max(0, dir.dot(a.sunDirection));
       c.r += sunColor.r * (Math.pow(s, 400) * 40 + Math.pow(s, 12) * 0.5);
       c.g += sunColor.g * (Math.pow(s, 400) * 40 + Math.pow(s, 12) * 0.5);

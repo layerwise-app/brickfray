@@ -25,10 +25,11 @@ const RELOAD: Record<WeaponId, 'rifle' | 'pistol' | 'pump' | 'bolt' | 'revolver'
 /** Shell-by-shell loaders hold a loading pose between shells and finish with their own clip. */
 export const loadsShells = (id: WeaponId) => RELOAD[id] === 'pump';
 
-export function reloadClip(id: WeaponId, empty: boolean, duration: number): Clip {
+/** `slot` is the side-carrier shell a shell-by-shell load starts from (null: from the belt). */
+export function reloadClip(id: WeaponId, empty: boolean, duration: number, slot: number | null = null): Clip {
   switch (RELOAD[id]) {
     case 'pump':
-      return shotgunLoadIn(duration < 0.6 ? duration : 0.28);
+      return shotgunLoadIn(duration < 0.6 ? duration : 0.28, slot);
     case 'rifle':
       return arReload(id, empty, duration);
     case 'bolt':

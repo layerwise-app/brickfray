@@ -14,9 +14,12 @@ const BURST_GROW = 0.9;
 /** Each shot also walks the gun up by CLIMB × its rise (rad), easing back at CLIMB_RETURN per second once the trigger rests. */
 const CLIMB = 0.0024;
 const CLIMB_RETURN = 3.5;
-/** Slide pose: the body leans back and over, so the gun drops low on its side, still pointing ahead, and cants over; [x, y, z] and [pitch, yaw, roll]. */
-const SLIDE_POS = [0.026, -0.058, 0.02] as const;
-const SLIDE_ROT = [0.02, 0.03, 0.36] as const;
+/**
+ * Slide pose: the body leans back and over, so the gun is canted well over and held out to the right at chest height,
+ * not dropped: a gun low under the eye looks like it points straight up the screen; [x, y, z] and [pitch, yaw, roll].
+ */
+const SLIDE_POS = [0.06, 0.03, -0.02] as const;
+const SLIDE_ROT = [0.02, 0.1, 0.62] as const;
 /** The scrape of the slide: a fine fast shake on top, (m, rad) at SCRAPE_HZ. */
 const SCRAPE = [0.0016, 0.006] as const;
 const SCRAPE_HZ = 17;
@@ -72,6 +75,11 @@ export class Motion {
     return this.recoilRot.value;
   }
 
+  /** Sustained fire's climb (rad of pitch), already inside `rot`. */
+  get climbTurn() {
+    return this.climb;
+  }
+
   setTuning(t: Tuning) {
     this.tuning = t;
     this.recoilPos.stiffness = this.recoilRot.stiffness = t.spring[0];
@@ -117,7 +125,7 @@ export class Motion {
     const plant = (1 - Math.abs(Math.sin(this.phase - PLANT))) ** 4;
 
     // Jump: the gun is left behind as the legs push off, floats up tucked in and rolled while airborne, and is driven down by the landing.
-    if (this.grounded && !input.grounded) this.land.impulse(-0.4, -1.6, 0);
+    if (this.grounded && !input.grounded) this.land.impulse(-0.9, -3.4, 0);
     this.grounded = input.grounded;
     this.air = approach(this.air, input.grounded ? 0 : 1, 6, dt);
     this.land.step(dt);
@@ -142,7 +150,7 @@ export class Motion {
     this.rot.set(
       s2 * mix('pitch') - plant * mix('plant') * 1.5 + this.climb + air * 0.065 + land * 0.55 + Math.sin(t * 1.55 + 0.7) * 0.0045 * breathe,
       s1 * mix('yaw') + Math.sin(t * 0.71) * 0.0025 * breathe + air * 0.05,
-      -s1 * mix('roll') + air * 0.11
+      -s1 * mix('roll') + air * 0.16
     );
     for (let i = 0; i < 3; i++) {
       this.pos.setComponent(i, this.pos.getComponent(i) + CROUCH_POS[i]! * cant);

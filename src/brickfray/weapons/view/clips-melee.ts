@@ -23,10 +23,13 @@ interface Beat {
   back: number;
 }
 
-/** Light: a quick flick and straight back. Heavy: a long hang at the top, a dead stop in the target for a couple of frames (its stop pose is the hit pose), then driven on through and out of the frame. */
-const LIGHT: Beat = { fetch: 0.044, hang: 0.01, load: 0.12, swing: 0.024, bite: 0.018, follow: 0.04, stow: 0.03, back: 0.08 };
-const MEDIUM: Beat = { fetch: 0.049, hang: 0.017, load: 0.12, swing: 0.025, bite: 0.03, follow: 0.06, stow: 0.04, back: 0.1 };
-const HEAVY: Beat = { fetch: 0.05, hang: 0.028, load: 0.15, swing: 0.024, bite: 0.04, follow: 0.05, stow: 0.06, back: 0.11 };
+/**
+ * Light: a quick flick and straight back. Heavy: a long hang at the top. Every blow catches in the target for a few
+ * frames (its stop pose lies a finger's width past the hit pose: the hit-stop), then follows through, still in view.
+ */
+const LIGHT: Beat = { fetch: 0.044, hang: 0.01, load: 0.12, swing: 0.024, bite: 0.034, follow: 0.05, stow: 0.03, back: 0.08 };
+const MEDIUM: Beat = { fetch: 0.049, hang: 0.017, load: 0.12, swing: 0.025, bite: 0.04, follow: 0.06, stow: 0.04, back: 0.1 };
+const HEAVY: Beat = { fetch: 0.05, hang: 0.028, load: 0.15, swing: 0.024, bite: 0.05, follow: 0.06, stow: 0.06, back: 0.11 };
 /** Shares of the lift at which the weapon, still hanging head down, clears the bottom of the frame, and at which it is half turned over. */
 const PULLED = 0.2;
 const TURNED = 0.62;
@@ -49,8 +52,13 @@ interface Swing {
   dip: readonly number[];
 }
 
-const DIP = [0.06, -0.075, 0.05, -0.34, -0.3, -0.5];
-const HEAVY_DIP = [0.065, -0.1, 0.06, -0.42, -0.36, -0.56];
+/** The gun in the right hand while the left one strikes, per weapon: a knife's quick jab barely moves it, a sword's slash rolls it over on its side out of the cut, a heavy swing lets it sink. */
+const KNIFE_DIP = [0.035, -0.04, 0.03, -0.16, -0.18, -0.32];
+const SWORD_DIP = [0.075, -0.06, 0.07, -0.28, -0.45, -0.78];
+const HATCHET_DIP = [0.06, -0.085, 0.05, -0.42, -0.3, -0.42];
+const WRENCH_DIP = [0.05, -0.07, 0.045, -0.3, -0.2, -0.62];
+const MALLET_DIP = [0.065, -0.1, 0.06, -0.42, -0.36, -0.56];
+const ANCHOR_DIP = [0.07, -0.11, 0.065, -0.5, -0.3, -0.45];
 /** Hanging from the fist at the front of the left hip, head down and a little ahead, just under the frame: where it is drawn from. */
 const HIP: Pose = [[-0.03, -0.3, -0.42], [0.05, -0.8, -0.6], [0.9, 0.1, -0.4]];
 /** Where it goes back in, a little lower so the fist is well out of the picture. */
@@ -85,11 +93,11 @@ const SWINGS: Record<MeleeId, Swing> = {
     wind: [[-0.13, -0.07, -0.42], [-0.5, 0.86, 0.0], [0.45, 0.2, -0.87]],
     hit: [[-0.036, -0.187, -0.508], [0.12, 0.62, -0.77], [0, -0.77, -0.62]],
     stop: [[-0.036, -0.187, -0.508], [0.12, 0.62, -0.77], [0, -0.77, -0.62]],
-    through: [[-0.05, -0.36, -0.43], [0.1, -0.55, -0.83], [0, -0.83, 0.55]],
-    recover: [[-0.07, -0.38, -0.42], [0.15, -0.7, -0.7], [0.1, -0.7, 0.7]],
+    through: [[-0.045, -0.3, -0.46], [0.1, -0.15, -0.98], [0, -0.98, 0.15]],
+    recover: [[-0.07, -0.39, -0.42], [0.15, -0.7, -0.7], [0.1, -0.7, 0.7]],
     beat: HEAVY,
     weight: 1.3,
-    dip: DIP
+    dip: MALLET_DIP
   },
   // Diagonal slash, upper left to lower right, the blade crossing the crosshair and carrying on out of the bottom of the frame.
   sword: {
@@ -97,25 +105,25 @@ const SWINGS: Record<MeleeId, Swing> = {
     rise: [[-0.15, -0.21, -0.43], [-0.85, 0.2, -0.5], [0.45, 0.45, -0.77]],
     wind: [[-0.23, -0.04, -0.43], [-0.42, 0.85, -0.3], [0.75, 0.25, -0.6]],
     hit: [[-0.135, -0.176, -0.469], [0.42, 0.55, -0.72], [0.7, -0.65, 0.1]],
-    stop: [[-0.07, -0.2, -0.46], [0.62, 0.25, -0.74], [0.6, -0.8, 0]],
-    through: [[0.06, -0.32, -0.4], [0.6, -0.45, -0.66], [0.3, -0.9, -0.3]],
-    recover: [[0.02, -0.34, -0.4], [0.4, -0.5, -0.77], [0.4, -0.8, 0.3]],
+    stop: [[-0.1265, -0.1883, -0.469], [0.42, 0.55, -0.72], [0.7, -0.65, 0.1]],
+    through: [[-0.04, -0.235, -0.45], [0.62, 0.2, -0.76], [0.55, -0.83, 0]],
+    recover: [[0.06, -0.34, -0.4], [0.6, -0.45, -0.66], [0.3, -0.9, -0.3]],
     beat: MEDIUM,
-    weight: 0.6,
-    dip: DIP
+    weight: 0.7,
+    dip: SWORD_DIP
   },
   // A stab: up out of the hip with the blade turning forward, edge down, drawn back low beside the chest, and thrust straight out with the point on the crosshair, then pulled back down out of the frame.
   knife: {
-    draw: HIP,
-    rise: [[-0.2, -0.28, -0.4], [0.1, 0.25, -0.96], [0.1, -0.95, -0.25]],
-    wind: [[-0.19, -0.22, -0.37], [0.3, 0.32, -0.9], [0.05, -0.95, -0.3]],
-    hit: [[-0.06, -0.09, -0.46], [0.19, 0.285, -0.94], [0.05, -0.95, -0.3]],
-    stop: [[-0.058, -0.087, -0.47], [0.19, 0.285, -0.94], [0.05, -0.95, -0.3]],
-    through: [[-0.1, -0.33, -0.36], [0.2, -0.3, -0.93], [0, -0.95, 0.3]],
-    recover: [[-0.06, -0.36, -0.38], [0.2, -0.6, -0.77], [0, -0.8, 0.6]],
+    draw: [[-0.05, -0.31, -0.36], [0.05, -0.8, -0.6], [0.9, 0.1, -0.4]],
+    rise: [[-0.21, -0.27, -0.38], [0.25, 0.45, -0.86], [0.15, -0.9, -0.2]],
+    wind: [[-0.2, -0.235, -0.33], [0.45, 0.5, -0.74], [0.25, -0.85, -0.1]],
+    hit: [[-0.15, -0.185, -0.47], [0.42, 0.5, -0.76], [0.25, -0.88, -0.1]],
+    stop: [[-0.144, -0.178, -0.481], [0.42, 0.5, -0.76], [0.25, -0.88, -0.1]],
+    through: [[-0.19, -0.25, -0.37], [0.4, 0.25, -0.88], [0.2, -0.95, 0.15]],
+    recover: [[-0.12, -0.37, -0.36], [0.15, -0.7, -0.7], [0.1, -0.7, 0.7]],
     beat: LIGHT,
-    weight: 0.4,
-    dip: DIP
+    weight: 0.5,
+    dip: KNIFE_DIP
   },
   // Rising hook from low on the left: the crown swings out of the hip and back, hangs, comes up through the crosshair, its weight tips it over to the right, and it drops out of the frame.
   anchor: {
@@ -128,7 +136,7 @@ const SWINGS: Record<MeleeId, Swing> = {
     recover: [[0.02, -0.4, -0.41], [0.55, -0.65, -0.52], [0.1, -0.55, 0.8]],
     beat: HEAVY,
     weight: 1.4,
-    dip: HEAVY_DIP
+    dip: ANCHOR_DIP
   },
   // Diagonal chop from the upper left: the bit sinks in at the crosshair, side-on to the eye, and is wrenched out down to the right.
   hatchet: {
@@ -136,12 +144,12 @@ const SWINGS: Record<MeleeId, Swing> = {
     rise: [[-0.14, -0.2, -0.43], [-0.85, 0.25, -0.45], [0.45, 0.45, -0.77]],
     wind: [[-0.21, -0.07, -0.45], [-0.55, 0.82, -0.12], [0.6, 0.3, -0.75]],
     hit: [[-0.112, -0.173, -0.49], [0.4, 0.62, -0.68], [0.6, -0.7, -0.3]],
-    stop: [[-0.1, -0.19, -0.49], [0.42, 0.55, -0.72], [0.6, -0.78, -0.2]],
-    through: [[0.04, -0.32, -0.42], [0.5, -0.4, -0.77], [0.4, -0.9, 0.1]],
-    recover: [[0.01, -0.35, -0.42], [0.3, -0.6, -0.74], [0.3, -0.8, 0.5]],
+    stop: [[-0.1037, -0.1816, -0.49], [0.4, 0.62, -0.68], [0.6, -0.7, -0.3]],
+    through: [[-0.03, -0.245, -0.45], [0.45, 0.45, -0.77], [0.45, -0.85, -0.1]],
+    recover: [[0.04, -0.34, -0.42], [0.4, -0.5, -0.77], [0.35, -0.85, 0.3]],
     beat: MEDIUM,
-    weight: 0.9,
-    dip: DIP
+    weight: 1,
+    dip: HATCHET_DIP
   },
   // A short hook: cocked out at the left, head level with the crosshair and pointing away, the forearm swings it flat across so the jaw comes round level into the crosshair, and it carries on round to the right and drops out of the frame.
   wrench: {
@@ -149,12 +157,12 @@ const SWINGS: Record<MeleeId, Swing> = {
     rise: [[-0.19, -0.24, -0.4], [-0.45, 0.55, -0.7], [0.85, 0.1, -0.5]],
     wind: [[-0.17, -0.13, -0.42], [-0.55, 0.35, -0.75], [0.89, 0, -0.46]],
     hit: [[-0.12, -0.105, -0.45], [0.45, 0.35, -0.82], [0.85, -0.2, 0.45]],
-    stop: [[-0.09, -0.11, -0.45], [0.62, 0.28, -0.73], [0.75, -0.3, 0.6]],
-    through: [[0.03, -0.3, -0.42], [0.85, -0.2, -0.48], [0.3, -0.7, 0.65]],
-    recover: [[0.04, -0.35, -0.42], [0.6, -0.5, -0.62], [0.4, -0.85, 0.3]],
+    stop: [[-0.109, -0.1, -0.456], [0.45, 0.35, -0.82], [0.85, -0.2, 0.45]],
+    through: [[-0.04, -0.16, -0.45], [0.7, 0.2, -0.68], [0.7, -0.35, 0.6]],
+    recover: [[0.03, -0.36, -0.4], [0.6, -0.5, -0.62], [0.4, -0.85, 0.3]],
     beat: MEDIUM,
     weight: 1,
-    dip: DIP
+    dip: WRENCH_DIP
   }
 };
 
@@ -259,8 +267,9 @@ export function meleeClip(id: MeleeId, duration: number, windup: number): Clip {
     f.show.mallet = u >= draw && u < recover ? 1 : 0;
 
     const dip = s.dip;
-    // Kept low until the hand is back on it, then brought up with both hands.
-    f.gun(track(u, [[0, Z], [draw, scaled(dip, DIP_EARLY)], [cock, dip], [stop, scaled(dip, 1.05)], [through, dip], [recover, scaled(dip, 0.95)], [below, scaled(dip, 0.8)], [back, scaled(dip, 0.5)], [back + settle * 0.55, [-0.002, 0.006, -0.006, 0.028, 0.01, 0.022]], [back + settle, Z]]));
+    // Out of the way for the blow; from the hit-stop the gun hand already brings it back up, so the follow-through and
+    // the weapon's exit play out over a gun on its way back, never over an empty frame.
+    f.gun(track(u, [[0, Z], [draw, scaled(dip, DIP_EARLY)], [cock, dip], [stop, scaled(dip, 1.05)], [through, scaled(dip, 0.8)], [recover, scaled(dip, 0.5)], [below, scaled(dip, 0.24)], [back, scaled(dip, 0.07)], [back + settle * 0.55, [-0.002, 0.006, -0.006, 0.028, 0.01, 0.022]], [back + settle, Z]]));
     const jolt = bump(u, hit + at(0.022), at(0.02)) * s.weight;
     f.gun([0.004, -0.006, 0.012, -0.03, -0.025, 0.035], jolt);
     f.busy = seg(u, 0, hit * 0.5) * (1 - seg(u, back, back + settle));

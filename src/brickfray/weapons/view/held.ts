@@ -17,9 +17,11 @@ const BELOW_FRAME = -0.27;
 /** …or this many seconds at most, if the hand never goes down. */
 const PUT_AWAY = 0.35;
 /** Seconds a flicked pin is shown, its launch speed (view space) and the pull on it. */
-const PIN_LIFE = 0.4;
-const PIN_FLICK = new THREE.Vector3(-0.25, 1.1, -0.2);
-const PIN_GRAVITY = 9;
+const PIN_LIFE = 0.55;
+const PIN_FLICK = new THREE.Vector3(-0.55, 1.25, -0.1);
+const PIN_GRAVITY = 7;
+/** The flicked pin tumbles end over end and wobbles (rad/s about each axis), slowing as it goes. */
+const PIN_SPIN = [26, 11, 34] as const;
 
 /** How far down the thumb's last joint the ring sits. */
 const HOOK_DEPTH = -0.011;
@@ -66,13 +68,14 @@ export class Held {
     space: THREE.Object3D,
     private readonly hand: THREE.Object3D,
     private readonly hook: THREE.Object3D,
-    shellGeometry: THREE.BufferGeometry
+    private readonly redShell: THREE.BufferGeometry,
+    private readonly blueShell: THREE.BufferGeometry
   ) {
     this.melee = this.take('mallet');
     this.grenade = createRiggedModel('grenade', kit, 'first');
     hand.add(this.grenade.model.root);
     this.grenade.model.root.position.set(0.0165, 0.016, -0.002);
-    this.shell = new THREE.Mesh(shellGeometry, surfaceMaterial(kit.materials));
+    this.shell = new THREE.Mesh(redShell, surfaceMaterial(kit.materials));
     this.shell.position.copy(SHELL_HOLD.pos);
     this.shell.quaternion.copy(SHELL_HOLD.quat);
     hand.add(this.shell);
@@ -112,6 +115,11 @@ export class Held {
   /** Where the gun hand's thumb takes the ring. */
   ringHook(): Goal {
     return goal(this.hook, [0, 0, HOOK_DEPTH], new THREE.Quaternion());
+  }
+
+  /** The next shell in the fingers: a blue one from the carrier's every second slot, else red. */
+  shellHull(blue: boolean) {
+    this.shell.geometry = blue ? this.blueShell : this.redShell;
   }
 
   /** Another clip cuts in: a weapon still in the hand goes down with it instead of vanishing. */
@@ -165,9 +173,11 @@ export class Held {
     const fly = f.pin.fly;
     pin.visible = f.show.pin && (fly >= 0 ? fly < PIN_LIFE : f.show.grenade > 0 || f.pin.hook > 0);
     if (fly >= 0) {
-      pin.position.copy(this.flyFrom).addScaledVector(PIN_FLICK, fly);
+      // Air drag: it goes out fast and hangs at the top of its arc before falling away.
+      const out = (1 - Math.exp(-3 * fly)) / 3;
+      pin.position.copy(this.flyFrom).addScaledVector(PIN_FLICK, out);
       pin.position.y -= PIN_GRAVITY * 0.5 * fly * fly;
-      pin.quaternion.copy(this.pinTurn).multiply(spin.setFromEuler(e.set(fly * 9, fly * 4, fly * 14)));
+      pin.quaternion.copy(this.pinTurn).multiply(spin.setFromEuler(e.set(out * PIN_SPIN[0], out * PIN_SPIN[1] + Math.sin(fly * 30) * 0.3, out * PIN_SPIN[2])));
       return;
     }
     const bomb = this.grenade.model.root;

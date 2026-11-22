@@ -32,7 +32,6 @@ export function Hud() {
   return (
     <div className='pointer-events-none absolute inset-0 select-none'>
       <LowHealth level={hud.alive ? Math.min(1, Math.max(0, (LOW_HEALTH - hud.health / hud.maxHealth) / 0.35)) : 0} />
-      {hud.scoped && <div className='bf-scope' />}
       {hud.alive && playing && <Crosshair hidden={hud.scoped || hud.aiming || (!!hud.offer && !hud.offer.picked)} />}
       <KillConfirm />
       <MultiKill />

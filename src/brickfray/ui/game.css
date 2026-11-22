@@ -308,31 +308,6 @@ html.bf-rotated .bf-root input[type='range'] {
   transition: opacity 0.25s ease;
 }
 
-.bf-scope {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background: radial-gradient(circle at center, transparent 0, transparent min(36vh, 36vw), rgba(0, 0, 0, 0.92) calc(min(36vh, 36vw) + 2px));
-}
-.bf-scope::before,
-.bf-scope::after {
-  content: '';
-  position: absolute;
-  background: rgba(0, 0, 0, 0.85);
-  left: 50%;
-  top: 50%;
-}
-.bf-scope::before {
-  width: min(72vh, 72vw);
-  height: 2px;
-  transform: translate(-50%, -50%);
-}
-.bf-scope::after {
-  width: 2px;
-  height: min(72vh, 72vw);
-  transform: translate(-50%, -50%);
-}
-
 .bf-scroll::-webkit-scrollbar {
   width: 8px;
 }

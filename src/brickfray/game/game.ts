@@ -420,7 +420,7 @@ export class Game {
     if (match && this.soloHalted) {
       // Zero time: apply snapshots and place the camera, but nothing moves.
       match.frame(0, this.input.read(0, 1), true);
-      this.renderer.render(match.scene, match.fp.camera, match.me.alive && !match.scoped ? this.view.scene : null, this.view.camera);
+      this.renderer.render(match.scene, match.fp.camera, match.me.alive ? this.view.scene : null, this.view.camera);
       this.report(this.tally?.frame(0, this.hud.state, true));
     } else if (match) {
       if (this.hud.state.phase === 'ended' && this.input.locked) this.input.unlock();
@@ -429,7 +429,7 @@ export class Game {
       const input = this.input.read(dt, zoom, (y, p) => match.assist(y, p, this.settings.input.aimAssist));
       if (input.scoreboard !== this.hud.state.scoreboard) this.hud.set({ scoreboard: input.scoreboard });
       match.frame(dt, input, paused || !this.input.active);
-      this.renderer.render(match.scene, match.fp.camera, match.me.alive && !match.scoped ? this.view.scene : null, this.view.camera);
+      this.renderer.render(match.scene, match.fp.camera, match.me.alive ? this.view.scene : null, this.view.camera);
       this.report(this.tally?.frame(dt, this.hud.state, false));
     } else {
       this.showroom.update(dt);
