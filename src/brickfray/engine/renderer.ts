@@ -14,6 +14,9 @@ export { DEFAULT_ATMOSPHERE, plainLights, type Atmosphere };
 
 type View = [THREE.Scene, THREE.Camera];
 
+/** How far the environment's zenith is pulled to a grey of the same luminance (0 = sky blue, 1 = grey). */
+const ENV_ZENITH_GREY = 0.45;
+
 export class GameRenderer {
   readonly renderer: THREE.WebGLRenderer;
   readonly timer: FrameTimer;
@@ -114,7 +117,10 @@ export class GameRenderer {
     this.buildEnvironment(scene);
   }
 
-  /** Reflections come from the same sky, so plastic picks up blue on top and warm bounce below. */
+  /**
+   * Reflections and shade light come from the same sky with its zenith turned mostly grey: the full zenith blue
+   * lit every shadowed top saturated blue, so shade stays a slightly cool grey and the sun keeps the warmth.
+   */
   private buildEnvironment(scene: THREE.Scene) {
     this.envTarget?.dispose();
     this.envTarget = null;
@@ -124,6 +130,8 @@ export class GameRenderer {
     const sky = this.sky.clone();
     sky.material = this.sky.material.clone();
     sky.material.uniforms.uSunColor!.value.multiplyScalar(0.35);
+    const zenith: THREE.Color = sky.material.uniforms.uZenith!.value;
+    zenith.lerp(new THREE.Color().setScalar(0.2126 * zenith.r + 0.7152 * zenith.g + 0.0722 * zenith.b), ENV_ZENITH_GREY);
     envScene.add(sky);
     const ground = new THREE.Mesh(new THREE.CircleGeometry(400, 24), new THREE.MeshBasicMaterial({ color: this.atmosphere.ground }));
     ground.rotation.x = -Math.PI / 2;

@@ -9,6 +9,10 @@ export const BOAT_GANGWAYS: [number, number][] = [[-9.2, -8.0], [1.6, 2.8]];
 const HOUSE = { x0: -8.0, x1: -3.2, z0: -1.2, z1: 1.6 } as const;
 const DOOR = { z0: -0.36, z1: 0.76 } as const;
 const STAIR = { x: -2.0, z0: -2.4, z1: -1.2, steps: 6, run: 0.6 } as const;
+/** Roof rail: higher than a jump so its top is no perch. */
+const RAIL_H = 1.25;
+/** Opening in the aft roof rail: the second way off the roof, a drop onto the aft deck. */
+const AFT_GAP = { z0: -0.4, z1: 0.8 } as const;
 const HULL = '#1f4e79';
 const RED = '#b0302a';
 const WHITE = '#e9e6dc';
@@ -24,7 +28,7 @@ const DECKS: [number, number, number][] = [
 
 function rails(): [Vec3, Vec3][] {
   const D = BOAT.deck;
-  const top = D + 0.96;
+  const top = D + RAIL_H;
   const out: [Vec3, Vec3][] = [];
   let a: number = BOAT.aft;
   for (const [g0, g1] of BOAT_GANGWAYS) {
@@ -54,11 +58,13 @@ function houseColliders(): PlanCollider[] {
   for (const z of [z0, z1 - 0.2]) out.push(f.box([x0, D, z], [x1, sill, z + 0.2], 'metal'));
   for (const x of [x0, x1 - 0.2]) for (const z of [z0, z1 - 0.2, DOOR.z0 - 0.2, DOOR.z1]) out.push(f.box([x, sill, z], [x + 0.2, lintel, z + 0.2], 'metal'));
   out.push(f.box([x0, lintel, z0], [x1, BOAT.roof, z1], 'metal', { walk: true }));
-  out.push(f.box([x0, BOAT.roof, z1 - 0.1], [x1, BOAT.roof + 0.9, z1], 'metal', { bulletsPass: true }));
-  out.push(f.box([x0, BOAT.roof, z0], [x0 + 0.1, BOAT.roof + 0.9, z1], 'metal', { bulletsPass: true }));
-  out.push(f.box([x1 - 0.1, BOAT.roof, z0], [x1, BOAT.roof + 0.9, z1], 'metal', { bulletsPass: true }));
-  out.push(f.box([x0, BOAT.roof, z0], [-5.8, BOAT.roof + 0.9, z0 + 0.1], 'metal', { bulletsPass: true }));
-  out.push(f.box([-4.4, BOAT.roof, z0], [x1, BOAT.roof + 0.9, z0 + 0.1], 'metal', { bulletsPass: true }));
+  const top = BOAT.roof + RAIL_H;
+  out.push(f.box([x0, BOAT.roof, z1 - 0.1], [x1, top, z1], 'metal', { bulletsPass: true }));
+  out.push(f.box([x0, BOAT.roof, z0], [x0 + 0.1, top, AFT_GAP.z0], 'metal', { bulletsPass: true }));
+  out.push(f.box([x0, BOAT.roof, AFT_GAP.z1], [x0 + 0.1, top, z1], 'metal', { bulletsPass: true }));
+  out.push(f.box([x1 - 0.1, BOAT.roof, z0], [x1, top, z1], 'metal', { bulletsPass: true }));
+  out.push(f.box([x0, BOAT.roof, z0], [-5.8, top, z0 + 0.1], 'metal', { bulletsPass: true }));
+  out.push(f.box([-4.4, BOAT.roof, z0], [x1, top, z0 + 0.1], 'metal', { bulletsPass: true }));
   return out;
 }
 
@@ -88,7 +94,7 @@ export const BOAT_EL: Element<At> = {
   },
   nav: (p) => {
     const f = frameOf(p);
-    return [f.p(-6.8, BOAT.deck, -1.9), f.p(-1.0, BOAT.deck, -1.9), f.p(-3.5, BOAT.deck + 1.44, -1.8), f.p(-5.3, BOAT.roof, -1.8), f.p(-5.3, BOAT.roof, 0.2), f.p(-8.8, BOAT.deck, 0.2), f.p(-2.4, BOAT.deck, 2.2)];
+    return [f.p(-6.8, BOAT.deck, -1.9), f.p(-1.0, BOAT.deck, -1.9), f.p(-3.5, BOAT.deck + 1.44, -1.8), f.p(-5.3, BOAT.roof, -1.8), f.p(-5.3, BOAT.roof, 0.2), f.p(-7.4, BOAT.roof, 0.2), f.p(-8.8, BOAT.deck, 0.2), f.p(-2.4, BOAT.deck, 2.2)];
   },
   draw(d, p) {
     const t = pen(d, p);
@@ -155,12 +161,14 @@ function roof(t: Pen) {
   const posts: [number, number][] = [];
   for (let k = 0; k <= 4; k++) posts.push([x0 + 0.05 + (k * (x1 - x0 - 0.1)) / 4, z1 - 0.05]);
   for (const x of [x0 + 0.05, -5.85, -4.35, x1 - 0.05]) posts.push([x, z0 + 0.05]);
-  for (const x of [x0 + 0.05, x1 - 0.05]) posts.push([x, (z0 + z1) / 2]);
-  for (const [x, z] of posts) t.box(x, R, z, 0.06, 0.82, 0.06, '#f6c624', 'metal', 0);
-  t.span(x0, R + 0.42, z1 - 0.08, x1, R + 0.47, z1 - 0.02, '#f6c624', 'metal', 0);
-  for (const x of [x0 + 0.02, x1 - 0.08]) t.span(x, R + 0.42, z0, x + 0.06, R + 0.47, z1, '#f6c624', 'metal', 0);
-  t.span(x0, R + 0.42, z0 + 0.02, -5.8, R + 0.47, z0 + 0.08, '#f6c624', 'metal', 0);
-  t.span(-4.4, R + 0.42, z0 + 0.02, x1, R + 0.47, z0 + 0.08, '#f6c624', 'metal', 0);
+  posts.push([x1 - 0.05, (z0 + z1) / 2], [x0 + 0.05, AFT_GAP.z0 - 0.05], [x0 + 0.05, AFT_GAP.z1 + 0.05]);
+  const mid = RAIL_H / 2;
+  for (const [x, z] of posts) t.box(x, R, z, 0.06, RAIL_H - 0.08, 0.06, '#f6c624', 'metal', 0);
+  t.span(x0, R + mid, z1 - 0.08, x1, R + mid + 0.05, z1 - 0.02, '#f6c624', 'metal', 0);
+  t.span(x1 - 0.08, R + mid, z0, x1 - 0.02, R + mid + 0.05, z1, '#f6c624', 'metal', 0);
+  for (const [a, b] of [[z0, AFT_GAP.z0], [AFT_GAP.z1, z1]] as const) t.span(x0 + 0.02, R + mid, a, x0 + 0.08, R + mid + 0.05, b, '#f6c624', 'metal', 0);
+  t.span(x0, R + mid, z0 + 0.02, -5.8, R + mid + 0.05, z0 + 0.08, '#f6c624', 'metal', 0);
+  t.span(-4.4, R + mid, z0 + 0.02, x1, R + mid + 0.05, z0 + 0.08, '#f6c624', 'metal', 0);
 }
 
 function house(t: Pen) {

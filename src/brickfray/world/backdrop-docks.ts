@@ -1,16 +1,19 @@
 import { hills, skyline } from './backdrop';
 import { WATER_Y } from './docks-parts';
 import type { Drawer } from './plan';
+import { CONTAINER, CONTAINER_SIZE } from './props-harbor';
 import { Pen } from './props-kit';
-import { Frame, mix, Rng } from './util';
+import { Frame, mix, Rng, shade } from './util';
 
 const HAZE = '#f4cf9e';
+/** The low tier's fog is opaque by 140 m, so its town ring stays inside it to keep the skyline's silhouette. */
+const LOW_OUTER = 100;
 const BOX_COLORS = ['#c0392b', '#2f7fbf', '#e67e22', '#2e8b57', '#d9b93a', '#7f8c8d', '#16a085', '#8e5a9a'];
 
 /** Harbor surroundings: open sea and far shore to the south, container port and town inland. */
 export function docksBackdrop(d: Drawer) {
   d.anim.water(-420, 10, 420, 420, WATER_Y, '#2c5866');
-  skyline(d, { inner: [62, 54], outer: 160, haze: HAZE, colors: ['#e3d9c6', '#b5523b', '#d9a441', '#6f8496', '#3f8f8a', '#a0705a', '#c8b89a'], seed: 11, minH: 10, maxH: 30, skip: ['s'], dusk: 0.12 });
+  skyline(d, { inner: [62, 54], outer: d.detail === 0 ? LOW_OUTER : 160, haze: HAZE, colors: ['#e3d9c6', '#b5523b', '#d9a441', '#6f8496', '#3f8f8a', '#a0705a', '#c8b89a'], seed: 11, minH: 10, maxH: 30, skip: ['s'], dusk: 0.12 });
   for (const side of [-1, 1]) shore(d, side);
   hills(d, { count: 10, radius: [40, 70], dist: [190, 240], colors: ['#7d8f6a', '#8a9a74', '#6f8262'], haze: HAZE, seed: 5, arc: [Math.PI * 0.2, Math.PI * 0.8], height: 0.32 });
   const t = new Pen(d, new Frame(0, 0, 0));
@@ -23,7 +26,11 @@ export function docksBackdrop(d: Drawer) {
         const z = -44 + row * 3.2;
         const levels = rng.int(1, 4);
         const fade = Math.min(0.5, (Math.hypot(x, z) - 30) / 90);
-        for (let k = 0; k < levels; k++) t.box(x, k * 2.56, z, 6, 2.56, 2.4, mix(rng.pick(BOX_COLORS), HAZE, fade), 'metal', 0);
+        for (let k = 0; k < levels; k++) {
+          const color = mix(rng.pick(BOX_COLORS), HAZE, fade);
+          if (col === 0) CONTAINER.draw(d, { x, z, y: k * CONTAINER_SIZE.height, turns: side < 0 ? 0 : 2, color });
+          else farContainer(d, t, x, k * CONTAINER_SIZE.height, z, color, side);
+        }
       }
     }
     for (let i = 0; i < 2; i++) gantry(t, side * (74 + i * 20), 4, side < 0 ? 1 : 0);
@@ -36,6 +43,13 @@ export function docksBackdrop(d: Drawer) {
   lighthouse(t, 58, 70);
   d.anim.foam.ring(58, 70, WATER_Y, 3.2, 1.4, 16);
   t.span(30, WATER_Y, 66, 66, 0.6, 74, mix('#8d8f88', HAZE, 0.35), undefined, 0);
+}
+
+/** Rows behind the first, seen only past it: corrugated sheeting and the door frame on the end toward the map. */
+function farContainer(d: Drawer, t: Pen, x: number, y: number, z: number, color: string, side: number) {
+  const { length: L, width: W, height: H } = CONTAINER_SIZE;
+  d.siding.box([x - L / 2, y, z - W / 2], [x + L / 2, y + H, z + W / 2], color);
+  t.box(x - side * (L / 2 + 0.02), y + 0.1, z, 0.04, H - 0.2, W - 0.16, shade(color, -0.22), 'metal', 0);
 }
 
 /** The town's waterfront either side of the bay: the skyline stands on it instead of in the sea. */

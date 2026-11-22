@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { DECAL } from './blocks';
 import { BOAT, BOAT_EL, BOAT_GANGWAYS } from './boat';
+import { BARGE } from './docks-barge';
 import { docksBackdrop } from './backdrop-docks';
 import { docksGround } from './docks-ground';
 import { GANGWAY, PIER, QUAY_EDGE, QUAY_WALL, RAILS } from './docks-parts';
@@ -33,6 +34,8 @@ function harbor(p: Plan) {
   p.add(PIER, { x0: PIERS[0]![0], z0: BOARDWALK.z0, x1: PIERS[2]![1], z1: BOARDWALK.z1 });
   p.add(BOAT_EL, BOAT_AT);
   for (const [a, b] of BOAT_GANGWAYS) p.add(GANGWAY, { x: BOAT_AT.x + (a + b) / 2, z: BOARDWALK.z1 - 1.6 });
+  p.add(BARGE, { x: -12.8, z: 13.4, hull: '#3d4a3a', cargo: '#d9b93a' });
+  p.add(BARGE, { x: 12.8, z: 13.4, hull: '#4a3b34', cargo: '#16a085' });
 }
 
 function warehouse(p: Plan) {
@@ -47,6 +50,7 @@ function warehouse(p: Plan) {
     p.add(BARREL, { x: s * 12.8, z: -15.6, kind: 'drum', color: '#2f7f7a' });
     p.add(BARREL, { x: s * 12.2, z: -15.4, kind: 'drum', color: '#545c63' });
   }
+  p.add(RACK, { x: 0, z: -18.6, length: 6.0, turns: 1 });
   p.add(FORKLIFT, { x: -4.4, z: -17.2, turns: 0 });
   p.add(PALLET, { x: -2.0, z: -17.2, load: 'boxes' });
   for (const s of [-1, 1] as const) p.add(METAL_STAIRS, { x: s * 5.6, z: -24.4, y0: 0, dir: s < 0 ? 'w' : 'e', width: 1.6, steps: 7, rise: WH.deck / 7, run: 0.8, style, surface: 'metal' });
@@ -60,15 +64,22 @@ function bounds(p: Plan) {
 }
 
 function spawns(p: Plan) {
-  const side: [number, number][] = [[-33.6, -25.6], [-30.4, -22.4], [-33.6, -18.4], [-29.6, -16.0], [-33.6, -9.6], [-30.4, -5.6], [-33.6, -1.6], [-30.4, 1.6], [-33.6, 6.4], [-28.8, 8.0]];
-  for (const [x, z] of side) p.spawn(x, 0, z, -Math.PI / 2, 0);
-  for (const [x, z] of side) p.spawn(-x, 0, z, Math.PI / 2, 1);
-  const ffa: [number, number, number][] = [
-    [-8.0, WH.deck, -26.4], [8.0, WH.deck, -26.4], [0, WH.deck, -20.8], [-11.2, 0, -18.0], [11.2, 0, -18.0], [0, 2.56, -4.8],
-    [-17.6, 0, -6.8], [17.6, 0, -6.8], [-8.0, 0, 4.8], [8.0, 0, 4.8], [-14.4, 0, 7.6], [14.4, 0, 7.6], [-24.0, 0, 15.2], [24.0, 0, 15.2],
-    [-12.0, 0, 21.6], [12.0, 0, 21.6], [5.6, BOAT.deck, BOAT_AT.z], [-5.2, BOAT.roof, BOAT_AT.z + 0.2], [-24.0, 0, -20.8], [24.0, 0, -20.8]
+  // Three pockets per side, each behind a two-high stack: north corner, middle (yard screen), south (quay screen).
+  const side: [number, number, number][] = [
+    [-29.2, -26.4, Math.PI], [-33.6, -25.6, Math.PI], [-29.2, -21.6, Math.PI],
+    [-29.2, -12.8, Math.PI], [-33.2, -10.8, Math.PI], [-29.2, -9.2, Math.PI],
+    [-29.2, -2.4, 0], [-33.6, 0.4, 0], [-29.2, 2.8, 0], [-34.4, 6.4, 0]
   ];
-  for (const [x, y, z] of ffa) p.spawn(x, y, z, yawToward([x, z], [0, 0]));
+  for (const [x, z, yaw] of side) p.spawn(x, 0, z, yaw, 0);
+  for (const [x, z, yaw] of side) p.spawn(-x, 0, z, yaw, 1);
+  const W = Math.PI / 2;
+  const ffa: [number, number, number, number][] = [
+    [-2.0, 0, -24.4, Math.PI], [2.0, 0, -24.4, Math.PI], [-12.4, 0, -22.0, -W], [12.4, 0, -22.0, W], [-17.6, 0, -19.2, Math.PI], [17.6, 0, -19.2, Math.PI],
+    [-18.0, 0, -3.2, 0], [18.0, 0, -3.2, 0], [-5.0, 0, -13.4, NaN], [5.0, 0, -13.4, NaN],
+    [-24.0, 0, 15.2, NaN], [24.0, 0, 15.2, NaN], [-12.0, 0, 21.6, NaN], [12.0, 0, 21.6, NaN],
+    [5.6, BOAT.deck, BOAT_AT.z, NaN], [-1.2, BOAT.deck, BOAT_AT.z + 1.6, NaN], [-8.8, 0, 6.0, NaN], [8.8, 0, 6.0, NaN], [-21.6, 0, 1.6, Math.PI], [21.6, 0, 1.6, Math.PI]
+  ];
+  for (const [x, y, z, yaw] of ffa) p.spawn(x, y, z, Number.isNaN(yaw) ? yawToward([x, z], [0, 0]) : yaw);
 }
 
 export const DOCKS_VIEWS: LabView[] = [
@@ -76,10 +87,11 @@ export const DOCKS_VIEWS: LabView[] = [
   { name: 'overview-sea', cam: [-30, 30, 70], target: [0, 0, -4], fov: 50 },
   { name: 'lane-north', cam: [-30, 1.62, -17.8], target: [0, 2.2, -17.8], fov: 70 },
   { name: 'lane-mid', cam: [-30, 1.62, -6.8], target: [0, 1.6, -4], fov: 70 },
-  { name: 'lane-south', cam: [-30, 1.62, 8.0], target: [0, 2.4, 14], fov: 70 },
+  { name: 'lane-south', cam: [-23.2, 1.62, 8.4], target: [0, 2.4, 14], fov: 70 },
   { name: 'warehouse', cam: [-12, WH.deck + 1.62, -26.4], target: [8, 1.5, -18], fov: 75 },
   { name: 'boat', cam: [-5.2, BOAT.roof + 1.62, 26.6], target: [10, 1, 10], fov: 75 },
-  { name: 'yard-top', cam: [0, 2.56 + 1.62, -2.0], target: [-20, 1.5, -10], fov: 75 },
+  { name: 'yard-top', cam: [-13.6, 2.56 + 1.62, -3.2], target: [10, 1.5, -6], fov: 75 },
+  { name: 'fence-west', cam: [-33.6, 1.62, -16.8], target: [-60, 4, -24], fov: 70 },
   { name: 'piers', cam: [24, 1.62, 21.6], target: [0, 1.5, 24], fov: 70 }
 ];
 
