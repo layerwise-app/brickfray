@@ -118,7 +118,10 @@ export class Cluster {
     for (const [i0, wi] of lay(w, 0)) {
       const width = wi * P - GAP * P * 2;
       const ox = (i0 + wi / 2 - w / 2) * P;
-      const wedge = new THREE.ExtrudeGeometry(shape, { depth: width, bevelEnabled: false });
+      // A bevel inside the cut, like the bricks' chamfer: its edges catch the light instead of ending in a hard line.
+      const bevel = P * 0.07;
+      const wedge = new THREE.ExtrudeGeometry(shape, { depth: width - 2 * bevel, bevelEnabled: true, bevelThickness: bevel, bevelSize: bevel, bevelOffset: -bevel, bevelSegments: 1 });
+      wedge.translate(0, 0, bevel);
       wedge.rotateY(-Math.PI / 2);
       wedge.translate(ox + width / 2, 0, 0);
       const pieces: THREE.BufferGeometry[] = [wedge];

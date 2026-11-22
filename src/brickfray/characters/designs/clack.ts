@@ -76,13 +76,15 @@ function blocky(b: PartSet) {
 export const stance: Stance = {
   pelvis: { at: [0.045, -0.075, 0.02], rot: [-0.55, 0.1, 0.07] },
   chest: [-0.4, -0.1, 0],
+  // The lames under the cuirass turn with it, so their top edge stays tucked under the breastplate's rim.
+  waist: 1,
   head: [-0.55, 0.12, 0],
   feet: {
     L: { at: [-0.29, 0, 0.15], heading: -1.2, knee: -0.02 },
     R: { at: [0.2, 0, -0.17], heading: 0.1, knee: 0.2 }
   },
   arms: {
-    R: { wrist: [0.27, -0.1, -0.16], hand: [0.8, -0.12, -0.15], elbow: [0.068, -0.777, 0.625], space: 'chest', shape: 'grip' },
+    R: { wrist: [0.23, -0.11, -0.22], hand: [0.5, -0.3, -0.1], elbow: [0.35, -0.75, 0.55], space: 'chest', shape: 'grip' },
     L: { wrist: [-0.324, 0.143, -0.108], hand: [0.085, 0.576, 0.43], elbow: [-0.229, -0.881, 0.415], space: 'chest', shape: 'hold' }
   },
   melee: { head: 'thumb' },

@@ -126,7 +126,7 @@ export interface MatchSettings {
   map: MapId;
   minutes: number;
   /** Room size: bots fill the seats no human holds, and give them up as humans join. */
-  bots: number;
+  seats: number;
   /** Solo only: how fast the waves ramp up. */
   difficulty: Difficulty;
 }

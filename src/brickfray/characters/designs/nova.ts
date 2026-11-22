@@ -18,7 +18,7 @@ export const stance: Stance = {
     L: { at: [-0.24, 0, -0.14], heading: -0.6, knee: 0.14, pitch: -0.6 }
   },
   arms: {
-    R: { wrist: [0.266, 0.05, -0.195], hand: [0.783, 0.933, -0.328], elbow: [0.044, -0.991, 0.124], space: 'chest', shape: 'grip' },
+    R: { wrist: [0.31, 0.19, -0.2], hand: [0.6, 1.05, -0.05], elbow: [0.75, -0.62, 0.2], space: 'chest', shape: 'grip' },
     L: { wrist: [-0.46, 0.56, -0.07], hand: [-2.285, 1.389, 0.209], elbow: [-0.8, -0.6, 0.2], space: 'chest', shape: 'open', wave: 0.2 }
   },
   life: { breath: 1, sway: 1, look: 0.6 }

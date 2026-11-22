@@ -3,13 +3,13 @@ import type { QualityProfile } from '../engine/quality';
 import { BONE, BONES, type BoneName, type V3 } from './skeleton';
 import * as S from './shapes';
 
-/** Surface look per part, baked into the `surface` vertex attribute (roughness, metalness, glow, tint flag). */
+/** Surface look per part, baked into the `surface` vertex attribute (roughness, metalness, glow, tint flag; 0.25 there marks cloth). */
 export type Look = 'plastic' | 'gloss' | 'cloth' | 'matte' | 'rubber' | 'skin' | 'metal' | 'chrome' | 'gold' | 'glow' | 'glass' | 'tint';
 
 const LOOKS: Record<Exclude<Look, 'glass'>, [number, number, number, number]> = {
   plastic: [0.36, 0, 0, 0],
   gloss: [0.16, 0, 0, 0],
-  cloth: [0.78, 0, 0, 0],
+  cloth: [0.9, 0, 0, 0.25],
   matte: [1, 0, 0, 0],
   rubber: [0.88, 0, 0, 0],
   skin: [0.55, 0, 0, 0],

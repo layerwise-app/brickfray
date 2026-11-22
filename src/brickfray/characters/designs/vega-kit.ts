@@ -1,9 +1,10 @@
 import * as THREE from 'three';
-import { limbBand } from '../body-limbs';
+import { tone } from '../body-kit';
+import { limbBand, limbRings } from '../body-limbs';
 import type { PartSet } from '../parts';
 import * as S from '../shapes';
 import type { V3 } from '../skeleton';
-import { Garment, lump, plate, strand, thigh, tier } from './tailor';
+import { Garment, limbGarment, lump, plate, strand, thigh, tier } from './tailor';
 import { C } from './vega-hair';
 
 const HALF = Math.PI / 2;
@@ -36,6 +37,7 @@ const HEM = -0.036;
 const ZIP_X = -0.03;
 export const L = 0.93;
 export const THIGH = thigh(L);
+const UPPER = limbGarment('upperArm', L);
 /** Raglan seam: from the armpit up to the collar. */
 const raglan = (y: number) => lerp(0.2, 0.05, smoothstep(y, 0.085, 0.25));
 const span = (y0: number, y1: number, f: (y: number) => [number, number]) => ({ y: [y0, y1] as [number, number], a: (t: number) => f(lerp(y0, y1, t)) });
@@ -57,7 +59,9 @@ export function jacket(b: PartSet) {
       if (hero) b.add('chest', CHEST.panel({ ...span(0.09, TOP, (y) => [at(y, raglan(y) - 0.006), at(y, raglan(y) + 0.002)]), lift: ON + 0.002, thick: 0.0012, seg: [1, ny] }), C.tealDark, { look: 'cloth' });
     }
     if (!hi) return;
-    b.add(`upperArm${side}`, S.sphere(0.06 * L + 0.002, tier(b, 8, 10, 20), tier(b, 6, 7, 14)), C.white, { look: 'cloth' });
+    // The shoulder ball no wider than the sleeve's top, so it fills the joint without standing proud of the arm.
+    b.add(`upperArm${side}`, S.sphere(0.0505 * L, tier(b, 8, 10, 20), tier(b, 6, 7, 14)), C.teal, { at: [0, -0.006, 0], look: 'cloth' });
+    b.add(`upperArm${side}`, S.loft(limbRings('upperArm', L), tier(b, 8, 12, 18), { steps: b.hero ? 2 : 1, bottom: 0.02, top: 0.03 }), C.teal, { look: 'cloth' });
     // Dark panels under the arms and a slanted welt pocket on each side of the waist.
     b.add('chest', CHEST.panel({ y: [-0.05, 0.08], a: [sign * (HALF - 0.36), sign * (HALF + 0.36)], lift: ON - 0.0002, thick: 0.0016, seg: [tier(b, 3, 3, 8), 1] }), C.tealDark, { look: 'cloth' });
     b.add('spine', WAIST.panel({ y: [HEM + 0.026, 0.15], a: [sign * (HALF - 0.36), sign * (HALF + 0.36)], lift: ON - 0.0002, thick: 0.0016, seg: [tier(b, 3, 3, 8), 1] }), C.tealDark, { look: 'cloth' });
@@ -136,7 +140,9 @@ export function sleeves(b: PartSet) {
   b.mirror((side, sign) => {
     const ua = `upperArm${side}` as const;
     const fa = `forearm${side}` as const;
-    b.add(ua, limbBand(b, 'upperArm', L, -0.073, -0.007, 0.005), C.white, { look: 'cloth' });
+    // The raglan yoke runs on down the outside of the sleeve, narrowing to a point above the elbow.
+    if (hi) b.add(ua, UPPER.panel({ y: [-0.15, -0.012], a: (t) => [sign * (HALF - lerp(0.12, 1.25, t ** 0.8)), sign * (HALF + lerp(0.12, 1.25, t ** 0.8))], lift: 0.0015, thick: 0.003, seg: [tier(b, 4, 6, 14), tier(b, 3, 4, 8)] }), C.white, { look: 'cloth' });
+    else b.add(ua, limbBand(b, 'upperArm', L, -0.073, -0.007, 0.005), C.white, { look: 'cloth' });
     b.add(fa, limbBand(b, 'forearm', L, -0.181, -0.155, 0.0035), C.white, { look: 'cloth' });
     if (!hi) return;
     b.add(ua, limbBand(b, 'upperArm', L, -0.083, -0.075, 0.006), C.tealDark, { look: 'cloth' });
@@ -158,7 +164,8 @@ export function scarf(b: PartSet) {
   const hero = b.hero;
   const seg = tier(b, 10, 12, 48);
   const radial = tier(b, 5, 6, 16);
-  const loop = (y: number, rx: number, rz: number, r: number, tilt: number, lean: number, from: number, to: number) => {
+  // Wraps of a knitted band, each one tall and thin, stacked and crossing, with soft gathers along their edges.
+  const loop = (y: number, rx: number, rz: number, r: number, tilt: number, lean: number, from: number, to: number, flat: number, phase: number) => {
     const pts: V3[] = [];
     const n = hero ? 24 : 12;
     const closed = to - from >= Math.PI * 2 - 1e-6;
@@ -166,11 +173,12 @@ export function scarf(b: PartSet) {
       const a = lerp(from, to, i / n);
       pts.push([Math.sin(a) * rx, y + Math.cos(a) * tilt + Math.sin(a) * lean, 0.004 - Math.cos(a) * rz]);
     }
-    return strand(pts, r, { flat: 0.78, side: [0, 1, 0], seg, radial, closed });
+    const gathers = (t: number) => r * (1 + (hero ? 0.1 * Math.sin(t * Math.PI * 2 * 5 + phase) + 0.05 * Math.sin(t * Math.PI * 2 * 9 + phase * 2) : 0));
+    return strand(pts, gathers, { flat, side: [0, 1, 0], seg, radial, closed });
   };
-  b.add('chest', loop(0.258, 0.088, 0.082, 0.034, -0.012, 0.004, Math.PI, Math.PI * 3), C.scarf, { look: 'cloth' });
-  b.add('chest', loop(0.292, 0.078, 0.074, 0.028, 0.008, -0.008, Math.PI - 0.4, Math.PI * 3 - 0.1), C.scarfDark, { look: 'cloth' });
-  if (hero) b.add('chest', loop(0.274, 0.097, 0.088, 0.016, -0.02, 0.012, 1.2, 5.4), '#ffbd45', { look: 'cloth' });
+  b.add('chest', loop(0.25, 0.09, 0.084, 0.027, -0.014, 0.004, Math.PI, Math.PI * 3, 0.4, 0), C.scarf, { look: 'cloth' });
+  b.add('chest', loop(0.272, 0.085, 0.079, 0.024, 0.012, -0.006, Math.PI, Math.PI * 3, 0.42, 1.3), tone(C.scarf, 0.95), { look: 'cloth' });
+  b.add('chest', loop(0.295, 0.074, 0.07, 0.02, 0.006, -0.008, Math.PI - 0.4, Math.PI * 3 - 0.1, 0.5, 2.1), C.scarfDark, { look: 'cloth' });
 
   // Knot and the short end over her left collarbone; close up the knot is a puff gathered by a band wrapped round it.
   const knot: V3 = [-0.058, 0.232, -0.088];

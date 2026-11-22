@@ -66,7 +66,7 @@ describe('bot grenades', () => {
   it('land near a target 10–18 m off and are never thrown from 20 m or more', () => {
     const misses: number[] = [];
     for (const d of [10, 14, 18, 24]) {
-      const match = new Match(flat(), { mode: 'solo', map: 'plaza', minutes: 0, bots: 0, difficulty: 'normal' }, 5);
+      const match = new Match(flat(), { mode: 'solo', map: 'plaza', minutes: 0, seats: 0, difficulty: 'normal' }, 5);
       const me = match.addHuman('Me', 'vega');
       match.sim.spawn(me, { position: [0, 0, 0], yaw: 0 });
       match.sim.damageEnabled = false;

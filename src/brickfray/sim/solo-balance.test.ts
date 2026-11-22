@@ -159,7 +159,7 @@ interface Run {
  * then strips it again, so the run has the same breaks and refills but no upgrades.
  */
 export function playRun(map: MapId, difficulty: Difficulty, character: CharacterId, skill: Skill, upgrades: boolean, cover: number, maxMinutes = 60): Run {
-  const match = new Match(MAPS[map].layout(), { mode: 'solo', map, minutes: 0, bots: 0, difficulty });
+  const match = new Match(MAPS[map].layout(), { mode: 'solo', map, minutes: 0, seats: 0, difficulty });
   const me = match.addHuman('Sim', character);
   match.start();
   const player = new Stand(match.sim, me, skill);

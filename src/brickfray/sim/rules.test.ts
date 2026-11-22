@@ -29,7 +29,7 @@ function arena(): MapLayout {
 }
 
 function ffa(bots = 0) {
-  const match = new Match(arena(), { mode: 'ffa', map: 'plaza', minutes: 10, bots, difficulty: 'normal' });
+  const match = new Match(arena(), { mode: 'ffa', map: 'plaza', minutes: 10, seats: bots, difficulty: 'normal' });
   return match;
 }
 
@@ -157,7 +157,7 @@ describe('deaths', () => {
     expect(match.time).toBeGreaterThanOrEqual(kill!.respawnAt!);
     expect(match.time - kill!.respawnAt!).toBeLessThan(TICK * 1.5);
 
-    const solo = new Match(arena(), { mode: 'solo', map: 'plaza', minutes: 0, bots: 0, difficulty: 'normal' });
+    const solo = new Match(arena(), { mode: 'solo', map: 'plaza', minutes: 0, seats: 0, difficulty: 'normal' });
     const me = solo.addHuman('Me', 'rivet');
     solo.start();
     for (let t = 0; t < 4.2; t += TICK) solo.tick(TICK);

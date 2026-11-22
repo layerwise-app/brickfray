@@ -19,11 +19,14 @@ function spline(keys: [number, number][]) {
 
 /** The hood's rings from the brim (v = 0) to the tail's tip (v = 1): depth, half width, top and bottom. */
 const HOOD = {
-  z: spline([[0, -0.132], [0.12, -0.08], [0.3, 0.0], [0.5, 0.095], [0.65, 0.175], [0.8, 0.262], [0.92, 0.335], [1, 0.375]]),
-  w: spline([[0, 0.16], [0.12, 0.172], [0.3, 0.174], [0.5, 0.154], [0.65, 0.11], [0.8, 0.062], [0.92, 0.027], [1, 0]]),
-  top: spline([[0, 0.238], [0.12, 0.29], [0.3, 0.3], [0.5, 0.282], [0.65, 0.24], [0.8, 0.162], [0.92, 0.078], [1, 0.0]]),
-  bottom: spline([[0, -0.08], [0.12, -0.08], [0.3, -0.072], [0.5, -0.05], [0.65, 0.0], [0.8, 0.03], [0.92, 0.02], [1, 0.0]])
+  z: spline([[0, -0.132], [0.12, -0.08], [0.3, 0.0], [0.5, 0.095], [0.65, 0.175], [0.8, 0.258], [0.9, 0.3], [1, 0.326]]),
+  w: spline([[0, 0.16], [0.12, 0.172], [0.3, 0.174], [0.5, 0.154], [0.65, 0.11], [0.8, 0.064], [0.9, 0.044], [1, 0.034]]),
+  top: spline([[0, 0.238], [0.12, 0.29], [0.3, 0.3], [0.5, 0.282], [0.65, 0.24], [0.8, 0.162], [0.9, 0.118], [1, 0.09]]),
+  bottom: spline([[0, -0.08], [0.12, -0.08], [0.3, -0.072], [0.5, -0.05], [0.65, 0.0], [0.8, 0.03], [0.9, 0.036], [1, 0.04]])
 };
+/** The tail closes in a rounded end over its last stretch instead of drawing every crease into one pinched point. */
+const TIP = 0.86;
+const tipRound = (v: number) => (v <= TIP ? 1 : Math.sqrt(Math.max(0, 1 - ((v - TIP) / (1 - TIP)) ** 2)));
 
 /** The hood's outer face in head space: u around the opening from the crown, v from the brim back to the tail's tip; `ripple` scales the creases down its back. */
 export const hoodAt =
@@ -34,11 +37,12 @@ export const hoodAt =
     const co = Math.cos(phi);
     const front = Math.max(0, 1 - v / 0.3) ** 2;
     // Soft rounded creases (a cosine, not a folded |sin|, whose sharp valleys read as hard planes).
-    const gather = 1 + 0.05 * Math.sin(phi * 7) * Math.max(0, -co) * bump(v, 0.1, 0.7) + ripple * 0.085 * (0.7 + 0.3 * Math.sin(phi * 3)) * -Math.cos(phi * 5 + v * 4) * bump(v, 0.18, 1.05) ** 0.6;
+    const gather = 1 + 0.05 * Math.sin(phi * 7) * Math.max(0, -co) * bump(v, 0.1, 0.7) + ripple * 0.1 * (0.7 + 0.3 * Math.sin(phi * 3)) * -Math.cos(phi * 5 + v * 4) * bump(v, 0.18, 0.9) ** 0.6;
     const top = HOOD.top(v);
     const bottom = HOOD.bottom(v);
-    const w = v >= 1 ? 0 : (Math.max(0, HOOD.w(v)) + grow) * gather;
-    const half = v >= 1 ? 0 : ((top - bottom) / 2 + grow) * gather;
+    const k = tipRound(v);
+    const w = (Math.max(0, HOOD.w(v)) + grow) * gather * k;
+    const half = ((top - bottom) / 2 + grow) * gather * k;
     const z = HOOD.z(v) - 0.062 * Math.max(0, co) ** 1.5 * front + 0.1 * Math.max(0, -co) ** 1.3 * front;
     return [w * sgnPow(s, 0.8) * (1 - 0.36 * Math.max(0, co) ** 2.4 * (1 - Math.min(1, v / 0.5))), (top + bottom) / 2 + half * sgnPow(co, 0.8) + 0.02 * Math.max(0, co) ** 8 * front, z];
   };
@@ -66,7 +70,9 @@ export function hood(b: PartSet, color: string, lining: string, trim: string, pi
   const band: Surface = (u, v) => hoodAt(0.0004 + 0.0032 * (1 - THREE.MathUtils.smoothstep(v, 0.03, 0.085)), ripple)(u, v);
   b.add('head', surface(us, [0.012, 0.03, 0.045, 0.06, 0.075, 0.085], band, true, true), trim, { look: 'cloth' });
   // Seam along the crown.
-  b.add('head', surface([-0.012, 0, 0.012], samples(10).map((i) => 0.1 + i * 0.85), (u, v) => hoodAt(u ? 0.001 : 0.006)(u, v), false, true), trim, { look: 'cloth' });
+  // Seam along the crown: a flat piping that rises out of the hood and sinks back into it at both ends.
+  const seam = (u: number, v: number) => hoodAt((u ? 0.0008 : 0.0032) * Math.sin(Math.PI * Math.min(1, Math.max(0, (v - 0.1) / 0.7))) ** 0.5)(u, v);
+  b.add('head', surface([-0.009, 0, 0.009], samples(12).map((i) => 0.1 + i * 0.7), seam, false, true), trim, { look: 'cloth' });
 }
 
 /** A soft rolled hem of radius r round the open edge (v = 0) of a closed surface. */

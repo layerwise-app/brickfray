@@ -64,15 +64,15 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
   );
 
   return (
-    <div className='absolute inset-0 z-40 grid place-items-center bg-[#0b1222]/65 p-4 backdrop-blur-sm' onClick={onClose}>
-      <div className='bf-panel bf-studs bf-pop flex max-h-[88vh] w-full max-w-[620px] flex-col gap-4 p-6' onClick={(e) => e.stopPropagation()}>
+    <div className='bf-screen-in absolute inset-0 z-40 grid place-items-center bg-[#0b1222]/65 p-3 backdrop-blur-sm min-[420px]:p-4' onClick={onClose}>
+      <div className='bf-panel bf-studs bf-pop flex max-h-[88vh] w-full max-w-[620px] flex-col gap-4 p-4 min-[420px]:p-6' onClick={(e) => e.stopPropagation()}>
         <div className='flex items-center gap-3'>
           <button className='bf-btn bf-btn-ghost bf-icon-btn bf-touch-target !h-10 !w-10' onClick={onClose} aria-label={t('done')}>
             <BackIcon size={20} />
           </button>
           <h2 className='bf-display text-3xl'>{t('settings')}</h2>
         </div>
-        <div className='bf-seg'>
+        <div className='bf-seg text-sm min-[420px]:text-base'>
           {TABS.map((id) => (
             <button key={id} aria-pressed={tab === id} onClick={() => setTab(id)}>
               {t(id)}
@@ -139,7 +139,7 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
             <>
               <div className='flex flex-col gap-2'>
                 <span className='font-medium'>{t('language')}</span>
-                <div className='grid grid-cols-4 gap-2'>
+                <div className='grid grid-cols-3 gap-2 min-[420px]:grid-cols-4'>
                   {LANGUAGES.map((l) => (
                     <button key={l.code} className={`bf-touch-target rounded-lg px-2 py-2 font-medium ${l.code === lang ? 'bg-[var(--bf-yellow)] text-[#2a1a00]' : 'bg-white/8 hover:bg-white/15'}`} onClick={() => setLang(l.code)}>
                       {l.name}

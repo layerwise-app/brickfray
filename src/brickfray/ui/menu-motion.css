@@ -1,0 +1,59 @@
+/* Screens and their backdrops fade in, and what they hold rises into place, instead of appearing whole. */
+.bf-screen-in {
+  animation: bf-screen-in 0.2s ease-out both;
+}
+@keyframes bf-screen-in {
+  from {
+    opacity: 0;
+  }
+}
+.bf-screen-rise {
+  animation: bf-screen-rise 0.34s cubic-bezier(0.2, 0.9, 0.3, 1) 0.04s both;
+}
+@keyframes bf-screen-rise {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.985);
+  }
+}
+
+/* The big buttons lift toward the pointer and sink when pressed. */
+.bf-btn.bf-big-btn {
+  transition:
+    transform 0.14s ease,
+    box-shadow 0.14s ease,
+    filter 0.14s ease;
+}
+.bf-big-btn-icon {
+  transition: transform 0.14s ease;
+}
+@media (hover: hover) {
+  .bf-btn.bf-big-btn:hover:not(:disabled) {
+    transform: translateY(-3px);
+    filter: brightness(1.12);
+    box-shadow:
+      inset 0 2px 0 rgba(255, 255, 255, 0.26),
+      0 8px 0 var(--lip),
+      0 16px 24px rgba(0, 0, 0, 0.36);
+  }
+  .bf-btn.bf-big-btn:hover:not(:disabled) .bf-big-btn-icon {
+    transform: scale(1.08) rotate(-4deg);
+  }
+  .bf-menu-tools .bf-btn:hover:not(:disabled) {
+    transform: translateY(-2px);
+  }
+}
+.bf-btn.bf-big-btn:active:not(:disabled),
+.bf-btn.bf-big-btn[data-pressed='true'] {
+  transform: translateY(4px);
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.18),
+    0 1px 0 var(--lip),
+    0 3px 8px rgba(0, 0, 0, 0.3);
+}
+@media (prefers-reduced-motion: reduce) {
+  .bf-screen-in,
+  .bf-screen-rise {
+    animation: none;
+  }
+}

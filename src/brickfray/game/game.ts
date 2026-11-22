@@ -207,7 +207,7 @@ export class Game {
   }
 
   private baseSettings(mode: MatchSettings['mode'], map?: MapId): MatchSettings {
-    return { mode, map: map ?? MAP_IDS[Math.floor(Math.random() * MAP_IDS.length)]!, minutes: 5, bots: mode === 'solo' ? 0 : 6, difficulty: this.settings.difficulty };
+    return { mode, map: map ?? MAP_IDS[Math.floor(Math.random() * MAP_IDS.length)]!, minutes: 5, seats: mode === 'solo' ? 0 : 6, difficulty: this.settings.difficulty };
   }
 
   /** Opens the solo setup screen; the run begins on Start. */
@@ -363,8 +363,8 @@ export class Game {
     if (!this.host) return;
     this.host.setSettings(settings);
     // What the host picks is the default next time, after a reload too.
-    const { mode, map, minutes, bots, difficulty } = { ...this.host.lobby.settings, ...settings };
-    this.settings = this.host.kind === 'solo' ? { ...this.settings, difficulty, soloMap: map } : { ...this.settings, room: { mode, map, minutes, bots } };
+    const { mode, map, minutes, seats, difficulty } = { ...this.host.lobby.settings, ...settings };
+    this.settings = this.host.kind === 'solo' ? { ...this.settings, difficulty, soloMap: map } : { ...this.settings, room: { mode, map, minutes, seats } };
     saveSettings(this.settings);
   }
 

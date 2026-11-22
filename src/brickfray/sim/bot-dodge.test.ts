@@ -14,7 +14,7 @@ function platform(w: number, d: number): MapLayout {
 
 /** A bot of `skill` at `at`, a live grenade resting at `grenade` with `fuse` s left, thrown by an enemy who is gone. */
 function scene(layout: MapLayout, at: [number, number, number], grenade: [number, number, number], skill: number, seed: number, fuse = 2.5) {
-  const sim = new HostSim(layout, { mode: 'ffa', map: 'plaza', minutes: 10, bots: 0, difficulty: 'normal' }, seed);
+  const sim = new HostSim(layout, { mode: 'ffa', map: 'plaza', minutes: 10, seats: 0, difficulty: 'normal' }, seed);
   const bots = new BotDirector(sim);
   const bot = sim.addPlayer('Bot', 'vega', 'grunt');
   sim.spawn(bot, { position: at, yaw: 0 });
@@ -79,7 +79,7 @@ describe('bots and live grenades', () => {
 
   it('by kind: a Zipbot keeps rushing, a Megabot ignores all but a close one', () => {
     const layout = platform(40, 40);
-    const sim = new HostSim(layout, { mode: 'solo', map: 'plaza', minutes: 0, bots: 0, difficulty: 'normal' }, 5);
+    const sim = new HostSim(layout, { mode: 'solo', map: 'plaza', minutes: 0, seats: 0, difficulty: 'normal' }, 5);
     const me = sim.addPlayer('Me', 'vega');
     sim.spawn(me, { position: [0, 0, 20], yaw: 0 });
     const watch = new GrenadeWatch(sim, new BotNav(sim));

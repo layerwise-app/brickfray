@@ -23,7 +23,7 @@ function arena(): MapLayout {
 }
 
 function ffa() {
-  const match = new Match(arena(), { mode: 'ffa', map: 'plaza', minutes: 10, bots: 0, difficulty: 'normal' }, 7);
+  const match = new Match(arena(), { mode: 'ffa', map: 'plaza', minutes: 10, seats: 0, difficulty: 'normal' }, 7);
   const a = match.addHuman('A', 'vega');
   const b = match.addHuman('B', 'rivet');
   match.start();
@@ -168,7 +168,7 @@ describe('upgrade effects are real in the sim', () => {
 
 describe('solo waves with upgrade picks', () => {
   function solo() {
-    const match = new Match(arena(), { mode: 'solo', map: 'plaza', minutes: 0, bots: 0, difficulty: 'normal' }, 11);
+    const match = new Match(arena(), { mode: 'solo', map: 'plaza', minutes: 0, seats: 0, difficulty: 'normal' }, 11);
     const me = match.addHuman('Me', 'vega');
     match.start();
     me.protectedUntil = Infinity;

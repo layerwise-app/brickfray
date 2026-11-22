@@ -31,7 +31,8 @@ export function vega(b: PartSet) {
     mouth: b.detail >= 2 ? 'none' : 'smirk',
     lashes: true,
     blush: '#f0a78f',
-    expression: { open: 0.93, squint: 0.22, lidTilt: -0.03, brows: [-0.002, 0.008], gaze: [0.2, 0.15] }
+    expression: { open: 0.93, squint: 0.22, lidTilt: -0.03, brows: [-0.002, 0.008], gaze: [0.2, 0.15] },
+    omit: b.detail >= 2 ? ['upperArms'] : []
   });
   if (b.detail === 0) return blockCostume(b, bulk);
   if (b.detail >= 2) smirk(b);
@@ -45,12 +46,13 @@ export function vega(b: PartSet) {
     b.add('dangleBack', draped.stripe!, C.scarfDark, { look: 'cloth' });
     b.add('dangleBack', draped.short!, C.scarfDark, { look: 'cloth' });
     b.add('dangleBack', draped.shortInner!, tone(C.scarfDark, 0.82), { look: 'cloth' });
+    if (draped.shortStripe) b.add('dangleBack', draped.shortStripe, C.scarf, { look: 'cloth' });
   } else scarfTails(b);
   hair(b);
   goggles(b);
   fieldKit(b);
+  binoculars(b);
   if (b.detail >= 2) {
-    binoculars(b);
     legKit(b);
     jacketBack(b);
     trousers(b);
@@ -58,18 +60,18 @@ export function vega(b: PartSet) {
   if (b.hero) freckles(b);
 }
 
-/** Rifle at a high ready in both hands, muzzle up past the right shoulder, weight on the front leg and the back heel up, chin up to the viewer. */
+/** Rifle at a high ready in both hands, muzzle up past the right shoulder; feet planted wide, the weight on the straight back leg and the front knee eased, chin up to the viewer. */
 export const stance: Stance = {
-  pelvis: { at: [-0.08, -0.115, -0.04], rot: [0.45, -0.06, -0.12] },
-  chest: [0.2, -0.08, 0.02],
+  pelvis: { at: [0.05, -0.05, 0.03], rot: [0.45, -0.04, 0.06] },
+  chest: [0.2, -0.06, -0.02],
   head: [-0.38, 0.14, 0.06],
   feet: {
-    L: { at: [-0.19, 0, -0.2], heading: -0.35, knee: 0.16 },
-    R: { at: [0.2, 0, 0.17], heading: 0.55, knee: 0.28, pitch: -0.35 }
+    L: { at: [-0.28, 0, -0.2], heading: -0.55, knee: 0.1 },
+    R: { at: [0.2, 0, 0.16], heading: 0.95, knee: 0.05 }
   },
   arms: {
-    R: { wrist: [0.188, 0.06, -0.198], hand: [0.298, 0.88, -0.446], elbow: [-0.037, -0.996, 0.079], space: 'chest', shape: 'grip' },
-    L: { wrist: [0.211, 0.349, -0.302], hand: [1.467, 0.254, 0.71], elbow: [-0.59, -0.64, -0.49], space: 'chest', shape: 'hold' }
+    R: { wrist: [0.17, 0.053, -0.184], hand: [0.298, 0.88, -0.446], elbow: [-0.037, -0.996, 0.079], space: 'chest', shape: 'grip' },
+    L: { wrist: [0.193, 0.342, -0.288], hand: [1.467, 0.254, 0.71], elbow: [-0.59, -0.64, -0.49], space: 'chest', shape: 'hold' }
   },
   life: { breath: 1, sway: 0.5, look: 0.5 }
 };
@@ -91,10 +93,11 @@ function blockCostume(b: PartSet, bulk: number) {
   // Hair cap, bangs and the high ponytail on the head's swinging bone.
   lowBlob(b, 'head', [0.255, 0.15, 0.27], HAIR, { at: [0, 0.176, 0.012], look: 'cloth', e: 0.72, seg: 8 });
   b.box('head', [0.2, 0.045, 0.03], HAIR, { at: [0.02, 0.19, -0.12], rot: [0, 0, -0.12], look: 'cloth' });
-  // The back of the head is covered down to the nape, the ponytail falls to the shoulders.
-  lowBlob(b, 'head', [0.25, 0.22, 0.15], HAIR, { at: [0, 0.068, 0.08], look: 'cloth', e: 0.62, seg: 6 });
-  b.cyl('dangleHead', 0.03, 0.03, 0.035, TEAL, { at: [0, 0.0, 0.0], rot: [0.5, 0, 0], look: 'gloss' });
-  lowBlob(b, 'dangleHead', [0.095, 0.32, 0.085], HAIR, { at: [0, -0.16, 0.03], look: 'cloth', e: 0.8, taper: 0.45, seg: 6 });
+  // The back of the head is covered down to the nape, narrowing so none of it shows beside the jaw from the front;
+  // the ponytail stands off it and falls to the shoulders.
+  lowBlob(b, 'head', [0.215, 0.2, 0.14], HAIR, { at: [0, 0.08, 0.09], look: 'cloth', e: 0.62, taper: 0.4, seg: 6 });
+  b.cyl('dangleHead', 0.034, 0.034, 0.04, TEAL, { at: [0, -0.01, 0.045], rot: [0.5, 0, 0], look: 'gloss' });
+  lowBlob(b, 'dangleHead', [0.11, 0.38, 0.1], HAIR, { at: [0, -0.18, 0.085], rot: [-0.18, 0, 0], look: 'cloth', e: 0.8, taper: 0.5, seg: 6 });
 
   // Goggles pushed up on the forehead.
   b.torus('head', 0.128, 0.012, DARK, { at: [0, 0.185, 0.0], rot: [Math.PI / 2 - 0.2, 0, 0], scale: [1, 1.05, 1], look: 'rubber' });

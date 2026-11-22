@@ -19,17 +19,19 @@ def smoothstep(x, a, b):
 def moss_cloak():
     def at(u, v):
         x = u * 2 - 1
-        pleat = math.cos(x * math.pi * 2.5 + 0.5 * math.sin(v * 3))
-        w = 0.19 + 0.17 * v ** 0.8  # cut wider than it hangs, so it gathers into folds
+        # Two layers of folds: broad ones from the shoulders and narrow ones between them, deepening toward the hem.
+        pleat = math.cos(x * math.pi * 3.5 + 0.6 * math.sin(v * 3)) + 0.4 * math.cos(x * math.pi * 7.5 + 1.3 + v)
+        w = 0.21 + 0.22 * v ** 0.8  # cut wider than it hangs, so it gathers into folds
         y = -0.07 - v * 0.7 * (1 - 0.06 * x * x) + 0.02 * pleat * v
-        return [x * w, y - 0.02, 0.022 - 0.05 * x * x + 0.5 * v + (0.006 + 0.05 * v ** 1.2) * pleat]
-    return dict(character='moss', bone='dangleBack', frames=200,
-                sheets=[dict(nu=28, nv=38, at=at, pin=2, thick=0.011, outer='outer', inner='lining', bands=[(0.9, 0.975, 'trim')])])
+        return [x * w, y - 0.02, 0.022 - (0.05 + 0.08 * v) * x * x + 0.5 * v + (0.008 + 0.065 * v ** 1.2) * pleat]
+    return dict(character='moss', bone='dangleBack', frames=240, cloth=dict(bending=0.6),
+                sheets=[dict(nu=36, nv=40, at=at, pin=2, thick=0.026, hem=(0.93, 0.985, 0.4), outer='outer', inner='lining', bands=[(0.9, 0.975, 'trim')])])
 
 def vega_scarf():
     # characters/designs/vega-trim.ts LONG and SHORT: knitted tails that leave the knot gathered, widen, then narrow to a fringed end
-    tails = [dict(x=(0.012, 0.045), length=0.49, width=(0.05, 0.104, 0.086), twist=0.9, phase=0.4, outer='long', inner='longInner', bands=[(0.76, 0.795, 'stripe'), (0.83, 0.865, 'stripe')]),
-             dict(x=(-0.016, -0.06), length=0.31, width=(0.045, 0.086, 0.07), twist=-0.7, phase=2.3, outer='short', inner='shortInner', bands=[])]
+    # Both hang off to her left shoulder blade, clear of the ponytail down the middle of her back.
+    tails = [dict(x=(-0.03, -0.075), length=0.49, width=(0.05, 0.1, 0.092), twist=0.35, phase=0.4, outer='long', inner='longInner', bands=[(0.8, 0.835, 'stripe'), (0.87, 0.905, 'stripe')]),
+             dict(x=(-0.06, -0.12), length=0.31, width=(0.045, 0.084, 0.078), twist=-0.3, phase=2.3, outer='short', inner='shortInner', bands=[(0.86, 0.9, 'shortStripe')])]
     def sheet(t):
         def at(u, v):
             across = u - 0.5
@@ -40,7 +42,7 @@ def vega_scarf():
             z = lerp(-0.035, 0.04, smoothstep(v, 0, 0.14)) + 0.2 * v
             trough = 0.03 * v * math.cos(across * math.pi * 2 + t['phase'])
             return [x + across * width * math.cos(turn), 0.05 - t['length'] * v, z + trough + across * width * math.sin(turn)]
-        return dict(nu=7, nv=max(12, round(t['length'] / 0.012)), at=at, pin=2, thick=0.009, outer=t['outer'], inner=t['inner'], bands=t['bands'], outward=(0, 0, 1), reach=0.05, fringe=0.92)
+        return dict(nu=9, nv=max(12, round(t['length'] / 0.012)), at=at, pin=2, thick=0.016, hem=(0.92, 0.99, 0.8), outer=t['outer'], inner=t['inner'], bands=t['bands'], outward=(0, 0, 1), reach=0.05)
     return dict(character='vega', bone='dangleBack', frames=160, sheets=[sheet(t) for t in tails],
                 cloth=dict(mass=0.15, bending=0.2, self=0.0025), gravity=(0.7, -9.7, 0.9))  # hanging down the back, leaning a little in a light breeze
 
@@ -59,8 +61,8 @@ def clack_tabard():
             rounded = (1 - (abs(x) * 0.5) ** 2.5) ** 0.4
             reach = 0.136 + 0.02 * gather + 0.3 * v + 0.007 * gather * pleat
             return [wide, lerp(0.03, hem, v), s * reach * rounded]
-        if s > 0: return dict(nu=22, nv=26, at=at, pin=2, thick=0.008, outer='panel', inner='lining', bands=[(0.86, 1.01, 'hem')], outward=(0, 0, s), hang=0.16)
-        return dict(nu=22, nv=26, at=at, pin=2, thick=0.008, outer='panel', inner='lining', bands=[(0.86, 1.01, 'hem')], outward=(0, 0, s), rows=0.08)
+        if s > 0: return dict(nu=22, nv=26, at=at, pin=2, thick=0.016, hem=(0.88, 0.97, 0.5), outer='panel', inner='lining', bands=[(0.86, 1.01, 'hem')], outward=(0, 0, s), hang=0.16)
+        return dict(nu=22, nv=26, at=at, pin=2, thick=0.016, hem=(0.88, 0.97, 0.5), outer='panel', inner='lining', bands=[(0.86, 1.01, 'hem')], outward=(0, 0, s), rows=0.08)
     return dict(character='clack', bone='dangleHip', frames=220, sheets=[sheet(-1), sheet(1)], cloth=dict(mass=0.35, bending=0.7, air=8, friction=2))
 
 spec = {'moss-cloak': moss_cloak, 'vega-scarf': vega_scarf, 'clack-tabard': clack_tabard}[name]()
@@ -175,6 +177,11 @@ for n, sh in enumerate(spec['sheets']):
     away = to_b(((np.array([sh['outward']] if 'outward' in sh else [sh['at'](0.5, 0.6)]) - (0 if 'outward' in sh else np.array([sh['at'](0.5, 0.0)]))) @ M[:3, :3].T))[0]
     if sum((p.normal @ Vector(away) for p in mesh.polygons)) < 0: mesh.flip_normals()
     ob.vertex_groups.new(name='pin').add(list(range((nu + 1) * sh['pin'])), 1.0, 'REPLACE')
+    if 'hem' in sh:
+        # A turned hem: the cloth thickens over the last rows (`thick` there, `hem[2]` of it above).
+        hem = ob.vertex_groups.new(name='hem')
+        for j in range(nv + 1):
+            hem.add(list(range(j * (nu + 1), (j + 1) * (nu + 1))), smoothstep(j / nv, sh['hem'][0], sh['hem'][1]), 'REPLACE')
     # Slots: the outer face and its bands, then the inner face last (solidify's offset is clamped to the last slot).
     slots = [sh['outer']] + [b[2] for b in sh['bands']] + [sh['inner']]
     slots = list(dict.fromkeys(slots))
@@ -220,6 +227,7 @@ for ob, sh, slots in cloths:
     sub = ob.modifiers.new('sub', 'SUBSURF'); sub.levels = 1; sub.render_levels = 1
     solid = ob.modifiers.new('solid', 'SOLIDIFY')
     solid.thickness = sh['thick']; solid.offset = -1; solid.material_offset = len(slots) - 1; solid.material_offset_rim = 0; solid.use_rim = True
+    if 'hem' in sh: solid.vertex_group = 'hem'; solid.thickness_vertex_group = sh['hem'][2]
     deps = bpy.context.evaluated_depsgraph_get()
     em = bpy.data.meshes.new_from_object(ob.evaluated_get(deps), depsgraph=deps)
     em.calc_loop_triangles()

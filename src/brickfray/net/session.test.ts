@@ -23,7 +23,7 @@ const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 describe('host and client over a lossy loopback', () => {
   it('predicts movement that matches the host after reconciliation', async () => {
     Object.assign(netConditions, { latency: 80, jitter: 20, loss: 0.1 });
-    const host = new HostSession('solo', 'Host', { mode: 'ffa', map: 'plaza', minutes: 10, bots: 3, difficulty: 'normal' });
+    const host = new HostSession('solo', 'Host', { mode: 'ffa', map: 'plaza', minutes: 10, seats: 3, difficulty: 'normal' });
     await host.open();
     const client = new ClientSession(host.localChannel(), 'Me', 'vega', 'token-1');
     let started = false;
@@ -61,7 +61,7 @@ describe('host and client over a lossy loopback', () => {
   it('a remote client predicts each grenade coming back on the same command as the host', async () => {
     Object.assign(netConditions, { latency: 80, jitter: 20, loss: 0 });
     const { BUTTON } = await import('../sim/types');
-    const host = new HostSession('solo', 'Host', { mode: 'ffa', map: 'plaza', minutes: 10, bots: 0, difficulty: 'normal' });
+    const host = new HostSession('solo', 'Host', { mode: 'ffa', map: 'plaza', minutes: 10, seats: 0, difficulty: 'normal' });
     await host.open();
     const client = new ClientSession(host.localChannel(), 'Me', 'vega', 'token-2');
     await wait(150);
@@ -107,7 +107,7 @@ describe('host and client over a lossy loopback', () => {
     Object.assign(netConditions, { latency: 80, jitter: 20, loss: 0.05 });
     const { BUTTON } = await import('../sim/types');
     const { takeUpgrade } = await import('../sim/upgrades');
-    const host = new HostSession('solo', 'Host', { mode: 'ffa', map: 'plaza', minutes: 10, bots: 0, difficulty: 'normal' });
+    const host = new HostSession('solo', 'Host', { mode: 'ffa', map: 'plaza', minutes: 10, seats: 0, difficulty: 'normal' });
     await host.open();
     const client = new ClientSession(host.localChannel(), 'Me', 'vega', 'token-3');
     await wait(150);

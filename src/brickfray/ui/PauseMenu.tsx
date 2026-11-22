@@ -6,7 +6,7 @@ export function PauseMenu({ openSettings }: { openSettings: () => void }) {
   const game = useGame();
   const { t } = useT();
   return (
-    <div className='absolute inset-0 z-20 grid place-items-center bg-[#0b1222]/55 backdrop-blur-sm'>
+    <div className='bf-screen-in absolute inset-0 z-20 grid place-items-center bg-[#0b1222]/55 backdrop-blur-sm'>
       <div className='bf-panel bf-studs bf-pop flex w-[320px] flex-col gap-4 p-6'>
         <button className='bf-btn bf-btn-primary !h-16' onClick={() => game.resume()}>
           <PlayIcon size={26} />

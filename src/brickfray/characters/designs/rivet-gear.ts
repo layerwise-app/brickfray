@@ -1,4 +1,5 @@
-import { limbBand } from '../body-limbs';
+import { limbBand, limbRings } from '../body-limbs';
+import * as S from '../shapes';
 import type { PartSet } from '../parts';
 import type { V3 } from '../skeleton';
 import { C } from './rivet-vest';
@@ -227,7 +228,6 @@ export function toolBelt(b: PartSet) {
     bevel(0.002)
   );
   b.add('pelvis', rag, '#c8372d', { at: [0.085, -0.018, 0.103], rot: [0.12, 0, -0.08], look: 'cloth' });
-  if (hero) b.add('pelvis', rag, '#e8e2d2', { at: [0.079, -0.024, 0.099], rot: [0.1, 0, 0.1], scale: [0.8, 0.9, 1], look: 'cloth' });
 }
 
 const LIMBS = 1.08;
@@ -281,14 +281,51 @@ export function legKit(b: PartSet) {
   for (const y of [-0.085, -0.1, -0.115]) b.box('thighR', [0.013, 0.002, 0.037], C.red, { at: [0.0965, y, 0.02], rot: [0, 0, -0.04], look: 'plastic', bevel: 0 });
 }
 
+/**
+ * A sleeve rolled up twice on the shared upper arm: two soft rounded folds, the upper one tucked under the lower, each
+ * swelling smoothly out of the sleeve and back, so the cuff has no flat steps.
+ */
+function rolledCuff() {
+  const rings = limbRings('upperArm', LIMBS);
+  const roll: [number, number][] = [
+    [-0.241, 0.002],
+    [-0.237, 0.0045],
+    [-0.231, 0.0078],
+    [-0.223, 0.0086],
+    [-0.215, 0.0072],
+    [-0.211, 0.0062],
+    [-0.206, 0.0074],
+    [-0.2, 0.0076],
+    [-0.195, 0.0058],
+    [-0.191, 0.002]
+  ];
+  return S.loft(
+    roll.map(([y, grow]) => {
+      const r = S.loftRingAt(rings, y);
+      return { ...r, y, rx: r.rx + grow, rz: r.rz + grow };
+    }),
+    36,
+    { steps: 2 }
+  );
+}
+
+/** The shared upper arm with its sleeve rolled up: navy down to the roll, bare skin from under it to the elbow, so the elbow is one with the arm. */
+function upperArm(b: PartSet, bone: 'upperArmL' | 'upperArmR') {
+  const rings = limbRings('upperArm', LIMBS);
+  const at = (y: number) => ({ ...S.loftRingAt(rings, y), y });
+  const n = b.hero ? 18 : 12;
+  const steps = b.hero ? 2 : 1;
+  b.add(bone, S.sphere(0.06 * LIMBS, b.hero ? 18 : 10, b.hero ? 11 : 6), C.navy, { look: 'cloth' });
+  b.add(bone, S.loft([at(-0.232), ...rings.filter((r) => r.y > -0.232)], n, { steps, top: 0.03 }), C.navy, { look: 'cloth' });
+  b.add(bone, S.loft([rings[0]!, at(-0.228)], n, { steps, bottom: 0.02 }), C.skin, { look: 'skin' });
+}
+
 /** Rolled sleeves, the gloves' wrist tabs and a wristwatch. */
 export function armKit(b: PartSet) {
   const hi = b.detail >= 2;
   const round = tier(b, 8, 10, 20);
-  b.mirror((side) => {
-    b.add(`upperArm${side}`, limbBand(b, 'upperArm', LIMBS, -0.237, -0.193, 0.006), C.collar, { look: 'cloth' });
-    if (hi) b.add(`upperArm${side}`, limbBand(b, 'upperArm', LIMBS, -0.205, -0.193, 0.0075), C.navy, { look: 'cloth' });
-  });
+  if (hi) b.mirror((side) => upperArm(b, `upperArm${side}`));
+  b.mirror((side) => b.add(`upperArm${side}`, b.hero ? rolledCuff() : limbBand(b, 'upperArm', LIMBS, -0.237, -0.193, 0.006), C.collar, { look: 'cloth' }));
   if (!hi) return;
   if (b.hero) b.mirror((side, sign) => b.box(`forearm${side}`, [0.008, 0.034, 0.03], C.dark, { at: [sign * 0.0525, -0.232, 0], look: 'rubber', bevel: 0.002 }));
   b.add('forearmL', limbBand(b, 'forearm', LIMBS, -0.195, -0.177, 0.003), C.dark, { look: 'rubber' });

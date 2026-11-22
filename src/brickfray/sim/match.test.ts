@@ -32,7 +32,7 @@ function arena(): MapLayout {
 
 describe('Match', () => {
   it('bots fight in free-for-all and score kills', () => {
-    const match = new Match(arena(), { mode: 'ffa', map: 'plaza', minutes: 10, bots: 6, difficulty: 'normal' });
+    const match = new Match(arena(), { mode: 'ffa', map: 'plaza', minutes: 10, seats: 6, difficulty: 'normal' });
     match.start();
     let kills = 0;
     for (let t = 0; t < 90; t += TICK) {
@@ -44,7 +44,7 @@ describe('Match', () => {
   });
 
   it('a human shot to the head deals headshot damage through the command path', () => {
-    const match = new Match(arena(), { mode: 'ffa', map: 'plaza', minutes: 10, bots: 0, difficulty: 'normal' });
+    const match = new Match(arena(), { mode: 'ffa', map: 'plaza', minutes: 10, seats: 0, difficulty: 'normal' });
     // Vega carries the Clicker AR: 40 to the head.
     const a = match.addHuman('A', 'vega');
     const b = match.addHuman('B', 'rivet');
@@ -63,7 +63,7 @@ describe('Match', () => {
   });
 
   it('commands made before the client saw a respawn keep the new spawn and facing', () => {
-    const match = new Match(arena(), { mode: 'ffa', map: 'plaza', minutes: 10, bots: 0, difficulty: 'normal' });
+    const match = new Match(arena(), { mode: 'ffa', map: 'plaza', minutes: 10, seats: 0, difficulty: 'normal' });
     const a = match.addHuman('A', 'rivet');
     match.start();
     const staleLife = a.life;
@@ -77,7 +77,7 @@ describe('Match', () => {
   });
 
   it("weapon slots and the melee follow the character's loadout", () => {
-    const match = new Match(arena(), { mode: 'ffa', map: 'plaza', minutes: 10, bots: 0, difficulty: 'normal' });
+    const match = new Match(arena(), { mode: 'ffa', map: 'plaza', minutes: 10, seats: 0, difficulty: 'normal' });
     const a = match.addHuman('A', 'coral');
     const b = match.addHuman('B', 'rivet');
     match.start();
@@ -100,7 +100,7 @@ describe('Match', () => {
   });
 
   it('the Pulse Carbine fires three rounds per trigger pull', () => {
-    const match = new Match(arena(), { mode: 'ffa', map: 'plaza', minutes: 10, bots: 0, difficulty: 'normal' });
+    const match = new Match(arena(), { mode: 'ffa', map: 'plaza', minutes: 10, seats: 0, difficulty: 'normal' });
     const a = match.addHuman('A', 'nova');
     match.start();
     for (let t = 0; t < 4.2; t += TICK) match.tick(TICK);
@@ -113,7 +113,7 @@ describe('Match', () => {
   it('first spawns land in different places from match to match', () => {
     const spots = new Set<string>();
     for (let i = 0; i < 12; i++) {
-      const match = new Match(arena(), { mode: 'solo', map: 'plaza', minutes: 0, bots: 0, difficulty: 'normal' });
+      const match = new Match(arena(), { mode: 'solo', map: 'plaza', minutes: 0, seats: 0, difficulty: 'normal' });
       const me = match.addHuman('Me', 'rivet');
       match.start();
       spots.add(`${me.move.x.toFixed(1)},${me.move.z.toFixed(1)}`);
@@ -122,7 +122,7 @@ describe('Match', () => {
   });
 
   it('solo keeps going wave after wave until the player falls', () => {
-    const match = new Match(arena(), { mode: 'solo', map: 'plaza', minutes: 0, bots: 0, difficulty: 'normal' });
+    const match = new Match(arena(), { mode: 'solo', map: 'plaza', minutes: 0, seats: 0, difficulty: 'normal' });
     const human = match.addHuman('Me', 'nova');
     match.start();
     human.protectedUntil = Infinity;
@@ -210,7 +210,7 @@ describe('solo difficulty', () => {
   });
 
   it('a solo match sends the table: each wave event names its theme and the wave its snapbots in order', () => {
-    const match = new Match(arena(), { mode: 'solo', map: 'plaza', minutes: 0, bots: 0, difficulty: 'normal' }, 3);
+    const match = new Match(arena(), { mode: 'solo', map: 'plaza', minutes: 0, seats: 0, difficulty: 'normal' }, 3);
     const me = match.addHuman('Me', 'vega');
     match.start();
     me.protectedUntil = Infinity;
@@ -232,7 +232,7 @@ describe('solo difficulty', () => {
 
 describe('room seats', () => {
   const room = (bots: number) => {
-    const match = new Match(arena(), { mode: 'tdm', map: 'plaza', minutes: 3, bots, difficulty: 'normal' });
+    const match = new Match(arena(), { mode: 'tdm', map: 'plaza', minutes: 3, seats: bots, difficulty: 'normal' });
     const host = match.addHuman('Host', CHARACTER_IDS[0]!);
     match.start();
     return { match, host };

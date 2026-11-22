@@ -32,7 +32,7 @@ export interface Settings {
   difficulty: Difficulty;
   /** Last map picked for a solo run, and the last room set up as host. */
   soloMap: MapId;
-  room: Pick<MatchSettings, 'mode' | 'map' | 'minutes' | 'bots'>;
+  room: Pick<MatchSettings, 'mode' | 'map' | 'minutes' | 'seats'>;
 }
 
 const KEY = 'brickfray.settings.v2';
@@ -68,7 +68,7 @@ export function defaultSettings(): Settings {
     autoResolution: true,
     difficulty: 'normal',
     soloMap: 'plaza',
-    room: { mode: 'ffa', map: 'plaza', minutes: 5, bots: 6 }
+    room: { mode: 'ffa', map: 'plaza', minutes: 5, seats: 6 }
   };
 }
 

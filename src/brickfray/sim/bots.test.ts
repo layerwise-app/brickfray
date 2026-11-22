@@ -7,7 +7,7 @@ const ALL_MAPS = ['plaza', 'fortress', 'docks', 'temple'] as const;
 
 describe.each(ALL_MAPS)('snapbots on %s', (id) => {
   it('reach an idle player, open fire and never walk into the kill zone', () => {
-    const match = new Match(MAPS[id].layout(), { mode: 'solo', map: id, minutes: 0, bots: 0, difficulty: 'normal' });
+    const match = new Match(MAPS[id].layout(), { mode: 'solo', map: id, minutes: 0, seats: 0, difficulty: 'normal' });
     const me = match.addHuman('Me', 'rivet');
     match.start();
     me.protectedUntil = Infinity;
@@ -31,7 +31,7 @@ const STILL = 5;
 
 describe.each(ALL_MAPS)('team bots on %s', (id) => {
   it('never stand idle, respawned or not', () => {
-    const match = new Match(MAPS[id].layout(), { mode: 'tdm', map: id, minutes: 30, bots: 10, difficulty: 'normal' }, 1);
+    const match = new Match(MAPS[id].layout(), { mode: 'tdm', map: id, minutes: 30, seats: 10, difficulty: 'normal' }, 1);
     match.start();
     const brains = (match.bots as unknown as { brains: Map<number, { target: number; lostFor: number }> }).brains;
     const trail = new Map<number, { t: number; x: number; y: number; z: number; contact: boolean }[]>();

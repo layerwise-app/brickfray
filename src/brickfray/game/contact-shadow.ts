@@ -8,7 +8,11 @@ const SHADOW_HEIGHT = 2.2;
 /** The shadow camera sits this far under the stand's top: soles that dip into it would otherwise be cut by its near plane. */
 const SINK = 0.03;
 const SHADOW_SIZE = 256;
-const KEY_SLANT = new THREE.Vector2(KEY_DIRECTION.x, KEY_DIRECTION.z).multiplyScalar(0.4 / KEY_DIRECTION.y);
+/**
+ * How far the shadow leans per meter of height, away from the key light. The menu's lens is barely above the stand,
+ * which it sees edge-on: the lean is turned toward the side, where it shows, instead of back behind the figure.
+ */
+const KEY_SLANT = new THREE.Vector2(KEY_DIRECTION.x, KEY_DIRECTION.z * 0.35).multiplyScalar(1.3 / KEY_DIRECTION.y);
 
 /**
  * Soft shadow of the figure's own shape on the floor, drawn from its depth as seen from below:
@@ -48,7 +52,7 @@ export class ContactShadow {
       shader.fragmentShader = shader.fragmentShader.replace(
         'gl_FragColor = vec4( vec3( 1.0 - fragCoordZ ), opacity );',
         `float up = max( fragCoordZ - ${(SINK / (SHADOW_HEIGHT + SINK)).toFixed(5)}, 0.0 );
-        gl_FragColor = vec4( vec3( 0.0 ), 0.65 * pow( 1.0 - up, 2.2 ) + 0.35 * pow( 1.0 - up, 40.0 ) );`
+        gl_FragColor = vec4( vec3( 0.0 ), 0.72 * pow( 1.0 - up, 1.8 ) + 0.3 * pow( 1.0 - up, 40.0 ) );`
       );
     };
     // One pass: every extra render target costs a weak GPU more than these taps do.
@@ -95,7 +99,7 @@ export class ContactShadow {
     this.camera.updateWorldMatrix(true, false);
     const m = this.camera.matrixWorld.elements;
     this.ground.value = m[13]! + SINK;
-    // Leans the shadow away from the key light, a fraction of the true slant so it stays a contact shadow.
+    // Leans the shadow away from the key light (KEY_SLANT).
     // The camera's x and y axes are the display's x and z, so this follows the display when it is turned.
     this.shear.value.set(m[0]! * KEY_SLANT.x + m[4]! * KEY_SLANT.y, m[2]! * KEY_SLANT.x + m[6]! * KEY_SLANT.y);
     const saved = { target: renderer.getRenderTarget(), autoClear: renderer.autoClear, alpha: renderer.getClearAlpha(), override: scene.overrideMaterial, background: scene.background };

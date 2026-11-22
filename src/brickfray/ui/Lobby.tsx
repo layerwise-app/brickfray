@@ -33,8 +33,8 @@ export function Lobby() {
   };
 
   return (
-    <div className='absolute inset-0 overflow-y-auto bg-[#0b1222]/70 p-4 backdrop-blur-md sm:p-8'>
-      <div className='mx-auto flex max-w-5xl flex-col gap-5'>
+    <div className='bf-screen-in absolute inset-0 overflow-y-auto bg-[#0b1222]/70 p-4 backdrop-blur-md sm:p-8'>
+      <div className='bf-screen-rise mx-auto flex min-h-full max-w-5xl flex-col justify-center gap-5 2xl:max-w-6xl'>
         <div className='flex items-center gap-4'>
           <button className='bf-btn bf-btn-ghost' onClick={() => game.leave()}>
             <DoorIcon size={20} />
@@ -101,16 +101,16 @@ export function Lobby() {
                   ))}
                 </div>
               </Field>
-              <Field label={`${t('seats')} · ${s.bots}`}>
+              <Field label={`${t('seats')} · ${s.seats}`}>
                 <input
                   type='range'
                   className='bf-range mt-3'
                   min={1}
                   max={MATCH.maxPlayers}
-                  value={s.bots}
+                  value={s.seats}
                   disabled={!host}
-                  style={{ ['--fill' as string]: `${((s.bots - 1) / (MATCH.maxPlayers - 1)) * 100}%` }}
-                  onChange={(e) => set({ bots: Number(e.target.value) })}
+                  style={{ ['--fill' as string]: `${((s.seats - 1) / (MATCH.maxPlayers - 1)) * 100}%` }}
+                  onChange={(e) => set({ seats: Number(e.target.value) })}
                 />
               </Field>
             </div>

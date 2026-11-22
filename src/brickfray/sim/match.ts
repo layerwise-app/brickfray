@@ -73,7 +73,7 @@ export class Match {
   }
 
   private seats() {
-    return Math.min(this.settings.bots, MATCH.maxPlayers);
+    return Math.min(this.settings.seats, MATCH.maxPlayers);
   }
 
   /** Bots take the seats no human holds. */

@@ -53,8 +53,11 @@ const w = new THREE.Vector3();
 const q = new THREE.Quaternion();
 const q2 = new THREE.Quaternion();
 const DOWN = new THREE.Vector3(0, -1, 0);
+const UP = new THREE.Vector3(0, 1, 0);
+const MOSS_LOW = { drop: 0.75, turn: 0.45 };
 
-const smooth = (x: number) => (x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x));
+/** Smootherstep: no jump in acceleration where a move starts or stops. */
+const smooth = (x: number) => (x <= 0 ? 0 : x >= 1 ? 1 : x * x * x * (x * (6 * x - 15) + 10));
 /** 0 before `a`, easing to 1 by `b`, holding, easing back to 0 from `c` to `d`. */
 const span = (u: number, a: number, b: number, c: number, d: number) => smooth((u - a) / (b - a)) * (1 - smooth((u - c) / (d - c)));
 /** A quick lift that drops back faster than it rose, peaking at `at`. */
@@ -117,7 +120,7 @@ export const GESTURES: Record<CharacterId, readonly Gesture[]> = {
     },
     // Brings the nailer up to look it over, then lets it drop back to his side.
     {
-      length: 1.8,
+      length: 2.2,
       body(u, life) {
         const e = span(u, 0.05, 0.3, 0.65, 0.95);
         life.head[0] += 0.18 * e;
@@ -201,14 +204,21 @@ export const GESTURES: Record<CharacterId, readonly Gesture[]> = {
   moss: [
     // Lowers the rifle from his eye, turns to look straight at the viewer, and goes back to the scope.
     {
-      length: 3.4,
+      length: 3.8,
       body(u, life, stance, viewer) {
-        const e = span(u, 0, 0.22, 0.74, 1);
+        const e = span(u, 0, 0.28, 0.7, 1);
         life.pelvisRot[0] -= 0.15 * e;
         life.chest[0] -= 0.55 * e;
         aim(life, stance, [viewer, -0.06, 0], span(u, 0.06, 0.3, 0.7, 0.94));
       },
-      gun: (u, _wrist, rotation, pose, pivot, turn) => tipGun(rotation, pose, pivot, turn, 0.42 * span(u, 0, 0.22, 0.74, 1))
+      // The rifle comes down off the eye to a low ready: muzzle dipped toward the ground ahead and kept turned off the viewer
+      // as the chest comes round, so it never points out of the screen or swings its stock through the glove.
+      gun(u, _wrist, rotation, pose, pivot, turn) {
+        const e = span(u, 0, 0.28, 0.7, 1);
+        tipGun(rotation, pose, pivot, turn, MOSS_LOW.drop * e);
+        turn.premultiply(q.setFromAxisAngle(UP, MOSS_LOW.turn * e));
+        return true;
+      }
     }
   ],
   // Nova's gesture is the wave its stance already carries.

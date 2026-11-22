@@ -58,7 +58,9 @@ export function limbs(k: BodyKit) {
     if (!omit.has('forearms')) {
       const elbow = s.elbow ?? sleeve;
       const elbowLook = s.elbow ? (s.forearmLook ?? shirtLook) : shirtLook;
-      if (elbowLook === 'skin') orb(b, fa, 0.0478 * L, joint, elbow, { scale: [1.07, 1, 1.03], look: elbowLook });
+      // A bare elbow: on the showroom figure no wider than the arm round it and drawn out along it, so it reads as the
+      // joint, not as a ball standing out of the sleeve.
+      if (elbowLook === 'skin') orb(b, fa, (b.hero ? 0.0442 : 0.0478) * L, joint, elbow, { scale: b.hero ? [1.01, 1.08, 1.01] : [1.07, 1, 1.03], look: elbowLook });
       else if (b.hero && s.joints !== 'hinge') clothElbow(k, side, elbow, elbowLook);
       else hinge(k, fa, 0.0455 * L, 0.1 * L, elbow, elbowLook);
       b.add(fa, S.loft(limbRings('forearm', L), n, { steps, bottom: 0.012, top: 0.02 }), s.forearm ?? sleeve, { look: s.forearmLook ?? shirtLook });
@@ -165,8 +167,11 @@ function hinge(k: BodyKit, bone: Parameters<BodyKit['b']['cyl']>[0], radius: num
     b.cyl(bone, radius, radius, length, color, { rot: ACROSS, look, seg: b.seg(6, 10, 12) });
     return;
   }
-  const cap = radius * 0.3;
-  const ends = [-length / 2, length / 2].map((y) => ({ y, rx: radius, rz: radius }));
-  b.add(bone, S.loft(ends, 20, { bottom: cap, top: cap, domes: 3 }), color, { rot: ACROSS, look });
-  for (const side of [-1, 1]) orb(b, bone, radius * 0.19, 8, tone(color, 0.62), { at: [side * (length / 2 + cap - 0.0015), 0, 0], scale: [0.5, 1, 1], look });
+  // Close up the barrel stays inside the limb's outline, its ends only softly rounded with a flush pivot cap, so the
+  // joint reads as part of the leg or arm and not as a ball between its segments.
+  const half = length * 0.4;
+  const cap = radius * 0.16;
+  const ends = [-half, half].map((y) => ({ y, rx: radius, rz: radius }));
+  b.add(bone, S.loft(ends, 24, { bottom: cap, top: cap, domes: 3 }), color, { rot: ACROSS, look });
+  for (const side of [-1, 1]) b.add(bone, S.cylinder(radius * 0.42, radius * 0.42, 0.003, 16), tone(color, 0.7), { at: [side * (half + cap - 0.0008), 0, 0], rot: ACROSS, look });
 }

@@ -19,6 +19,7 @@ import { InstallButton } from './touch/InstallGuide';
 import { frameRect, toFrame } from './touch/landscape';
 import { flushMatches } from '../../lib/board/client/sync';
 import './menu.css';
+import './menu-motion.css';
 import './menu-wide.css';
 import './menu-landscape.css';
 import './menu-stacked.css';
@@ -176,7 +177,7 @@ export function MainMenu({ openSettings }: { openSettings: () => void }) {
           <div data-cover className='bf-menu-picker'>
             {CHARACTER_IDS.map((id) => (
               <button key={id} onClick={() => pick(id)} aria-pressed={id === character} className='bf-menu-pick'>
-                <span className='bf-menu-thumb' style={{ background: `linear-gradient(160deg, ${ROSTER[id].primary} 0 calc(55% - 0.7px), ${ROSTER[id].secondary} calc(55% + 0.7px) 100%)` }}>
+                <span className='bf-menu-thumb' style={{ background: `linear-gradient(160deg, ${ROSTER[id].primary} 0 calc(66% - 0.7px), ${ROSTER[id].secondary} calc(66% + 0.7px) 100%)` }}>
                   {app.portraits[id] && <img src={app.portraits[id]} alt='' draggable={false} />}
                 </span>
                 <span className='bf-menu-pick-name'>{ROSTER[id].name}</span>

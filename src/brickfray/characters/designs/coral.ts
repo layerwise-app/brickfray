@@ -24,7 +24,7 @@ export function coral(b: PartSet) {
     buckle: BRASS,
     bulk: 1.1,
     limbs: 1.12,
-    fore: { half: [0.019, 0.025], corner: 0.009, yaw: 0.3, over: { r: 0.021, at: 0.035 }, seat: 0, sink: 0.004 },
+    fore: { half: [0.019, 0.022], corner: 0.009, yaw: 0.3, over: { r: 0.021, at: 0.035 }, seat: 0, sink: 0.004 },
     omit: low ? ['head'] : ['head', 'neck', 'chest', 'abdomen', 'boots', 'upperArms', 'forearms', 'thighs', 'shins']
   });
   if (low) return blocky(b);
@@ -46,7 +46,7 @@ function blocky(b: PartSet) {
   b.cyl('neck', 0.07, 0.08, 0.08, BRASS, { at: [0, 0.0, 0], look: 'metal' });
   lowBall(b, 'head', 0.168, BRASS, { at: [0, 0.1, 0], look: 'metal', seg: 11 });
   b.cyl('head', 0.088, 0.088, 0.02, '#101820', { at: [0, 0.09, -0.152], rot: [Math.PI / 2, 0, 0], look: 'rubber' });
-  b.mirror((_, sign) => b.box('head', [0.026, 0.036, 0.012], '#e9f3ff', { at: [sign * 0.032, 0.1, -0.162], look: 'glow' }));
+  b.mirror((_, sign) => b.cyl('head', 0.017, 0.017, 0.012, '#e9f3ff', { at: [sign * 0.032, 0.1, -0.162], rot: [Math.PI / 2, 0, 0], look: 'glow', seg: 8 }));
   b.cyl('head', 0.088, 0.088, 0.008, '#9fd4e8', { at: [0, 0.09, -0.168], rot: [Math.PI / 2, 0, 0], look: 'glass' });
   b.cyl('head', 0.108, 0.108, 0.026, BRASS, { at: [0, 0.09, -0.15], rot: [Math.PI / 2, 0, 0], look: 'metal', seg: 10 });
   b.cyl('head', 0.007, 0.007, 0.17, BRASS, { at: [0, 0.09, -0.176], look: 'metal' });
@@ -92,8 +92,8 @@ export const stance: Stance = {
     R: { at: [0.25, 0, 0.15], heading: 0.75 }
   },
   arms: {
-    R: { wrist: [0.214, -0.141, -0.106], hand: [0.255, 0.5, 0.062], elbow: [0.134, -0.934, 0.331], space: 'chest', shape: 'grip' },
-    L: { wrist: [0.214, 0.087, -0.406], hand: [1.588, 0.194, 1.104], elbow: [-0.38, -0.64, -0.66], space: 'chest', shape: 'hold' }
+    R: { wrist: [0.3, -0.133, -0.098], hand: [-0.145, 0.5, 0.062], elbow: [0.134, -0.934, 0.331], space: 'chest', shape: 'grip' },
+    L: { wrist: [0.183, 0.095, -0.374], hand: [1.188, 0.194, 1.104], elbow: [-0.38, -0.64, -0.66], space: 'chest', shape: 'hold' }
   },
   life: { breath: 1, sway: 0.6, look: 0.6 }
 };

@@ -22,7 +22,7 @@ function arena(): MapLayout {
 
 /** A room of humans past its warmup and their spawn protection. */
 function room(mode: ModeId, names: string[]) {
-  const match = new Match(arena(), { mode, map: 'plaza', minutes: 10, bots: 0, difficulty: 'normal' }, 7);
+  const match = new Match(arena(), { mode, map: 'plaza', minutes: 10, seats: 0, difficulty: 'normal' }, 7);
   const players = names.map((n) => match.addHuman(n, 'rivet'));
   match.start();
   run(match, 6);
@@ -144,7 +144,7 @@ describe('multi-kill chains', () => {
   });
 
   it('solo waves chain too', () => {
-    const match = new Match(arena(), { mode: 'solo', map: 'plaza', minutes: 10, bots: 0, difficulty: 'normal' }, 7);
+    const match = new Match(arena(), { mode: 'solo', map: 'plaza', minutes: 10, seats: 0, difficulty: 'normal' }, 7);
     const me = match.addHuman('Me', 'rivet');
     match.start();
     run(match, 6);

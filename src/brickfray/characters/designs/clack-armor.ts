@@ -120,7 +120,8 @@ function pair(loft: Loft, a0: number, t0: number, a1: number, t1: number, n: num
 export function cuirass(b: PartSet) {
   const q = tier(b);
   const cols = pick(b, 6, 9, 16);
-  const rows = q === 3 ? 3 : 1;
+  // The bib follows the breastplate's curve and narrows to its point: close up it needs rows enough for both to stay smooth.
+  const rows = q === 3 ? 12 : 1;
   const strip = pick(b, 2, 3, 5);
   const ring = pick(b, 10, 16, 28);
   const stud = pick(b, 5, 5, 12);

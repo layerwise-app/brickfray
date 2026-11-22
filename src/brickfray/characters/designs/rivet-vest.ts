@@ -102,10 +102,10 @@ export function vest(b: PartSet) {
   }
 
   zip(b);
+  chestKit(b);
   if (!hi) return;
   wrap('spine', WAIST, [HEM, HEM + 0.012], ON - 0.0002, 0.001, C.hem, 'cloth');
   pockets(b);
-  chestKit(b);
   if (!b.hero) return;
   // Yoke seam and hanging loop on the back, side seams under the arms.
   b.add('chest', CHEST.panel({ y: [0.158, 0.162], a: [Math.PI - armhole(0.16) + 0.03, Math.PI + armhole(0.16) - 0.03], lift: ON, thick: 0.0008, seg: [16, 1] }), C.hem, { look: 'cloth' });

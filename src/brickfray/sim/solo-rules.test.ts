@@ -21,7 +21,7 @@ function flat(extra: MapLayout['colliders'] = [], waypoints: Waypoint[] = []): M
 }
 
 function solo(difficulty: 'easy' | 'normal' | 'hard' = 'normal', layout = flat()) {
-  const match = new Match(layout, { mode: 'solo', map: 'plaza', minutes: 0, bots: 0, difficulty }, 11);
+  const match = new Match(layout, { mode: 'solo', map: 'plaza', minutes: 0, seats: 0, difficulty }, 11);
   const me = match.addHuman('Me', 'vega');
   return { match, me };
 }
@@ -160,7 +160,7 @@ describe('upgrade cards for the character', () => {
 
   it('slow kits hit snapbots harder in solo only', () => {
     const hit = (mode: 'solo' | 'ffa') => {
-      const match = new Match(flat(), { mode, map: 'plaza', minutes: 10, bots: 0, difficulty: 'normal' }, 2);
+      const match = new Match(flat(), { mode, map: 'plaza', minutes: 10, seats: 0, difficulty: 'normal' }, 2);
       const coral = match.addHuman('Coral', 'coral');
       match.sim.spawn(coral, { position: [0, 0, 0], yaw: 0 });
       const bot = match.sim.addPlayer('Snap', 'grunt', 'grunt');

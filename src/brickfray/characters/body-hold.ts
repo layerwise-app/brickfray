@@ -31,10 +31,13 @@ const unscaled = (f: ForeEnd): ForeEnd => ({ ...f, half: [f.half[0] / SIZE, f.ha
 export function foreGrip(fore: ForeEnd, girth: number, spread: Grasp['spread']): Grasp {
   const f = unscaled(fore);
   const centre = foreCentre(f);
+  const arch = fore.arch ?? 1;
+  const curl = HOLD.curl.map((c) => c * arch) as V3;
+  spread = spread.map((a) => a * (fore.fan ?? 1)) as Grasp['spread'];
   const fingers = FINGERS.map((g, i) =>
-    wrapDigit(f, centre, { from: [g.at[0] + HOLD.root, g.at[1], g.at[2]], dir: [0, Math.sin(spread[i]!), -Math.cos(spread[i]!)], toward: [-1, 0, 0], len: g.len, r: g.r * girth * 0.96, max: [1.75, 1.8, 1.35], press: HOLD.press, curl: HOLD.curl })
+    wrapDigit(f, centre, { from: [g.at[0] + HOLD.root, g.at[1], g.at[2]], dir: [0, Math.sin(spread[i]!), -Math.cos(spread[i]!)], toward: [-1, 0, 0], len: g.len, r: g.r * girth * 0.96, max: [1.75, 1.8, 1.35], press: HOLD.press, curl })
   ) as Grasp['fingers'];
-  return { fingers, spread, thumb: f.over ? thumbAlong(f, centre) : thumbOver(f, centre), root: HOLD.root };
+  return { fingers, spread, thumb: (fore.thumb ?? (f.over ? 'along' : 'over')) === 'along' ? thumbAlong(f, centre) : thumbOver(f, centre), root: HOLD.root };
 }
 
 /** The fore-end's axis (toward the muzzle), its near face's outward normal and its top, in the hand's space. */

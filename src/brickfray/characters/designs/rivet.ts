@@ -32,7 +32,8 @@ export function rivet(b: PartSet) {
     brow: '#3b2a1e',
     browTilt: -0.12,
     mouth: 'grin',
-    expression: { open: 0.96, squint: 0.42, brows: [0.006, 0.006] }
+    expression: { open: 0.96, squint: 0.42, brows: [0.006, 0.006] },
+    omit: b.detail >= 2 ? ['upperArms'] : []
   });
   if (b.detail === 0) return blockCostume(b, bulk);
   vest(b);
@@ -79,8 +80,6 @@ function blockCostume(b: PartSet, bulk: number) {
   });
   b.box('chest', [0.07, 0.17, 0.01], NAVY, { at: [0, 0.13, -0.116], look: 'cloth' });
 
-  // Rolled sleeve cuffs.
-  b.mirror((side) => lowBand(b, `upperArm${side}`, 'upperArm', 1.08, -0.235, -0.195, 0.006, '#34476a', 'cloth'));
 
   // Knee pads: foam cups with hard shells.
   kneePads(b, LEGS, C.dark, 'rubber', '#555c63');

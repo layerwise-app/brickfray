@@ -30,6 +30,12 @@ export interface ForeEnd {
   seat?: number;
   /** How far the handle presses into the palm's pad: a hard grip on a thick fore-end, so the fingers reach over its top. */
   sink?: number;
+  /** Scales the fingers' least bend at their middle and end joints: above 1 they arch harder against a face they cannot hook over. */
+  arch?: number;
+  /** Scales how far the fingers fan apart: below 1 they close up side by side. */
+  fan?: number;
+  /** Where the thumb goes: over the top edge, or along the near face toward the muzzle (the default under a tube). */
+  thumb?: 'over' | 'along';
 }
 
 /**

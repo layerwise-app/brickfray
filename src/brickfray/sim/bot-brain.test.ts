@@ -15,7 +15,7 @@ const brainsOf = (bots: BotDirector) => (bots as unknown as { brains: Brains }).
 
 /** A fill bot playing `character` at the origin facing -Z, and a player who never shoots back standing `d` m off along `dir`. */
 function duel(character: CharacterId, d: number, dir: [number, number] = [0, -1]) {
-  const sim = new HostSim(field, { mode: 'ffa', map: 'plaza', minutes: 10, bots: 0, difficulty: 'normal' }, 7);
+  const sim = new HostSim(field, { mode: 'ffa', map: 'plaza', minutes: 10, seats: 0, difficulty: 'normal' }, 7);
   const bots = new BotDirector(sim);
   const bot = sim.addPlayer('Bot', character, 'grunt');
   sim.spawn(bot, { position: [0, 0, 0], yaw: 0 });
@@ -80,7 +80,7 @@ describe('bots in a fight', () => {
 
 describe('team bots', () => {
   it('spread over the flanks: no flank takes more than two of a team of five', () => {
-    const match = new Match(MAPS.docks.layout(), { mode: 'tdm', map: 'docks', minutes: 30, bots: 10, difficulty: 'normal' }, 3);
+    const match = new Match(MAPS.docks.layout(), { mode: 'tdm', map: 'docks', minutes: 30, seats: 10, difficulty: 'normal' }, 3);
     match.start();
     for (let t = 0; t < 1; t += TICK) match.tick(TICK);
     const brains = brainsOf(match.bots);

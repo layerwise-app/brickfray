@@ -22,8 +22,8 @@ export const stance: Stance = {
     L: { at: [-0.279, 0, -0.28], heading: -0.05, knee: 0.1 }
   },
   arms: {
-    R: { wrist: [-0.11, 0.187, -0.318], hand: [-0.701, 0.026, 0.132], elbow: [0.642, 0, 0.766], space: 'chest', shape: 'grip' },
-    L: { wrist: [-0.373, 0.237, -0.535], hand: [0.39, 0.398, 1.744], elbow: [-0.766, -0.64, 0.003], space: 'chest', shape: 'hold' }
+    R: { wrist: [-0.105, 0.186, -0.304], hand: [-0.701, 0.026, 0.132], elbow: [0.642, 0, 0.766], space: 'chest', shape: 'grip' },
+    L: { wrist: [-0.35, 0.235, -0.5], hand: [0.39, 0.398, 1.744], elbow: [-0.766, -0.64, 0.003], space: 'chest', shape: 'hold' }
   },
   life: { breath: 0.6, sway: 0.3, look: 0 }
 };
@@ -36,7 +36,7 @@ export function moss(b: PartSet) {
     sleeve: C.tunic,
     glove: '#5b4630',
     gloveLook: 'cloth',
-    fore: { half: [0.017, 0.025], corner: 0.01, yaw: 0.45, roll: 0.3, over: { r: 0.0128, at: 0.023 }, seat: 0.004, sink: 0.004 },
+    fore: { half: [0.017, 0.025], corner: 0.01, yaw: 0.45, roll: 0.3, over: { r: 0.0128, at: 0.023 }, seat: 0.004, sink: 0.004, arch: 3.2, fan: 0.35 },
     pants: '#3f4a35',
     boot: '#5b4630',
     bootLook: b.detail === 0 ? 'rubber' : HIDE,
@@ -79,11 +79,11 @@ export function moss(b: PartSet) {
     legWraps(b, side);
     sleevesAndLegs(b, side, sign);
   });
+  hoodSprig(b);
   if (!hi) return kneePads(b, 1, C.leather, HIDE);
   pouches(b);
   bedroll(b);
   clasp(b);
-  hoodSprig(b);
   if (!b.hero) return;
   mantleStitches(b);
   if (!stance.melee) hatchetOnPack(b);
@@ -127,16 +127,14 @@ function beard(b: PartSet) {
   });
 }
 
-/** The low tier's costume: a handful of flat parts. */
+/** The low tier's costume: the hood and cloak at the medium tier's cut, the rest a handful of flat parts. */
 function plain(b: PartSet) {
   lowTaper(b, 'chest', [0.42, 0.25], [0.3, 0.2], 0.13, C.cloak, { at: [0, 0.19, 0.0], look: 'cloth', caps: 'top' });
   b.mirror((side, sign) => b.dome(`upperArm${side}`, 0.085, C.cloak, { at: [sign * 0.005, -0.01, 0], rot: [0, 0, sign * -0.25], scale: [1.05, 1.1, 1.15], look: 'cloth' }));
-  // Three stacked bands, not one board: the rig bends the cape along its length between their rows.
-  for (const i of [0, 1, 2]) b.taper('dangleBack', [0.44 - 0.0267 * i, 0.03], [0.4133 - 0.0267 * i, 0.03], 0.22, C.cloak, { at: [0, -0.52 + 0.22 * i, 0.01], look: 'cloth' });
-  for (const [x, y, color] of [[-0.1, -0.12, C.leaf], [0.09, -0.3, C.leaf2]] as const) b.box('dangleBack', [0.07, 0.07, 0.04], color, { at: [x, y, 0.012], rot: [0, 0, Math.PI / 4], look: 'cloth' });
+  cloak(b, C.cloak, C.lining, C.sash, C.thread);
   b.box('chest', [0.06, 0.06, 0.03], C.leaf2, { at: [-0.14, 0.2, -0.08], rot: [0.5, 0, Math.PI / 4], look: 'cloth' });
-  lowBlob(b, 'head', [0.29, 0.315, 0.28], C.cloak, { at: [0, 0.118, 0.05], look: 'cloth', e: 0.84, taper: 0.1, seg: 9 });
-  lowBlob(b, 'head', [0.1, 0.13, 0.12], C.cloak, { at: [0, 0.24, 0.12], rot: [-0.9, 0, 0], look: 'cloth', e: 0.85, taper: 0.5, seg: 6 });
+  hood(b, C.cloak, C.hoodLining, C.cloakDark, C.sash);
+  lowBlob(b, 'head', [0.2, 0.05, 0.06], C.beard, { at: [0, 0.205, -0.1], rot: [0.35, 0, 0], look: 'cloth', e: 0.7, seg: 6 });
   lowBeard(b, C.beard, C.beardLight);
   b.box('pelvis', [0.07, 0.15, 0.19], C.leather, { at: [-0.2, -0.03, 0.0], look: 'rubber' });
   for (const z of [-0.118, 0.118]) b.box('chest', [0.035, 0.46, 0.014], C.leather, { at: [0, 0.07, z], rot: [0, 0, z < 0 ? -0.62 : 0.62], look: 'rubber' });

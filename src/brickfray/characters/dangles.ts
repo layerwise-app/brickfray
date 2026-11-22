@@ -44,8 +44,9 @@ const TURNED: Partial<Record<number, Turned>> = {
   [BONE.dangleHead]: { toward: 0.16, away: 1.1, side: 0.75, lag: 0.04, twist: 0 },
   // The tabard's panels hang a few centimetres in front of and behind the thighs and share one bone: a twist past a
   // little swings their edges into the thighs, so they trail a turn mostly by swinging sideways in their own planes,
-  // the way the front panel (`weight`) is pulled, and swing back past the rest when it stops.
-  [BONE.dangleHip]: { toward: 0.05, away: 0.05, side: 0.3, lag: 0.1, twist: 0.14, weight: [0, -0.2, -0.13], gain: 2 }
+  // the way the front panel (`weight`) is pulled, and swing back past the rest when it stops. A twist turns the front
+  // and back panels opposite ways and opens the leg between them at the side.
+  [BONE.dangleHip]: { toward: 0.05, away: 0.05, side: 0.3, lag: 0.1, twist: 0.05, weight: [0, -0.2, -0.13], gain: 2 }
 };
 /** Twist toward the trailing side per radian per second of turn. */
 const TWIST_GAIN = 0.05;

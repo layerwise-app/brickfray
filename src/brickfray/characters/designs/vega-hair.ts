@@ -40,8 +40,8 @@ type Lock = (bone: 'head' | 'dangleHead', points: V3[], r: number, color: string
 /** Copper hair: fitted cap, combed-back ridges, side-swept fringe, face-framing locks and a high ponytail of loose strands. */
 export function hair(b: PartSet) {
   const hi = b.detail >= 2;
-  const seg = tier(b, 4, 5, 10);
-  const radial = tier(b, 4, 5, 8);
+  const seg = tier(b, 4, 5, 14);
+  const radial = tier(b, 4, 5, 12);
   const lock: Lock = (bone, points, r, color, o = {}) => {
     b.add(bone, strand(points, tapering(r, o.tip), { flat: o.flat ?? 0.5, side: o.side ?? [0, 1, 0], seg: seg + (o.more ?? 0), radial }), color, { look: 'cloth' });
   };
@@ -55,30 +55,55 @@ export function hair(b: PartSet) {
     const half = lerp(lerp(behindEars, HALF + 0.62, smoothstep(y, 0.085, 0.118)), Math.PI, smoothstep(y, 0.15, 0.172));
     return [Math.PI - half, Math.PI + half];
   };
-  b.add('head', SKULL.panel({ y: [y0, y1], a: cap, lift: 0.001, thick: 0.011, seg: [tier(b, 10, 14, 30), tier(b, 3, 4, 8)] }), C.hair, { look: 'cloth' });
+  b.add('head', SKULL.panel({ y: [y0, y1], a: cap, lift: 0.001, thick: b.hero ? 0.008 : 0.011, seg: [tier(b, 10, 14, 30), tier(b, 3, 4, 8)] }), C.hair, { look: 'cloth' });
   b.add('head', S.dome(0.08, tier(b, 8, 10, 20), tier(b, 2, 3, 5)), C.hair, { at: [0, 0.222, 0.004], scale: [0.95, 0.3, 1.05], look: 'cloth' });
   lump(b, 'head', [0.1, 0.085, 0.1], tier(b, 6, 8, 14), C.hair, { at: [0, 0.2, 0.092], rot: [-0.5, 0, 0], look: 'cloth', e: 0.9 });
 
-  // Ridges combed back to the knot, from the hairline over the top and up from the nape.
+  // Locks combed back to the knot, from the hairline over the top and up from the nape: on the showroom figure a
+  // darker under layer and a lighter, rounder over layer laid in its gaps, so the hair has depth instead of planks.
   const knot: V3 = [KNOT[0], KNOT[1] - 0.012, KNOT[2] - 0.03];
-  const tops = b.hero ? [-1.9, -1.35, -0.85, -0.4, 0, 0.42, 0.9, 1.4, 1.95] : hi ? [-1.75, -1.05, -0.35, 0.35, 1.05, 1.75] : [-1.3, 0, 1.3];
-  for (const [i, a] of tops.entries()) {
+  const combed = (a: number, r: number, color: string, lift: number, flat: number) => {
     const start = SKULL.path([
-      [0.176, a, 0.013],
-      [0.206, a * 1.04, 0.015]
+      [0.176, a, 0.013 + lift],
+      [0.206, a * 1.04, 0.015 + lift]
     ]);
-    const over: V3 = [start[1]![0] * 0.5, 0.243 - Math.abs(a) * 0.006, lerp(start[1]![2], knot[2], 0.55)];
-    lock('head', [...start, over, knot], (0.24 / tops.length) * (i % 2 ? 0.92 : 1), i % 2 ? C.hair : C.hairLight, { flat: 0.42, side: SKULL.around(0.19, a), tip: 0.7 });
-  }
-  if (hi) {
-    for (const [i, a] of (b.hero ? [2.3, 2.75, Math.PI, 3.53, 3.98] : [2.45, Math.PI, 3.83]).entries()) {
-      const up = SKULL.path([
-        [0.0, lerp(a, Math.PI, 0.45), 0.008],
-        [0.09, a, 0.014],
-        [0.17, lerp(a, Math.PI, 0.25), 0.016]
-      ]);
-      lock('head', [...up, knot], b.hero ? 0.03 : 0.042, i % 2 ? C.hairLight : C.hair, { flat: 0.36, side: SKULL.around(0.12, a), tip: 0.75 });
-    }
+    const over: V3 = [start[1]![0] * 0.5, 0.243 + lift - Math.abs(a) * 0.006, lerp(start[1]![2], knot[2], 0.55)];
+    lock('head', [...start, over, knot], r, color, { flat, side: SKULL.around(0.19, a), tip: 0.55 });
+  };
+  const nape = (a: number, r: number, color: string, lift: number, flat: number) => {
+    const up = SKULL.path([
+      [0.0, lerp(a, Math.PI, 0.45), 0.008 + lift],
+      [0.09, a, 0.014 + lift],
+      [0.17, lerp(a, Math.PI, 0.25), 0.016 + lift]
+    ]);
+    lock('head', [...up, knot], r, color, { flat, side: SKULL.around(0.12, a), tip: 0.6 });
+  };
+  if (b.hero) {
+    const under = [-1.95, -1.5, -1.05, -0.62, -0.2, 0.22, 0.64, 1.07, 1.5, 1.95];
+    under.forEach((a, i) => combed(a, 0.026, i % 2 ? C.hairDark : C.hair, 0, 0.55));
+    under.slice(0, -1).forEach((a, i) => combed((a + under[i + 1]!) / 2, 0.019, i % 3 ? C.hairLight : C.hair, 0.006, 0.72));
+    const back = [2.15, 2.5, 2.85, 3.2, 3.55, 3.9, 4.2];
+    back.forEach((a, i) => nape(a, 0.024, i % 2 ? C.hairDark : C.hair, 0, 0.55));
+    back.slice(0, -1).forEach((a, i) => nape((a + back[i + 1]!) / 2, 0.018, i % 2 ? C.hairLight : C.hair, 0.006, 0.72));
+    // Swept back above the ears, over the cap's edge.
+    b.mirror((_, sign) => {
+      for (const [y, r, color] of [
+        [0.118, 0.017, C.hair],
+        [0.138, 0.019, C.hairDark],
+        [0.16, 0.018, C.hairLight]
+      ] as const) {
+        const path = SKULL.path([
+          [y, sign * 1.42, 0.009],
+          [y + 0.008, sign * 1.85, 0.012],
+          [y + 0.02, sign * 2.35, 0.015]
+        ]);
+        lock('head', [...path, knot], r, color, { flat: 0.6, side: SKULL.around(y, sign * 1.9), tip: 0.5 });
+      }
+    });
+  } else {
+    const tops = hi ? [-1.75, -1.05, -0.35, 0.35, 1.05, 1.75] : [-1.3, 0, 1.3];
+    for (const [i, a] of tops.entries()) combed(a, (0.24 / tops.length) * (i % 2 ? 0.92 : 1), i % 2 ? C.hair : C.hairLight, 0, 0.5);
+    if (hi) for (const [i, a] of [2.45, Math.PI, 3.83].entries()) nape(a, 0.042, i % 2 ? C.hairLight : C.hair, 0, 0.42);
   }
 
   // Fringe swept from a parting over her right eye toward her left temple.
@@ -159,6 +184,8 @@ function ponytail(b: PartSet, lock: Lock) {
     b.torus('dangleHead', 0.026, 0.012, C.teal, { at: [0, 0.004, 0.006], rot: [0.75, 0, 0], look: 'gloss' });
     b.ball('dangleHead', 0.009, C.white, { at: [0.03, 0.0, 0.0], look: 'gloss' });
   } else b.cyl('dangleHead', 0.036, 0.036, 0.022, C.teal, { at: [0, 0.004, 0.006], rot: [0.75 - HALF, 0, 0], look: 'gloss', seg: tier(b, 8, 10, 10) });
+  // A full round tail; on the showroom figure locks of three tones wrap its front, sides and back, each with a
+  // blunt clumped end, so it has volume from every side.
   lock(
     'dangleHead',
     [
@@ -169,18 +196,29 @@ function ponytail(b: PartSet, lock: Lock) {
       [0.008, -0.285, 0.07],
       [0.014, -0.34, 0.086]
     ],
-    0.046,
+    b.hero ? 0.044 : 0.046,
     C.hair,
-    { flat: 0.8, side: [1, 0, 0], tip: 0.1, more: 4 }
+    { flat: b.hero ? 0.92 : 0.8, side: [1, 0, 0], tip: b.hero ? 0.22 : 0.1, more: 4 }
   );
-  const strands: [number, number, number, number, string][] = [
-    [-0.03, 0.26, 0.024, 0.014, C.hairLight],
-    [0.032, 0.3, 0.022, -0.004, C.hairDark],
-    [-0.012, 0.36, 0.022, 0.03, C.hairLight],
-    [0.014, 0.21, 0.02, 0.034, C.hair],
-    [-0.04, 0.19, 0.016, -0.006, C.hairDark]
-  ];
-  for (const [x, length, r, out, color] of strands.slice(0, tier(b, 1, 3, 5))) {
+  // [x, length, radius, out (toward the back), color]
+  const strands: [number, number, number, number, string][] = b.hero
+    ? [
+        [-0.022, 0.29, 0.027, 0.012, C.hairLight],
+        [0.022, 0.31, 0.026, 0.0, C.hairDark],
+        [-0.006, 0.36, 0.026, 0.022, C.hairLight],
+        [0.012, 0.25, 0.024, 0.026, C.hair],
+        [-0.026, 0.23, 0.022, -0.006, C.hairDark],
+        [0.026, 0.26, 0.022, 0.014, C.hairLight],
+        [0.004, 0.33, 0.024, -0.014, C.hairDark],
+        [-0.014, 0.31, 0.023, -0.01, C.hair],
+        [0.016, 0.34, 0.022, 0.018, C.hair]
+      ]
+    : [
+        [-0.03, 0.26, 0.024, 0.014, C.hairLight],
+        [0.032, 0.3, 0.022, -0.004, C.hairDark],
+        [-0.012, 0.36, 0.022, 0.03, C.hairLight]
+      ];
+  for (const [x, length, r, out, color] of strands.slice(0, tier(b, 1, 3, 9))) {
     lock(
       'dangleHead',
       [
@@ -192,7 +230,7 @@ function ponytail(b: PartSet, lock: Lock) {
       ],
       r,
       color,
-      { flat: 0.8, side: [1, 0, 0], tip: 0.08, more: 3 }
+      { flat: b.hero ? 0.9 : 0.8, side: [1, 0, 0], tip: b.hero ? 0.3 : 0.08, more: 3 }
     );
   }
 }
@@ -264,8 +302,9 @@ const SMIRK: [number, number][] = [
 /** The smirk drawn here instead of by the shared face, so the lower lip sits centred under it and follows its lift. */
 export function smirk(b: PartSet) {
   const at = (x: number, y: number, out: number): V3 => [x, y, S.loftFrontZ(HEAD, x, y) - out];
-  const points = SMIRK.map(([x, y]) => at(x, y, 0.0015));
-  b.add('head', S.tube(points, 0.0042, b.hero ? 14 : 8, b.hero ? 8 : 5), C.mouth, { look: 'skin' });
-  for (const p of [points[0]!, points[points.length - 1]!]) orb(b, 'head', 0.0044, b.hero ? 8 : 5, C.mouth, { at: p, look: 'skin' });
-  orb(b, 'head', 0.011, b.hero ? 10 : 6, C.lip, { at: at(0.002, -0.0187, -0.0052), rot: [0, 0, 0.12], scale: [1.45, 0.42, 0.5], look: 'skin' });
+  // A painted line: a flat band lying in the skin, proud of it by under a millimetre, so the profile stays clean.
+  const points = SMIRK.map(([x, y]) => at(x, y, -0.0006));
+  const width = (t: number) => 0.0034 * (1 - 0.45 * Math.abs(2 * t - 1) ** 2);
+  b.add('head', strand(points, width, { flat: 0.4, side: [0, 1, 0], seg: b.hero ? 16 : 8, radial: b.hero ? 10 : 6 }), C.mouth, { look: 'skin' });
+  orb(b, 'head', 0.011, b.hero ? 12 : 6, C.lip, { at: at(0.002, -0.0178, -0.0036), rot: [0, 0, 0.12], scale: [1.4, 0.38, 0.38], look: 'skin' });
 }
