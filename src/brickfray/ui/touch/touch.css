@@ -257,21 +257,44 @@ html.bf-touch .bf-scoreboard > * {
     --bf-fit: 0.62;
   }
 }
+/* Zoomed down that far, the cards' words would be 7–9 px: they get larger type and a shorter picture band instead,
+   so nothing on them reads under about 10 px. */
+@media (max-height: 560px) {
+  html.bf-touch .bf-pick .bf-card-art {
+    height: 92px;
+  }
+  html.bf-touch .bf-pick .bf-card-fx {
+    font-size: 19px;
+  }
+  html.bf-touch .bf-pick .bf-card-delta {
+    font-size: 17px;
+  }
+  html.bf-touch .bf-pick .bf-card-level {
+    font-size: 16px;
+    letter-spacing: 0.02em;
+  }
+  html.bf-touch .bf-pick .bf-pick-hint {
+    font-size: 19px;
+  }
+  html.bf-touch .bf-pick .bf-pick-auto {
+    font-size: 17px;
+  }
+}
 
 /* Menus by touch: every target at least 44 px, sliders with a thumb-sized grip. */
 html.bf-touch .bf-seg button {
   min-height: 44px;
 }
 html.bf-touch .bf-range {
-  height: 10px;
+  --thumb: 30px;
+  height: 44px;
 }
-html.bf-touch .bf-range::-webkit-slider-thumb {
-  width: 30px;
-  height: 30px;
+html.bf-touch .bf-ticks {
+  --thumb: 30px;
 }
-html.bf-touch .bf-range::-moz-range-thumb {
-  width: 30px;
-  height: 30px;
+html.bf-touch .bf-board-pager .bf-icon-btn {
+  width: 44px;
+  height: 44px;
 }
 html.bf-touch .bf-setting {
   min-height: 44px;

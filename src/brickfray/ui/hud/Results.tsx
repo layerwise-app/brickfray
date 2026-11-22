@@ -3,7 +3,7 @@ import type { ScoreRow } from '../../game/hud';
 import { useGame, useHud } from '../App';
 import { TrophyIcon } from '../board/icons';
 import { useT } from '../i18n';
-import { CrownIcon, DoorIcon, PlayIcon, SkullIcon, UsersIcon } from '../icons';
+import { CrownIcon, DoorIcon, PlayIcon, SkullIcon } from '../icons';
 import { awardMedals, MedalIcon, type Medal } from './Medal';
 import { Podium } from './Podium';
 import { UnlockStrip } from '../achievements/UnlockStrip';
@@ -41,7 +41,7 @@ export function Results() {
   const mode = hud.settings?.mode;
   const solo = mode === 'solo';
   const teams = mode === 'tdm';
-  const rows = standings(hud.rows, mode, hud.winner);
+  const rows = standings(hud.rows);
   const medals = awardMedals(rows);
   const place = rows.findIndex((r) => r.me);
   const me = place >= 0 ? rows[place]! : null;
@@ -201,15 +201,15 @@ function MyLine({ row, medals, outcome }: { row: ScoreRow; medals: Medal[]; outc
   );
 }
 
-/** The room goes back to its lobby on its own: the seconds left as a ring that empties. */
+/** The room goes back to its lobby on its own: said in words, the seconds left as a ring that empties. */
 function LobbyRing({ left }: { left: number }) {
   const { t } = useT();
   const [total] = useState(() => Math.max(1, left));
   const n = Math.max(0, Math.ceil(left));
   const c = 2 * Math.PI * 15;
   return (
-    <span className='bf-lobby-ring' role='timer' aria-label={t('backToLobby', { n })} title={t('backToLobby', { n })}>
-      <UsersIcon size={20} />
+    <span className='bf-lobby-ring' role='timer' aria-label={t('backToLobby', { n })}>
+      <span className='bf-lobby-words'>{t('results.lobby')}</span>
       <span className='bf-lobby-dial'>
         <svg viewBox='0 0 36 36' aria-hidden>
           <circle cx='18' cy='18' r='15' />

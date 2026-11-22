@@ -1,6 +1,7 @@
 import { createAudioEngine } from '../audio';
 import { CueSounds } from '../audio/cue-sounds';
 import type { AudioEngine } from '../audio/types';
+import { CHARACTER_IDS } from '../characters/roster';
 import type { CharacterId } from '../characters/types';
 import type { Kit } from '../engine/kit';
 import { GameRenderer } from '../engine/renderer';
@@ -84,7 +85,7 @@ export class Game {
           if (this.disposed) return false;
           this.app.set({ portraits: { ...this.app.state.portraits, [id]: url } });
           return true;
-        });
+        }).then(() => this.prewarmHeroes());
       })
     );
     this.input = new Input(canvas, settings.input);
@@ -163,6 +164,19 @@ export class Game {
     this.audio.playMusic?.('menu');
     await this.audio.unlock();
     this.app.set({ audioReady: true });
+  }
+
+  /** In idle time on the menu, every other hero is built once so that no first pick stalls a frame. */
+  private async prewarmHeroes() {
+    for (const id of CHARACTER_IDS) {
+      await idle();
+      if (this.disposed || this.match || id === this.settings.character) continue;
+      await this.showroom.prewarm(id);
+      if (this.disposed || this.match) continue;
+      // The first-person view keeps one hero's arms and sidearms; build this one's, then put back the one in play.
+      this.view.setCharacter(id);
+      this.view.setCharacter(this.settings.character);
+    }
   }
 
   setCharacter(id: CharacterId) {
@@ -456,3 +470,10 @@ export class Game {
   }
 }
 
+/** Resolves in the browser's next idle period (a short wait where there is none). */
+function idle() {
+  return new Promise<void>((resolve) => {
+    if ('requestIdleCallback' in window) requestIdleCallback(() => resolve(), { timeout: 2000 });
+    else setTimeout(resolve, 250);
+  });
+}

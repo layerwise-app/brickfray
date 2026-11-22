@@ -22,12 +22,6 @@
     opacity: 0;
   }
 }
-/* Chinese, Japanese and Korean fall back from the display face to the system's: ask for its bold, without faking a
-   bold Lilita for the digits and Latin letters among them. */
-:root:is(:lang(zh), :lang(ja), :lang(ko)) .bf-results .bf-display {
-  font-weight: 700;
-  font-synthesis: none;
-}
 /* Entrance: everything marked bf-in pops in after its own delay unless its class gives it a better move. */
 .bf-in {
   animation: bf-pop-in 0.45s cubic-bezier(0.2, 1.4, 0.4, 1) var(--in-d, 0s) both;
@@ -270,13 +264,18 @@
 .bf-lobby-ring {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   height: max(44px, calc(54 * var(--u)));
-  padding: 0 6px 0 14px;
+  padding: 0 6px 0 18px;
   border-radius: 999px;
   color: rgba(255, 255, 255, 0.8);
   background: rgba(255, 255, 255, 0.08);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+}
+.bf-lobby-words {
+  font-size: max(13px, calc(16 * var(--u)));
+  font-weight: 700;
+  white-space: nowrap;
 }
 .bf-lobby-dial {
   position: relative;

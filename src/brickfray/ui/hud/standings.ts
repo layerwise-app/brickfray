@@ -1,17 +1,10 @@
 import type { ScoreRow } from '../../game/hud';
-import type { MatchSettings } from '../../sim/types';
+import { byStanding } from '../../sim/match';
 import type { Lang } from '../i18n';
 
-/**
- * The final order of a room: by score, then kills (the board's and the stored score panel's order), except that the
- * free-for-all winner, who reached the kill limit or led on kills at the bell, is always first.
- */
-export function standings(rows: readonly ScoreRow[], mode: MatchSettings['mode'] | undefined, winner: number | null): ScoreRow[] {
-  const sorted = [...rows];
-  if (mode !== 'ffa' || winner === null) return sorted;
-  const at = sorted.findIndex((r) => r.id === winner);
-  if (at > 0) sorted.unshift(...sorted.splice(at, 1));
-  return sorted;
+/** The final order of a room, the host's own rule (it names the winner by it too): points, then kills, then fewer deaths. */
+export function standings(rows: readonly ScoreRow[]): ScoreRow[] {
+  return [...rows].sort(byStanding);
 }
 
 /** The leaderboard moments: number one, the top 10, the top 100; nothing below. */

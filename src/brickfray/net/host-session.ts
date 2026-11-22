@@ -127,6 +127,7 @@ export class HostSession {
         link.character = m.character;
         link.token = String(m.token).slice(0, 64);
         this.links.set(link.id, link);
+        this.fitSeats();
         this.send(link, { t: 'welcome', id: link.id, lobby: this.lobbyState() });
         if (this.match) this.joinMatch(link);
         this.changed();
@@ -204,7 +205,14 @@ export class HostSession {
 
   setSettings(settings: Partial<MatchSettings>) {
     this.lobby.settings = { ...this.lobby.settings, ...settings };
+    this.fitSeats();
     this.changed();
+  }
+
+  /** A room is never smaller than the players already in it. */
+  private fitSeats() {
+    const s = this.lobby.settings;
+    if (s.mode !== 'solo' && s.seats < this.humanCount()) this.lobby.settings = { ...s, seats: Math.min(MATCH.maxPlayers, this.humanCount()) };
   }
 
   start() {

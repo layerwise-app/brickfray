@@ -1,0 +1,23 @@
+/** Room lobby seats, results and HUD captions, the death card, the pause card and the not-found page. */
+export const playEn = {
+  'col.kills': 'Kills',
+  'col.deaths': 'Deaths',
+  'col.assists': 'Assists',
+  'col.score': 'Score',
+  'col.headshots': 'Headshots',
+  'col.accuracy': 'Accuracy',
+  'col.time': 'Time',
+  'col.ping': 'Ping',
+  'results.lobby': 'Back to lobby',
+  'rule.ffa': 'First to {n} kills ends the match. Most points wins.',
+  'rule.tdm': 'First team to {n} kills wins.',
+  'lobby.size': 'Room size',
+  'lobby.count': '{h} + {b} bots',
+  'lobby.open': 'Open seat',
+  'death.health': 'Health left',
+  'death.streak': 'Streak',
+  'paused.title': 'Paused',
+  'notFound.title': 'Nothing to build here',
+  'notFound.body': 'This page doesn’t exist.',
+  'notFound.home': 'Back to the game'
+} as const;

@@ -135,7 +135,7 @@ function Cards({ offer }: { offer: UpgradeOffer }) {
         ))}
       </div>
       <div className='flex flex-col items-center gap-2' style={{ opacity: picked ? 0 : 1, transition: 'opacity .2s' }}>
-        <div className='bf-hud-text flex items-center gap-2 text-base font-semibold text-white/85'>
+        <div className='bf-pick-hint bf-hud-text flex items-center gap-2 text-base font-semibold text-white/85'>
           {!touch &&
             offer.options.map((_, i) => (
               <span key={i} className='bf-display grid h-7 w-7 place-items-center rounded-md bg-white/15 text-lg leading-none shadow-[inset_0_-2px_0_rgba(0,0,0,.3)]'>
@@ -147,7 +147,7 @@ function Cards({ offer }: { offer: UpgradeOffer }) {
         <div className='bf-hud-text bf-display text-2xl text-[var(--bf-yellow)]' style={{ visibility: !touch && marked !== null && marked === hovered ? 'visible' : 'hidden' }}>
           {t('upgrade.again', { n: (marked ?? 0) + 1 })}
         </div>
-        <div className='flex items-center gap-3 text-sm font-semibold text-white/70' style={{ visibility: waiting ? 'visible' : 'hidden' }}>
+        <div className='bf-pick-auto flex items-center gap-3 text-sm font-semibold text-white/70' style={{ visibility: waiting ? 'visible' : 'hidden' }}>
           <span className='bf-hud-text tabular-nums'>{t('upgrade.auto', { n: Math.ceil(hud.phaseLeft) })}</span>
           <span className='h-1.5 w-40 overflow-hidden rounded-full bg-black/45'>
             <span className='block h-full rounded-full bg-white/70' style={{ width: `${Math.min(1, hud.phaseLeft / PICK_TIME) * 100}%` }} />
@@ -183,7 +183,7 @@ function Card({ id, index, offer, character, armor, state, setRef }: { id: Upgra
       }}
     >
       <div
-        className='relative grid h-[clamp(118px,13vw,156px)] place-items-center rounded-t-[22px]'
+        className='bf-card-art relative grid h-[clamp(118px,13vw,156px)] place-items-center rounded-t-[22px]'
         style={{ background: `linear-gradient(180deg, color-mix(in srgb, ${look.color} 82%, white) 0%, ${look.color} 55%)`, boxShadow: 'inset 0 3px 0 rgba(255,255,255,.35), inset 0 -6px 0 rgba(0,0,0,.18)' }}
       >
         <span
@@ -201,7 +201,7 @@ function Card({ id, index, offer, character, armor, state, setRef }: { id: Upgra
       </div>
       <div className='flex flex-1 flex-col items-center gap-2 px-4 pb-4 pt-3 text-center'>
         <span className='bf-display text-[clamp(21px,2vw,27px)] leading-tight'>{t(`upgrade.name.${id}`)}</span>
-        <span className='text-[clamp(15px,1.35vw,18px)] font-bold leading-snug text-[var(--bf-yellow)]'>{t(text.effect.key, text.effect.vars)}</span>
+        <span className='bf-card-fx text-[clamp(15px,1.35vw,18px)] font-bold leading-snug text-[var(--bf-yellow)] [text-wrap:balance]'>{t(text.effect.key, text.effect.vars)}</span>
         <Detail parts={text.detail} />
         <div className='mt-auto flex items-center gap-1.5 pt-2'>
           {Array.from({ length: cap }, (_, i) => (
@@ -215,7 +215,7 @@ function Card({ id, index, offer, character, armor, state, setRef }: { id: Upgra
               }}
             />
           ))}
-          <span className='ml-1.5 text-xs font-semibold uppercase tracking-wider text-white/55'>{t('upgrade.level', { n: `${level + 1}/${cap}` })}</span>
+          <span className='bf-card-level ml-1.5 whitespace-nowrap text-xs font-semibold uppercase tracking-wider text-white/55'>{t('upgrade.level', { n: `${level + 1}/${cap}` })}</span>
         </div>
       </div>
     </div>
@@ -229,7 +229,7 @@ function Detail({ parts }: { parts: DetailPart[] }) {
     return unit === 'seconds' ? t('unit.seconds', { n }) : unit === 'perSecond' ? t('unit.perSecond', { n }) : unit === 'percent' ? `${n}%` : n;
   };
   return (
-    <div className='flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[15px] font-semibold tabular-nums text-white/70'>
+    <div className='bf-card-delta flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[15px] font-semibold tabular-nums text-white/70'>
       {parts.map((p, i) => (
         <span key={i} className='flex items-center gap-1.5'>
           {p.weapon && <WeaponIcon weapon={p.weapon} size={34} className='text-white/80' />}

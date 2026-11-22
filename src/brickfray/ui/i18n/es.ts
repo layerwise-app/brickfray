@@ -3,6 +3,7 @@ import { touchEs } from './touch/es';
 import { hudEs } from './hud/es';
 import { streaksEs } from './streaks/es';
 import { achievementsEs } from './achievements/es';
+import { playEs } from './play/es';
 import type { Dictionary } from './en';
 
 export const es: Dictionary = {
@@ -11,6 +12,7 @@ export const es: Dictionary = {
   ...hudEs,
   ...streaksEs,
   ...achievementsEs,
+  ...playEs,
   play: 'Jugar',
   playCaption: 'Partida en línea',
   solo: 'Solo',
@@ -50,7 +52,6 @@ export const es: Dictionary = {
   map: 'Mapa',
   timeLimit: 'Duración',
   minutes: '{n} min',
-  seats: 'Jugadores · los bots completan',
   start: 'Empezar',
   waitingForHost: 'Esperando al anfitrión…',
   leave: 'Salir',
@@ -124,7 +125,7 @@ export const es: Dictionary = {
   'upgrade.title': 'Elige una mejora',
   'upgrade.cleared': 'Oleada {n} superada',
   'upgrade.hint': 'o haz clic en una carta',
-  'upgrade.auto': 'Primera carta en {n} s',
+  'upgrade.auto': 'Elección automática en {n} s',
   'upgrade.rare': 'Rara',
   'upgrade.level': 'Nivel {n}',
   'upgrade.list': 'Mejoras',
@@ -144,7 +145,7 @@ export const es: Dictionary = {
   'upgrade.fx.grenades': '+{n} hueco de granada',
   'upgrade.fx.grenadeRefill': 'Granadas {n} s antes',
   'upgrade.fx.speed': 'Velocidad +{n}%',
-  'upgrade.fx.regen': 'Curación {s} s antes, +{n} de vida/s',
+  'upgrade.fx.regen': 'Curación {s}\u00a0s antes, +{n}\u00a0de\u00a0vida/s',
   'upgrade.fx.damage': 'Daño +{n}%',
   'upgrade.fx.armor': '+{n} de blindaje y curación completa',
   'unit.seconds': '{n} s',

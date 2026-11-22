@@ -156,6 +156,11 @@ export class StageSet {
     return this.fog;
   }
 
+  /** Builds `id`'s far set ahead of its first pick. */
+  prebuild(id: CharacterId) {
+    this.props.prebuild(id);
+  }
+
   setCharacter(id: CharacterId) {
     const palette = PALETTES[id];
     const u = this.wall.material.uniforms;

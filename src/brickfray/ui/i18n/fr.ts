@@ -3,6 +3,7 @@ import { touchFr } from './touch/fr';
 import { hudFr } from './hud/fr';
 import { streaksFr } from './streaks/fr';
 import { achievementsFr } from './achievements/fr';
+import { playFr } from './play/fr';
 import type { Dictionary } from './en';
 
 export const fr: Dictionary = {
@@ -11,6 +12,7 @@ export const fr: Dictionary = {
   ...hudFr,
   ...streaksFr,
   ...achievementsFr,
+  ...playFr,
   play: 'Jouer',
   playCaption: 'Partie en ligne',
   solo: 'Solo',
@@ -50,7 +52,6 @@ export const fr: Dictionary = {
   map: 'Carte',
   timeLimit: 'Durée',
   minutes: '{n} min',
-  seats: 'Joueurs · complétés par des bots',
   start: 'Lancer',
   waitingForHost: 'En attente de l’hôte…',
   leave: 'Quitter',
@@ -124,7 +125,7 @@ export const fr: Dictionary = {
   'upgrade.title': 'Choisis une amélioration',
   'upgrade.cleared': 'Vague {n} terminée',
   'upgrade.hint': 'ou clique sur une carte',
-  'upgrade.auto': 'Première carte choisie dans {n} s',
+  'upgrade.auto': 'Choix automatique dans {n} s',
   'upgrade.rare': 'Rare',
   'upgrade.level': 'Niveau {n}',
   'upgrade.list': 'Améliorations',
@@ -144,7 +145,7 @@ export const fr: Dictionary = {
   'upgrade.fx.grenades': '+{n} emplacement de grenade',
   'upgrade.fx.grenadeRefill': 'Grenades rendues {n} s plus tôt',
   'upgrade.fx.speed': 'Vitesse +{n} %',
-  'upgrade.fx.regen': 'Soin {s} s plus tôt, +{n} PV/s',
+  'upgrade.fx.regen': 'Soin {s}\u00a0s plus tôt, +{n}\u00a0PV/s',
   'upgrade.fx.damage': 'Dégâts +{n} %',
   'upgrade.fx.armor': '+{n} d’armure et soin complet',
   'unit.seconds': '{n} s',

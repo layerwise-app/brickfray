@@ -49,6 +49,11 @@ export class HeroDisplay {
    */
   outline = new Float32Array(0);
   private rig: CharacterRig | null = null;
+  /**
+   * The figure shown before this one, off stage. Its material goes one pick late: disposed while it is the only user of
+   * its shader program, the program is thrown away and the next figure links it again, a stalled frame on every pick.
+   */
+  private retired: CharacterRig | null = null;
   private life: HeroLife | null = null;
   private lids: Eyelids | null = null;
   private gun: WeaponModel | null = null;
@@ -94,8 +99,32 @@ export class HeroDisplay {
     this.group.add(this.figure, this.blob, this.contact.mesh, this.contact.camera);
   }
 
+  /** A throwaway build of `id`'s figure, weapons and lids as setCharacter makes them: it fills the shared caches ahead of a pick. */
+  ghost(id: CharacterId) {
+    const stance = STANCES[id];
+    const rig = createCharacter(id, this.kit, { hands: heroHands(id) });
+    rig.setStance(stance);
+    const gun = createWeaponModel(LOADOUTS[id].primary, this.kit, 'first');
+    rig.setWeapon(gun.root, gun.supportGrip);
+    const melee = stance.melee ? createWeaponModel(LOADOUTS[id].melee, this.kit, 'first') : null;
+    rig.setMelee(melee?.root ?? null);
+    measure(rig, rig.root);
+    const lids = rig instanceof Rig ? Eyelids.fit(rig) : null;
+    return {
+      root: rig.root,
+      dispose() {
+        lids?.dispose();
+        rig.dispose();
+        gun.dispose();
+        melee?.dispose();
+      }
+    };
+  }
+
   setCharacter(id: CharacterId) {
-    this.rig?.dispose();
+    this.retired?.dispose();
+    this.retired = this.rig;
+    this.rig?.root.removeFromParent();
     const stance = STANCES[id];
     this.rig = createCharacter(id, this.kit, { hands: heroHands(id) });
     this.rig.setStance(stance);
@@ -161,6 +190,7 @@ export class HeroDisplay {
 
   dispose() {
     this.lids?.dispose();
+    this.retired?.dispose();
     this.rig?.dispose();
     this.gun?.dispose();
     this.melee?.dispose();

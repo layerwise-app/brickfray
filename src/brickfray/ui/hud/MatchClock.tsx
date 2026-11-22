@@ -1,6 +1,9 @@
+import type { ScoreRow } from '../../game/hud';
 import { TEAM_COLORS } from '../../game/remotes';
+import { Avatar } from '../board/Avatar';
 import { useHud } from '../App';
 import { useT } from '../i18n';
+import { CrownIcon } from '../icons';
 import { BossBars, NextWave } from './SoloHud';
 
 /** In the last minute of a timed match the clock turns yellow and grows; over the last ten seconds it turns red. */
@@ -20,7 +23,10 @@ export function TopBar() {
   const mode = hud.settings?.mode;
   if (!mode) return null;
   const me = hud.rows.find((r) => r.me);
-  const leader = hud.rows[0];
+  // Free-for-all: the player against whoever is ahead of everyone else (the runner-up while the player leads).
+  const rival = hud.rows.find((r) => !r.me) ?? null;
+  const first = hud.rows[0]?.score ? hud.rows[0] : null;
+  const leading = !!me && first === me;
   // The wave banner announces the wave; the pill steps aside until it is gone so the number never shows twice.
   const announcing = mode === 'solo' && (!!hud.banner || (!!hud.offer && !hud.offer.picked));
   const timed = mode !== 'solo' && hud.phase === 'playing' && hud.phaseLeft > 0;
@@ -35,7 +41,7 @@ export function TopBar() {
         style={{ opacity: announcing ? 0 : 1, transition: 'opacity .3s ease', outline: lastMinute ? `2px solid ${final ? 'rgba(255,74,61,.85)' : 'rgba(255,205,46,.7)'}` : undefined, outlineOffset: -2 }}
       >
         {mode === 'tdm' && <Score value={hud.teamScore[0]} color={TEAM_COLORS[0]} highlight={hud.myTeam === 0} />}
-        {mode === 'ffa' && <Score value={me?.kills ?? 0} color='#ffcd2e' highlight />}
+        {mode === 'ffa' && <Side row={me ?? null} label={t('you')} crown={leading} color='#ffcd2e' />}
         <div className='flex min-w-24 items-center justify-center px-4'>
           <span
             key={final ? second : lastMinute ? 'last' : 'clock'}
@@ -46,7 +52,7 @@ export function TopBar() {
           </span>
         </div>
         {mode === 'tdm' && <Score value={hud.teamScore[1]} color={TEAM_COLORS[1]} highlight={hud.myTeam === 1} />}
-        {mode === 'ffa' && <Score value={leader && !leader.me ? leader.kills : (hud.rows[1]?.kills ?? 0)} color='#ffffff33' />}
+        {mode === 'ffa' && <Side row={rival} label={rival?.name ?? ''} crown={!!rival && first === rival} color='#ffffff33' portrait />}
       </div>
       {hud.phase === 'warmup' && hud.phaseLeft > 0 && (
         <div key={Math.ceil(hud.phaseLeft)} className='bf-pop mt-16 flex flex-col items-center'>
@@ -86,6 +92,20 @@ function Score({ value, color, highlight }: { value: number; color: string; high
   return (
     <div className='bf-display flex min-w-16 items-center justify-center px-3 text-3xl tabular-nums' style={{ background: color, color: highlight ? '#fff' : '#ffffffcc', textShadow: '0 2px 0 rgba(0,0,0,.35)' }}>
       {value}
+    </div>
+  );
+}
+
+/** One side of the free-for-all pill: a word (or the rival's face and name) over their points, a crown on the leader. */
+function Side({ row, label, crown, color, portrait }: { row: ScoreRow | null; label: string; crown: boolean; color: string; portrait?: boolean }) {
+  return (
+    <div className='flex min-w-20 max-w-40 flex-col items-center justify-center gap-0.5 px-3 py-1' style={{ background: color, textShadow: '0 2px 0 rgba(0,0,0,.35)' }}>
+      <span className='flex max-w-full items-center gap-1 text-[11px] font-bold uppercase leading-none tracking-[0.08em] text-white/90'>
+        {crown && <CrownIcon size={12} className='shrink-0 text-[var(--bf-yellow)]' />}
+        {portrait && row && <Avatar character={row.character} size={16} />}
+        <span className='truncate'>{label}</span>
+      </span>
+      <span className='bf-display text-[26px] leading-none tabular-nums text-white'>{row?.score ?? 0}</span>
     </div>
   );
 }

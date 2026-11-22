@@ -71,26 +71,29 @@ button.bf-board-tr:focus-visible {
   justify-content: flex-end;
   overflow: visible;
 }
+.bf-board-th .bf-stat-head {
+  align-items: flex-end;
+}
 .bf-board-list[data-cols='solo'] {
-  --cols: 34px minmax(0, 1fr) 50px 66px 52px 34px 54px 100px 44px;
+  --cols: 34px minmax(0, 1fr) 50px 66px 52px 84px 54px 100px 44px;
 }
 .bf-board-list[data-cols='solo'][data-onemap] {
-  --cols: 34px minmax(0, 1fr) 50px 66px 52px 34px 54px 44px;
+  --cols: 34px minmax(0, 1fr) 50px 66px 52px 84px 54px 44px;
 }
 .bf-board-list[data-cols='room'] {
-  --cols: 34px minmax(0, 1fr) 66px 38px 38px 38px 116px 100px;
+  --cols: 34px minmax(0, 1fr) 66px 60px 60px 60px 116px 100px;
 }
 .bf-board-list[data-cols='room'][data-onemap] {
-  --cols: 34px minmax(0, 1fr) 66px 38px 38px 38px 116px;
+  --cols: 34px minmax(0, 1fr) 66px 60px 60px 60px 116px;
 }
 .bf-board-list[data-onemap] [data-col='map'] {
   display: none;
 }
 .bf-board-list[data-cols='history'] {
-  --cols: minmax(0, 1fr) 116px 66px 42px 42px 42px 54px;
+  --cols: minmax(0, 1fr) 116px 66px 60px 60px 60px 54px;
 }
 .bf-board-list[data-cols='scoreboard'] {
-  --cols: 34px minmax(0, 1fr) 44px 44px 44px 70px;
+  --cols: 34px minmax(0, 1fr) 56px 56px 56px 70px;
 }
 .bf-board-tr[data-mine] {
   background: rgba(255, 205, 46, 0.14);
@@ -210,17 +213,17 @@ button.bf-board-tr[data-mine]:hover {
    what is inside the list, so the narrower --cols go on the rows. */
 @container (max-width: 720px) {
   .bf-board-list[data-cols='solo'] .bf-board-tr {
-    --cols: 34px minmax(0, 1fr) 50px 66px 52px 34px 54px 100px;
+    --cols: 34px minmax(0, 1fr) 50px 66px 52px 84px 54px 100px;
   }
   .bf-board-list[data-cols='solo'][data-onemap] .bf-board-tr {
-    --cols: 34px minmax(0, 1fr) 50px 66px 52px 34px 54px;
+    --cols: 34px minmax(0, 1fr) 50px 66px 52px 84px 54px;
   }
   .bf-board-list[data-cols='solo'] [data-col='hero'] {
     display: none;
   }
   .bf-board-list[data-cols='room'] .bf-board-tr,
   .bf-board-list[data-cols='room'][data-onemap] .bf-board-tr {
-    --cols: 34px minmax(0, 1fr) 66px 38px 38px 38px 116px;
+    --cols: 34px minmax(0, 1fr) 66px 60px 60px 60px 116px;
   }
   .bf-board-list[data-cols='room'] [data-col='map'] {
     display: none;
@@ -236,13 +239,13 @@ button.bf-board-tr[data-mine]:hover {
   }
   .bf-board-list[data-cols='room'] .bf-board-tr,
   .bf-board-list[data-cols='room'][data-onemap] .bf-board-tr {
-    --cols: 30px minmax(0, 1fr) 62px 38px 38px 38px 108px;
+    --cols: 30px minmax(0, 1fr) 62px 56px 56px 56px 108px;
   }
   .bf-board-list[data-cols='room'] [data-col='map'] {
     display: none;
   }
   .bf-board-list[data-cols='history'] .bf-board-tr {
-    --cols: minmax(0, 1fr) 108px 62px 38px 38px 38px;
+    --cols: minmax(0, 1fr) 108px 62px 56px 56px 56px;
   }
   .bf-board-list[data-cols='history'] [data-col='time'] {
     display: none;
@@ -281,7 +284,10 @@ button.bf-board-tr[data-mine]:hover {
     white-space: normal;
   }
   .bf-board-list[data-cols='scoreboard'] .bf-board-tr {
-    --cols: 22px minmax(0, 1fr) 26px 26px 26px 56px;
+    --cols: 22px minmax(0, 1fr) 44px 44px 44px 56px;
+  }
+  .bf-board-list[data-cols='scoreboard'][data-teams] .bf-board-tr {
+    --cols: minmax(0, 1fr) 44px 44px 44px 56px;
   }
   .bf-board-who {
     gap: 8px;

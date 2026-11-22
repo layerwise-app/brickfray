@@ -6,6 +6,7 @@ import { flushMatches } from '../../../lib/board/client/sync';
 import type { BoardEntry, BoardPlayer, HistoryTotals } from '../../../lib/board/contract';
 import { useGame } from '../App';
 import { useT, type Lang } from '../i18n';
+import { StatHead } from '../hud/stat-head';
 import { Avatar } from './Avatar';
 import { clock, mapName, number, outcome, playTime, when } from './format';
 import { BOARD, usePlayerId } from './me';
@@ -37,14 +38,14 @@ export function History({ player, onOpen }: { player: BoardPlayer | null; onOpen
   const data = history.data;
   const waiting = data && !data.offline ? pendingMatches().length : 0;
   const open = (m: BoardEntry) => onOpen({ id: m.id, entry: m, player, local: m.id < 0 ? localDetail(m.id) : undefined });
-  const head: Record<Column, string> = {
+  const head: Record<Column, React.ReactNode> = {
     match: t('board.col.match'),
     result: t('board.col.result'),
-    score: t('score'),
-    kills: t('board.col.k'),
-    deaths: t('board.col.d'),
-    assists: t('board.col.a'),
-    time: t('board.col.time')
+    score: <StatHead stat='score' size={14} />,
+    kills: <StatHead stat='kills' size={14} />,
+    deaths: <StatHead stat='deaths' size={14} />,
+    assists: <StatHead stat='assists' size={14} />,
+    time: <StatHead stat='time' size={14} />
   };
 
   return (

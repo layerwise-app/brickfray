@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { ROSTER } from '../characters/roster';
 import { MATCH } from '../sim/constants';
 import { DIFFICULTIES, type MatchSettings } from '../sim/types';
 import { mapPreview } from './map-preview';
 import { useApp, useGame } from './App';
 import { useT } from './i18n';
-import { CopyIcon, CrownIcon, DoorIcon, PlayIcon } from './icons';
+import { Avatar } from './board/Avatar';
+import { CopyIcon, DoorIcon, PlayIcon } from './icons';
+import { LobbySeats } from './LobbySeats';
 import { SnapbotPrimer, SoloBrief } from './hud/SoloBrief';
 
 const MAPS = ['plaza', 'fortress', 'docks', 'temple'] as const;
@@ -101,36 +102,28 @@ export function Lobby() {
                   ))}
                 </div>
               </Field>
-              <Field label={`${t('seats')} · ${s.seats}`}>
-                <input
-                  type='range'
-                  className='bf-range mt-3'
-                  min={1}
-                  max={MATCH.maxPlayers}
-                  value={s.seats}
-                  disabled={!host}
-                  style={{ ['--fill' as string]: `${((s.seats - 1) / (MATCH.maxPlayers - 1)) * 100}%` }}
-                  onChange={(e) => set({ seats: Number(e.target.value) })}
-                />
-              </Field>
+              <SeatsSlider seats={s.seats} min={Math.max(1, lobby.players.length)} disabled={!host} onSeats={(seats) => set({ seats })} />
             </div>
             )}
           </section>
 
           <section className='bf-panel bf-studs flex flex-col gap-3 p-5'>
-            <div className='flex items-baseline justify-between'>
+            <div className='flex items-baseline justify-between gap-3'>
               <h2 className='bf-display text-2xl'>{solo ? t('soloCaption') : t('players')}</h2>
-              {!solo && <span className='bf-display text-xl text-[var(--bf-muted)]'>{lobby.players.length}/10</span>}
+              {!solo && <SeatCount humans={lobby.players.length} seats={s.seats} />}
             </div>
-            <ul className='flex flex-col gap-2'>
-              {lobby.players.map((p) => (
-                <li key={p.id} className='flex items-center gap-3 rounded-xl bg-white/5 px-3 py-2'>
-                  <span className='h-8 w-8 rounded-lg' style={{ background: `linear-gradient(160deg, ${ROSTER[p.character].primary} 0 58%, ${ROSTER[p.character].secondary} 58%)` }} />
-                  <span className='font-semibold'>{p.name}</span>
-                  {p.host && !solo && <CrownIcon size={18} className='ml-auto text-[var(--bf-yellow)]' aria-label={t('host')} />}
-                </li>
-              ))}
-            </ul>
+            {solo ? (
+              <ul className='flex flex-col gap-2'>
+                {lobby.players.map((p) => (
+                  <li key={p.id} className='flex items-center gap-3 rounded-xl bg-white/5 px-3 py-2'>
+                    <Avatar character={p.character} size={32} />
+                    <span className='font-semibold'>{p.name}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <LobbySeats players={lobby.players} settings={s} />
+            )}
             {solo && <SoloBrief settings={s} />}
             <div className='mt-auto pt-3'>
               {host ? (
@@ -154,6 +147,51 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
     <div className='flex flex-col gap-2'>
       <div className='text-xs font-semibold uppercase tracking-[0.2em] text-[var(--bf-muted)]'>{label}</div>
       {children}
+    </div>
+  );
+}
+
+/** "1 + 5 bots / 6": players in the room, the bots that will fill the other seats, and the room's size. */
+function SeatCount({ humans, seats }: { humans: number; seats: number }) {
+  const { t } = useT();
+  const size = Math.max(humans, Math.min(seats, MATCH.maxPlayers));
+  const bots = size - humans;
+  return (
+    <span className='bf-display whitespace-nowrap text-xl text-[var(--bf-muted)]'>
+      {bots ? t('lobby.count', { h: humans, b: bots }) : humans} / {size}
+    </span>
+  );
+}
+
+/** The room's size, 1 to 10, never below the players already in it: the number large, a tick for every size. */
+function SeatsSlider({ seats, min, disabled, onSeats }: { seats: number; min: number; disabled: boolean; onSeats: (seats: number) => void }) {
+  const { t } = useT();
+  const max = MATCH.maxPlayers;
+  const value = Math.max(min, Math.min(max, seats));
+  return (
+    <div className='flex flex-col gap-1'>
+      <div className='flex items-baseline justify-between gap-3'>
+        <span className='text-xs font-semibold uppercase tracking-[0.2em] text-[var(--bf-muted)]'>{t('lobby.size')}</span>
+        <span className='bf-display text-4xl leading-none text-[var(--bf-yellow)]'>{value}</span>
+      </div>
+      <input
+        type='range'
+        className='bf-range'
+        min={1}
+        max={max}
+        value={value}
+        disabled={disabled}
+        aria-label={t('lobby.size')}
+        style={{ ['--fill' as string]: `${((value - 1) / (max - 1)) * 100}%` }}
+        onChange={(e) => onSeats(Math.max(min, Number(e.target.value)))}
+      />
+      <div className='bf-ticks' aria-hidden>
+        {Array.from({ length: max }, (_, i) => (
+          <span key={i} data-off={i + 1 < min || undefined} data-on={i + 1 === value || undefined}>
+            {i + 1}
+          </span>
+        ))}
+      </div>
     </div>
   );
 }

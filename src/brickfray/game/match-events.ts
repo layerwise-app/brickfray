@@ -3,11 +3,13 @@ import type { ShatterPiece } from '../characters/types';
 import { PLASTIC } from '../engine/palette';
 import type { GameEvent, ShotTrace } from '../sim/types';
 import { magSize } from '../sim/arms';
+import { PLAYER } from '../sim/constants';
+import { byStanding } from '../sim/match';
 import { waveTuning } from '../sim/waves';
 import { WEAPONS } from '../weapons/defs';
 import { LOADOUTS } from '../weapons/loadouts';
 import { countChain, countKill, noFeats } from '../../lib/achievements/feats';
-import type { FeedEntry, ScoreRow } from './hud';
+import type { FeedEntry, KillerCard, ScoreRow } from './hud';
 import type { MatchView } from './match-view';
 
 const FEED_LIFE = 6;
@@ -36,6 +38,8 @@ export class MatchEvents {
   private hudTimer = 0;
   /** The local player's own record of the match for the HUD: headshot kills, shots fired and landed, seconds played. */
   private mine = { headshots: 0, shots: 0, hit: 0, time: 0, feats: noFeats() };
+  /** Everyone's kills since their last death, from the kill events this client has seen (the death plate's streak). */
+  private streaks = new Map<number, number>();
 
   constructor(private readonly mv: MatchView) {}
 
@@ -47,6 +51,7 @@ export class MatchEvents {
     this.clock = from.clock;
     this.offerUntil = from.offerUntil;
     this.mine = from.mine;
+    this.streaks = from.streaks;
   }
 
   private name(id: number) {
@@ -55,6 +60,14 @@ export class MatchEvents {
 
   private team(id: number) {
     return this.mv.session.roster.get(id)?.team ?? -1;
+  }
+
+  /** The killer as the latest snapshot shows them; null for a killer no longer in the roster. */
+  private killerCard(id: number): KillerCard | null {
+    const entry = this.mv.session.roster.get(id);
+    if (!entry) return null;
+    const seen = this.mv.session.snapshots.at(-1)?.players.find((p) => p.id === id);
+    return { character: entry.character, health: seen ? seen.health : null, maxHealth: PLAYER.health, streak: this.streaks.get(id) ?? 1 };
   }
 
   /** Remote players' shots: tracer from their gun, impacts and their sound near the listener, the shot with distance, a whiz if it passed close. */
@@ -117,6 +130,8 @@ export class MatchEvents {
           break;
         }
         case 'kill': {
+          this.streaks.set(e.victim, 0);
+          if (e.killer !== e.victim) this.streaks.set(e.killer, (this.streaks.get(e.killer) ?? 0) + 1);
           const victim = mv.remotes.map.get(e.victim);
           if (victim) {
             const impulse = victim.position.clone().sub(mv.fp.camera.position).setY(0).normalize().multiplyScalar(e.weapon === 'grenade' ? 7 : 3.5);
@@ -134,7 +149,7 @@ export class MatchEvents {
             mv.deathCam = { at: mv.fp.camera.position.clone(), killer: e.killer, t: 0 };
             mv.play('death', null, 1, 9);
             mv.hud.set({
-              death: { killer: e.killer === me ? '' : this.name(e.killer), weapon: e.weapon, respawnAt: e.respawnAt },
+              death: { killer: e.killer === me ? '' : this.name(e.killer), weapon: e.weapon, respawnAt: e.respawnAt, by: e.killer === me ? null : this.killerCard(e.killer) },
               respawnLeft: e.respawnAt !== null ? Math.max(0, e.respawnAt - mv.session.hostNow()) : -1
             });
           }
@@ -360,6 +375,6 @@ export class MatchEvents {
         const s = stats.get(e.id);
         return { id: e.id, name: e.name, character: e.character, team: e.team, kills: s?.kills ?? 0, deaths: s?.deaths ?? 0, assists: s?.assists ?? 0, score: s?.score ?? 0, ping: s?.ping ?? 0, me: e.id === mv.session.you, bot: !!e.bot, bounty: s?.bounty ?? 0 };
       })
-      .sort((a, b) => b.score - a.score || b.kills - a.kills);
+      .sort(byStanding);
   }
 }

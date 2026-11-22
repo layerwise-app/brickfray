@@ -2,8 +2,7 @@ import { useEffect, useState, type CSSProperties } from 'react';
 import type { Outcome } from '../../../lib/board/client/outcome';
 import { useGame } from '../App';
 import { useT } from '../i18n';
-import { Badge, metalOf, roman } from './Badge';
-import { achievement } from '../../../lib/achievements/catalogue';
+import { Badge, metalOf, TierPips } from './Badge';
 import { achievementName, useNews } from './model';
 import { newTiers } from './showcase';
 import './achievements.css';
@@ -19,9 +18,10 @@ const STAY = 5.5;
 const started = new Map<string, number>();
 
 /**
- * The tiers a match unlocked, as toasts in the top corner once its upload is stored: up to three, newest tier of each
- * achievement only, the rest counted in a last toast. A short box (a phone) shows the first alone, counting the others
- * in it. One shimmer sound for the lot.
+ * The tiers a solo run left early unlocked, as toasts in the top corner of the menu once its upload is stored (a
+ * finished match shows them on its results strip instead): up to three, newest tier of each achievement only, the
+ * rest counted in a last toast. A short box (a phone) shows the first alone, counting the others in it. One shimmer
+ * sound for the lot.
  */
 export function UnlockToasts({ outcome }: { outcome: Outcome | null }) {
   const game = useGame();
@@ -58,10 +58,8 @@ export function UnlockToasts({ outcome }: { outcome: Outcome | null }) {
             <Badge id={u.id} tier={u.tier} size={46} />
             <span className='bf-ach-toast-text'>
               <small>{t('ach.unlocked')}</small>
-              <b className='bf-display'>
-                {achievementName(t, u.id)}
-                {achievement(u.id).tiers.length > 1 && <em>{roman(u.tier)}</em>}
-              </b>
+              <b className='bf-display'>{achievementName(t, u.id)}</b>
+              <TierPips id={u.id} tier={u.tier} />
             </span>
             {i === 0 && shown.length + more > 1 && <span className='bf-display bf-ach-toast-count'>+{shown.length + more - 1}</span>}
           </div>

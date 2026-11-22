@@ -1,17 +1,34 @@
-import { useEffect, useRef } from 'react';
+import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { achievement, CATEGORIES, type Category } from '../../../lib/achievements/catalogue';
 import type { AchievementState, AchievementsPage as PageData } from '../../../lib/achievements/contract';
 import { number } from '../board/format';
 import { useAccount } from '../board/me';
 import { useT } from '../i18n';
 import { BackIcon } from '../icons';
-import { Badge, metalOf, roman } from './Badge';
+import { Badge, metalOf, TierPips } from './Badge';
 import { achievementHow, achievementName, day, useAchievements } from './model';
 import './achievements.css';
 
-/** Every achievement by category: locked ones show their goal, reached tiers their colour and date. */
+const SEEN = 'brickfray.achievementsSeen';
+/** On a first visit with no record, tiers reached within this long count as new. */
+const FIRST_VISIT = 24 * 3600 * 1000;
+
+/** When the player last opened this page; tiers reached after it are new to them. */
+function lastSeen() {
+  try {
+    const at = Number(localStorage.getItem(SEEN));
+    return at > 0 ? at : Date.now() - FIRST_VISIT;
+  } catch {
+    return Infinity;
+  }
+}
+
+const Seen = createContext(Infinity);
+
+/** Every achievement by category: locked ones show their goal, reached tiers their colour and date, new ones a glow. */
 export default function AchievementsPage({ onClose }: { onClose: () => void }) {
   const { t } = useT();
+  const [seen] = useState(lastSeen);
   const query = useAchievements();
   const signedIn = useAccount().data?.signedIn ?? true;
   const panel = useRef<HTMLElement>(null);
@@ -25,6 +42,15 @@ export default function AchievementsPage({ onClose }: { onClose: () => void }) {
 
   // Focus moves into the dialog so the keyboard (and a screen reader) starts there.
   useEffect(() => panel.current?.focus(), []);
+
+  // Storage is the external system: once the page has been open, what it shows is no longer new.
+  useEffect(() => {
+    try {
+      localStorage.setItem(SEEN, String(Date.now()));
+    } catch {
+      // Without storage every visit highlights the same tiers; the page still works.
+    }
+  }, []);
 
   return (
     <div className='bf-ach-backdrop' onClick={onClose}>
@@ -40,7 +66,11 @@ export default function AchievementsPage({ onClose }: { onClose: () => void }) {
         </header>
         <div className='bf-ach-list bf-scroll' data-fetching={query.isFetching || undefined}>
           {data ? (
-            CATEGORIES.map((category) => <Section key={category} category={category} items={data.items.filter((a) => achievement(a.id).category === category)} />)
+            <Seen.Provider value={seen}>
+              {CATEGORIES.map((category) => (
+                <Section key={category} category={category} items={data.items.filter((a) => achievement(a.id).category === category)} />
+              ))}
+            </Seen.Provider>
           ) : query.isPending ? (
             <div className='bf-ach-state'>
               <div className='bf-spinner' />
@@ -93,22 +123,30 @@ function Section({ category, items }: { category: Category; items: AchievementSt
 
 function Card({ item }: { item: AchievementState }) {
   const { t, lang } = useT();
+  const seen = useContext(Seen);
   const def = achievement(item.id);
   const tier = item.unlocked.filter((d) => d !== null).length;
   const complete = tier === def.tiers.length;
   const goal = def.tiers[Math.min(tier, def.tiers.length - 1)]!;
   const fill = complete ? 1 : Math.min(1, item.value / goal);
   const latest = tier ? item.unlocked[tier - 1] : null;
+  const fresh = !!latest && latest > seen;
   const metal = metalOf(item.id, tier);
   const next = metalOf(item.id, Math.min(tier + 1, def.tiers.length));
   const name = achievementName(t, item.id);
+  const tiers = def.tiers.length;
   return (
-    <article className='bf-ach-card' data-state={complete ? 'done' : tier ? 'some' : 'locked'} style={{ '--ach-face': metal.dark, '--ach-next': next.dark } as React.CSSProperties}>
+    <article
+      className='bf-ach-card'
+      data-state={complete ? 'done' : tier ? 'some' : 'locked'}
+      data-fresh={fresh || undefined}
+      style={{ '--ach-face': metal.dark, '--ach-next': next.dark } as React.CSSProperties}
+    >
       <Badge id={item.id} tier={tier} size={56} />
       <div className='bf-ach-info'>
         <h4 className='bf-ach-name'>
           <span className='bf-display'>{name}</span>
-          {tier > 0 && def.tiers.length > 1 && <b className='bf-ach-roman'>{roman(tier)}</b>}
+          {fresh && <span className='bf-ach-new'>{t('ach.new')}</span>}
         </h4>
         <p className='bf-ach-how'>{achievementHow(t, item.id)}</p>
         <div className='bf-ach-progress'>
@@ -126,11 +164,10 @@ function Card({ item }: { item: AchievementState }) {
           </span>
         </div>
         <div className='bf-ach-foot'>
-          {def.tiers.length > 1 && (
-            <span className='bf-ach-pips' aria-label={t('ach.tier', { n: `${tier}/${def.tiers.length}` })}>
-              {def.tiers.map((_, i) => (
-                <i key={i} data-on={i < tier || undefined} style={i < tier ? { background: metalOf(item.id, i + 1).dark } : undefined} />
-              ))}
+          {tiers > 1 && (
+            <span className='bf-ach-tier'>
+              <TierPips id={item.id} tier={tier} />
+              <span>{t('ach.tierOf', { n: tier, m: tiers })}</span>
             </span>
           )}
           {latest && <span className='bf-ach-date'>{t('ach.since', { date: day(lang, latest) })}</span>}

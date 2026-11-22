@@ -1,7 +1,7 @@
 /* The unlock toasts and the results strip (achievements.css holds what they share with the page). Sized by their own
    boxes (container queries), never by the window. */
 
-/* The unlock toasts: top-left over the results screen (its podium leaves that corner free), top-right on a phone. */
+/* The unlock toasts: top-left over the menu after a solo run left early, top-right on a phone. */
 .bf-ach-hud {
   position: absolute;
   inset: 0;
@@ -87,9 +87,6 @@
   .bf-ach-toast {
     animation-name: bf-ach-fade;
   }
-  .bf-ach-got {
-    animation: none;
-  }
 }
 @keyframes bf-ach-fade {
   0%,
@@ -141,7 +138,7 @@
   }
 }
 
-/* The results strip: badges and names of what unlocked, then the nearest goals. */
+/* The results strip: what unlocked, revealed one badge at a time; or the nearest goals. */
 .bf-ach-strip-box {
   min-width: 0;
   container: ach-strip / inline-size;
@@ -167,32 +164,64 @@
   border-radius: 12px;
   background: rgba(0, 0, 0, 0.38);
   box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.08);
-  animation: bf-pop 0.42s cubic-bezier(0.2, 1.6, 0.4, 1) both;
+  animation: bf-ach-reveal 0.55s cubic-bezier(0.2, 1.6, 0.4, 1) var(--at, 0s) both;
 }
-.bf-ach-got:nth-child(2) {
-  animation-delay: 0.12s;
+/* Each badge flips in and a glint crosses it as it lands. */
+.bf-ach-got .bf-ach-badge {
+  animation: bf-ach-flip 0.55s cubic-bezier(0.2, 1.4, 0.4, 1) var(--at, 0s) both;
 }
-.bf-ach-got:nth-child(3) {
-  animation-delay: 0.24s;
+.bf-ach-got::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(105deg, transparent 30%, rgba(255, 255, 255, 0.5) 50%, transparent 70%) no-repeat;
+  background-size: 250% 100%;
+  background-position: 130% 0;
+  pointer-events: none;
+  animation: bf-ach-glint 0.7s ease-out calc(var(--at, 0s) + 0.25s) both;
 }
-.bf-ach-got:nth-child(4) {
-  animation-delay: 0.36s;
+@keyframes bf-ach-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.6);
+  }
+}
+@keyframes bf-ach-flip {
+  from {
+    transform: rotateY(90deg) scale(0.6);
+  }
+}
+@keyframes bf-ach-glint {
+  from {
+    background-position: 130% 0;
+  }
+  to {
+    background-position: -30% 0;
+  }
 }
 .bf-ach-got-name {
   display: flex;
-  align-items: center;
-  gap: 6px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
   white-space: nowrap;
 }
 .bf-ach-got-name .bf-display {
   font-size: 16px;
+  line-height: 1;
 }
-.bf-ach-got-name b {
-  background: rgba(255, 255, 255, 0.16);
+.bf-ach-got-name .bf-ach-pips i,
+.bf-ach-toast .bf-ach-pips i,
+.bf-ach-goal .bf-ach-pips i {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
 }
 .bf-ach-strip-more {
   font-size: 15px;
   color: var(--bf-muted);
+  animation: bf-ach-reveal 0.45s cubic-bezier(0.2, 1.6, 0.4, 1) var(--at, 0s) both;
 }
 .bf-ach-goal {
   display: inline-flex;
@@ -209,10 +238,15 @@
   width: 100%;
   flex: none;
   height: 6px;
-  --ach-next: var(--bf-yellow);
 }
 .bf-ach-goal-bar .bf-ach-nums {
   font-size: 12px;
+}
+.bf-ach-goal-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
 }
 
 @container ach-strip (max-width: 520px) {
@@ -244,5 +278,21 @@
 @container ach-strip (max-width: 340px) {
   .bf-ach-goal {
     display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bf-ach-got,
+  .bf-ach-got .bf-ach-badge,
+  .bf-ach-strip-more {
+    animation: bf-ach-fade-in 0.3s ease var(--at, 0s) both;
+  }
+  .bf-ach-got::before {
+    display: none;
+  }
+}
+@keyframes bf-ach-fade-in {
+  from {
+    opacity: 0;
   }
 }

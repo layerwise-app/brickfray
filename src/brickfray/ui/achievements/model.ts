@@ -5,7 +5,7 @@ import type { AchievementId } from '../../../lib/achievements/catalogue';
 import { newsFor, subscribeNews } from '../../../lib/achievements/client/news';
 import type { AchievementNews } from '../../../lib/achievements/contract';
 import { LONG_SHOT } from '../../../lib/achievements/feats';
-import { getOutcome, subscribeOutcome, type Outcome } from '../../../lib/board/client/outcome';
+import type { Outcome } from '../../../lib/board/client/outcome';
 import { CHAIN_WINDOW } from '../../sim/streaks';
 import { BOARD, usePlayerId } from '../board/me';
 import type { Lang, MessageKey } from '../i18n';
@@ -39,12 +39,6 @@ export function day(lang: Lang, at: number) {
 export function useAchievements() {
   const playerId = usePlayerId();
   return useQuery({ queryKey: [...BOARD, 'achievements', playerId], queryFn: () => getAchievements({ data: { playerId } }) });
-}
-
-/** The outcome of the match a screen belongs to (its settings object), or null. */
-export function useMatchOutcome(settings: object | null): Outcome | null {
-  const outcome = useSyncExternalStore(subscribeOutcome, getOutcome, getOutcome);
-  return outcome && outcome.settings === settings ? outcome : null;
 }
 
 /** What the upload of this outcome's match did to the player's achievements, once it is known. */

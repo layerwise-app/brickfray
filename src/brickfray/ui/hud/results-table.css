@@ -22,20 +22,28 @@
   padding: 0 calc(14 * var(--u)) 0 calc(10 * var(--u));
   color: var(--bf-muted);
 }
+.bf-table[data-teams] {
+  --cols: minmax(0, 1fr) calc(56 * var(--u)) calc(44 * var(--u)) calc(44 * var(--u)) calc(44 * var(--u)) calc(78 * var(--u));
+}
+/* A column's icon over its word; the word may run past a narrow column's edges into the gap. */
 .bf-table-icon {
   display: flex;
-  justify-content: center;
+  min-width: 0;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(3 * var(--u));
 }
 .bf-table-icon[data-end] {
-  justify-content: flex-end;
+  align-items: flex-end;
 }
 .bf-table-icon svg {
   width: max(14px, calc(19 * var(--u)));
   height: max(14px, calc(19 * var(--u)));
 }
-.bf-table-head .bf-tip::after {
-  bottom: auto;
-  top: calc(100% + 8px);
+.bf-table-icon small {
+  font: 700 max(9px, calc(11.5 * var(--u))) / 1 'Rubik Variable', system-ui, 'PingFang SC', 'Hiragino Sans', 'Apple SD Gothic Neo', sans-serif;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
 }
 .bf-table-group {
   display: flex;
@@ -142,7 +150,22 @@
   font-size: max(16px, calc(25 * var(--u)));
 }
 
-/* Leaderboard badge: the cup and the rank, gold with its tier from the top 100 up. */
+/* Leaderboard badge: the cup and the rank, gold with its tier from the top 100 up, under a word naming it. */
+.bf-rank-box {
+  display: inline-flex;
+  flex: none;
+  flex-direction: column;
+  align-items: center;
+  gap: max(3px, calc(5 * var(--u)));
+}
+.bf-rank-cap {
+  --in-d: 0.9s;
+  font: 700 max(9px, calc(12 * var(--u))) / 1 'Rubik Variable', system-ui, 'PingFang SC', 'Hiragino Sans', 'Apple SD Gothic Neo', sans-serif;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--bf-muted);
+}
 .bf-rank,
 .bf-rank-off {
   display: inline-flex;

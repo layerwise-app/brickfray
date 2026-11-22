@@ -8,5 +8,5 @@ export const streaksDe: Record<keyof typeof streaksEn, string> = {
   'streak.6': 'Sechsfachkill',
   'bounty.collected': '+{n} Kopfgeld',
   'bounty.on': 'Kopfgeld {n}',
-  'bounty.rule': 'Kills entscheiden das Match. Ab einer Serie von 3 Kills steht ein Kopfgeld auf den Spieler: +25 pro Kill, bis +150, für den, der ihn stoppt.'
+  'bounty.rule': 'Ab einer Serie von 3 Kills steht ein Kopfgeld auf den Spieler: +25 pro Kill, bis +150, für den, der ihn stoppt.'
 };

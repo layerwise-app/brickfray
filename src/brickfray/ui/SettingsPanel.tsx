@@ -65,7 +65,7 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
 
   return (
     <div className='bf-screen-in absolute inset-0 z-40 grid place-items-center bg-[#0b1222]/65 p-3 backdrop-blur-sm min-[420px]:p-4' onClick={onClose}>
-      <div className='bf-panel bf-studs bf-pop flex max-h-[88vh] w-full max-w-[620px] flex-col gap-4 p-4 min-[420px]:p-6' onClick={(e) => e.stopPropagation()}>
+      <div className='bf-panel bf-studs bf-pop flex h-[min(88vh,680px)] w-full max-w-[620px] flex-col gap-4 p-4 min-[420px]:p-6' onClick={(e) => e.stopPropagation()}>
         <div className='flex items-center gap-3'>
           <button className='bf-btn bf-btn-ghost bf-icon-btn bf-touch-target !h-10 !w-10' onClick={onClose} aria-label={t('done')}>
             <BackIcon size={20} />

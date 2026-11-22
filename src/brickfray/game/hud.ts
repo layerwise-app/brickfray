@@ -22,6 +22,16 @@ export interface FeedEntry {
   chain: number;
 }
 
+/** Who took the local player out, as the client last saw them: their look, the health they had left, their streak. */
+export interface KillerCard {
+  character: CharacterId | BotKind;
+  /** Null when no snapshot had them. */
+  health: number | null;
+  maxHealth: number;
+  /** Kills since their last death, this one included (only the kills this client saw). */
+  streak: number;
+}
+
 export interface ScoreRow {
   id: number;
   name: string;
@@ -72,7 +82,7 @@ export interface HudState {
   /** Big center callout (e.g. "Wave 3") — an i18n key plus values. */
   banner: { key: number; text: string; sub?: string } | null;
   /** `respawnAt` is host time (null: no respawn); `killer` is empty for a death of one's own doing or the world's. */
-  death: { killer: string; weapon: FeedEntry['weapon']; respawnAt: number | null } | null;
+  death: { killer: string; weapon: FeedEntry['weapon']; respawnAt: number | null; by: KillerCard | null } | null;
   /** Seconds until the local player comes back; -1 while alive or when there is no respawn. */
   respawnLeft: number;
   scoreboard: boolean;

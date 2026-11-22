@@ -65,6 +65,21 @@ html.bf-rotated .bf-root input[type='range'] {
   font-weight: 400;
   letter-spacing: 0.01em;
 }
+/* The display face has no Chinese, Japanese or Korean: those letters come from the system's own face at its heaviest
+   weight, so they stand as tall as the Latin beside them. No faked bold for the display face's own letters and digits. */
+:root:lang(zh) .bf-display {
+  font-family: 'Lilita One', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', 'Source Han Sans SC', 'Noto Sans SC', sans-serif;
+}
+:root:lang(ja) .bf-display {
+  font-family: 'Lilita One', 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Yu Gothic', 'Meiryo', 'Noto Sans CJK JP', 'Noto Sans JP', sans-serif;
+}
+:root:lang(ko) .bf-display {
+  font-family: 'Lilita One', 'Apple SD Gothic Neo', 'Malgun Gothic', 'Noto Sans CJK KR', 'Noto Sans KR', sans-serif;
+}
+:root:is(:lang(zh), :lang(ja), :lang(ko)) .bf-display {
+  font-weight: 900;
+  font-synthesis: none;
+}
 
 /* Wordmark: chunky letters with a plastic edge. */
 .bf-logo {
@@ -215,29 +230,64 @@ html.bf-rotated .bf-root input[type='range'] {
 }
 
 .bf-range {
+  --thumb: 20px;
   -webkit-appearance: none;
   appearance: none;
   width: 100%;
+  height: var(--thumb);
+  background: transparent;
+  outline: none;
+}
+.bf-range::-webkit-slider-runnable-track {
   height: 8px;
   border-radius: 99px;
   background: linear-gradient(to right, var(--bf-yellow) var(--fill, 50%), rgba(255, 255, 255, 0.15) var(--fill, 50%));
-  outline: none;
+}
+.bf-range::-moz-range-track {
+  height: 8px;
+  border-radius: 99px;
+  background: linear-gradient(to right, var(--bf-yellow) var(--fill, 50%), rgba(255, 255, 255, 0.15) var(--fill, 50%));
 }
 .bf-range::-webkit-slider-thumb {
   -webkit-appearance: none;
-  width: 20px;
-  height: 20px;
+  width: var(--thumb);
+  height: var(--thumb);
+  margin-top: calc(4px - var(--thumb) / 2);
   border-radius: 50%;
   background: #fff;
   box-shadow: 0 2px 0 rgba(0, 0, 0, 0.35);
   cursor: pointer;
 }
 .bf-range::-moz-range-thumb {
-  width: 20px;
-  height: 20px;
+  width: var(--thumb);
+  height: var(--thumb);
   border-radius: 50%;
   background: #fff;
   border: 0;
+}
+.bf-range:disabled::-webkit-slider-thumb {
+  cursor: default;
+}
+/* A slider's values under it, each centred under where the thumb stops for it. */
+.bf-ticks {
+  display: flex;
+  justify-content: space-between;
+  padding: 0 calc(var(--thumb, 20px) / 2);
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--bf-muted);
+}
+.bf-ticks span {
+  display: flex;
+  width: 0;
+  justify-content: center;
+}
+.bf-ticks [data-on] {
+  color: var(--bf-yellow);
+}
+.bf-ticks [data-off] {
+  opacity: 0.35;
 }
 
 .bf-fade-in {
@@ -314,4 +364,19 @@ html.bf-rotated .bf-root input[type='range'] {
 .bf-scroll::-webkit-scrollbar-thumb {
   background: rgba(255, 255, 255, 0.2);
   border-radius: 99px;
+}
+
+/* A table column's head: the stat's mark over its word (hud/stat-head.tsx). */
+.bf-stat-head {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+.bf-stat-head small {
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
 }

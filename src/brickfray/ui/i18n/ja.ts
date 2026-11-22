@@ -3,6 +3,7 @@ import { touchJa } from './touch/ja';
 import { hudJa } from './hud/ja';
 import { streaksJa } from './streaks/ja';
 import { achievementsJa } from './achievements/ja';
+import { playJa } from './play/ja';
 import type { Dictionary } from './en';
 
 export const ja: Dictionary = {
@@ -11,6 +12,7 @@ export const ja: Dictionary = {
   ...hudJa,
   ...streaksJa,
   ...achievementsJa,
+  ...playJa,
   play: 'プレイ',
   playCaption: 'オンライン対戦',
   solo: 'ソロ',
@@ -50,7 +52,6 @@ export const ja: Dictionary = {
   map: 'マップ',
   timeLimit: '制限時間',
   minutes: '{n}分',
-  seats: '人数 · ボットで補充',
   start: '開始',
   waitingForHost: 'ホストの開始を待っています…',
   leave: '退出',

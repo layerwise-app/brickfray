@@ -7,7 +7,7 @@ import type { CharacterId } from '../../characters/types';
 import { MAP_IDS } from '../../game/settings';
 import type { MapId } from '../../world/types';
 import { useT, type Lang } from '../i18n';
-import { HeadshotIcon } from '../icons';
+import { StatHead } from '../hud/stat-head';
 import { Avatar } from './Avatar';
 import { clock, mapName, number, outcome } from './format';
 import { BOARD, usePlayerId } from './me';
@@ -59,6 +59,25 @@ export function Rankings({ filter, setFilter, onOpen }: { filter: RankFilter; se
             </button>
           ))}
         </div>
+        {/* A short box (a phone on its side): difficulty and map as two drop-downs beside the modes, so the list keeps a row. */}
+        <div className='bf-board-picks'>
+          {solo && (
+            <select aria-label={t('difficulty')} value={filter.difficulty} onChange={(e) => choose({ difficulty: e.target.value as SoloLevel })}>
+              {SOLO_LEVELS.map((d) => (
+                <option key={d} value={d}>
+                  {t(`difficulty.${d}`)}
+                </option>
+              ))}
+            </select>
+          )}
+          <select aria-label={t('map')} value={filter.map ?? ''} onChange={(e) => choose({ map: (e.target.value || null) as MapId | null })}>
+            {[null, ...MAP_IDS].map((m) => (
+              <option key={m ?? 'all'} value={m ?? ''}>
+                {m ? mapName(lang, m) : t('board.allMaps')}
+              </option>
+            ))}
+          </select>
+        </div>
         <div className='bf-board-filter-row'>
           {solo && (
             <div className='bf-seg' role='group' aria-label={t('difficulty')}>
@@ -85,7 +104,7 @@ export function Rankings({ filter, setFilter, onOpen }: { filter: RankFilter; se
           <>
             <div className='bf-board-tr bf-board-th'>
               {columns.map((c) => (
-                <Head key={c} column={c} solo={solo} />
+                <Head key={c} column={c} />
               ))}
             </div>
             <ol>
@@ -114,28 +133,27 @@ export function Rankings({ filter, setFilter, onOpen }: { filter: RankFilter; se
   );
 }
 
-/** Room boards use short K, D, A; a solo board has room to spell out kills. */
-function Head({ column, solo }: { column: Column; solo: boolean }) {
+const STATS = { score: 'score', kills: 'kills', headshots: 'headshots', deaths: 'deaths', assists: 'assists', time: 'time' } as const;
+
+/** Numbers wear their mark over their word, as everywhere else; the rest of the columns are words. */
+function Head({ column }: { column: Column }) {
   const { t } = useT();
-  const label: Record<Column, string> = {
+  const stat = STATS[column as keyof typeof STATS];
+  if (stat)
+    return (
+      <span data-col={column}>
+        <StatHead stat={stat} size={14} />
+      </span>
+    );
+  const label: Partial<Record<Column, string>> = {
     rank: '#',
     player: t('player'),
     wave: t('board.col.wave'),
-    score: t('score'),
-    kills: solo ? t('board.col.kills') : t('board.col.k'),
-    headshots: t('board.headshots'),
-    time: t('board.col.time'),
     map: t('map'),
     hero: t('board.col.hero'),
-    deaths: t('board.col.d'),
-    assists: t('board.col.a'),
     result: t('board.col.result')
   };
-  return (
-    <span data-col={column} title={column === 'headshots' ? label.headshots : undefined}>
-      {column === 'headshots' ? <HeadshotIcon size={14} aria-label={label.headshots} /> : label[column]}
-    </span>
-  );
+  return <span data-col={column}>{label[column]}</span>;
 }
 
 function Cells({ row, columns, lang }: { row: RankedEntry; columns: Column[]; lang: Lang }) {

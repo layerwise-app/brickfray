@@ -233,20 +233,25 @@ export class StageProps {
   private readonly sets = new Map<CharacterId, { group: THREE.Group; pieces: Piece[] }>();
   private shown: CharacterId | null = null;
 
+  /** Builds `id`'s set ahead of its first show, hidden until then: building is the slow part of a first pick. */
+  prebuild(id: CharacterId) {
+    if (this.sets.has(id)) return;
+    const group = new THREE.Group();
+    const pieces = SETS[id]().map((cluster): Piece => {
+      const mesh = new THREE.Mesh(mergeGeometries(cluster.parts)!, this.look.material);
+      for (const part of cluster.parts) part.dispose();
+      mesh.frustumCulled = false;
+      group.add(mesh);
+      return { mesh, side: cluster.side, depth: cluster.depth };
+    });
+    this.sets.set(id, { group, pieces });
+    group.visible = false;
+    this.group.add(group);
+  }
+
   /** Shows `id`'s set in tones of its studio: the wall darkened toward the corners for shade, lifted toward the glow where lit, the ring's colour for its accents. */
   show(id: CharacterId, palette: { wall: string; glow: string; top: string; ring: string }) {
-    if (!this.sets.has(id)) {
-      const group = new THREE.Group();
-      const pieces = SETS[id]().map((cluster): Piece => {
-        const mesh = new THREE.Mesh(mergeGeometries(cluster.parts)!, this.look.material);
-        for (const part of cluster.parts) part.dispose();
-        mesh.frustumCulled = false;
-        group.add(mesh);
-        return { mesh, side: cluster.side, depth: cluster.depth };
-      });
-      this.sets.set(id, { group, pieces });
-      this.group.add(group);
-    }
+    this.prebuild(id);
     this.shown = id;
     for (const [key, set] of this.sets) set.group.visible = key === id;
     const u = this.look.uniforms;

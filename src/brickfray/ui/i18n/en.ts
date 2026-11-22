@@ -3,6 +3,7 @@ import { touchEn } from './touch/en';
 import { hudEn } from './hud/en';
 import { streaksEn } from './streaks/en';
 import { achievementsEn } from './achievements/en';
+import { playEn } from './play/en';
 
 export const en = {
   ...boardEn,
@@ -10,6 +11,7 @@ export const en = {
   ...hudEn,
   ...streaksEn,
   ...achievementsEn,
+  ...playEn,
   play: 'Play',
   playCaption: 'Online match',
   solo: 'Solo',
@@ -49,7 +51,6 @@ export const en = {
   map: 'Map',
   timeLimit: 'Time limit',
   minutes: '{n} min',
-  seats: 'Players · bots fill in',
   start: 'Start',
   waitingForHost: 'Waiting for the host…',
   leave: 'Leave',
@@ -123,7 +124,7 @@ export const en = {
   'upgrade.title': 'Choose an upgrade',
   'upgrade.cleared': 'Wave {n} cleared',
   'upgrade.hint': 'or click a card',
-  'upgrade.auto': 'First card picked in {n} s',
+  'upgrade.auto': 'Auto-pick in {n} s',
   'upgrade.rare': 'Rare',
   'upgrade.level': 'Level {n}',
   'upgrade.list': 'Upgrades',
@@ -143,7 +144,7 @@ export const en = {
   'upgrade.fx.grenades': '+{n} grenade slot',
   'upgrade.fx.grenadeRefill': 'Grenades refill {n} s sooner',
   'upgrade.fx.speed': 'Move speed +{n}%',
-  'upgrade.fx.regen': 'Heals {s} s sooner, +{n} health/s',
+  'upgrade.fx.regen': 'Heals {s}\u00a0s sooner, +{n}\u00a0health/s',
   'upgrade.fx.damage': 'Damage +{n}%',
   'upgrade.fx.armor': '+{n} armor and a full heal',
   'unit.seconds': '{n} s',

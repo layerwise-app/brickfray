@@ -192,18 +192,6 @@
 .bf-ach-card[data-state='locked'] .bf-ach-name .bf-display {
   color: rgba(244, 246, 251, 0.78);
 }
-.bf-ach-roman,
-.bf-ach-toast em,
-.bf-ach-got-name b {
-  flex-shrink: 0;
-  padding: 1px 7px;
-  border-radius: 7px;
-  background: var(--ach-face, var(--bf-yellow));
-  color: #fff;
-  font: 800 12px/1.35 'Rubik Variable', system-ui, sans-serif;
-  font-style: normal;
-  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.35);
-}
 .bf-ach-how {
   display: -webkit-box;
   overflow: hidden;
@@ -230,7 +218,45 @@
 }
 .bf-ach-pips {
   display: flex;
+  flex-shrink: 0;
   gap: 4px;
+}
+.bf-ach-tier {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--bf-muted);
+  white-space: nowrap;
+}
+/* A tier reached since the page was last open: a glow and a tag until the player has seen it once. */
+.bf-ach-card[data-fresh] {
+  box-shadow:
+    inset 0 0 0 2px var(--bf-yellow),
+    0 0 18px rgba(255, 205, 46, 0.35),
+    inset 0 -3px 0 rgba(0, 0, 0, 0.22);
+  animation: bf-ach-fresh 1.6s ease-in-out 3;
+}
+@keyframes bf-ach-fresh {
+  50% {
+    box-shadow:
+      inset 0 0 0 2px var(--bf-yellow),
+      0 0 30px rgba(255, 205, 46, 0.6),
+      inset 0 -3px 0 rgba(0, 0, 0, 0.22);
+  }
+}
+.bf-ach-new {
+  flex-shrink: 0;
+  padding: 1px 7px;
+  border-radius: 6px;
+  background: var(--bf-yellow);
+  color: #2a1a00;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 .bf-ach-pips i {
   width: 10px;

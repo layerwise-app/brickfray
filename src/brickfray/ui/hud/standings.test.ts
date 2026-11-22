@@ -31,10 +31,9 @@ describe('medals', () => {
 });
 
 describe('standings', () => {
-  it('keeps score order, with the free-for-all winner first', () => {
-    const rows = [row(2, 9, 8), row(1, 10, 0), row(3, 2, 1)];
-    expect(standings(rows, 'ffa', 1).map((r) => r.id)).toEqual([1, 2, 3]);
-    expect(standings(rows, 'tdm', 0).map((r) => r.id)).toEqual([2, 1, 3]);
+  it('orders by points, then kills, then fewer deaths, whatever order the rows came in', () => {
+    const rows = [row(2, 9, 8), row(1, 10, 0, 1000), { ...row(3, 10, 0, 1000), deaths: 4 }, row(4, 2, 1)];
+    expect(standings(rows).map((r) => r.id)).toEqual([2, 1, 3, 4]);
   });
 });
 

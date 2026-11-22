@@ -82,7 +82,7 @@ function Cause() {
   );
 }
 
-/** A run's numbers as icon chips in one row (score, kills, headshots, accuracy, time), then its upgrades as icons. */
+/** A run's numbers as chips in one row (score, kills, headshots, accuracy, time), each with its word, then its upgrades as icons. */
 export function RunChips() {
   const hud = useHud();
   const { t } = useT();
@@ -92,19 +92,19 @@ export function RunChips() {
   return (
     <div className='bf-run-chips'>
       <div className='bf-chips'>
-        <Chip text={t('score')} icon={<ScoreIcon size={26} className='text-[var(--bf-yellow)]' />} delay={0.5}>
+        <Chip text={t('col.score')} icon={<ScoreIcon size={26} className='text-[var(--bf-yellow)]' />} delay={0.5}>
           <CountUp value={me?.score ?? 0} delay={0.5} duration={0.9} />
         </Chip>
-        <Chip text={t('run.kills')} icon={<KillsIcon size={26} className='text-[#ff6a5a]' />} delay={0.58}>
+        <Chip text={t('col.kills')} icon={<KillsIcon size={26} className='text-[#ff6a5a]' />} delay={0.58}>
           <CountUp value={me?.kills ?? 0} delay={0.58} />
         </Chip>
-        <Chip text={t('run.headshots')} icon={<HeadshotsIcon size={26} />} delay={0.66}>
+        <Chip text={t('col.headshots')} icon={<HeadshotsIcon size={26} />} delay={0.66}>
           <CountUp value={hud.headshots} delay={0.66} />
         </Chip>
-        <Chip text={t('run.accuracy')} icon={<AccuracyIcon size={26} className='text-[#6aa8ff]' />} delay={0.74}>
+        <Chip text={t('col.accuracy')} icon={<AccuracyIcon size={26} className='text-[#6aa8ff]' />} delay={0.74}>
           {hits === null ? '–' : <CountUp value={hits} delay={0.74} format={(n) => `${n}%`} />}
         </Chip>
-        <Chip text={t('run.time')} icon={<TimeIcon size={26} />} delay={0.82}>
+        <Chip text={t('col.time')} icon={<TimeIcon size={26} />} delay={0.82}>
           {clock(hud.playTime)}
         </Chip>
       </div>
@@ -133,10 +133,11 @@ export function RunChips() {
 
 function Chip({ text, icon, delay, children }: { text: string; icon: ReactNode; delay: number; children: ReactNode }) {
   return (
-    <Tip text={text} className='bf-chip bf-in' style={{ ['--d' as string]: `${delay}s` }}>
+    <span className='bf-chip bf-in' style={{ ['--d' as string]: `${delay}s` }}>
       {icon}
       <b className='bf-display'>{children}</b>
-    </Tip>
+      <small>{text}</small>
+    </span>
   );
 }
 

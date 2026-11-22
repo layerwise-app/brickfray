@@ -3,6 +3,7 @@ import { touchDe } from './touch/de';
 import { hudDe } from './hud/de';
 import { streaksDe } from './streaks/de';
 import { achievementsDe } from './achievements/de';
+import { playDe } from './play/de';
 import type { Dictionary } from './en';
 
 export const de: Dictionary = {
@@ -11,6 +12,7 @@ export const de: Dictionary = {
   ...hudDe,
   ...streaksDe,
   ...achievementsDe,
+  ...playDe,
   play: 'Spielen',
   playCaption: 'Online-Match',
   solo: 'Solo',
@@ -50,7 +52,6 @@ export const de: Dictionary = {
   map: 'Karte',
   timeLimit: 'Zeitlimit',
   minutes: '{n} Min.',
-  seats: 'Spieler · Bots füllen auf',
   start: 'Starten',
   waitingForHost: 'Warte auf den Host …',
   leave: 'Verlassen',
@@ -124,7 +125,7 @@ export const de: Dictionary = {
   'upgrade.title': 'Wähle ein Upgrade',
   'upgrade.cleared': 'Welle {n} geschafft',
   'upgrade.hint': 'oder klicke eine Karte',
-  'upgrade.auto': 'Erste Karte in {n} s',
+  'upgrade.auto': 'Automatische Wahl in {n} s',
   'upgrade.rare': 'Selten',
   'upgrade.level': 'Stufe {n}',
   'upgrade.list': 'Upgrades',
@@ -144,7 +145,7 @@ export const de: Dictionary = {
   'upgrade.fx.grenades': '+{n} Granatenplatz',
   'upgrade.fx.grenadeRefill': 'Granaten {n} s früher zurück',
   'upgrade.fx.speed': 'Tempo +{n} %',
-  'upgrade.fx.regen': 'Heilung {s} s früher, +{n} Leben/s',
+  'upgrade.fx.regen': 'Heilung {s}\u00a0s früher, +{n}\u00a0Leben/s',
   'upgrade.fx.damage': 'Schaden +{n} %',
   'upgrade.fx.armor': '+{n} Panzerung, volle Heilung',
   'unit.seconds': '{n} s',

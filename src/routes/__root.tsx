@@ -25,11 +25,12 @@ export const Route = createRootRouteWithContext<{
       ...seo({
         title: 'Brickfray',
         description:
-          'An original brick-built online FPS with Snapbots, four weapons and three colorful arenas.'
+          'An original brick-built online FPS. Battle with up to 10 players or survive waves of Snapbots in colorful arenas.'
       }).meta
     ],
     links: [
-      { rel: 'icon', href: '/brickfray-icon.svg' },
+      { rel: 'icon', href: '/favicon.ico', sizes: '48x48' },
+      { rel: 'icon', href: '/brickfray-icon.svg', type: 'image/svg+xml' },
       { rel: 'apple-touch-icon', href: '/apple-touch-icon.png' },
       { rel: 'manifest', href: '/site.webmanifest' }
     ]

@@ -19,7 +19,6 @@ import { UpgradePick } from './UpgradePick';
 import { Ammo, Health, LOW_HEALTH } from './Vitals';
 import { TouchLayer } from '../touch/TouchLayer';
 import { useTouchMode } from '../touch/useInputMode';
-import { ResultsAchievements } from '../achievements/ResultsAchievements';
 
 export function Hud() {
   const hud = useHud();
@@ -51,7 +50,6 @@ export function Hud() {
       {hud.scoreboard && hud.phase !== 'ended' && <Scoreboard />}
       <UpgradePick />
       {hud.phase === 'ended' && <Results />}
-      {hud.phase === 'ended' && <ResultsAchievements />}
       {hud.hint && (
         <div className='bf-pop absolute left-1/2 top-24 -translate-x-1/2 rounded-xl bg-black/70 px-4 py-2 text-sm font-medium'>{t('ctrlHint')}</div>
       )}
@@ -124,16 +122,31 @@ function KillFeed() {
           className='bf-fade-in flex items-center gap-2 rounded-lg px-3 py-1 text-sm font-semibold'
           style={{ background: f.mine ? 'rgba(255,205,46,.85)' : f.victimIsMe ? 'rgba(234,61,50,.85)' : 'rgba(0,0,0,.5)', color: f.mine ? '#2a1a00' : '#fff' }}
         >
-          {!f.self && <span style={{ color: !f.mine && f.killerTeam !== -1 ? TEAM_COLORS[f.killerTeam] : undefined }}>{f.killer}</span>}
-          <CauseIcon cause={f.weapon} size={f.weapon in WEAPONS || f.weapon === 'water' ? 42 : 30} />
+          {!f.self && <FeedName name={f.killer} team={f.killerTeam} plain={f.mine || f.victimIsMe} />}
+          <CauseIcon cause={f.weapon} size={f.weapon in WEAPONS || f.weapon === 'water' ? 48 : 32} className='shrink-0' />
           {f.headshot && <HeadshotIcon size={15} />}
           {f.self && f.weapon !== 'water' && <SkullIcon size={15} />}
-          <span style={{ color: !f.mine && f.victimTeam !== -1 ? TEAM_COLORS[f.victimTeam] : undefined }}>{f.victim}</span>
+          <FeedName name={f.victim} team={f.victimTeam} plain={f.mine || f.victimIsMe} />
           {f.bounty > 0 && <BountyChip amount={f.bounty} collected size='sm' />}
           {f.chain > 1 && <ChainChip count={f.chain} />}
         </div>
       ))}
     </div>
+  );
+}
+
+/**
+ * A name in the feed, in its team's colour. On the player's own yellow or red row a team colour would not read, so the
+ * name stays the row's ink and a team-coloured brick goes before it.
+ */
+function FeedName({ name, team, plain }: { name: string; team: number; plain: boolean }) {
+  if (team === -1) return <span>{name}</span>;
+  if (!plain) return <span style={{ color: TEAM_COLORS[team] }}>{name}</span>;
+  return (
+    <span className='flex items-center gap-1.5'>
+      <i className='h-2.5 w-2.5 shrink-0 rounded-[3px]' style={{ background: TEAM_COLORS[team], boxShadow: '0 0 0 1.5px rgba(255,255,255,.9)' }} />
+      {name}
+    </span>
   );
 }
 

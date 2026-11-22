@@ -6,6 +6,7 @@ import { ROSTER } from '../../characters/roster';
 import type { CharacterId } from '../../characters/types';
 import { TEAM_COLORS } from '../../game/remotes';
 import { noUpgrades, type UpgradeId } from '../../sim/upgrades';
+import { StatHead, StatIcon, type Stat } from '../hud/stat-head';
 import { UpgradeList } from '../hud/UpgradeList';
 import { useT, type Lang } from '../i18n';
 import { BackIcon, BotIcon, CrownIcon } from '../icons';
@@ -90,12 +91,17 @@ function title(t: T, lang: Lang, entry: OpenMatch['entry'], detail: MatchDetail 
   return outcome(lang, entry);
 }
 
-function Tiles({ tiles }: { tiles: [label: string, value: React.ReactNode, accent?: boolean][] }) {
+type Tile = [label: string, value: React.ReactNode, accent?: boolean, stat?: Stat];
+
+function Tiles({ tiles }: { tiles: Tile[] }) {
   return (
     <dl className='bf-board-tiles'>
-      {tiles.map(([label, value, accent]) => (
+      {tiles.map(([label, value, accent, stat]) => (
         <div key={label} data-accent={accent || undefined}>
-          <dt>{label}</dt>
+          <dt>
+            {stat && <StatIcon stat={stat} size={14} />}
+            {label}
+          </dt>
           <dd className='bf-display'>{value}</dd>
         </div>
       ))}
@@ -113,10 +119,10 @@ function Run({ entry, detail, loading, lang }: { entry: OpenMatch['entry']; deta
       <Tiles
         tiles={[
           [t('run.wave'), number(lang, entry.wave), true],
-          [t('score'), number(lang, entry.score)],
-          [t('board.kills'), number(lang, entry.kills)],
-          [t('board.headshots'), number(lang, entry.headshots)],
-          [t('board.col.time'), clock(entry.durationS)]
+          [t('score'), number(lang, entry.score), false, 'score'],
+          [t('board.kills'), number(lang, entry.kills), false, 'kills'],
+          [t('board.headshots'), number(lang, entry.headshots), false, 'headshots'],
+          [t('board.col.time'), clock(entry.durationS), false, 'time']
         ]}
       />
       <div className='bf-board-hero'>
@@ -136,54 +142,75 @@ function Run({ entry, detail, loading, lang }: { entry: OpenMatch['entry']; deta
 
 function Room({ entry, detail, loading, mine, lang }: { entry: OpenMatch['entry']; detail: MatchDetail | null; loading: boolean; mine: boolean; lang: Lang }) {
   const { t } = useT();
+  const tiles = (
+    <Tiles
+      tiles={[
+        [t('board.col.result'), outcome(lang, entry), true],
+        [t('score'), number(lang, entry.score), false, 'score'],
+        [t('board.kills'), number(lang, entry.kills), false, 'kills'],
+        [t('board.deaths'), number(lang, entry.deaths), false, 'deaths'],
+        [t('board.assists'), number(lang, entry.assists), false, 'assists']
+      ]}
+    />
+  );
   if (detail?.mode === 'tdm') {
-    return ([0, 1] as const).map((team) => (
-      <section key={team} className='flex flex-col gap-1.5'>
-        <h4 className='bf-board-team bf-display' style={{ background: TEAM_COLORS[team] }}>
-          {detail.winner === team && <CrownIcon size={18} aria-label={t('board.winner')} />}
-          {t(`team.${team}`)} <span className='tabular-nums'>{number(lang, detail.teams[team])}</span>
-        </h4>
-        <Scoreboard players={detail.players} only={team} mine={mine} lang={lang} />
-      </section>
-    ));
+    return (
+      <>
+        {tiles}
+        {([0, 1] as const).map((team) => (
+          <section key={team} className='flex flex-col gap-1.5'>
+            <h4 className='bf-board-team bf-display' style={{ background: TEAM_COLORS[team] }}>
+              {detail.winner === team && <CrownIcon size={18} aria-label={t('board.winner')} />}
+              {t(`team.${team}`)} <span className='tabular-nums'>{number(lang, detail.teams[team])}</span>
+            </h4>
+            <Scoreboard players={detail.players} only={team} mine={mine} lang={lang} />
+          </section>
+        ))}
+      </>
+    );
   }
-  if (detail?.mode === 'ffa') return <Scoreboard players={detail.players} winner={detail.winner} mine={mine} lang={lang} />;
+  if (detail?.mode === 'ffa') {
+    return (
+      <>
+        {tiles}
+        <Scoreboard players={detail.players} winner={detail.winner} mine={mine} lang={lang} />
+      </>
+    );
+  }
   return (
     <>
-      <Tiles
-        tiles={[
-          [t('score'), number(lang, entry.score), true],
-          [t('board.kills'), number(lang, entry.kills)],
-          [t('board.deaths'), number(lang, entry.deaths)],
-          [t('board.assists'), number(lang, entry.assists)],
-          [t('board.col.result'), outcome(lang, entry)]
-        ]}
-      />
+      {tiles}
       {!loading && <p className='bf-board-hint'>{t('board.noDetail')}</p>}
     </>
   );
 }
 
-/** The final scoreboard in its own order (rank = place in the whole match), one team at a time in team matches. */
+/**
+ * The final scoreboard in its own order: a free-for-all numbers each place; a team's list does not (the team's score
+ * is its place). The player's own row is yellow, as on the results screen.
+ */
 function Scoreboard({ players, only, winner, mine, lang }: { players: DetailPlayer[]; only?: 0 | 1; winner?: number | null; mine: boolean; lang: Lang }) {
   const { t } = useT();
+  const places = only === undefined;
   return (
-    <div className='bf-board-list bf-board-score-list' data-cols='scoreboard'>
+    <div className='bf-board-list bf-board-score-list' data-cols='scoreboard' data-teams={places ? undefined : true}>
       <div className='bf-board-tr bf-board-th'>
-        <span data-col='rank'>#</span>
+        {places && <span data-col='rank'>#</span>}
         <span data-col='player'>{t('player')}</span>
-        <span data-col='kills'>{t('board.col.k')}</span>
-        <span data-col='deaths'>{t('board.col.d')}</span>
-        <span data-col='assists'>{t('board.col.a')}</span>
-        <span data-col='score'>{t('score')}</span>
+        <StatHead stat='kills' size={14} />
+        <StatHead stat='deaths' size={14} />
+        <StatHead stat='assists' size={14} />
+        <StatHead stat='score' size={14} />
       </div>
       <ol>
         {players.map((p, i) =>
           only !== undefined && p.team !== only ? null : (
-            <li key={i} className='bf-board-tr' data-mine={p.me || undefined}>
-              <span data-col='rank' className='bf-board-rank bf-display'>
-                {i + 1}
-              </span>
+            <li key={i} className='bf-board-tr' data-me={p.me || undefined}>
+              {places && (
+                <span data-col='rank' className='bf-board-rank bf-display'>
+                  {i + 1}
+                </span>
+              )}
               <span data-col='player' className='bf-board-who'>
                 <Avatar avatar={{ hero: p.character, image: null }} size={28} />
                 <PlayerName name={p.name} tag={null} label={p.me && mine && t('you')} />

@@ -17,6 +17,13 @@ const RESULTS = 12;
 const BOT_NAMES = ['Bolt', 'Pixel', 'Widget', 'Sprocket', 'Gizmo', 'Ratchet', 'Clicky', 'Dynamo', 'Fuse', 'Cog'];
 const SNAPBOT_NAMES: Record<BotKind, string> = { grunt: 'Snapbot', rusher: 'Zipbot', sniper: 'Scopebot', boss: 'Megabot' };
 
+type Standing = { score: number; kills: number; deaths: number };
+
+/** A room's order, the same everywhere it is shown or decided: most points, then most kills, then fewest deaths. */
+export function byStanding(a: Standing, b: Standing) {
+  return b.score - a.score || b.kills - a.kills || a.deaths - b.deaths;
+}
+
 /** Mode rules around the host simulation: warmup, scoring, respawns, waves and the end of a match. */
 export class Match {
   readonly sim: HostSim;
@@ -138,7 +145,8 @@ export class Match {
     }
     victim.respawnAt = this.time + PLAYER.respawnDelay;
     const limit = this.settings.mode === 'ffa' ? MATCH.ffaKills : MATCH.tdmKills;
-    if (this.settings.mode === 'ffa' && killer && killer.kills >= limit) this.end(killer.id);
+    // Reaching the kill limit ends a free-for-all; the standings decide who won it.
+    if (this.settings.mode === 'ffa' && killer && killer.kills >= limit) this.end(this.leader());
     if (this.settings.mode === 'tdm') {
       const [a, b] = this.state.teamScore;
       if (a >= limit) this.end(0);
@@ -159,9 +167,9 @@ export class Match {
       const [a, b] = this.state.teamScore;
       return a === b ? null : a > b ? 0 : 1;
     }
-    let best: HostPlayer | null = null;
-    for (const p of this.sim.players.values()) if (!best || p.kills > best.kills) best = p;
-    return best?.id ?? null;
+    const [first, second] = [...this.sim.players.values()].sort(byStanding);
+    if (!first || (second && byStanding(first, second) === 0)) return null;
+    return first.id;
   }
 
   private startWave() {

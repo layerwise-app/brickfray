@@ -1,1 +1,17 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect x="4" y="4" width="56" height="56" rx="13" fill="#ed8044"/><path d="M4 44v3c0 8 5 13 13 13h30c8 0 13-5 13-13v-3c0 8-5 11-13 11H17C9 55 4 52 4 44" fill="#ba542e"/><g fill="#f6ae7a" stroke="#ffd4ad" stroke-width="1"><circle cx="21" cy="20" r="7"/><circle cx="43" cy="20" r="7"/><circle cx="21" cy="41" r="7"/><circle cx="43" cy="41" r="7"/></g></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <g id="stud">
+      <circle cx="0" cy="3.2" r="9.4" fill="#a86f00"/>
+      <circle cx="0" cy="0" r="9" fill="#ffd43f"/>
+      <circle cx="0" cy="0" r="8.4" fill="none" stroke="#e0a400" stroke-width="1.4"/>
+      <path d="M-5.6 -2.6a6.3 6.3 0 0 1 5.3 -4.6" fill="none" stroke="#fffbe0" stroke-width="2.4" stroke-linecap="round" stroke-opacity="0.95"/>
+    </g>
+  </defs>
+  <rect x="3" y="8" width="58" height="54" rx="11" fill="#c98f00"/>
+  <rect x="3" y="3" width="58" height="55" rx="11" fill="#ffcd2e"/>
+  <rect x="3.8" y="3.8" width="56.4" height="53.4" rx="10.2" fill="none" stroke="#ffe27a" stroke-width="1.2" stroke-opacity="0.65"/>
+  <use href="#stud" x="18.5" y="17.5"/>
+  <use href="#stud" x="45.5" y="17.5"/>
+  <use href="#stud" x="18.5" y="43"/>
+  <use href="#stud" x="45.5" y="43"/>
+</svg>

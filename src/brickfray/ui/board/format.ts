@@ -18,12 +18,14 @@ export function clock(seconds: number) {
   return h ? `${h}:${String(m).padStart(2, '0')}:${rest}` : `${m}:${rest}`;
 }
 
-/** Hours and minutes for long totals: "3 h 05 min" style, in the language's own units. */
+/** Hours and minutes for long totals ("3 h 05 min" style, in the language’s own units); seconds under a minute. */
 export function playTime(lang: Lang, seconds: number) {
   const h = Math.floor(seconds / 3600);
   const m = Math.floor((seconds % 3600) / 60);
-  const unit = (value: number, u: 'hour' | 'minute') => new Intl.NumberFormat(lang, { style: 'unit', unit: u, unitDisplay: 'narrow' }).format(value);
-  return h ? `${unit(h, 'hour')} ${unit(m, 'minute')}` : unit(m, 'minute');
+  const unit = (value: number, u: 'hour' | 'minute' | 'second') => new Intl.NumberFormat(lang, { style: 'unit', unit: u, unitDisplay: 'narrow' }).format(value);
+  if (h) return `${unit(h, 'hour')} ${unit(m, 'minute')}`;
+  // Under a minute played still shows: "45s", not "0m".
+  return m ? unit(m, 'minute') : unit(Math.round(seconds), 'second');
 }
 
 /** A map's name; one added after this build shows its id. */

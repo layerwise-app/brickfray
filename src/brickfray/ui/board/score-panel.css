@@ -84,6 +84,10 @@
   color: var(--bf-yellow);
 }
 .bf-board-tiles dt {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
   margin-top: 6px;
   font-size: 11px;
   font-weight: 700;
@@ -122,7 +126,32 @@
   position: static;
 }
 .bf-board-score-list .bf-board-tr {
-  min-height: 44px;
+  min-height: 48px;
+}
+.bf-board-score-list .bf-board-th {
+  min-height: 34px;
+}
+.bf-board-list[data-cols='scoreboard'][data-teams] {
+  --cols: minmax(0, 1fr) 56px 56px 56px 70px;
+}
+/* The player's own row: yellow, as on the results screen and the Tab table. */
+.bf-board-score-list .bf-board-tr[data-me] {
+  color: #2a1a00;
+  background: var(--bf-yellow);
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.35),
+    0 3px 0 rgba(0, 0, 0, 0.3);
+}
+.bf-board-score-list .bf-board-tr[data-me] .bf-board-rank {
+  color: #2a1a00;
+}
+.bf-board-score-list .bf-board-tr[data-me] .bf-board-tag {
+  background: #2a1a00;
+  color: var(--bf-yellow);
+}
+.bf-board-score-list .bf-board-tr[data-me] .bf-board-bot {
+  background: rgba(0, 0, 0, 0.15);
+  color: #2a1a00;
 }
 .bf-board-bot {
   display: grid;

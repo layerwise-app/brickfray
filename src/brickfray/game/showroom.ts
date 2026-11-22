@@ -116,6 +116,49 @@ export class Showroom {
     this.refit();
   }
 
+  /**
+   * Builds what a hero's first pick would build (their far set, their figure and weapons) and compiles its shaders, so
+   * the pick itself only swaps built things. For idle time, one hero at a time.
+   */
+  async prewarm(id: CharacterId) {
+    this.stage.prebuild(id);
+    const ghost = this.display.ghost(id);
+    // Out of every view while its shaders compile.
+    ghost.root.position.y = -200;
+    this.scene.add(ghost.root);
+    try {
+      const renderer = this.renderer.renderer;
+      const shadows = renderer.shadowMap.enabled;
+      renderer.shadowMap.enabled = true;
+      await renderer.compileAsync(this.scene, this.camera);
+      if (ghost.root.parent) this.warmDraw(ghost.root);
+      renderer.shadowMap.enabled = shadows;
+    } finally {
+      ghost.root.removeFromParent();
+      ghost.dispose();
+    }
+  }
+
+  /**
+   * Draws `root` once into a single pixel of the canvas: a compiled program's first draw still links it, and that must
+   * not land on a pick. The menu's next frame clears and redraws the whole canvas, and the shadow map is left as it was.
+   */
+  private warmDraw(root: THREE.Object3D) {
+    const renderer = this.renderer.renderer;
+    const eye = new THREE.PerspectiveCamera(FOV, 1, 0.1, 30);
+    eye.position.set(root.position.x, root.position.y + 1, root.position.z + 8);
+    eye.lookAt(root.position.x, root.position.y + 1, root.position.z);
+    const scissor = renderer.getScissorTest();
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.needsUpdate = false;
+    renderer.setRenderTarget(null);
+    renderer.setScissorTest(true);
+    renderer.setScissor(0, 0, 1, 1);
+    renderer.autoClear = false;
+    renderer.render(this.scene, eye);
+    renderer.setScissorTest(scissor);
+  }
+
   resize(width: number, height: number) {
     this.width = Math.max(1, width);
     this.height = Math.max(1, height);

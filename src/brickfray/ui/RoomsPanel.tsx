@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { MATCH } from '../sim/constants';
 import { useApp, useGame } from './App';
 import { useT } from './i18n';
@@ -11,11 +11,18 @@ export function RoomsPanel({ onClose }: { onClose: () => void }) {
   const [code, setCode] = useState('');
   const browsing = app.busy === 'browse';
 
+  // Esc closes it, as it closes every other dialog over the menu.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
   return (
     <div className='absolute inset-0 z-10 grid place-items-center bg-[#0b1222]/60 p-4 backdrop-blur-sm' onClick={onClose}>
       <div className='bf-panel bf-studs bf-pop flex w-full max-w-[560px] flex-col gap-5 p-6' onClick={(e) => e.stopPropagation()}>
         <div className='flex items-center gap-3'>
-          <button className='bf-btn bf-btn-ghost bf-icon-btn !h-10 !w-10' onClick={onClose} aria-label={t('back')}>
+          <button className='bf-btn bf-btn-ghost bf-icon-btn bf-touch-target !h-11 !w-11' onClick={onClose} aria-label={t('back')}>
             <BackIcon size={20} />
           </button>
           <h2 className='bf-display text-3xl'>{t('rooms')}</h2>
@@ -54,7 +61,7 @@ export function RoomsPanel({ onClose }: { onClose: () => void }) {
         <div className='flex flex-col gap-2'>
           <div className='flex items-center justify-between'>
             <h3 className='text-sm font-semibold uppercase tracking-[0.18em] text-[var(--bf-muted)]'>{t('publicRooms')}</h3>
-            <button className='bf-btn bf-btn-ghost !h-9 !px-3 text-sm' onClick={() => void game.browse()} disabled={browsing}>
+            <button className='bf-btn bf-btn-ghost bf-touch-target !h-9 !px-3 text-sm' onClick={() => void game.browse()} disabled={browsing}>
               <RefreshIcon size={16} className={browsing ? 'animate-spin' : ''} />
               {t('refresh')}
             </button>
@@ -70,7 +77,7 @@ export function RoomsPanel({ onClose }: { onClose: () => void }) {
                 </span>
                 <span className='ml-auto text-sm font-semibold'>{lobby.phase === 'playing' ? t('inMatch') : t('inLobby')}</span>
                 <span className='bf-display text-lg'>
-                  {lobby.count}/{MATCH.maxPlayers}
+                  {lobby.count}/{Math.max(lobby.count, Math.min(lobby.settings.seats, MATCH.maxPlayers))}
                 </span>
               </button>
             ))}

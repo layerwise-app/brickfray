@@ -3,6 +3,7 @@ import { touchKo } from './touch/ko';
 import { hudKo } from './hud/ko';
 import { streaksKo } from './streaks/ko';
 import { achievementsKo } from './achievements/ko';
+import { playKo } from './play/ko';
 import type { Dictionary } from './en';
 
 export const ko: Dictionary = {
@@ -11,6 +12,7 @@ export const ko: Dictionary = {
   ...hudKo,
   ...streaksKo,
   ...achievementsKo,
+  ...playKo,
   play: '플레이',
   playCaption: '온라인 대전',
   solo: '솔로',
@@ -50,7 +52,6 @@ export const ko: Dictionary = {
   map: '맵',
   timeLimit: '제한 시간',
   minutes: '{n}분',
-  seats: '인원 · 봇으로 채움',
   start: '시작',
   waitingForHost: '방장이 시작하기를 기다리는 중…',
   leave: '나가기',

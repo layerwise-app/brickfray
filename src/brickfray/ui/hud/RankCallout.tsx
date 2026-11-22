@@ -39,15 +39,32 @@ export function RankBadge({ outcome }: { outcome: Outcome | null }) {
   if (outcome.upload === 'local' || outcome.upload === 'refused' || outcome.upload === 'waiting') return <Unranked short={`rank.short.${outcome.upload}`} long={`rank.${outcome.upload}`} />;
   if (outcome.upload === 'sending' || rank.isLoading) {
     return (
-      <span className='bf-rank' data-busy role='status' aria-label={t('rank.checking')} title={t('rank.checking')}>
-        <TrophyIcon size={20} />
-        <span className='bf-rank-dots' aria-hidden />
-      </span>
+      <Labelled>
+        <span className='bf-rank' data-busy role='status' aria-label={t('rank.checking')} title={t('rank.checking')}>
+          <TrophyIcon size={20} />
+          <span className='bf-rank-dots' aria-hidden />
+        </span>
+      </Labelled>
     );
   }
   const data = rank.data;
   if (!data || 'refused' in data) return <Unranked short='rank.short.failed' long='rank.failed' />;
-  return <Ranked rank={data} solo={outcome.report.mode === 'solo'} />;
+  return (
+    <Labelled>
+      <Ranked rank={data} solo={outcome.report.mode === 'solo'} />
+    </Labelled>
+  );
+}
+
+/** The badge under a word that says what it is: the player's place on the leaderboard, not in this match. */
+function Labelled({ children }: { children: React.ReactNode }) {
+  const { t } = useT();
+  return (
+    <span className='bf-rank-box'>
+      <small className='bf-rank-cap bf-in'>{t('board.title')}</small>
+      {children}
+    </span>
+  );
 }
 
 function Unranked({ short, long }: { short: MessageKey; long: MessageKey }) {

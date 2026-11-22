@@ -8,5 +8,5 @@ export const streaksZh: Record<keyof typeof streaksEn, string> = {
   'streak.6': '六杀',
   'bounty.collected': '赏金 +{n}',
   'bounty.on': '悬赏 {n}',
-  'bounty.rule': '胜负看击杀数。连杀 3 人起身上就有悬赏：每多杀一人 +25，最高 +150，终结他的人拿走。'
+  'bounty.rule': '连杀 3 人起身上就有悬赏：每多杀一人 +25，最高 +150，终结他的人拿走。'
 };

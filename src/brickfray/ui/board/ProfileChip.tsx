@@ -5,7 +5,7 @@ import type { CharacterId } from '../../characters/types';
 import { useGame } from '../App';
 import { useT } from '../i18n';
 import { Avatar } from './Avatar';
-import { BOARD, setLocalName, useAccount, useLocalName, useProfileSaved } from './me';
+import { BOARD, setLocalName, useAccount, useAvatarPicked, useLocalName, useProfileSaved } from './me';
 
 /** The player's picture and Name#1234 in the menu's top-right corner; opens the profile menu. */
 export function ProfileChip({ ref, character, open, onOpen }: { ref: Ref<HTMLButtonElement>; character: CharacterId; open: boolean; onOpen: () => void }) {
@@ -14,6 +14,7 @@ export function ProfileChip({ ref, character, open, onOpen }: { ref: Ref<HTMLBut
   const account = useAccount();
   const local = useLocalName(game);
   const profileSaved = useProfileSaved();
+  const picked = useAvatarPicked();
   const client = useQueryClient();
   const joining = useRef(false);
   const data = account.data;
@@ -44,7 +45,7 @@ export function ProfileChip({ ref, character, open, onOpen }: { ref: Ref<HTMLBut
   const tag = profile?.tag ?? null;
   return (
     <button ref={ref} className='bf-btn bf-btn-ghost bf-menu-me' aria-haspopup='dialog' aria-expanded={open} aria-label={`${t('board.profile')}: ${name}${tag === null ? '' : `#${tag}`}`} onClick={onOpen}>
-      <Avatar avatar={profile?.avatar} character={character} size={40} />
+      <Avatar avatar={profile?.avatar.image || picked ? profile?.avatar : null} character={character} size={40} />
       <span className='bf-menu-me-name'>{name}</span>
       {tag !== null && <span className='bf-menu-me-tag'>#{tag}</span>}
     </button>

@@ -103,8 +103,10 @@ export function SwitchRow({ label, hint, on, onChange }: { label: string; hint?:
         <span className='font-medium'>{label}</span>
         {hint && <span className='text-sm text-[var(--bf-muted)]'>{hint}</span>}
       </span>
-      <button role='switch' aria-checked={on} onClick={() => onChange(!on)} className={`relative h-8 w-14 shrink-0 rounded-full transition-colors ${on ? 'bg-[var(--bf-yellow)]' : 'bg-white/15'}`}>
-        <span className={`absolute left-1 top-1 h-6 w-6 rounded-full bg-white shadow transition-transform ${on ? 'translate-x-6' : 'translate-x-0'}`} />
+      <button role='switch' aria-checked={on} onClick={() => onChange(!on)} className='grid h-11 w-14 shrink-0 place-items-center'>
+        <span className={`relative h-8 w-14 rounded-full transition-colors ${on ? 'bg-[var(--bf-yellow)]' : 'bg-white/15'}`}>
+          <span className={`absolute left-1 top-1 h-6 w-6 rounded-full bg-white shadow transition-transform ${on ? 'translate-x-6' : 'translate-x-0'}`} />
+        </span>
       </button>
     </label>
   );

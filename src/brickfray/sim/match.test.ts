@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import type { MapLayout } from '../world/types';
 import { CHARACTER_IDS } from '../characters/roster';
-import { TICK } from './constants';
+import { MATCH, TICK } from './constants';
 import { WEAPONS } from '../weapons/defs';
-import { Match } from './match';
+import { byStanding, Match } from './match';
 import { botsThrough, secondsToReach, waveRoster, waveTuning } from './waves';
 import { BUTTON, DIFFICULTIES, type Difficulty } from './types';
 
@@ -41,6 +41,42 @@ describe('Match', () => {
     }
     expect(match.state.phase).toBe('playing');
     expect(kills).toBeGreaterThan(3);
+  });
+
+  it('the kill limit ends a free-for-all and the most points win it, not the player who reached the limit', () => {
+    const match = new Match(arena(), { mode: 'ffa', map: 'plaza', minutes: 10, seats: 0, difficulty: 'normal' });
+    const a = match.addHuman('A', 'rivet');
+    const b = match.addHuman('B', 'vega');
+    const c = match.addHuman('C', 'nova');
+    match.start();
+    for (let t = 0; t < 4.2; t += TICK) match.tick(TICK);
+    // B is behind on kills but ahead on points (bounties and assists).
+    Object.assign(a, { kills: MATCH.ffaKills - 1, score: 2900, deaths: 2 });
+    Object.assign(b, { kills: MATCH.ffaKills - 2, score: 3400, deaths: 5 });
+    c.protectedUntil = 0;
+    match.sim.damage(c, 9999, { attacker: a.id, weapon: 'ar', kind: 'body', from: [0, 0, 0] });
+    expect(a.kills).toBe(MATCH.ffaKills);
+    expect(match.state.phase).toBe('ended');
+    expect(match.state.winner).toBe(b.id);
+  });
+
+  it('standings: points, then kills, then fewer deaths; a dead heat at the bell is a draw', () => {
+    const rows = [
+      { id: 1, score: 500, kills: 4, deaths: 3 },
+      { id: 2, score: 500, kills: 5, deaths: 6 },
+      { id: 3, score: 500, kills: 5, deaths: 2 },
+      { id: 4, score: 600, kills: 1, deaths: 9 }
+    ];
+    expect([...rows].sort(byStanding).map((r) => r.id)).toEqual([4, 3, 2, 1]);
+    const match = new Match(arena(), { mode: 'ffa', map: 'plaza', minutes: 1, seats: 0, difficulty: 'normal' });
+    const a = match.addHuman('A', 'rivet');
+    const b = match.addHuman('B', 'vega');
+    match.start();
+    Object.assign(a, { score: 800, kills: 8, deaths: 1 });
+    Object.assign(b, { score: 800, kills: 8, deaths: 1 });
+    for (let t = 0; t < 65; t += TICK) match.tick(TICK);
+    expect(match.state.phase).toBe('ended');
+    expect(match.state.winner).toBeNull();
   });
 
   it('a human shot to the head deals headshot damage through the command path', () => {

@@ -12,7 +12,7 @@ import { useRefreshBoard } from './account';
 import { Avatar } from './Avatar';
 import { Crop } from './Crop';
 import { ChevronIcon, UploadIcon } from './icons';
-import { useAccount } from './me';
+import { markAvatarPicked, useAccount } from './me';
 import { NameField } from './NameField';
 import { SignIn } from './SignIn';
 import './profile.css';
@@ -53,7 +53,10 @@ export default function ProfilePanel({ character, onClose, onMatches, onAchievem
   };
   const pick = useMutation({
     mutationFn: (hero: string) => saveProfile({ data: { playerId: getPlayerId(), hero } }),
-    onSuccess: settle,
+    onSuccess: async (result) => {
+      if (!('refused' in result)) markAvatarPicked();
+      await settle(result);
+    },
     onError: () => setNotice(t('board.error'))
   });
   const upload = useMutation({
@@ -64,6 +67,7 @@ export default function ProfilePanel({ character, onClose, onMatches, onAchievem
       return uploadAvatar({ data: form });
     },
     onSuccess: async (result) => {
+      if (!('refused' in result)) markAvatarPicked();
       await settle(result);
       if (!('refused' in result)) setPicked(null);
     },

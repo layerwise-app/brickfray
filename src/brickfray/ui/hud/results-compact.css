@@ -33,8 +33,10 @@
   .bf-ribbon {
     --h: max(36px, calc(66 * var(--u)));
   }
+  /* Short of room the podium may rise under the headline, but the player's line must not reach the unlock strip. */
   .bf-results-hero {
-    gap: 10px;
+    gap: 8px;
+    justify-content: flex-end;
   }
   .bf-pod {
     --fig: calc(124 * var(--u));
@@ -49,24 +51,48 @@
     top: -14px;
   }
   .bf-mine {
-    gap: 6px 14px;
-    padding: 6px 12px;
+    gap: 4px 8px;
+    padding: 5px 8px;
     border-radius: 14px;
   }
+  .bf-mine-medals {
+    gap: 0;
+  }
+  .bf-mine-medal + .bf-mine-medal {
+    margin-left: -10px;
+  }
+  .bf-mine .bf-stat {
+    gap: 3px;
+  }
   .bf-mine-medal svg {
-    width: max(26px, calc(44 * var(--u)));
-    height: max(32.5px, calc(55 * var(--u)));
+    width: 24px;
+    height: 30px;
   }
   .bf-mine-stats {
-    gap: 12px;
+    gap: 6px;
+  }
+  .bf-rank .bf-rank-tier {
+    gap: 4px;
+    padding: 0 8px 0 7px;
+  }
+  .bf-rank .bf-rank-num {
+    gap: 5px;
+    padding: 0 9px;
+  }
+  /* The words name the tier; without the cup the player's line fits on one row. */
+  .bf-rank:not([data-tier='top1']) .bf-rank-tier svg {
+    display: none;
   }
   .bf-results-side {
     justify-content: center;
   }
   .bf-table {
-    --cols: max(20px, calc(34 * var(--u))) minmax(0, 1fr) max(30px, calc(54 * var(--u))) max(22px, calc(42 * var(--u))) max(22px, calc(42 * var(--u))) max(22px, calc(42 * var(--u))) max(40px, calc(74 * var(--u)));
-    --row: clamp(26px, calc((100cqh - 34px) / var(--n) - 5px), 44px);
+    --cols: max(20px, calc(34 * var(--u))) minmax(0, 1fr) max(30px, calc(54 * var(--u))) max(40px, calc(42 * var(--u))) max(40px, calc(42 * var(--u))) max(40px, calc(42 * var(--u))) max(40px, calc(74 * var(--u)));
+    --row: clamp(26px, calc((100cqh - 44px) / var(--n) - 5px), 44px);
     gap: 4px;
+  }
+  .bf-table[data-teams] {
+    --cols: minmax(0, 1fr) max(30px, calc(54 * var(--u))) max(40px, calc(42 * var(--u))) max(40px, calc(42 * var(--u))) max(40px, calc(42 * var(--u))) max(40px, calc(74 * var(--u)));
   }
   .bf-table-group {
     gap: 4px;
@@ -131,14 +157,15 @@
   .bf-chip b {
     font-size: max(21px, calc(40 * var(--u)));
   }
+  /* Three to a row, so every tile is wide enough for its word. */
   .bf-chip {
     min-width: 0;
-    flex: 1 1 0;
-    padding: 8px 6px 7px;
+    flex: 1 1 calc(33% - 6px);
+    padding: 7px 6px 6px;
     border-radius: 12px;
   }
   .bf-chips {
-    flex-wrap: nowrap;
+    flex-wrap: wrap;
     width: 100%;
     gap: 6px;
   }
