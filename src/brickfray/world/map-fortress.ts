@@ -1,108 +1,94 @@
 import * as THREE from 'three';
-import { BLOCK, DECAL, GROUND, STAIRS, type StairParams } from './blocks';
 import { castleBackdrop } from './backdrop-castle';
-import { C, CASTLE_STONE, CORNER_TOWER, CURTAIN, GATEHOUSE, WALK_TILE } from './castle-parts';
+import { FORTRESS_DETAILS } from './fortress-details';
 import { fortressDressing } from './fortress-dressing';
-import { HAYLOFT, LOFT, SMITHY_EL } from './fortress-parts';
-import { BRIDGE, K, KEEP, MOAT, PLANK_BRIDGE } from './keep';
+import { fortressGround } from './fortress-ground';
+import { fortressOutside } from './fortress-outside';
+import { NAV_SEEDS } from './fortress-nav';
+import { fortressWorks, WORKS } from './fortress-works';
+import { KEEP } from './keep';
+import { KEEP_DRESSING } from './keep-dressing';
 import type { LabView } from './lab-map';
 import { defineMap, Plan } from './plan';
 import { yawToward } from './util';
 
-const SAND = '#d6c290';
-const COBBLE = '#a8a294';
-const MARKET = '#c79c74';
-const PADDOCK = '#a9895a';
-const W = C.walk;
+type Spot = [number, number, number];
 
-function ground(p: Plan) {
-  const g = (x0: number, z0: number, x1: number, z1: number, color = SAND) => p.add(GROUND, { x0, z0, x1, z1, y: 0, color, surface: 'plastic' });
-  g(-36, -36, 36, -K.moat);
-  g(-36, K.moat, 36, 36);
-  g(-36, -K.moat, -K.moat, K.moat, MARKET);
-  g(K.moat, -K.moat, 36, K.moat);
-  p.add(GROUND, { x0: -K.island, z0: -K.island, x1: K.island, z1: K.island, y: 0, color: '#86a95f', surface: 'plastic' });
-  const decal = (x0: number, z0: number, x1: number, z1: number, color: string, smooth = false) => p.add(DECAL, { x0, z0, x1, z1, y: 0.004, color, surface: 'plastic', smooth });
-  for (const s of [-1, 1]) decal(15.2, s < 0 ? -18.4 : 8.8, 22.4, s < 0 ? -8.8 : 18.4, PADDOCK);
-  for (const s of [-1, 1]) {
-    decal(-2.0, s > 0 ? K.moat : -29.2, 2.0, s > 0 ? 29.2 : -K.moat, COBBLE);
-    decal(s > 0 ? K.moat : -24.8, -1.2, s > 0 ? 24.8 : -K.moat, 1.2, COBBLE);
-  }
-  decal(-14.4, -14.4, 14.4, -K.moat, COBBLE);
-  decal(-14.4, K.moat, 14.4, 14.4, COBBLE);
-  decal(-14.4, -K.moat, -K.moat, K.moat, COBBLE);
-  decal(K.moat, -K.moat, 14.4, K.moat, COBBLE);
-  for (const [x0, z0, x1, z1] of [[-30.4, -24, -26.4, -17.6], [26.4, 17.6, 30.4, 24], [-12, 22.4, -6.4, 28], [6.4, -28, 12, -22.4]] as const) decal(x0, z0, x1, z1, '#7fa45a');
-  const grass = '#6f9a4a';
-  for (const [x0, z0, x1, z1] of [[-110, -110, 110, -36], [-110, 36, 110, 110], [-110, -36, -36, 36], [36, -36, 110, 36]] as const) p.add(DECAL, { x0, z0, x1, z1, y: 0, color: grass, surface: 'foliage' });
-}
+/** Sound spots for audio/scenery.ts: flags on their poles, crows on the curtain and gate tops, birds in the orchard trees. */
+export const FORTRESS_AMBIENCE: { flags: Spot[]; battlements: Spot[]; trees: Spot[] } = {
+  flags: [[16.8, 5.4, -47.2], [-25.0, 5.4, 44.2], [6.0, 15.0, 6.0], [-6.0, 15.0, -6.0]],
+  battlements: [[-21.2, 7.8, -38.0], [25.2, 7.8, -42.0], [21.2, 7.8, -6.0], [21.2, 7.8, 14.0], [-17.2, 7.8, 30.8], [9.2, 7.8, 40.0], [-8.8, 8.6, 46.4]],
+  trees: [[-45.6, 5.0, -24.8], [-45.2, 5.0, -13.6], [-33.6, 5.0, -24.4], [-43.2, 5.0, -10.6], [-31.2, 5.0, -11.6], [-31.6, 5.0, -30.0]]
+};
 
-const stair = (x: number, z: number, dir: StairParams['dir']): StairParams => ({ x, z, y0: 0, dir, width: 2.4, steps: 8, rise: 0.48, run: 0.8, style: CASTLE_STONE, surface: 'stone' });
-const landing = (x0: number, z0: number, x1: number, z1: number) => ({ min: [x0, 0, z0] as [number, number, number], max: [x1, W, z1] as [number, number, number], surface: 'stone' as const, style: CASTLE_STONE, top: 'tiles' as const, topColor: WALK_TILE, walk: true });
-
-function walls(p: Plan) {
-  const t = C.tower;
-  const ew: [number, number][] = [[-16.0, -13.6], [-6.4, 6.4], [13.6, 16.0]];
-  p.add(CURTAIN, { side: 'w', from: -t, to: t, gaps: ew });
-  p.add(CURTAIN, { side: 'e', from: -t, to: t, gaps: ew });
-  for (const side of ['n', 's'] as const) {
-    p.add(CURTAIN, { side, from: -t, to: -5.6, gaps: [[-16.8, -14.4]] });
-    p.add(CURTAIN, { side, from: 5.6, to: t, gaps: [[14.4, 16.8]] });
-    p.add(GATEHOUSE, { sz: side === 'n' ? -1 : 1 });
-  }
-  for (const sx of [-1, 1] as const) for (const sz of [-1, 1] as const) p.add(CORNER_TOWER, { sx, sz });
-  for (const sx of [-1, 1]) {
-    const x = sx * 29.6;
-    p.add(STAIRS, stair(x, -8.0, 'n'));
-    p.add(STAIRS, stair(x, 8.0, 's'));
-    const [x0, x1] = sx < 0 ? [-30.8, -28.4] : [28.4, 30.8];
-    p.add(BLOCK, landing(x0, -16.0, x1, -14.4));
-    p.add(BLOCK, landing(x0, 14.4, x1, 16.0));
-  }
-  for (const sz of [-1, 1]) {
-    const z = sz * 29.6;
-    p.add(STAIRS, stair(-8.8, z, 'w'));
-    p.add(STAIRS, stair(8.8, z, 'e'));
-    const [z0, z1] = sz < 0 ? [-30.8, -28.4] : [28.4, 30.8];
-    p.add(BLOCK, landing(-16.8, z0, -15.2, z1));
-    p.add(BLOCK, landing(15.2, z0, 16.8, z1));
-  }
-}
-
-function center(p: Plan) {
-  p.add(MOAT, {});
-  p.add(KEEP, {});
-  p.add(BRIDGE, { sz: -1 });
-  p.add(BRIDGE, { sz: 1 });
-  p.add(PLANK_BRIDGE, { sx: -1 });
-  p.add(PLANK_BRIDGE, { sx: 1 });
-  p.add(HAYLOFT, {});
-  p.add(STAIRS, { x: -26.4, z: 10.4, y0: 0, dir: 'n', width: 2.4, steps: 5, rise: 0.48, run: 0.8, style: { colors: ['#8a5f3a', '#9a6a3f', '#7d5434'], variance: 0.3 }, surface: 'wood', topColor: '#b98a5a' });
-  p.add(SMITHY_EL, {});
-}
+/**
+ * Team 1 in the upper ward (north) with side clusters in the kitchen garden and the postern lane; team 0 in the barbican
+ * (south) with a side cluster in the lists. Each cluster faces the lane it opens on, so a side spawn starts a side lane.
+ */
+const TEAM1: [number, number, [number, number]][] = [
+  ...([[-17.6, -44.8], [-13.6, -43.2], [-9.6, -46.4], [-3.2, -45.6], [-1.6, -40.0], [5.6, -40.0], [6.4, -46.4], [12.0, -44.0], [14.4, -46.4], [15.2, -40.8], [19.2, -42.4]] as const).map(([x, z]): [number, number, [number, number]] => [x, z, [2.4, -40.0]]),
+  [-32.0, -46.4, [-32.4, -28.0]], [-32.0, -41.6, [-32.4, -28.0]], [-29.6, -38.4, [-32.4, -28.0]],
+  [28.0, -46.4, [30.4, -28.0]], [30.4, -42.4, [30.4, -28.0]], [28.0, -38.4, [30.4, -28.0]]
+];
+const TEAM0: [number, number, [number, number]][] = [
+  ...([[-23.2, 37.6], [-20.0, 42.4], [-16.8, 37.6], [-13.6, 42.4], [-8.8, 42.4], [-4.8, 43.2], [-0.8, 42.4], [2.4, 37.6], [1.6, 44.0], [-11.2, 36.8]] as const).map(([x, z]): [number, number, [number, number]] => [x, z, [x, 0]]),
+  [12.8, 32.0, [30.0, 26.0]], [16.0, 36.0, [30.0, 26.0]], [12.8, 39.2, [30.0, 26.0]]
+];
+/** Free-for-all spawns, all on the ground and spread over every district; each faces the keep unless given a point to face. */
+const FFA: [number, number, [number, number]?][] = [
+  [-40.0, -24.8], [-32.0, -16.0], [-31.2, -40.0, [-20.0, -43.2]], [-30.4, 13.6], [-6.0, -18.0, [20.0, -18.0]], [6.0, -22.0], [-2.0, 20.0],
+  [-12.0, -24.0], [12.0, -16.0, [12.0, -28.0]], [-12.0, 22.4], [9.6, 12.0], [-3.2, -44.0], [-18.4, 40.8],
+  [29.6, -24.0, [32.0, -8.0]], [31.2, -10.0], [32.0, 16.8], [21.6, 36.8], [16.0, 34.4, [30.0, 34.4]], [29.6, -37.6], [1.6, 42.4],
+  [-6.4, -2.4], [6.4, 2.4], [-15.6, 0.0], [15.6, 0.0], [-10.4, -32.8]
+];
 
 function spawns(p: Plan) {
-  const side: [number, number][] = [[-20.4, -27.6], [-18.4, -22.4], [-12, -25.6], [-4.4, -26.4], [0, -30.4], [4.4, -26.4], [12, -25.6], [20, -27.6], [18.4, -22.4], [0, -21.6]];
-  for (const [x, z] of side) p.spawn(x, 0, z, Math.PI, 1);
-  for (const [x, z] of side) p.spawn(-x, 0, -z, 0, 0);
-  const ffa: [number, number, number][] = [
-    [-32.8, W, -20], [32.8, W, 20], [-32.8, W, 22], [32.8, W, -22], [-22, W, -32.8], [22, W, 32.8], [-27.2, LOFT.top, 0], [28.0, 3.36, 4.4],
-    [0, 0, -3.2], [-3.2, K.roof, 3.2], [-20, 0, -8], [20, 0, 8], [-18, 0, 16], [18, 0, -16], [-6.4, 0, -18], [6.4, 0, 18], [-22.4, 0, 20.8], [22.4, 0, -20.8]
-  ];
-  for (const [x, y, z] of ffa) p.spawn(x, y, z, yawToward([x, z], [0, 0]));
+  // The ward is shallow: red faces along it, toward the middle of the hall row.
+  for (const [x, z, face] of TEAM1) p.spawn(x, 0, z, yawToward([x, z], face), 1);
+  for (const [x, z, face] of TEAM0) p.spawn(x, 0, z, yawToward([x, z], face), 0);
+  for (const [x, z, face] of FFA) p.spawn(x, 0, z, yawToward([x, z], face ?? [0, 0]));
 }
 
+const EYE = 1.62;
+
 export const FORTRESS_VIEWS: LabView[] = [
-  { name: 'overview', cam: [44, 52, 58], target: [0, 0, 0], fov: 50 },
-  { name: 'overview-west', cam: [-60, 40, -20], target: [0, 0, 0], fov: 50 },
-  { name: 'lane-west', cam: [-20, 1.62, 26], target: [-20, 1.6, 0], fov: 70 },
-  { name: 'lane-center', cam: [0, 1.62, 26], target: [0, 2.4, 0], fov: 70 },
-  { name: 'lane-east', cam: [20, 1.62, 26], target: [20, 1.6, 0], fov: 70 },
-  { name: 'wall-walk', cam: [-32.8, W + 1.62, 24], target: [-20, 2, 0], fov: 75 },
-  { name: 'keep-roof', cam: [2, K.roof + 1.62, -3], target: [-10, 1, 20], fov: 75 },
-  { name: 'gate', cam: [6, 1.62, -20], target: [0, 3, -30], fov: 70 },
-  { name: 'moat', cam: [-8, 2.2, 10.5], target: [6, 0, 6], fov: 70 }
+  { name: 'overview', cam: [58, 70, 78], target: [-2, 0, 0], fov: 50 },
+  { name: 'top', cam: [0, 130, 0.1], target: [0, 0, 0], fov: 45 },
+  { name: 'overview-west', cam: [-84, 56, -30], target: [0, 0, 0], fov: 50 },
+  { name: 'inner-court', cam: [-17.6, EYE, -25.6], target: [4, 3, -12], fov: 75 },
+  { name: 'outer-bailey', cam: [16.8, EYE, 12.0], target: [-6, 2.5, 20], fov: 75 },
+  { name: 'market', cam: [-4.8, EYE, 14.4], target: [-13, 1.6, 19], fov: 75 },
+  { name: 'keep-hall', cam: [-4.4, EYE, 4.4], target: [3, 2, -3], fov: 80 },
+  { name: 'great-hall', cam: [-1.6, EYE, -29.6], target: [-14, 2.6, -33], fov: 80 },
+  { name: 'chapel', cam: [3.6, EYE, -29.2], target: [15, 2, -32], fov: 80 },
+  { name: 'smithy', cam: [18.4, EYE, -6.4], target: [12, 1.6, 2], fov: 80 },
+  { name: 'stables', cam: [-36.0, EYE, 6.0], target: [-46, 2, -4], fov: 75 },
+  { name: 'stable-yard', cam: [-27.2, EYE, 18.4], target: [-42, 2.5, 20], fov: 75 },
+  { name: 'orchard', cam: [-22.4, EYE, -24.8], target: [-40, 3, -16], fov: 75 },
+  { name: 'kitchen-garden', cam: [-23.2, EYE, -30.4], target: [-28, 2, -44], fov: 75 },
+  { name: 'river-north', cam: [36.0, EYE, -9.6], target: [30, 3, -22], fov: 75 },
+  { name: 'river-south', cam: [34.4, EYE, 8.8], target: [36, 1, 26], fov: 75 },
+  { name: 'mill', cam: [24.0, EYE, 12.0], target: [36, 2, -2], fov: 75 },
+  { name: 'ruin-top', cam: [32.0, 3.84 + EYE, -18.4], target: [8, 0, -18], fov: 75 },
+  { name: 'upper-ward', cam: [-16, EYE, -46], target: [8, 3, -38], fov: 75 },
+  { name: 'barbican', cam: [-22, EYE, 44], target: [0, 3, 36], fov: 75 },
+  { name: 'gate', cam: [-5.6, EYE, 22], target: [-5.6, 2, 34], fov: 70 }
 ];
+
+/** The fortress's plan: ground, works, keep, details, dressing and spawns (the backdrop draws the land beyond). */
+export function fortressPlan() {
+  const p = new Plan();
+  fortressGround(p);
+  const works = fortressWorks();
+  p.add(WORKS, works);
+  p.add(KEEP, {});
+  p.add(KEEP_DRESSING, {});
+  p.add(FORTRESS_DETAILS, works);
+  p.navSeeds.push(...NAV_SEEDS);
+  fortressDressing(p);
+  spawns(p);
+  return p;
+}
 
 export const FORTRESS = defineMap({
   id: 'fortress',
@@ -114,20 +100,15 @@ export const FORTRESS = defineMap({
     sunColor: '#ffd8a0',
     sunIntensity: 2.7,
     sunDirection: new THREE.Vector3(-0.55, 0.5, 0.45).normalize(),
-    fogNear: 80,
+    fogNear: 95,
     clouds: { count: 10, seed: 8 }
   },
-  bounds: { min: [-34, -6, -34], max: [34, 40, 34] },
+  bounds: { min: [-50.4, -6, -50.4], max: [47.2, 40, 47.2] },
   killY: -0.8,
   seed: 23,
-  plan() {
-    const p = new Plan();
-    ground(p);
-    walls(p);
-    center(p);
-    fortressDressing(p, { sand: SAND, market: MARKET });
-    spawns(p);
-    return p;
-  },
-  backdrop: (d) => castleBackdrop(d)
+  plan: fortressPlan,
+  backdrop: (d) => {
+    fortressOutside(d);
+    castleBackdrop(d);
+  }
 });

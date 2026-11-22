@@ -67,7 +67,7 @@ export const CART: Element<At & { load?: 'hay' | 'barrels' }> = {
       t.cylZ(-0.2, 0.48, z, 0.48, 0.1, DARK_WOOD, undefined, 0.02);
       if (d.detail > 0) {
         t.cylZ(-0.2, 0.48, z * 1.05, 0.12, 0.14, IRON, 'metal');
-        t.ring(-0.2, 0.48, z, 0.46, 0.035, IRON, 'metal');
+        t.ringUp(-0.2, 0.48, z, 0.46, 0.035, IRON, 'metal');
       }
     }
     if (p.load === 'hay') {
