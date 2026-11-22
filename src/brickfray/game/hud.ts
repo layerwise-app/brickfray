@@ -1,6 +1,6 @@
 import type { BotKind, CharacterId } from '../characters/types';
 import { GRENADE_REFILL } from '../sim/constants';
-import type { KillCause, MatchPhase, MatchSettings } from '../sim/types';
+import type { KillCause, MatchPhase, MatchSettings, MatchState } from '../sim/types';
 import { noUpgrades, type UpgradeId, type UpgradeLevels } from '../sim/upgrades';
 import { GRENADE, type WeaponId } from '../weapons/defs';
 
@@ -85,6 +85,10 @@ export interface HudState {
   /** Solo upgrade levels held, and each pick in the order taken (the run summary lists them). */
   upgrades: UpgradeLevels;
   upgradesTaken: UpgradeId[];
+  /** Solo: snapbots of this wave still to beat, what the wave is about, and what ended the run. */
+  waveLeft: number;
+  waveTheme: MatchState['theme'];
+  soloCause: MatchState['cause'];
 }
 
 export type HudPulse =
@@ -129,7 +133,10 @@ export function initialHud(): HudState {
     armor: 0,
     offer: null,
     upgrades: noUpgrades(),
-    upgradesTaken: []
+    upgradesTaken: [],
+    waveLeft: 0,
+    waveTheme: null,
+    soloCause: null
   };
 }
 

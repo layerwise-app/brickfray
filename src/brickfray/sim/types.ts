@@ -3,6 +3,7 @@ import type { MeleeId, WeaponId } from '../weapons/defs';
 import type { MapId } from '../world/types';
 import type { MoveState } from './movement';
 import type { UpgradeId, UpgradeLevels } from './upgrades';
+import type { WaveTheme } from './waves';
 
 export const BUTTON = {
   fire: 1,
@@ -113,6 +114,8 @@ export interface HostPlayer extends PlayerState {
   upgrades: UpgradeLevels;
   /** Soaks damage before health until it is used up. */
   armor: number;
+  /** Grenades thrown this match. */
+  thrown?: number;
 }
 
 export const DIFFICULTIES = ['easy', 'normal', 'hard'] as const;
@@ -136,6 +139,11 @@ export interface MatchState {
   teamScore: [number, number];
   wave: number;
   winner: number | null;
+  /** Solo: snapbots of this wave still to beat (on the field or yet to come), and what the wave is about. */
+  waveLeft: number;
+  theme: WaveTheme | null;
+  /** Solo, once the run is over: what ended it (`killer` null: the player's own grenade or the water). */
+  cause: { killer: BotKind | null; weapon: KillCause } | null;
 }
 
 export type HitKind = 'body' | 'head';
@@ -161,7 +169,7 @@ export type GameEvent =
   /** `wall`: a swing that met no one but struck the world within reach (what it is made of, where). */
   | { type: 'melee'; player: number; hit: boolean; wall?: { surface: string; at: [number, number, number] } }
   | { type: 'chat'; player: number; text: string }
-  | { type: 'wave'; wave: number }
+  | { type: 'wave'; wave: number; theme: WaveTheme }
   /** Solo, after a cleared wave: the cards `player` picks one from, with the levels they hold now. */
   | { type: 'upgradeOffer'; player: number; wave: number; options: UpgradeId[]; levels: UpgradeLevels }
   | { type: 'upgrade'; player: number; id: UpgradeId; level: number; auto: boolean }

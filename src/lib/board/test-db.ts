@@ -35,6 +35,7 @@ export function report(over: Partial<MatchReport> = {}): MatchReport {
     placement: 1,
     players: 6,
     result: 'win',
+    detail: null,
     ...over
   };
 }

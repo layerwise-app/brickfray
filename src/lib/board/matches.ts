@@ -5,25 +5,27 @@ import {
   LEADERBOARD_PAGE,
   avatarUrl,
   type BoardEntry,
+  type BoardPlayer,
   type HistoryPage,
   type LeaderboardPage,
   type LeaderboardQuery,
+  type MatchDetail,
   type MatchReport,
+  type MatchView,
   type RankedEntry
 } from './contract';
 import { inOrder, type BoardDb } from './db';
 import type { PlayerRef } from './players';
-import { periodStart } from './validate';
 
 /** Stores reported matches once each: a key the player already sent is left as it is. */
 export async function storeMatches(db: BoardDb, player: PlayerRef, reports: MatchReport[], now: number) {
   // One statement per match: D1 caps the bound values of a single statement.
   await inOrder(
     db,
-    reports.map(({ key, ticket: _, ...r }) =>
+    reports.map(({ key, ticket: _, detail, ...r }) =>
       db
         .insert(boardMatch)
-        .values({ ...r, matchKey: key, playerId: player.id, profileId: player.profileId, createdAt: now })
+        .values({ ...r, detail: detail && JSON.stringify(detail), matchKey: key, playerId: player.id, profileId: player.profileId, createdAt: now })
         .onConflictDoNothing({ target: [boardMatch.playerId, boardMatch.matchKey] })
     )
   );
@@ -51,13 +53,21 @@ interface EntryRow {
   result: BoardEntry['result'];
 }
 
-interface RankedRow extends EntryRow {
-  rank: number;
-  total: number;
+interface PlayerRow {
   name: string;
+  tag: number | null;
   avatar_hero: string | null;
   avatar_image: string | null;
+}
+
+interface RankedRow extends EntryRow, PlayerRow {
+  rank: number;
+  total: number;
   mine: number;
+}
+
+function boardPlayer(r: PlayerRow): BoardPlayer {
+  return { name: r.name, tag: r.tag, avatar: { hero: r.avatar_hero, image: r.avatar_image ? avatarUrl(r.avatar_image) : null } };
 }
 
 function entry(r: EntryRow): BoardEntry {
@@ -87,35 +97,29 @@ function order(mode: LeaderboardQuery['mode']): SQL {
 }
 
 /**
- * One row per player (their best match in the period), ranked, one page of them, plus the asker's own row
- * wherever it ranks. `profileId` is the asker's profile, never sent back.
+ * One row per player (their best match of all time on this board), ranked, one page of them, plus the asker's own
+ * row wherever it ranks. `profileId` is the asker's profile, never sent back. board_match_board_idx finds the board's rows.
  */
-export async function leaderboard(db: BoardDb, q: LeaderboardQuery, profileId: string | null, now: number): Promise<LeaderboardPage> {
-  const since = periodStart(q.period, now, q.tzOffset);
+export async function leaderboard(db: BoardDb, q: LeaderboardQuery, profileId: string | null): Promise<LeaderboardPage> {
   const from = q.page * LEADERBOARD_PAGE;
   const me = profileId ?? '';
   const rows = await db.all<RankedRow>(sql`
     WITH best AS (
       SELECT m.*, ROW_NUMBER() OVER (PARTITION BY m.profile_id ORDER BY ${order(q.mode)}) AS pick
       FROM board_match m
-      WHERE m.mode = ${q.mode} AND m.ended_at >= ${since} ${q.difficulty ? sql`AND m.difficulty = ${q.difficulty}` : sql``}
+      WHERE m.mode = ${q.mode} ${q.difficulty ? sql`AND m.difficulty = ${q.difficulty}` : sql``} ${q.map ? sql`AND m.map = ${q.map}` : sql``}
     ), ranked AS (
       SELECT m.*, ROW_NUMBER() OVER (ORDER BY ${order(q.mode)}) AS rank, COUNT(*) OVER () AS total
       FROM best m WHERE m.pick = 1
     )
-    SELECT ${ENTRY}, m.rank, m.total, p.name, p.avatar_hero, p.avatar_image, m.profile_id = ${me} AS mine
+    SELECT ${ENTRY}, m.rank, m.total, p.name, p.tag, p.avatar_hero, p.avatar_image, m.profile_id = ${me} AS mine
     FROM ranked m JOIN board_profile p ON p.id = m.profile_id
     WHERE (m.rank > ${from} AND m.rank <= ${from + LEADERBOARD_PAGE}) OR m.profile_id = ${me}
     ORDER BY m.rank`);
-  const ranked = rows.map(
-    (r): RankedEntry => ({
-      ...entry(r),
-      rank: r.rank,
-      name: r.name,
-      avatar: { hero: r.avatar_hero, image: r.avatar_image ? avatarUrl(r.avatar_image) : null },
-      mine: !!r.mine
-    })
-  );
+  const ranked = rows.map((r): RankedEntry => {
+    const { endedAt: _, ...rest } = entry(r);
+    return { ...rest, ...boardPlayer(r), rank: r.rank, mine: !!r.mine };
+  });
   const pageRows = ranked.filter((r) => r.rank > from && r.rank <= from + LEADERBOARD_PAGE);
   return {
     rows: pageRows,
@@ -167,6 +171,27 @@ export async function history(db: BoardDb, profileId: string, page: number): Pro
       bestWave: t.best_wave ?? 0,
       seconds: t.seconds ?? 0
     }
+  };
+}
+
+interface MatchRow extends EntryRow, PlayerRow {
+  profile_id: string;
+  detail: string | null;
+}
+
+/** One stored match with who played it and its score panel; its date only when it is the asker's. */
+export async function matchView(db: BoardDb, id: number, profileId: string | null): Promise<MatchView | null> {
+  const row = await db.get<MatchRow>(sql`
+    SELECT ${ENTRY}, m.profile_id, m.detail, p.name, p.tag, p.avatar_hero, p.avatar_image
+    FROM board_match m JOIN board_profile p ON p.id = m.profile_id WHERE m.id = ${id}`);
+  if (!row) return null;
+  const mine = row.profile_id === profileId;
+  const match = entry(row);
+  return {
+    match: { ...match, endedAt: mine ? match.endedAt : null },
+    player: boardPlayer(row),
+    mine,
+    detail: row.detail ? (JSON.parse(row.detail) as MatchDetail) : null
   };
 }
 

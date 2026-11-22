@@ -2,6 +2,17 @@ import type { UseQueryResult } from '@tanstack/react-query';
 import { useT } from '../i18n';
 import { ChevronIcon } from './icons';
 
+/** "Name#1234", the tag quieter than the name; `label` is a short yellow tag after it ("You", "Your rank"). */
+export function PlayerName({ name, tag, label }: { name: string; tag: number | null; label?: string | false }) {
+  return (
+    <span className='bf-board-name'>
+      <span className='truncate'>{name}</span>
+      {tag !== null && <span className='bf-board-tagno'>#{tag}</span>}
+      {label && <span className='bf-board-tag'>{label}</span>}
+    </span>
+  );
+}
+
 /** Loading, failed or empty: one line in the list's place. */
 export function Status({ query, empty, emptyText }: { query: UseQueryResult<unknown>; empty: boolean; emptyText: string }) {
   const { t } = useT();

@@ -4,7 +4,7 @@ import { boardAvatar, boardMatch, boardPlayer, boardProfile, user } from '~/db/s
 import { checkAvatar, readAvatar, saveAvatar } from './avatar';
 import type { LeaderboardQuery } from './contract';
 import type { BoardDb } from './db';
-import { history, leaderboard, storeMatches } from './matches';
+import { history, leaderboard, matchView, storeMatches } from './matches';
 import { claimPlayer, ensurePlayer, findPlayer, updateProfile } from './players';
 import { allow, HOUR } from './rate';
 import { report, soloReport, testDb } from './test-db';
@@ -25,7 +25,7 @@ async function play(n: number, name: string, ...reports: ReturnType<typeof repor
 }
 
 function board(over: Partial<LeaderboardQuery> = {}): LeaderboardQuery {
-  return { mode: 'ffa', period: 'all', difficulty: null, page: 0, tzOffset: 0, playerId: null, ...over };
+  return { mode: 'ffa', difficulty: null, map: null, page: 0, playerId: null, ...over };
 }
 
 async function addUser(userId: string) {
@@ -54,7 +54,7 @@ describe('leaderboard', () => {
     await play(1, 'Ace', report({ score: 900 }), report({ score: 2100 }));
     await play(2, 'Bolt', report({ score: 1500 }));
     const me = await play(3, 'Cog', report({ score: 1500, kills: 12, endedAt: NOW - 1000 }));
-    const page = await leaderboard(db, board(), me.profileId, NOW);
+    const page = await leaderboard(db, board(), me.profileId);
     expect(page.rows.map((r) => [r.rank, r.name, r.score, r.mine])).toEqual([
       [1, 'Ace', 2100, false],
       [2, 'Cog', 1500, true],
@@ -68,33 +68,50 @@ describe('leaderboard', () => {
     await play(1, 'Ace', soloReport({ wave: 8, score: 4000 }), soloReport({ wave: 9, score: 3000 }));
     await play(2, 'Bolt', soloReport({ wave: 9, score: 3500 }));
     await play(3, 'Cog', soloReport({ wave: 20, score: 9000, difficulty: 'easy' }));
-    const page = await leaderboard(db, board({ mode: 'solo', difficulty: 'normal' }), null, NOW);
+    const page = await leaderboard(db, board({ mode: 'solo', difficulty: 'normal' }), null);
     expect(page.rows.map((r) => [r.name, r.wave, r.score])).toEqual([
       ['Bolt', 9, 3500],
       ['Ace', 9, 3000]
     ]);
-    expect(await leaderboard(db, board({ mode: 'ffa' }), null, NOW)).toMatchObject({ rows: [], total: 0 });
+    expect(await leaderboard(db, board({ mode: 'ffa' }), null)).toMatchObject({ rows: [], total: 0 });
   });
 
-  it('filters by period on the player’s calendar', async () => {
-    await play(1, 'Old', report({ score: 5000, endedAt: NOW - 30 * DAY }));
-    await play(2, 'Week', report({ score: 3000, endedAt: NOW - 2 * DAY }));
-    await play(3, 'Today', report({ score: 1000, endedAt: NOW - 60_000 }));
-    const names = async (period: LeaderboardQuery['period']) => (await leaderboard(db, board({ period }), null, NOW)).rows.map((r) => r.name);
-    expect(await names('all')).toEqual(['Old', 'Week', 'Today']);
-    expect(await names('day')).toEqual(['Today']);
-    expect((await names('week')).includes('Old')).toBe(false);
+  it('ranks all time, on every map or on one, without dates', async () => {
+    await play(1, 'Old', report({ score: 5000, endedAt: NOW - 30 * DAY, map: 'temple' }));
+    await play(2, 'Week', report({ score: 3000, endedAt: NOW - 2 * DAY }), report({ score: 2500, map: 'docks' }));
+    await play(3, 'Today', report({ score: 1000, endedAt: NOW - 60_000, map: 'docks' }));
+    const names = async (map: string | null) => (await leaderboard(db, board({ map }), null)).rows.map((r) => [r.name, r.score, r.map]);
+    expect(await names(null)).toEqual([
+      ['Old', 5000, 'temple'],
+      ['Week', 3000, 'plaza'],
+      ['Today', 1000, 'docks']
+    ]);
+    expect(await names('docks')).toEqual([
+      ['Week', 2500, 'docks'],
+      ['Today', 1000, 'docks']
+    ]);
+    expect(await names('fortress')).toEqual([]);
+    expect(JSON.stringify(await leaderboard(db, board(), null))).not.toContain('endedAt');
+  });
+
+  it('shows each name with its tag', async () => {
+    await play(1, 'Ace', report({ score: 900 }));
+    await play(2, 'Ace', report({ score: 800 }));
+    const rows = (await leaderboard(db, board(), null)).rows;
+    expect(rows.map((r) => r.name)).toEqual(['Ace', 'Ace']);
+    expect(rows[0]!.tag).not.toBe(rows[1]!.tag);
+    for (const r of rows) expect(r.tag).toBeGreaterThanOrEqual(1000);
   });
 
   it('pages in SQL and still reports the asker’s rank off the page', async () => {
     for (let i = 1; i <= 45; i++) await play(i, `P${i}`, report({ score: 10_000 - i * 10, kills: 60, durationS: 900 }));
     const asker = await findPlayer(db, id(44));
-    const first = await leaderboard(db, board({ playerId: id(44) }), asker!.profileId, NOW);
+    const first = await leaderboard(db, board({ playerId: id(44) }), asker!.profileId);
     expect(first.rows).toHaveLength(20);
     expect(first.rows[0]!.name).toBe('P1');
     expect(first.total).toBe(45);
     expect(first.me).toMatchObject({ rank: 44, name: 'P44', mine: true });
-    const third = await leaderboard(db, board({ page: 2 }), asker!.profileId, NOW);
+    const third = await leaderboard(db, board({ page: 2 }), asker!.profileId);
     expect(third.rows.map((r) => r.rank)).toEqual([41, 42, 43, 44, 45]);
     expect(third.rows.find((r) => r.mine)?.name).toBe('P44');
   });
@@ -103,7 +120,7 @@ describe('leaderboard', () => {
     await addUser('u1');
     await play(1, 'Ace', report());
     await claimPlayer(db, id(1), 'u1', 'Ace', NOW);
-    const text = JSON.stringify(await leaderboard(db, board(), null, NOW));
+    const text = JSON.stringify(await leaderboard(db, board(), null));
     expect(text).not.toContain(id(1));
     expect(text).not.toContain('example.com');
     expect(text).not.toContain('u1');
@@ -126,6 +143,22 @@ describe('history', () => {
   });
 });
 
+describe('score panel', () => {
+  it('opens any stored match with its detail; the date only for the asker’s own', async () => {
+    const detail = { mode: 'solo' as const, upgrades: ['health' as const, 'speed' as const] };
+    const ace = await play(1, 'Ace', soloReport({ detail, endedAt: NOW - 5000 }), report({ score: 700 }));
+    const other = await play(2, 'Bolt', report());
+    const [solo, old] = (await history(db, ace.profileId, 0)).rows.sort((a, b) => a.id - b.id);
+    const own = await matchView(db, solo!.id, ace.profileId);
+    expect(own).toMatchObject({ mine: true, detail, match: { wave: 5, endedAt: NOW - 5000 }, player: { name: 'Ace', tag: ace.tag } });
+    expect(await matchView(db, solo!.id, other.profileId)).toMatchObject({ mine: false, detail, match: { endedAt: null } });
+    expect(await matchView(db, solo!.id, null)).toMatchObject({ mine: false, match: { endedAt: null } });
+    // Stored before details were kept: the row alone.
+    expect(await matchView(db, old!.id, ace.profileId)).toMatchObject({ detail: null, match: { score: 700 } });
+    expect(await matchView(db, 99_999, null)).toBeNull();
+  });
+});
+
 describe('signing in', () => {
   it('first browser lends the account its profile; the second merges in with its matches', async () => {
     await addUser('u1');
@@ -136,14 +169,14 @@ describe('signing in', () => {
     const first = await claimPlayer(db, id(1), 'u1', 'Laptop', NOW);
     expect(first).toMatchObject({ playerId: id(1), profile: { name: 'Laptop' } });
     const second = await claimPlayer(db, id(2), 'u1', 'Phone', NOW);
-    // The account keeps its name; a picture only the merged browser had comes along.
-    expect(second.profile).toEqual({ name: 'Laptop', avatar: { hero: 'nova', image: null } });
+    // The account keeps its name, tag and portrait.
+    expect(second.profile).toEqual(first.profile);
 
     const profiles = await db.select().from(boardProfile);
     expect(profiles).toHaveLength(1);
     expect(profiles[0]).toMatchObject({ id: a.profileId, userId: 'u1' });
     expect((await history(db, a.profileId, 0)).totals.matches).toBe(3);
-    const ranked = await leaderboard(db, board(), a.profileId, NOW);
+    const ranked = await leaderboard(db, board(), a.profileId);
     expect(ranked.rows.map((r) => [r.name, r.score, r.mine])).toEqual([['Laptop', 3000, true]]);
     // Claiming again changes nothing.
     await claimPlayer(db, id(2), 'u1', 'Phone', NOW);
@@ -201,8 +234,8 @@ describe('profile and avatar', () => {
     const second = await saveAvatar(db, p, 'image/png', png(64, 64), NOW);
     expect(await readAvatar(db, first)).toBeNull();
     expect((await readAvatar(db, second))?.bytes).toEqual(png(64, 64));
-    const view = await updateProfile(db, p, { hero: 'moss', name: 'Moss Fan' }, NOW);
-    expect(view).toEqual({ name: 'Moss Fan', avatar: { hero: 'moss', image: null } });
+    const view = await updateProfile(db, p, { hero: 'moss', name: 'MossFan' }, NOW);
+    expect(view).toEqual({ name: 'MossFan', tag: p.tag, avatar: { hero: 'moss', image: null } });
     expect(await db.select().from(boardAvatar).where(eq(boardAvatar.profileId, p.profileId))).toHaveLength(0);
   });
 });

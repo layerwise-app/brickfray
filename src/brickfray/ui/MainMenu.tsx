@@ -11,6 +11,8 @@ import { LOADOUTS } from '../weapons/loadouts';
 import { BotIcon, FullscreenIcon, GearIcon, GlobeIcon, PlayIcon, UsersIcon, WeaponIcon } from './icons';
 import { RoomsPanel } from './RoomsPanel';
 import { TrophyIcon } from './board/icons';
+import { useAccount, useProfileSaved } from './board/me';
+import { NAME_MAX, nameText } from '../../lib/board/names';
 import { queueRename } from '../../lib/board/client/rename';
 import { flushMatches } from '../../lib/board/client/sync';
 import './menu.css';
@@ -29,6 +31,8 @@ export function MainMenu({ openSettings }: { openSettings: () => void }) {
   const { t, lang } = useT();
   const [character, setCharacter] = useState<CharacterId>(game.settings.character);
   const [name, setName] = useState(game.settings.name);
+  const tag = useAccount().data?.profile?.tag ?? null;
+  const profileSaved = useProfileSaved();
   const [rooms, setRooms] = useState(false);
   const [board, setBoard] = useState(false);
   const [turning, setTurning] = useState(false);
@@ -93,11 +97,13 @@ export function MainMenu({ openSettings }: { openSettings: () => void }) {
     game.audio.play('uiHover', { volume: 0.6 });
   };
 
-  const rename = (value: string) => {
-    const clean = value.replace(/\s+/g, ' ').slice(0, 16);
+  // While an input method composes (pinyin, kana), its text shows as typed; the name rule applies once it is committed.
+  const rename = (value: string, composing = false) => {
+    if (composing) return setName(value);
+    const clean = nameText(value);
     setName(clean);
-    game.applySettings({ ...game.settings, name: clean.trim() });
-    queueRename(clean.trim());
+    game.applySettings({ ...game.settings, name: clean });
+    queueRename(clean, profileSaved);
   };
 
   const grab = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -174,7 +180,17 @@ export function MainMenu({ openSettings }: { openSettings: () => void }) {
           </div>
           <label data-cover className='bf-menu-callsign'>
             <TagIcon />
-            <input placeholder={t('namePlaceholder')} aria-label={t('namePlaceholder')} value={name} maxLength={16} spellCheck={false} autoComplete='off' onChange={(e) => rename(e.target.value)} />
+            <input
+              placeholder={t('namePlaceholder')}
+              aria-label={t('namePlaceholder')}
+              value={name}
+              maxLength={NAME_MAX}
+              spellCheck={false}
+              autoComplete='off'
+              onChange={(e) => rename(e.target.value, (e.nativeEvent as InputEvent).isComposing)}
+              onCompositionEnd={(e) => rename(e.currentTarget.value)}
+            />
+            {tag !== null && <span className='shrink-0 text-[0.875em] font-semibold tabular-nums text-white/45'>#{tag}</span>}
           </label>
         </section>
 

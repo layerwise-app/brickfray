@@ -1,7 +1,8 @@
 import { uploadMatches } from '../board.functions';
 import { UPLOAD_BATCH, type MatchReport } from '../contract';
-import { addLocalMatch, markUploads, pendingMatches } from './history';
+import { addLocalMatch, localMatches, markUploads, pendingMatches } from './history';
 import { getPlayerId, markKnown } from './identity';
+import { settleOutcome } from './outcome';
 
 let running: Promise<boolean> | null = null;
 
@@ -32,7 +33,12 @@ async function send(name: string) {
 /** A match just finished: kept here first, then sent. One that got no ticket stays here only. */
 export function recordMatch(report: MatchReport, name: string) {
   addLocalMatch(report, report.ticket ? 'pending' : 'refused');
-  if (!report.ticket) return;
+  if (!report.ticket) return settleOutcome(report.key, 'local');
   // An upload already under way may have read the queue before this match joined it.
-  void (running ?? Promise.resolve()).then(() => flushMatches(name));
+  void (running ?? Promise.resolve())
+    .then(() => flushMatches(name))
+    .then(() => {
+      const upload = localMatches().find((m) => m.key === report.key)?.upload;
+      settleOutcome(report.key, upload === 'stored' ? 'stored' : upload === 'refused' ? 'refused' : 'waiting');
+    });
 }

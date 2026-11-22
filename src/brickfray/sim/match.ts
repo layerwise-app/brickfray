@@ -2,12 +2,12 @@ import type { BotKind, CharacterId } from '../characters/types';
 import { CHARACTER_IDS } from '../characters/roster';
 import { fillMagazines } from './arms';
 import { BotDirector } from './bots';
-import { MATCH, PLAYER } from './constants';
+import { MATCH, PLAYER, REGEN } from './constants';
 import { HostSim } from './host';
 import type { MapLayout } from '../world/types';
-import type { Difficulty, HostPlayer, MatchSettings, MatchState } from './types';
-import { drawOffer, takeUpgrade, type UpgradeId } from './upgrades';
-import { WAVE_BREAK, waveBosses, waveTuning } from './waves';
+import type { HostPlayer, KillCause, MatchSettings, MatchState } from './types';
+import { drawOffer, idleCards, takeUpgrade, type UpgradeId } from './upgrades';
+import { WAVE_BREAK, waveRoster, waveTuning } from './waves';
 
 const WARMUP = 4;
 /** Seconds the upgrade cards wait before taking the first card for a player who doesn't choose. */
@@ -20,7 +20,7 @@ const SNAPBOT_NAMES: Record<BotKind, string> = { grunt: 'Snapbot', rusher: 'Zipb
 export class Match {
   readonly sim: HostSim;
   readonly bots: BotDirector;
-  state: MatchState = { phase: 'warmup', phaseEnds: 0, teamScore: [0, 0], wave: 0, winner: null };
+  state: MatchState = { phase: 'warmup', phaseEnds: 0, teamScore: [0, 0], wave: 0, winner: null, waveLeft: 0, theme: null, cause: null };
   private waveQueue: BotKind[] = [];
   private waveSpawnTimer = 0;
   private wave = waveTuning('normal', 1);
@@ -32,7 +32,7 @@ export class Match {
     this.seed = seed >>> 0;
     this.sim = new HostSim(layout, settings, seed);
     this.bots = new BotDirector(this.sim);
-    this.sim.onKill = (victim, killer) => this.onKill(victim, killer);
+    this.sim.onKill = (victim, killer, weapon) => this.onKill(victim, killer, weapon);
   }
 
   get time() {
@@ -40,7 +40,7 @@ export class Match {
   }
 
   start() {
-    this.state = { phase: 'warmup', phaseEnds: this.time + WARMUP, teamScore: [0, 0], wave: 0, winner: null };
+    this.state = { phase: 'warmup', phaseEnds: this.time + WARMUP, teamScore: [0, 0], wave: 0, winner: null, waveLeft: 0, theme: null, cause: null };
     this.offers.clear();
     this.sim.damageEnabled = false;
     if (this.settings.mode !== 'solo') {
@@ -96,12 +96,13 @@ export class Match {
     if (bot) this.remove(bot.id);
   }
 
-  private onKill(victim: HostPlayer, killer: HostPlayer | null) {
+  private onKill(victim: HostPlayer, killer: HostPlayer | null, weapon: KillCause) {
     if (this.settings.mode === 'tdm' && killer && killer.team !== -1) this.state.teamScore[killer.team]++;
     if (this.settings.mode === 'solo') {
       if (victim.bot) {
         victim.respawnAt = this.time + 1.5;
       } else {
+        this.state.cause = { killer: killer?.bot ?? null, weapon };
         this.end(null);
       }
       return;
@@ -136,21 +137,17 @@ export class Match {
 
   private startWave() {
     const wave = ++this.state.wave;
-    this.sim.events.push({ type: 'wave', wave });
     this.wave = waveTuning(this.settings.difficulty, wave);
+    this.sim.events.push({ type: 'wave', wave, theme: this.wave.theme });
     this.bots.skill = this.wave.skill;
+    this.bots.lag = this.wave.lag;
     this.sim.botDamage = this.wave.damage;
-    // Rushers join from wave 2 and snipers from wave 3, each taking a growing share; every fifth wave adds bosses.
-    const rushers = wave >= 2 ? Math.min(4, wave) : 0;
-    const snipers = wave >= 3 ? Math.min(2, wave - 2) : 0;
-    const queue: BotKind[] = [];
-    for (let i = 0; i < this.wave.count; i++) {
-      const r = (i * 7 + wave * 3) % 10;
-      queue.push(r < rushers ? 'rusher' : r >= 10 - snipers ? 'sniper' : 'grunt');
-    }
-    for (let i = 0; i < waveBosses(wave); i++) queue.push('boss');
-    this.waveQueue = queue;
+    this.waveQueue = waveRoster(this.settings.difficulty, wave);
     this.waveSpawnTimer = 0;
+    this.state.theme = this.wave.theme;
+    this.state.waveLeft = this.waveQueue.length;
+    // A held regeneration (a part heal between waves) comes back once the wave is under way, after its usual wait.
+    if (this.sim.regenAfter === Infinity) this.sim.regenAfter = this.time + REGEN.delay;
   }
 
   /** Advance one host tick. */
@@ -199,13 +196,14 @@ export class Match {
   private clearWave() {
     const s = this.state;
     s.phase = 'intermission';
+    if (this.wave.heal < 1) this.sim.regenAfter = Infinity;
     for (const p of this.sim.players.values()) {
       if (p.bot || !p.alive) continue;
       p.health = Math.min(p.maxHealth, p.health + p.maxHealth * this.wave.heal);
       fillMagazines(p.arms);
       p.arms.grenades = p.arms.grenadeMax;
       p.arms.grenadeTimer = 0;
-      const options = drawOffer(p.upgrades, this.seed + p.id * 7919, s.wave);
+      const options = drawOffer(p.upgrades, this.seed + p.id * 7919, s.wave, 3, idleCards(p));
       if (!options.length) continue;
       this.offers.set(p.id, options);
       this.sim.events.push({ type: 'upgradeOffer', player: p.id, wave: s.wave, options, levels: { ...p.upgrades } });
@@ -220,8 +218,10 @@ export class Match {
     if (this.waveQueue.length && alive < this.wave.alive && this.waveSpawnTimer <= 0) {
       this.waveSpawnTimer = this.wave.spawnEvery;
       const bot = this.addBot(this.waveQueue.shift()!);
+      if (bot.bot === 'boss') bot.maxHealth = this.wave.bossHealth;
       this.sim.spawn(bot);
     }
+    this.state.waveLeft = this.waveQueue.length + [...this.sim.players.values()].filter((p) => p.bot && p.alive).length;
     if (!this.waveQueue.length && alive === 0 && this.botCount() === 0) this.clearWave();
   }
 

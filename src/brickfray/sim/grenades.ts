@@ -15,11 +15,22 @@ export interface Grenade {
   /** Bounces since the last snapshot, for client sounds. */
   bounces: number;
   resting: boolean;
+  /** Thrown by a bot: hits humans for the bots' share even if the bot is gone by the time it bursts. */
+  byBot?: boolean;
 }
+
+/**
+ * The overhand throw: one speed, raised a little above a level aim, the rise fading out by 45° of aim. Carry on flat
+ * ground from standing: 13 m level, 28 m at most (aim 40–45°), nearer again above that; a sprint adds about 3 m.
+ */
+export const THROW = { speed: 24, lift: 0.14, liftFade: Math.PI / 4, inherit: 0.3 } as const;
 
 const RADIUS = 0.09;
 const RESTITUTION = 0.38;
 const FRICTION = 0.7;
+/** A hard landing bites into the ground and barely hops: it keeps at least this share of its run and of its fall. */
+const LANDING_GRIP = 0.4;
+const LANDING_BOUNCE = 0.22;
 
 export function throwGrenade(
   id: number,
@@ -30,21 +41,58 @@ export function throwGrenade(
   cook: number,
   low: boolean
 ): Grenade {
-  const speed = low ? GRENADE.lobSpeed : GRENADE.throwSpeed;
-  const lift = low ? 0.05 : 0.18;
+  const v = low ? lobVelocity(dir) : throwVelocity(dir);
+  const keep = low ? 0.6 : THROW.inherit;
   return {
     id,
     owner,
     x: eye[0] + dir[0] * 0.4,
     y: eye[1] - 0.15 + dir[1] * 0.4,
     z: eye[2] + dir[2] * 0.4,
-    vx: dir[0] * speed + inherit[0] * 0.6,
-    vy: (dir[1] + lift) * speed + inherit[1] * 0.3,
-    vz: dir[2] * speed + inherit[2] * 0.6,
+    vx: v[0] + inherit[0] * keep,
+    vy: v[1] + inherit[1] * 0.3,
+    vz: v[2] + inherit[2] * keep,
     fuse: Math.max(0.05, GRENADE.fuse - cook),
     bounces: 0,
     resting: false
   };
+}
+
+/** The underhand lob: short and soft whatever the aim. */
+function lobVelocity(dir: [number, number, number]): [number, number, number] {
+  return [dir[0] * GRENADE.lobSpeed, (dir[1] + 0.05) * GRENADE.lobSpeed, dir[2] * GRENADE.lobSpeed];
+}
+
+function throwVelocity(dir: [number, number, number]): [number, number, number] {
+  const flat = Math.hypot(dir[0], dir[2]);
+  const pitch = Math.atan2(dir[1], flat);
+  const up = pitch + THROW.lift * Math.max(0, 1 - Math.max(0, pitch) / THROW.liftFade);
+  const across = flat > 1e-6 ? Math.cos(up) / flat : 0;
+  return [dir[0] * across * THROW.speed, Math.sin(up) * THROW.speed, dir[2] * across * THROW.speed];
+}
+
+/**
+ * The aim pitch whose overhand throw first comes down `distance` m away (in plan) and `rise` m above the eye; null when
+ * no aim up to the longest throw reaches it. Below the longest throw's aim the carry only grows with pitch.
+ */
+export function throwPitchFor(distance: number, rise: number): number | null {
+  const carry = (pitch: number) => {
+    const c = Math.cos(pitch);
+    const s = Math.sin(pitch);
+    const [vx, vy, vz] = throwVelocity([0, s, -c]);
+    const drop = -0.15 + 0.4 * s - rise;
+    const root = vy * vy + 2 * MOVE.gravity * drop;
+    return root < 0 ? -1 : 0.4 * c + Math.hypot(vx, vz) * ((vy + Math.sqrt(root)) / MOVE.gravity);
+  };
+  let lo = -0.6;
+  let hi = THROW.liftFade - 0.05;
+  if (carry(hi) < distance) return null;
+  for (let i = 0; i < 24; i++) {
+    const mid = (lo + hi) / 2;
+    if (carry(mid) < distance) lo = mid;
+    else hi = mid;
+  }
+  return hi;
 }
 
 /** Advance a grenade; returns true when its fuse runs out. */
@@ -72,9 +120,12 @@ export function stepGrenade(world: CollisionWorld, g: Grenade, dt: number): bool
     remaining *= 1 - hit.t;
     const [nx, ny, nz] = hit.normal;
     const vn = g.vx * nx + g.vy * ny + g.vz * nz;
-    g.vx = (g.vx - nx * vn) * FRICTION - nx * vn * RESTITUTION;
-    g.vy = (g.vy - ny * vn) * FRICTION - ny * vn * RESTITUTION;
-    g.vz = (g.vz - nz * vn) * FRICTION - nz * vn * RESTITUTION;
+    const floor = ny > 0.5;
+    const grip = floor ? Math.max(LANDING_GRIP, FRICTION - 0.025 * Math.abs(vn)) : FRICTION;
+    const bounce = floor ? Math.max(LANDING_BOUNCE, RESTITUTION - 0.008 * Math.abs(vn)) : RESTITUTION;
+    g.vx = (g.vx - nx * vn) * grip - nx * vn * bounce;
+    g.vy = (g.vy - ny * vn) * grip - ny * vn * bounce;
+    g.vz = (g.vz - nz * vn) * grip - nz * vn * bounce;
     if (Math.abs(vn) > 1.2) g.bounces++;
     if (ny > 0.5 && Math.hypot(g.vx, g.vy, g.vz) < 0.6) {
       g.resting = true;

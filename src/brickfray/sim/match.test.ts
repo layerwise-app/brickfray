@@ -3,7 +3,7 @@ import type { MapLayout } from '../world/types';
 import { TICK } from './constants';
 import { WEAPONS } from '../weapons/defs';
 import { Match } from './match';
-import { waveTuning } from './waves';
+import { botsThrough, secondsToReach, waveRoster, waveTuning } from './waves';
 import { BUTTON, DIFFICULTIES, type Difficulty } from './types';
 
 function arena(): MapLayout {
@@ -147,25 +147,84 @@ describe('Match', () => {
 });
 
 describe('solo difficulty', () => {
-  const tuning = (d: Difficulty) => Array.from({ length: 15 }, (_, i) => waveTuning(d, i + 1));
-  const keys = ['skill', 'damage', 'count', 'alive'] as const;
+  const tuning = (d: Difficulty) => Array.from({ length: 30 }, (_, i) => waveTuning(d, i + 1));
 
-  it.each(DIFFICULTIES)('%s gets harder every wave', (d) => {
+  it.each(DIFFICULTIES)('%s aims and hits harder every wave, and its aim trails a mover less', (d) => {
     const waves = tuning(d);
     for (let i = 1; i < waves.length; i++) {
-      for (const k of keys) expect(waves[i]![k]).toBeGreaterThanOrEqual(waves[i - 1]![k]);
-      expect(waves[i]!.count).toBeGreaterThan(waves[i - 1]!.count);
+      expect(waves[i]!.skill).toBeGreaterThanOrEqual(waves[i - 1]!.skill);
+      expect(waves[i]!.damage).toBeGreaterThanOrEqual(waves[i - 1]!.damage);
+      expect(waves[i]!.lag).toBeLessThanOrEqual(waves[i - 1]!.lag);
     }
-    expect(waves[4]!.skill).toBeGreaterThan(waves[0]!.skill);
-    expect(waves[4]!.damage).toBeGreaterThan(waves[0]!.damage);
+    expect(waves[11]!.skill).toBeGreaterThan(waves[0]!.skill);
+    expect(waves[29]!.damage).toBeGreaterThan(waves[11]!.damage);
   });
 
   it('harder settings start harder', () => {
     const [easy, normal, hard] = DIFFICULTIES.map((d) => waveTuning(d, 1));
-    for (const k of keys) {
+    for (const k of ['skill', 'damage', 'count', 'alive', 'bossHealth'] as const) {
       expect(normal![k]).toBeGreaterThanOrEqual(easy![k]);
       expect(hard![k]).toBeGreaterThanOrEqual(normal![k]);
     }
-    expect(hard!.skill).toBeGreaterThan(easy!.skill);
+    expect(hard!.lag).toBeLessThan(easy!.lag);
+    expect(hard!.heal).toBeLessThan(1);
+  });
+
+  it('the waves change mix and theme, with something new every two or three waves up to 12', () => {
+    const roster = (w: number) => waveRoster('normal', w);
+    const kinds = (w: number) => new Set(roster(w));
+    expect(kinds(1)).toEqual(new Set(['grunt']));
+    expect(kinds(2).has('rusher') && !kinds(2).has('sniper')).toBe(true);
+    expect(kinds(3).has('sniper')).toBe(true);
+    expect(kinds(5).has('boss')).toBe(true);
+    const themes = Array.from({ length: 12 }, (_, i) => waveTuning('normal', i + 1).theme);
+    const firsts = themes.map((t, i) => (themes.indexOf(t) === i ? i + 1 : 0)).filter(Boolean);
+    for (let i = 1; i < firsts.length; i++) expect(firsts[i]! - firsts[i - 1]!).toBeLessThanOrEqual(3);
+    expect(firsts.at(-1)).toBeGreaterThanOrEqual(10);
+    // No two waves in a row share a mix (a share of each kind within 10%).
+    const mix = (w: number) => ['grunt', 'rusher', 'sniper', 'boss'].map((k) => roster(w).filter((x) => x === k).length / roster(w).length);
+    for (let w = 2; w <= 20; w++) expect(mix(w).some((v, i) => Math.abs(v - mix(w - 1)[i]!) > 0.1)).toBe(true);
+  });
+
+  it('boss waves bring fewer snapbots alongside the boss than the waves around them', () => {
+    for (const d of DIFFICULTIES) {
+      for (const w of [5, 10, 15, 20]) {
+        const regulars = (n: number) => waveRoster(d, n).filter((k) => k !== 'boss').length;
+        expect(waveRoster(d, w).includes('boss')).toBe(true);
+        expect(regulars(w)).toBeLessThan(regulars(w - 1));
+      }
+    }
+  });
+
+  it('the leaderboard checks count every snapbot the table sends and the least time it takes', () => {
+    for (const d of DIFFICULTIES) {
+      let bots = 0;
+      for (let w = 1; w <= 30; w++) {
+        bots += waveRoster(d, w).length;
+        expect(botsThrough(d, w)).toBe(bots);
+        expect(waveTuning(d, w).count).toBe(waveRoster(d, w).length);
+        expect(secondsToReach(d, w + 1)).toBeGreaterThan(secondsToReach(d, w));
+      }
+    }
+  });
+
+  it('a solo match sends the table: each wave event names its theme and the wave its snapbots in order', () => {
+    const match = new Match(arena(), { mode: 'solo', map: 'plaza', minutes: 0, bots: 0, difficulty: 'normal' }, 3);
+    const me = match.addHuman('Me', 'vega');
+    match.start();
+    me.protectedUntil = Infinity;
+    const seen: string[] = [];
+    let theme = '';
+    for (let t = 0; t < 120 && match.state.wave < 3; t += TICK) {
+      match.tick(TICK);
+      for (const e of match.sim.drain().events) {
+        if (e.type === 'wave') theme = e.theme;
+        if (e.type === 'spawn' && match.sim.players.get(e.player)?.bot) seen.push(match.sim.players.get(e.player)!.bot!);
+        if (e.type === 'upgradeOffer') match.pickUpgrade(me.id, e.options[0]!);
+      }
+      expect(match.state.theme).toBe(theme || null);
+      for (const p of match.sim.players.values()) if (p.bot && p.alive && match.time > 5) match.sim.damage(p, 999, { attacker: me.id, weapon: 'ar', kind: 'body', from: [0, 0, 0] });
+    }
+    expect(seen.slice(0, waveRoster('normal', 1).length + waveRoster('normal', 2).length)).toEqual([...waveRoster('normal', 1), ...waveRoster('normal', 2)]);
   });
 });

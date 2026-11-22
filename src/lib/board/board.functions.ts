@@ -13,15 +13,19 @@ import {
   type LeaderboardPage,
   type LeaderboardQuery,
   type MatchReport,
+  type MatchRank,
   type MatchStart,
+  type MatchView,
   type ProfileView,
   type UploadResult
 } from './contract';
-import { EMPTY_HISTORY, history, leaderboard, storeMatches } from './matches';
+import { EMPTY_HISTORY, history, leaderboard, matchView, storeMatches } from './matches';
+import { matchRank } from './rank';
+import { cleanName } from './names';
 import { claimPlayer, ensurePlayer, findPlayer, getProfile, profileView, updateProfile } from './players';
 import { allowAll, HOUR, ipKey, MINUTE } from './rate';
 import { issueTicket, openTicket } from './ticket';
-import { admit, cleanName, parseHistoryQuery, parseLeaderboardQuery, parseMatchStart, parseUpload, playerId } from './validate';
+import { admit, parseHistoryQuery, parseLeaderboardQuery, parseMatchQuery, parseMatchStart, parseRankQuery, parseUpload, playerId } from './validate';
 
 // The browser's player id is its credential here; the auth session only decides which account a claim joins.
 
@@ -101,7 +105,31 @@ export const getLeaderboard = createServerFn({ method: 'GET' })
   .validator((raw: Omit<LeaderboardQuery, 'playerId'> & { playerId: string | null }) => parseLeaderboardQuery(raw))
   .handler(async ({ data }): Promise<LeaderboardPage> => {
     const player = data.playerId ? await findPlayer(db, data.playerId) : null;
-    return leaderboard(db, data, player?.profileId ?? null, Date.now());
+    return leaderboard(db, data, player?.profileId ?? null);
+  });
+
+/** Asked once a match is stored: where it leaves the asker on its board, for the end-of-match screen. */
+export const getMatchRank = createServerFn({ method: 'GET' })
+  .validator((raw: { playerId: string; key: string; mode: string }) => parseRankQuery(raw))
+  .handler(async ({ data }): Promise<MatchRank | { refused: 'rate' } | null> => {
+    const ok = await allowAll(
+      db,
+      [
+        [`rank:p:${data.playerId}`, 30, 10 * MINUTE],
+        [`rank:ip:${await caller()}`, 300, HOUR]
+      ],
+      Date.now()
+    );
+    if (!ok) return { refused: 'rate' };
+    return matchRank(db, data.playerId, data.key, data.mode);
+  });
+
+/** The score panel of one stored match (a ranking row or one of the asker's own). */
+export const getMatch = createServerFn({ method: 'GET' })
+  .validator((raw: { id: number; playerId: string | null }) => parseMatchQuery(raw))
+  .handler(async ({ data }): Promise<MatchView | null> => {
+    const player = data.playerId ? await findPlayer(db, data.playerId) : null;
+    return matchView(db, data.id, player?.profileId ?? null);
   });
 
 export const getHistory = createServerFn({ method: 'GET' })

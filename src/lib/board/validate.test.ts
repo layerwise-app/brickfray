@@ -3,7 +3,7 @@ import { BoardError } from './contract';
 import { report, soloReport } from './test-db';
 import { botsThrough, secondsToReach } from '~/brickfray/sim/waves';
 import { issueTicket, openTicket, type Ticket } from './ticket';
-import { admit, cleanName, parseLeaderboardQuery, parseReport, parseUpload, periodStart } from './validate';
+import { admit, parseLeaderboardQuery, parseMatchQuery, parseReport, parseUpload } from './validate';
 
 const NOW = 1_800_000_100_000;
 
@@ -81,7 +81,8 @@ describe('match tickets', () => {
 describe('match reports', () => {
   it('accepts what the game produces', () => {
     expect(parseReport(report(), NOW).score).toBe(1200);
-    expect(parseReport(soloReport({ wave: 12, durationS: 900, kills: 120, score: 14000 }), NOW).wave).toBe(12);
+    const kills = botsThrough('normal', 12) - 2;
+    expect(parseReport(soloReport({ wave: 12, durationS: 900, kills, assists: 0, score: 110 * kills }), NOW).wave).toBe(12);
   });
 
   it('refuses malformed fields', () => {
@@ -135,39 +136,19 @@ describe('match reports', () => {
   });
 });
 
-describe('names', () => {
-  it('keeps one clean line of at most 16 characters', () => {
-    expect(cleanName('  Brick   Layer ')).toBe('Brick Layer');
-    expect(cleanName('a\u202ebc\u200bd\n')).toBe('abcd');
-    expect(cleanName('ＷＩＤＥ')).toBe('WIDE');
-    expect(cleanName('x'.repeat(40))).toBe('x'.repeat(16));
-    expect(cleanName('積み木の王様になりたい人です、よろしく')).toHaveLength(16);
-    expect(cleanName('😀'.repeat(20))).toBe('😀'.repeat(16));
-    expect(cleanName('\u200b \u200b')).toBeNull();
-    expect(cleanName(42)).toBeNull();
-  });
-});
-
-describe('leaderboard queries', () => {
-  it('solo boards need a difficulty, room boards drop it', () => {
-    expect(() => parseLeaderboardQuery({ mode: 'solo', period: 'all', page: 0 })).toThrow('difficulty unknown');
-    expect(parseLeaderboardQuery({ mode: 'ffa', period: 'week', page: 2, difficulty: 'hard', tzOffset: 480, playerId: 'bad' })).toEqual({
-      mode: 'ffa',
-      period: 'week',
-      difficulty: null,
-      page: 2,
-      tzOffset: 480,
-      playerId: null
-    });
+describe('board queries', () => {
+  it('all-time boards: solo ones need a difficulty, room ones drop it; a map narrows any of them', () => {
+    expect(() => parseLeaderboardQuery({ mode: 'solo', map: null, page: 0 })).toThrow('difficulty unknown');
+    expect(parseLeaderboardQuery({ mode: 'ffa', map: null, page: 2, difficulty: 'hard', playerId: 'bad' })).toEqual({ mode: 'ffa', difficulty: null, map: null, page: 2, playerId: null });
+    expect(parseLeaderboardQuery({ mode: 'solo', map: 'temple', page: 0, difficulty: 'easy', playerId: null })).toMatchObject({ map: 'temple', difficulty: 'easy' });
+    expect(() => parseLeaderboardQuery({ mode: 'ffa', map: '../x', page: 0 })).toThrow('bad map');
+    // A page loaded before the map filter asks without one (and with the period it no longer has): every map.
+    expect(parseLeaderboardQuery({ mode: 'ffa', period: 'week', tzOffset: 60, page: 0 })).toMatchObject({ map: null });
   });
 
-  it('starts today and this week at the player’s own midnight, weeks on Monday', () => {
-    // Saturday 2026-11-21 15:30 UTC = 23:30 in UTC+8.
-    const now = Date.UTC(2026, 10, 21, 15, 30);
-    expect(new Date(periodStart('day', now, 480)).toISOString()).toBe('2026-11-20T16:00:00.000Z');
-    expect(new Date(periodStart('day', now, 0)).toISOString()).toBe('2026-11-21T00:00:00.000Z');
-    expect(new Date(periodStart('week', now, 480)).toISOString()).toBe('2026-11-15T16:00:00.000Z');
-    expect(new Date(periodStart('week', now, -300)).toISOString()).toBe('2026-11-16T05:00:00.000Z');
-    expect(periodStart('all', now, 0)).toBe(0);
+  it('a score panel is asked for by a stored match id', () => {
+    expect(parseMatchQuery({ id: 42, playerId: PLAYER })).toEqual({ id: 42, playerId: PLAYER });
+    expect(parseMatchQuery({ id: 42, playerId: 'x' })).toEqual({ id: 42, playerId: null });
+    for (const id of [0, -1, 1.5, '42', null]) expect(() => parseMatchQuery({ id, playerId: null })).toThrow('bad match id');
   });
 });

@@ -1,10 +1,9 @@
+import type { UpgradeId } from '~/brickfray/sim/upgrades';
+
 // What the leaderboard client and server exchange. Shared by both sides, so nothing here touches the database or the DOM.
 
 export const MODES = ['solo', 'ffa', 'tdm'] as const;
 export type BoardMode = (typeof MODES)[number];
-
-export const PERIODS = ['day', 'week', 'all'] as const;
-export type BoardPeriod = (typeof PERIODS)[number];
 
 export const SOLO_LEVELS = ['easy', 'normal', 'hard'] as const;
 export type SoloLevel = (typeof SOLO_LEVELS)[number];
@@ -13,7 +12,6 @@ export type MatchResult = 'win' | 'loss' | 'draw';
 
 export const LEADERBOARD_PAGE = 20;
 export const HISTORY_PAGE = 15;
-export const NAME_MAX = 16;
 export const AVATAR_PX = 128;
 export const AVATAR_MAX_BYTES = 32 * 1024;
 export const AVATAR_TYPES = ['image/webp', 'image/jpeg', 'image/png'] as const;
@@ -45,7 +43,32 @@ export interface MatchReport {
   players: number;
   /** Solo: null. */
   result: MatchResult | null;
+  /** What the end-of-match screen showed; null from a client older than it. */
+  detail: MatchDetail | null;
 }
+
+/** One player on a room's final scoreboard. */
+export interface DetailPlayer {
+  name: string;
+  /** A character id (room bots wear the roster too). */
+  character: string;
+  /** -1 in free-for-all. */
+  team: number;
+  score: number;
+  kills: number;
+  deaths: number;
+  assists: number;
+  bot: boolean;
+  /** The player who reported the match. */
+  me: boolean;
+}
+
+/** The score panel of a finished match: a room's final scoreboard in its order, or the upgrades a solo run took. */
+export type MatchDetail =
+  | { mode: 'solo'; upgrades: UpgradeId[] }
+  /** `winner`: index into `players`; null on a draw or when the winner had left. */
+  | { mode: 'ffa'; players: DetailPlayer[]; winner: number | null }
+  | { mode: 'tdm'; players: DetailPlayer[]; teams: [number, number]; winner: 0 | 1 | null };
 
 /** A started match: its ticket and the key its report must carry. */
 export interface MatchStart {
@@ -59,6 +82,7 @@ export interface Avatar {
   image: string | null;
 }
 
+/** A stored match in the player's own list. Its date is shown there only, so other lists leave it out. */
 export interface BoardEntry {
   id: number;
   mode: BoardMode;
@@ -78,22 +102,27 @@ export interface BoardEntry {
   result: MatchResult | null;
 }
 
-export interface RankedEntry extends BoardEntry {
-  rank: number;
+/** Who a row belongs to, as everyone sees it: "Name#1234" and a picture. A profile from before tags has a null tag. */
+export interface BoardPlayer {
   name: string;
+  tag: number | null;
   avatar: Avatar;
+}
+
+export interface RankedEntry extends Omit<BoardEntry, 'endedAt'>, BoardPlayer {
+  rank: number;
   /** The asking browser's own row (its player, or its account's). */
   mine: boolean;
 }
 
+/** All-time boards, one per mode (solo: per difficulty), on one map or all of them. */
 export interface LeaderboardQuery {
   mode: BoardMode;
-  period: BoardPeriod;
   /** Solo boards are kept per difficulty. */
   difficulty: SoloLevel | null;
+  /** Null: every map. */
+  map: string | null;
   page: number;
-  /** Minutes east of UTC, so "today" and "this week" start at the player's own midnight. */
-  tzOffset: number;
   playerId: string | null;
 }
 
@@ -127,9 +156,27 @@ export interface HistoryPage {
   totals: HistoryTotals;
 }
 
-export interface ProfileView {
-  name: string;
-  avatar: Avatar;
+export type ProfileView = BoardPlayer;
+
+/** One match's score panel. `endedAt` only for the asker's own match; `detail` null for a match stored before details were kept. */
+export interface MatchView {
+  match: Omit<BoardEntry, 'endedAt'> & { endedAt: number | null };
+  player: BoardPlayer;
+  mine: boolean;
+  detail: MatchDetail | null;
+}
+
+/** Where a just-stored match leaves its player on the all-time board of its mode (solo: its difficulty), every map. */
+export interface MatchRank {
+  mode: BoardMode;
+  difficulty: SoloLevel | null;
+  /** The player's place now (their best match there), out of `total` ranked players. */
+  rank: number;
+  total: number;
+  /** Their place without this match; null when it is their first there. */
+  before: number | null;
+  /** Where this match alone places against everyone else's best (equal to `rank` when it is their best). */
+  run: number;
 }
 
 /** Only ever sent to the browser it describes: the email is the signed-in user's own. */

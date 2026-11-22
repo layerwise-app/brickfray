@@ -75,18 +75,25 @@ function Cards({ offer }: { offer: UpgradeOffer }) {
       click() {
         if (over !== null) choose(over);
       },
-      choose,
+      // A number key marks its card and the same key again takes it: 1 and 2 also switch guns, and one pressed as
+      // the cards come up must not pick.
+      choose(i) {
+        if (over === i) choose(i);
+        else if (offer.options[i]) goTo(i);
+      },
       step(direction) {
         const n = offer.options.length;
-        const i = over === null ? (direction > 0 ? 0 : n - 1) : (over + direction + n) % n;
-        const r = cards.current[i]?.getBoundingClientRect();
-        if (r) {
-          pos.x = r.left + r.width / 2;
-          pos.y = r.top + r.height * 0.62;
-          place();
-        }
-        hover(i);
+        goTo(over === null ? (direction > 0 ? 0 : n - 1) : (over + direction + n) % n);
       }
+    };
+    const goTo = (i: number) => {
+      const r = cards.current[i]?.getBoundingClientRect();
+      if (r) {
+        pos.x = r.left + r.width / 2;
+        pos.y = r.top + r.height * 0.62;
+        place();
+      }
+      hover(i);
     };
     place();
     game.input.setPicker(picker);

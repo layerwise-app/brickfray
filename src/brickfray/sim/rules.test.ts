@@ -67,7 +67,7 @@ describe('grenade refill', () => {
     }
     expect(a.arms.grenades).toBe(GRENADE.perLife);
     expect(a.arms.grenadeTimer).toBe(0);
-    // The first comes back 15 s after its throw; the second 15 s after that, not in parallel.
+    // The first comes back a refill after its throw; the second a refill after that, not in parallel.
     expect(arrivals.length).toBe(2);
     expect(Math.abs((arrivals[0]! - 4) * TICK - GRENADE_REFILL)).toBeLessThan(0.05);
     expect(Math.abs((arrivals[1]! - arrivals[0]!) * TICK - GRENADE_REFILL)).toBeLessThan(0.05);
@@ -78,12 +78,12 @@ describe('grenade refill', () => {
     const a = match.addHuman('A', 'rivet');
     match.start();
     for (let i = 0; i < 3; i++) takeUpgrade(a, 'grenadeRefill');
-    expect(a.arms.grenadeRefill).toBe(6);
+    expect(a.arms.grenadeRefill).toBe(4.5);
     match.sim.spawn(a, { position: [10, 0, 10], yaw: 0 });
-    expect(a.arms.grenadeRefill).toBe(6);
+    expect(a.arms.grenadeRefill).toBe(4.5);
     expect(a.arms.grenades).toBe(a.arms.grenadeMax);
     let seq = throwOne(match, a, 1);
-    for (let i = 0; i < 6 * 60 - 30; i++) match.sim.applyCommand(a.id, idle(seq++, a));
+    for (let i = 0; i < 4.5 * 60 - 30; i++) match.sim.applyCommand(a.id, idle(seq++, a));
     expect(a.arms.grenades).toBe(GRENADE.perLife - 1);
     for (let i = 0; i < 40; i++) match.sim.applyCommand(a.id, idle(seq++, a));
     expect(a.arms.grenades).toBe(GRENADE.perLife);

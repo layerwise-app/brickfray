@@ -3,6 +3,7 @@ import type { CharacterId } from '../characters/types';
 import type { QualityLevel } from '../engine/quality';
 import type { Difficulty, MatchSettings } from '../sim/types';
 import type { MapId } from '../world/types';
+import { nameText } from '../../lib/board/names';
 import { DEFAULT_BINDINGS, type InputSettings } from './input';
 
 export const MAP_IDS: MapId[] = ['plaza', 'fortress', 'docks', 'temple'];
@@ -78,6 +79,8 @@ export function loadSettings(): Settings {
     return {
       ...base,
       ...saved,
+      // A name saved before the name rule (spaces, emoji) is cleaned the way the board cleaned the profile's.
+      name: typeof saved.name === 'string' ? nameText(saved.name) : base.name,
       input: { ...base.input, ...saved.input, bindings: { ...base.input.bindings, ...saved.input?.bindings } },
       mix: { ...base.mix, ...saved.mix },
       crosshair: { ...base.crosshair, ...saved.crosshair },

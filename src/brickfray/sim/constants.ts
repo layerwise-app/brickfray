@@ -17,7 +17,7 @@ export const PLAYER = {
 } as const;
 
 /** Seconds to get one thrown grenade back, in every mode; solo upgrades lower a player's own. */
-export const GRENADE_REFILL = 15;
+export const GRENADE_REFILL = 9;
 
 /** Health comes back `rate` per second per 100 max health once `delay` seconds pass without damage. */
 export const REGEN = { delay: 4.5, rate: 22 } as const;

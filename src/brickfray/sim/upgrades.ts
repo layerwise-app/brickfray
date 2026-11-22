@@ -26,9 +26,9 @@ export const UPGRADES: Record<UpgradeId, UpgradeDef> = {
   /** Grenade slots. */
   grenades: { steps: [1, 1, 1], weight: 0.8 },
   /** Seconds cut from getting a grenade back. */
-  grenadeRefill: { steps: [4, 3, 2], weight: 0.8 },
+  grenadeRefill: { steps: [2, 1.5, 1], weight: 0.8 },
   /** Share added to move speed. */
-  speed: { steps: [0.1, 0.07, 0.05], weight: 0.8 },
+  speed: { steps: [0.15, 0.1, 0.08], weight: 0.8 },
   /** Health per second (per 100 max health) added to regeneration, which also starts sooner (REGEN_SOONER). */
   regen: { steps: [12, 8, 6], weight: 0.9 },
   /** Share added to all damage dealt. */
@@ -74,9 +74,17 @@ export function upgradeStats(levels: UpgradeLevels) {
 }
 export type UpgradeStats = ReturnType<typeof upgradeStats>;
 
-/** Up to `count` different upgrades not yet at their cap, weighted. The same seed and round deal the same cards. */
-export function drawOffer(levels: UpgradeLevels, seed: number, round: number, count = 3): UpgradeId[] {
-  const pool = UPGRADE_IDS.filter((id) => canTake(levels, id));
+/** Grenade cards change nothing for a player who has not thrown one yet this run. */
+export function idleCards(p: HostPlayer): UpgradeId[] {
+  return p.thrown ? [] : ['grenades', 'grenadeRefill'];
+}
+
+/**
+ * Up to `count` different upgrades not yet at their cap and not in `skip`, weighted. The same seed, round and skip
+ * deal the same cards.
+ */
+export function drawOffer(levels: UpgradeLevels, seed: number, round: number, count = 3, skip: readonly UpgradeId[] = []): UpgradeId[] {
+  const pool = UPGRADE_IDS.filter((id) => canTake(levels, id) && !skip.includes(id));
   const out: UpgradeId[] = [];
   for (let k = 0; k < count && pool.length; k++) {
     let r = hashRandom(seed, round, k) * pool.reduce((s, id) => s + UPGRADES[id].weight, 0);

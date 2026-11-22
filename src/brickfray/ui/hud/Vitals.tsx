@@ -27,15 +27,55 @@ function useHits() {
   return hits;
 }
 
+/** The bar is as long at any max health as it is at 100: more health means more, thinner cells. */
+const BAR = 236;
+/** Below this cell width (px) a cell holds 20 health instead of 10. */
+const MIN_CELL = 9;
+/** Hits closer together than this (ms) flash as one run of lost health. */
+const MERGE_MS = 300;
+
+/** Cells of `unit` health (the last one holds what is left) and the gap between them, all within BAR. */
+export function healthCells(max: number) {
+  const fit = (unit: number) => {
+    const count = Math.ceil(max / unit - 1e-6);
+    const gap = count > 12 ? 3 : 4;
+    const px = (BAR + gap) / max;
+    const cells = Array.from({ length: count }, (_, i) => {
+      const from = i * unit;
+      const worth = Math.min(unit, max - from);
+      return { from, worth, width: worth * px - gap };
+    });
+    return { unit, gap, cells };
+  };
+  const ten = fit(10);
+  return ten.cells.every((c) => c.worth < 10 || c.width >= MIN_CELL) ? ten : fit(20);
+}
+
+/** The run of health the latest hit took, kept while its flash plays; a regen tick never starts one. */
+function useLostFlash(health: number) {
+  const [seen, setSeen] = useState(health);
+  const [flash, setFlash] = useState({ key: 0, top: 0, bottom: 0, at: 0 });
+  if (health !== seen) {
+    setSeen(health);
+    if (health < seen) {
+      const now = performance.now();
+      const top = now - flash.at < MERGE_MS ? Math.max(flash.top, seen) : seen;
+      setFlash({ key: flash.key + 1, top, bottom: Math.max(0, health), at: now });
+    }
+  }
+  return flash;
+}
+
 /**
- * Health as a white figure on the same dark plate as the ammo count, beside a brick per ten max health that drain
- * (upgrades lengthen the row). Both turn red only below LOW_HEALTH, where the screen edges warn too; every hit flashes
- * them (red, or white once already red). Armour rides above as a row of steel bricks.
+ * Health as a white figure on the same dark plate as the ammo count, beside a bar of bricks that drain. The bar keeps
+ * its length whatever the max (upgrades add cells, each thinner; past a point a cell holds 20). Both turn red only below
+ * LOW_HEALTH, where the screen edges warn too; a hit flashes the health it took (red, or white once already red).
+ * Armour rides above as a row of steel bricks.
  */
 export function Health({ health, max, armor }: { health: number; max: number; armor: number }) {
   const hits = useHits();
-  const bricks = Math.max(10, Math.round(max / 10));
-  const per = max / bricks;
+  const lost = useLostFlash(health);
+  const { unit, gap, cells } = healthCells(max);
   const low = health < max * LOW_HEALTH;
   const fill = low ? WARN_FILL : '#f4f6fb';
   const flash = low ? '#ffffff' : WARN_FILL;
@@ -53,20 +93,31 @@ export function Health({ health, max, armor }: { health: number; max: number; ar
       </div>
       <div className='flex flex-col gap-1.5 pb-1.5'>
         {armor > 0 && <Armor armor={armor} />}
-        <div className='flex gap-1'>
-        {Array.from({ length: bricks }, (_, i) => {
-          const level = Math.max(0, Math.min(1, (health - i * per) / per));
-          return (
-            <div key={i} className='relative h-7 w-5 overflow-hidden rounded-[5px] bg-black/45 shadow-[0_2px_0_rgba(0,0,0,.4)]'>
-              <div
-                className='absolute inset-x-0 bottom-0 rounded-[5px] transition-[height] duration-150'
-                style={{ height: `${level * 100}%`, background: fill, boxShadow: 'inset 0 -3px 0 rgba(0,0,0,.22), inset 0 2px 0 rgba(255,255,255,.5)' }}
-              />
-              <div className='absolute left-1/2 top-[-3px] h-[6px] w-[10px] -translate-x-1/2 rounded-full' style={{ background: level > 0.95 ? (low ? '#ff8a7c' : '#ffffff') : 'rgba(0,0,0,.35)' }} />
-              {hits > 0 && <div key={hits} className='absolute inset-0 rounded-[5px]' style={{ background: flash, animation: 'bf-hp-flash .45s ease-in both' }} />}
-            </div>
-          );
-        })}
+        <div className='flex' style={{ gap, width: BAR }}>
+          {cells.map(({ from, worth, width }) => {
+            const share = (v: number) => Math.max(0, Math.min(1, (v - from) / worth));
+            const level = share(health);
+            const flashTop = share(lost.top);
+            const flashBottom = share(lost.bottom);
+            const stud = Math.min(10, width * 0.5);
+            return (
+              <div key={from} className='relative h-7 shrink-0 overflow-hidden rounded-[5px] bg-black/45 shadow-[0_2px_0_rgba(0,0,0,.4)]' style={{ width, borderRadius: Math.min(5, width / 3) }}>
+                <div
+                  className='absolute inset-x-0 bottom-0 transition-[height] duration-150'
+                  style={{ height: `${level * 100}%`, borderRadius: 'inherit', background: fill, boxShadow: 'inset 0 -3px 0 rgba(0,0,0,.22), inset 0 2px 0 rgba(255,255,255,.5)' }}
+                />
+                {unit === 20 && worth === 20 && <div className='absolute inset-x-0 top-1/2 h-[2px] -translate-y-1/2 bg-black/30' />}
+                <div className='absolute left-1/2 top-[-3px] h-[6px] -translate-x-1/2 rounded-full' style={{ width: stud, background: level > 0.95 ? (low ? '#ff8a7c' : '#ffffff') : 'rgba(0,0,0,.35)' }} />
+                {lost.key > 0 && flashTop > flashBottom && (
+                  <div
+                    key={lost.key}
+                    className='absolute inset-x-0'
+                    style={{ bottom: `${flashBottom * 100}%`, height: `${(flashTop - flashBottom) * 100}%`, background: flash, animation: 'bf-hp-flash .45s ease-in both' }}
+                  />
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>

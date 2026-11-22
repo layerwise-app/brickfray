@@ -13,10 +13,13 @@ export interface ArmsHooks {
   dryFire?(): void;
 }
 
-/** Rounds a full magazine of `weapon` holds at this upgrade scale; a bigger magazine adds at least a round. */
+/**
+ * Rounds a full magazine of `weapon` holds at this upgrade scale. Every magazine level adds at least a round, so a
+ * one-round gun grows too: the levels add .4, .3 and .2 of a magazine, about a level per .3.
+ */
 export function scaledMag(weapon: WeaponId, scale: number) {
   const base = WEAPONS[weapon].mag;
-  return scale === 1 ? base : Math.max(base + 1, Math.ceil(base * scale - 1e-9));
+  return scale === 1 ? base : Math.max(base + Math.max(1, Math.round((scale - 1) / 0.3)), Math.ceil(base * scale - 1e-9));
 }
 
 export function magSize(arms: ArmsState, weapon: WeaponId) {

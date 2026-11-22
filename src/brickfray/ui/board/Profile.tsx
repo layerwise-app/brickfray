@@ -3,8 +3,8 @@ import { useRef, useState } from 'react';
 import { CHARACTER_IDS, ROSTER } from '../../characters/roster';
 import { saveProfile, uploadAvatar } from '../../../lib/board/board.functions';
 import { getPlayerId, markKnown } from '../../../lib/board/client/identity';
-import { NAME_MAX, type AccountView, type ProfileView } from '../../../lib/board/contract';
-import { cleanName } from '../../../lib/board/validate';
+import type { AccountView, ProfileView } from '../../../lib/board/contract';
+import { cleanName, NAME_MAX, nameText } from '../../../lib/board/names';
 import { useGame } from '../App';
 import { useT } from '../i18n';
 import { adoptName, useRefreshBoard } from './account';
@@ -23,6 +23,8 @@ export function Profile({ account, onName }: { account: AccountView | undefined;
   const [draft, setDraft] = useState<string | null>(null);
   const [picked, setPicked] = useState<File | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  /** Set when a rename had to move the tag: the name already had ours. */
+  const [moved, setMoved] = useState<string | null>(null);
   const file = useRef<HTMLInputElement>(null);
 
   // Resolves once the account is fetched again, so a change stays on screen until the server's copy shows it.
@@ -37,7 +39,12 @@ export function Profile({ account, onName }: { account: AccountView | undefined;
   };
   const rename = useMutation({
     mutationFn: (name: string) => saveProfile({ data: { playerId: getPlayerId(), name } }),
-    onSuccess: settle
+    onMutate: () => ({ tag: profile?.tag ?? null }),
+    onSuccess: async (result, _, before) => {
+      const old = before?.tag ?? null;
+      setMoved('refused' in result || old === null || result.tag === old ? null : t('board.tagMoved', { name: result.name, old, tag: result.tag ?? '' }));
+      await settle(result);
+    }
   });
   const pick = useMutation({
     mutationFn: (hero: string) => saveProfile({ data: { playerId: getPlayerId(), hero } }),
@@ -58,6 +65,8 @@ export function Profile({ account, onName }: { account: AccountView | undefined;
 
   const current = (rename.isPending ? rename.variables : undefined) ?? profile?.name ?? game.settings.name;
   const name = draft ?? current;
+  // While an input method composes (pinyin, kana), its text passes as typed; the rule applies once it is committed.
+  const type = (value: string, composing: boolean) => setDraft(composing ? value : nameText(value));
   const commitName = () => {
     if (draft === null) return;
     const clean = cleanName(draft);
@@ -78,18 +87,32 @@ export function Profile({ account, onName }: { account: AccountView | undefined;
           <label className='bf-board-label' htmlFor='bf-board-name'>
             {t('board.name')}
           </label>
-          <input
-            id='bf-board-name'
-            className='bf-input bf-board-name-input'
-            value={name}
-            maxLength={NAME_MAX}
-            spellCheck={false}
-            autoComplete='nickname'
-            placeholder={t('namePlaceholder')}
-            onChange={(e) => setDraft(e.target.value)}
-            onBlur={commitName}
-            onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
-          />
+          <div className='bf-board-name-row'>
+            <input
+              id='bf-board-name'
+              className='bf-input bf-board-name-input'
+              value={name}
+              maxLength={NAME_MAX}
+              spellCheck={false}
+              autoComplete='nickname'
+              placeholder={t('namePlaceholder')}
+              aria-describedby='bf-board-name-rule'
+              onChange={(e) => type(e.target.value, (e.nativeEvent as InputEvent).isComposing)}
+              onCompositionEnd={(e) => type(e.currentTarget.value, false)}
+              onBlur={commitName}
+              onKeyDown={(e) => e.key === 'Enter' && !e.nativeEvent.isComposing && e.currentTarget.blur()}
+            />
+            {profile && profile.tag !== null && <span className='bf-board-tagno bf-board-tagno-big'>#{profile.tag}</span>}
+          </div>
+          <p id='bf-board-name-rule' className='bf-board-hint'>
+            {t('board.nameRule')}
+          </p>
+          {moved && (
+            <p className='bf-board-moved' role='status'>
+              {moved}
+            </p>
+          )}
+          {profile?.tag != null && <p className='bf-board-hint'>{t('board.tagHint')}</p>}
           <p className='bf-board-hint'>{account?.signedIn ? t('board.synced') : t('board.guest')}</p>
         </div>
       </section>

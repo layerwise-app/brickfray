@@ -1,23 +1,12 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useSyncExternalStore } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { authClient } from '../../../lib/auth-client';
-import { claimAccount, getAccount } from '../../../lib/board/board.functions';
+import { claimAccount } from '../../../lib/board/board.functions';
 import { clearLocalMatches } from '../../../lib/board/client/history';
-import { freshPlayer, getPlayerId, markKnown, setPlayerId, subscribePlayer } from '../../../lib/board/client/identity';
+import { freshPlayer, getPlayerId, markKnown, setPlayerId } from '../../../lib/board/client/identity';
 import { flushMatches } from '../../../lib/board/client/sync';
 import type { ProfileView } from '../../../lib/board/contract';
 import type { Game } from '../../game/game';
-
-export const BOARD = ['board'] as const;
-
-export function usePlayerId() {
-  return useSyncExternalStore(subscribePlayer, getPlayerId, getPlayerId);
-}
-
-export function useAccount() {
-  const playerId = usePlayerId();
-  return useQuery({ queryKey: [...BOARD, 'account', playerId], queryFn: () => getAccount({ data: { playerId } }) });
-}
+import { BOARD } from './me';
 
 /** The menu's name field and the game's settings follow the profile's name. */
 export function adoptName(game: Game, name: string, onName: (name: string) => void) {

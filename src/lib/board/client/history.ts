@@ -1,4 +1,4 @@
-import { HISTORY_PAGE, type BoardEntry, type HistoryPage, type MatchReport } from '../contract';
+import { HISTORY_PAGE, type BoardEntry, type HistoryPage, type MatchDetail, type MatchReport } from '../contract';
 import { getPlayerId } from './identity';
 
 // This browser's own record of its matches: history works offline, and what the server has not taken yet waits here.
@@ -62,10 +62,16 @@ export function clearLocalMatches() {
   }
 }
 
-/** The same page the server would give, from this browser's copy: used while the server cannot be reached. */
+function newestFirst() {
+  return load().sort((a, b) => b.endedAt - a.endedAt);
+}
+
+/** The same page the server would give, from this browser's copy: used while the server cannot be reached. Row n has id -n. */
 export function localHistory(page: number): HistoryPage {
-  const all = load().sort((a, b) => b.endedAt - a.endedAt);
-  const rows: BoardEntry[] = all.slice(page * HISTORY_PAGE, (page + 1) * HISTORY_PAGE).map(({ key: _, upload: __, ticket: ___, ...m }, i) => ({ ...m, id: -(page * HISTORY_PAGE + i + 1) }));
+  const all = newestFirst();
+  const rows: BoardEntry[] = all
+    .slice(page * HISTORY_PAGE, (page + 1) * HISTORY_PAGE)
+    .map(({ key: _, upload: __, ticket: ___, detail: ____, ...m }, i) => ({ ...m, id: -(page * HISTORY_PAGE + i + 1) }));
   const sum = (pick: (m: LocalMatch) => number) => all.reduce((total, m) => total + pick(m), 0);
   return {
     rows,
@@ -84,4 +90,9 @@ export function localHistory(page: number): HistoryPage {
       seconds: sum((m) => m.durationS)
     }
   };
+}
+
+/** The score panel of a localHistory row; a match kept before details has none. */
+export function localDetail(id: number): MatchDetail | null {
+  return newestFirst()[-id - 1]?.detail ?? null;
 }

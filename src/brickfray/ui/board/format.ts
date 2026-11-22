@@ -1,23 +1,8 @@
 import type { BoardEntry } from '../../../lib/board/contract';
 import { translate, type Lang, type MessageKey } from '../i18n';
 
-const MINUTE = 60_000;
-const HOUR = 60 * MINUTE;
-const DAY = 24 * HOUR;
-
 export function number(lang: Lang, n: number) {
   return new Intl.NumberFormat(lang).format(n);
-}
-
-/** "now", "5 min ago", "yesterday"; past a week, the date. */
-export function ago(lang: Lang, at: number, now = Date.now()) {
-  const gap = Math.max(0, now - at);
-  const rel = new Intl.RelativeTimeFormat(lang, { numeric: 'auto', style: 'short' });
-  if (gap < MINUTE) return rel.format(0, 'second');
-  if (gap < HOUR) return rel.format(-Math.floor(gap / MINUTE), 'minute');
-  if (gap < DAY) return rel.format(-Math.floor(gap / HOUR), 'hour');
-  if (gap < 7 * DAY) return rel.format(-Math.floor(gap / DAY), 'day');
-  return new Intl.DateTimeFormat(lang, { month: 'short', day: 'numeric' }).format(at);
 }
 
 export function when(lang: Lang, at: number) {
@@ -47,7 +32,9 @@ export function mapName(lang: Lang, id: string) {
   return (translate(lang, key) as string | undefined) ?? id;
 }
 
-/** "18 K · 5 D · 3 A" with the game's own letters. */
-export function kda(lang: Lang, e: Pick<BoardEntry, 'kills' | 'deaths' | 'assists'>) {
-  return `${number(lang, e.kills)} ${translate(lang, 'kills')} · ${number(lang, e.deaths)} ${translate(lang, 'deaths')} · ${number(lang, e.assists)} ${translate(lang, 'assists')}`;
+/** How a match ended for its player: the wave a run reached, a team's result, a free-for-all win or place. */
+export function outcome(lang: Lang, m: Pick<BoardEntry, 'mode' | 'wave' | 'result' | 'placement' | 'players'>) {
+  if (m.mode === 'solo') return translate(lang, 'wave', { n: m.wave });
+  if (m.mode === 'tdm' || m.result === 'win') return translate(lang, m.result === 'win' ? 'victory' : m.result === 'draw' ? 'draw' : 'defeat');
+  return translate(lang, 'board.place', { n: m.placement, total: m.players });
 }

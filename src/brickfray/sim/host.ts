@@ -36,10 +36,12 @@ export class HostSim {
   traces: ShotTrace[] = [];
   time = 0;
   /** Rules hook: decides respawns, scoring and round flow (see match.ts). */
-  onKill: ((victim: HostPlayer, killer: HostPlayer | null) => void) | null = null;
+  onKill: ((victim: HostPlayer, killer: HostPlayer | null, weapon: KillCause) => void) | null = null;
   damageEnabled = true;
   /** Bots hit humans for less; solo raises it wave by wave. */
   botDamage = 0.55;
+  /** Host time before which nobody regenerates (solo holds it through a part heal between waves). */
+  regenAfter = 0;
   private history = new Map<number, PoseRecord[]>();
   private deaths: RecentDeath[] = [];
   private lastHurt = new Map<number, number>();
@@ -91,7 +93,8 @@ export class HostSim {
       life: 0,
       scale,
       upgrades: noUpgrades(),
-      armor: 0
+      armor: 0,
+      thrown: 0
     };
     this.players.set(id, player);
     this.history.set(id, []);
@@ -149,7 +152,11 @@ export class HostSim {
       grenade: (player, cook, low) => {
         const m = player.move;
         const eye: [number, number, number] = [m.x, m.y + eyeHeight(m) * player.scale, m.z];
-        this.grenades.push(throwGrenade(this.nextGrenade++, player.id, eye, aimDirection(player.yaw, player.pitch), [m.vx, m.vy, m.vz], cook, low));
+        const g = throwGrenade(this.nextGrenade++, player.id, eye, aimDirection(player.yaw, player.pitch), [m.vx, m.vy, m.vz], cook, low);
+        g.byBot = player.bot !== null;
+        this.grenades.push(g);
+        const thrower = this.players.get(player.id);
+        if (thrower) thrower.thrown = (thrower.thrown ?? 0) + 1;
       }
     };
   }
@@ -222,7 +229,7 @@ export class HostSim {
     }
     const kill = { type: 'kill' as const, killer: killer?.id ?? victim.id, victim: victim.id, weapon: src.weapon, headshot: src.kind === 'head', assister, respawnAt: null as number | null };
     this.events.push(kill);
-    this.onKill?.(victim, killer);
+    this.onKill?.(victim, killer, src.weapon);
     if (victim.respawnAt > this.time && Number.isFinite(victim.respawnAt)) kill.respawnAt = victim.respawnAt;
   }
 
@@ -237,7 +244,7 @@ export class HostSim {
       }
     }
     for (const p of this.players.values()) {
-      if (p.alive && p.health < p.maxHealth) {
+      if (p.alive && p.health < p.maxHealth && this.time >= this.regenAfter) {
         const { regenDelay, regenRate } = upgradeStats(p.upgrades);
         if (this.time - (this.lastHurt.get(p.id) ?? -99) > regenDelay) p.health = Math.min(p.maxHealth, p.health + regenRate * dt * (p.maxHealth / 100));
       }
@@ -258,7 +265,8 @@ export class HostSim {
       if (!this.world.clearLine(g.x, g.y + 0.15, g.z, p.move.x, cy, p.move.z) && !this.world.clearLine(g.x, g.y + 0.15, g.z, p.move.x, p.move.y + 1.6 * p.scale, p.move.z)) continue;
       const owner = this.players.get(g.owner);
       if (owner && p.id !== owner.id && !this.hostile(owner, p)) continue;
-      this.damage(p, explosionDamage(d), { attacker: g.owner, weapon: 'grenade', kind: 'body', from: [g.x, g.y, g.z] });
+      const scale = g.byBot && !p.bot ? this.botDamage : 1;
+      this.damage(p, Math.round(explosionDamage(d) * scale), { attacker: g.owner, weapon: 'grenade', kind: 'body', from: [g.x, g.y, g.z] });
     }
   }
 

@@ -5,6 +5,23 @@ import { damageAt, headCenterY, rayHitPlayer } from './hitboxes';
 import type { HostSim, PoseRecord } from './host';
 import type { HitKind, HostPlayer, PlayerState, ShotTrace } from './types';
 
+/** Bots hit humans for less, by gun, swing or grenade alike (solo scales it wave by wave). */
+export function botScale(sim: HostSim, attacker: PlayerState | null | undefined, victim: PlayerState) {
+  return attacker?.bot && !victim.bot ? sim.botDamage : 1;
+}
+
+/**
+ * Solo only, a player's slow one-at-a-time guns hit snapbots harder (a Megabot harder still), so those kits hold up
+ * against a crowd as the fast guns do. Rooms keep the guns as they are.
+ */
+const SOLO_KIT: Partial<Record<WeaponId, number>> = { harpoon: 1.3, sniper: 1.25, shotgun: 1.15, cannon: 1.15, buzzer: 1.3 };
+const SOLO_KIT_BOSS = 1.5;
+
+function soloKit(sim: HostSim, shooter: PlayerState, victim: PlayerState, weapon: WeaponId) {
+  const kit = sim.settings.mode === 'solo' && !shooter.bot && victim.bot ? SOLO_KIT[weapon] : undefined;
+  return kit ? kit * (victim.bot === 'boss' ? SOLO_KIT_BOSS : 1) : 1;
+}
+
 /** A shot as the shooter saw the world (rewound by their view time): traces for everyone, damage per victim. */
 export function resolveShot(sim: HostSim, shooter: PlayerState, weapon: WeaponId, dirs: [number, number, number][], viewTime: number) {
   const def = WEAPONS[weapon];
@@ -37,7 +54,7 @@ export function resolveShot(sim: HostSim, shooter: PlayerState, weapon: WeaponId
     if (victim && sim.hostile(shooter, victim)) {
       const full = kind === 'head' ? def.head : def.body;
       const min = def.minDamage * (full / def.body);
-      const amount = damageAt(maxT, full, min, def.falloffStart, def.falloffEnd) * (shooter.bot && !victim.bot ? sim.botDamage : 1);
+      const amount = damageAt(maxT, full, min, def.falloffStart, def.falloffEnd) * botScale(sim, shooter, victim) * soloKit(sim, shooter, victim, weapon);
       const entry = totals.get(victim.id) ?? { amount: 0, head: false };
       entry.amount += amount;
       entry.head ||= kind === 'head';
@@ -85,5 +102,6 @@ export function resolveMelee(sim: HostSim, attacker: PlayerState, viewTime: numb
   const facing = Math.cos(best.yaw - toVictim);
   // Victim facing away from the attacker: their forward points along attacker→victim.
   const backstab = facing > 0.5;
-  sim.damage(best, backstab ? melee.backstab : melee.damage, { attacker: attacker.id, weapon: melee.id, kind: 'body', from: eye });
+  const amount = (backstab ? melee.backstab : melee.damage) * botScale(sim, attacker, best);
+  sim.damage(best, Math.round(amount), { attacker: attacker.id, weapon: melee.id, kind: 'body', from: eye });
 }

@@ -1,18 +1,22 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { getHistory } from '../../../lib/board/board.functions';
-import { localHistory, pendingMatches } from '../../../lib/board/client/history';
+import { localDetail, localHistory, pendingMatches } from '../../../lib/board/client/history';
 import { flushMatches } from '../../../lib/board/client/sync';
-import type { BoardEntry, HistoryTotals } from '../../../lib/board/contract';
+import type { BoardEntry, BoardPlayer, HistoryTotals } from '../../../lib/board/contract';
 import { useGame } from '../App';
 import { useT, type Lang } from '../i18n';
-import { HeadshotIcon } from '../icons';
-import { BOARD, usePlayerId } from './account';
 import { Avatar } from './Avatar';
-import { clock, kda, mapName, number, playTime, when } from './format';
+import { clock, mapName, number, outcome, playTime, when } from './format';
+import { BOARD, usePlayerId } from './me';
 import { Pager, Status } from './parts';
+import type { OpenMatch } from './ScorePanel';
 
-export function History() {
+/** board.css hides the trailing columns as the panel narrows; the date stays under the match. */
+const COLUMNS = ['match', 'result', 'score', 'kills', 'deaths', 'assists', 'time'] as const;
+type Column = (typeof COLUMNS)[number];
+
+export function History({ player, onOpen }: { player: BoardPlayer | null; onOpen: (match: OpenMatch) => void }) {
   const game = useGame();
   const { t, lang } = useT();
   const playerId = usePlayerId();
@@ -32,20 +36,43 @@ export function History() {
   });
   const data = history.data;
   const waiting = data && !data.offline ? pendingMatches().length : 0;
+  const open = (m: BoardEntry) => onOpen({ id: m.id, entry: m, player, local: m.id < 0 ? localDetail(m.id) : undefined });
+  const head: Record<Column, string> = {
+    match: t('board.col.match'),
+    result: t('board.col.result'),
+    score: t('score'),
+    kills: t('board.col.k'),
+    deaths: t('board.col.d'),
+    assists: t('board.col.a'),
+    time: t('board.col.time')
+  };
 
   return (
     <div className='bf-board-tab'>
       {data && <Totals totals={data.totals} lang={lang} />}
-      <div className='bf-board-list bf-scroll' data-fetching={history.isFetching && !history.isLoading}>
+      <div className='bf-board-list bf-scroll' data-cols='history' data-fetching={history.isFetching && !history.isLoading}>
         {data?.offline && <p className='bf-board-note bf-board-offline'>{t('board.offline')}</p>}
         {waiting > 0 && <p className='bf-board-note bf-board-offline'>{t('board.waiting', { n: waiting })}</p>}
         <Status query={history} empty={!!data && !data.rows.length} emptyText={t('board.emptyHistory')} />
         {data && data.rows.length > 0 && (
-          <ol>
-            {data.rows.map((m) => (
-              <MatchRow key={m.id} match={m} lang={lang} />
-            ))}
-          </ol>
+          <>
+            <div className='bf-board-tr bf-board-th'>
+              {COLUMNS.map((c) => (
+                <span key={c} data-col={c}>
+                  {head[c]}
+                </span>
+              ))}
+            </div>
+            <ol>
+              {data.rows.map((m) => (
+                <li key={m.id}>
+                  <button className='bf-board-tr' onClick={() => open(m)}>
+                    <MatchCells match={m} lang={lang} />
+                  </button>
+                </li>
+              ))}
+            </ol>
+          </>
         )}
       </div>
       {data && data.total > data.pageSize && (
@@ -79,36 +106,33 @@ function Totals({ totals, lang }: { totals: HistoryTotals; lang: Lang }) {
   );
 }
 
-function MatchRow({ match: m, lang }: { match: BoardEntry; lang: Lang }) {
+function MatchCells({ match: m, lang }: { match: BoardEntry; lang: Lang }) {
   const { t } = useT();
-  const outcome =
-    m.mode === 'solo'
-      ? t('wave', { n: m.wave })
-      : m.mode === 'tdm' || m.result === 'win'
-        ? t(m.result === 'win' ? 'victory' : m.result === 'draw' ? 'draw' : 'defeat')
-        : t('board.place', { n: m.placement, total: m.players });
-  const title = [t(`mode.${m.mode}`), mapName(lang, m.map), m.difficulty && t(`difficulty.${m.difficulty}`)].filter(Boolean).join(' · ');
-  return (
-    <li className='bf-board-row bf-board-match'>
-      <Avatar character={m.character} />
+  const title = [t(`board.mode.${m.mode}`), mapName(lang, m.map), m.difficulty && t(`difficulty.${m.difficulty}`)].filter(Boolean).join(' · ');
+  const cell: Record<Column, React.ReactNode> = {
+    match: (
       <span className='bf-board-who'>
-        <span className='bf-board-name'>
-          <span className='truncate'>{title}</span>
-        </span>
-        <span className='bf-board-stats'>
-          {kda(lang, m)} ·{' '}
-          <span className='bf-board-hs' title={t('board.headshots')}>
-            <HeadshotIcon size={12} /> {number(lang, m.headshots)}
-          </span>{' '}
-          · {clock(m.durationS)} · {when(lang, m.endedAt)}
+        <Avatar avatar={{ hero: m.character, image: null }} size={32} />
+        <span className='bf-board-lines'>
+          <span className='bf-board-match-title'>{title}</span>
+          <span className='bf-board-when'>{when(lang, m.endedAt)}</span>
         </span>
       </span>
-      <span className='bf-board-score'>
-        <span className='bf-board-result' data-result={m.mode === 'solo' ? 'wave' : (m.result ?? undefined)}>
-          {outcome}
-        </span>
-        <span className='bf-display'>{number(lang, m.score)}</span>
+    ),
+    result: (
+      <span className='bf-board-result' data-result={m.mode === 'solo' ? 'wave' : (m.result ?? undefined)}>
+        {outcome(lang, m)}
       </span>
-    </li>
-  );
+    ),
+    score: <span className='bf-display bf-board-big'>{number(lang, m.score)}</span>,
+    kills: number(lang, m.kills),
+    deaths: number(lang, m.deaths),
+    assists: number(lang, m.assists),
+    time: clock(m.durationS)
+  };
+  return COLUMNS.map((c) => (
+    <span key={c} data-col={c}>
+      {cell[c]}
+    </span>
+  ));
 }

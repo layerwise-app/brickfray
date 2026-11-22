@@ -3,6 +3,7 @@ import type { CharacterId } from '../characters/types';
 import { MATCH, TICK } from '../sim/constants';
 import { Match } from '../sim/match';
 import type { MatchSettings, ShotTrace } from '../sim/types';
+import { cleanName, DEFAULT_NAME } from '../../lib/board/names';
 import { MAPS } from '../world';
 import type { Channel } from './channel';
 import { loopbackPair } from './channel';
@@ -122,7 +123,7 @@ export class HostSession {
       case 'hello': {
         if (m.v !== PROTOCOL_VERSION) return this.send(link, { t: 'refused', reason: 'version' });
         if (this.humanCount() >= MATCH.maxPlayers) return this.send(link, { t: 'refused', reason: 'full' });
-        link.name = String(m.name).slice(0, 16) || 'Player';
+        link.name = cleanName(m.name) ?? DEFAULT_NAME;
         link.character = m.character;
         link.token = String(m.token).slice(0, 64);
         this.links.set(link.id, link);

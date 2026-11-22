@@ -2,7 +2,8 @@ import { CHARACTER_IDS } from '~/brickfray/characters/roster';
 import type { CharacterId } from '~/brickfray/characters/types';
 import type { HudState } from '~/brickfray/game/hud';
 import type { GameEvent, MatchSettings } from '~/brickfray/sim/types';
-import type { MatchReport, MatchResult, MatchStart } from '../contract';
+import type { MatchDetail, MatchReport, MatchResult, MatchStart } from '../contract';
+import { publishOutcome } from './outcome';
 
 /**
  * Watches one match from the local player's side and turns it into a report once: when the match ends, or when a
@@ -38,7 +39,7 @@ export class MatchTally {
     }
     if (hud.phase !== 'ended' || !this.startedAt) return null;
     this.done = true;
-    return this.report(hud);
+    return this.publish(this.report(hud), false);
   }
 
   /** Leaving: a solo run past its warm-up counts as finished at the wave it reached. */
@@ -48,7 +49,12 @@ export class MatchTally {
     // A run left before anything was scored would only put an empty row on the board.
     if (!hud.rows.find((r) => r.me)?.score) return null;
     this.done = true;
-    return this.report(hud);
+    return this.publish(this.report(hud), true);
+  }
+
+  private publish(report: MatchReport | null, left: boolean) {
+    if (report) publishOutcome(this.settings, report, left);
+    return report;
   }
 
   private report(hud: HudState): MatchReport | null {
@@ -77,7 +83,19 @@ export class MatchTally {
       headshots: Math.min(this.headshots, me.kills),
       placement: solo ? 1 : index + 1,
       players: solo ? 1 : hud.rows.length,
-      result
+      result,
+      detail: detail(this.settings.mode, hud)
     };
   }
+}
+
+/** The end-of-match screen as the HUD shows it: the final scoreboard in its order, or the upgrades of a solo run. */
+function detail(mode: MatchSettings['mode'], hud: HudState): MatchDetail {
+  if (mode === 'solo') return { mode, upgrades: [...hud.upgradesTaken] };
+  const players = hud.rows.map((r) => ({ name: r.name, character: r.character, team: r.team, score: r.score, kills: r.kills, deaths: r.deaths, assists: r.assists, bot: r.bot, me: r.me }));
+  if (mode === 'ffa') {
+    const winner = hud.rows.findIndex((r) => r.id === hud.winner);
+    return { mode, players, winner: winner < 0 ? null : winner };
+  }
+  return { mode, players, teams: [hud.teamScore[0], hud.teamScore[1]], winner: hud.winner === 0 || hud.winner === 1 ? hud.winner : null };
 }

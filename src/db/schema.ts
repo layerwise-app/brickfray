@@ -78,19 +78,27 @@ export const verification = sqliteTable('verification', {
 // Leaderboard. Times are epoch milliseconds.
 
 /** Whoever ranks: an anonymous browser's player, or an account (every browser signed in to it). */
-export const boardProfile = sqliteTable('board_profile', {
-  id: text('id').primaryKey(),
-  userId: text('user_id')
-    .unique()
-    .references(() => user.id, { onDelete: 'cascade' }),
-  name: text('name').notNull(),
-  /** A character id: that character's portrait. */
-  avatarHero: text('avatar_hero'),
-  /** A board_avatar id: an uploaded picture (wins over avatarHero). */
-  avatarImage: text('avatar_image'),
-  createdAt: integer('created_at').notNull(),
-  updatedAt: integer('updated_at').notNull()
-});
+export const boardProfile = sqliteTable(
+  'board_profile',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id')
+      .unique()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    /** The name without case (names.ts nameKey): name + tag is unique on it. Null with `tag` on a row no tag was given yet. */
+    nameKey: text('name_key'),
+    /** The number after the name (Name#1234). A rename keeps it unless the new name already has it. */
+    tag: integer('tag'),
+    /** A character id: that character's portrait. */
+    avatarHero: text('avatar_hero'),
+    /** A board_avatar id: an uploaded picture (wins over avatarHero). */
+    avatarImage: text('avatar_image'),
+    createdAt: integer('created_at').notNull(),
+    updatedAt: integer('updated_at').notNull()
+  },
+  (t) => [uniqueIndex('board_profile_name_tag_uq').on(t.nameKey, t.tag)]
+);
 
 /** A browser's anonymous id. It is the browser's only credential, so no response ever contains it. */
 export const boardPlayer = sqliteTable(
@@ -136,11 +144,13 @@ export const boardMatch = sqliteTable(
     placement: integer('placement').notNull(),
     players: integer('players').notNull(),
     result: text('result', { enum: ['win', 'loss', 'draw'] }),
+    /** JSON (contract.ts MatchDetail): the score panel the player saw at the end. Null on matches stored before it was kept. */
+    detail: text('detail'),
     createdAt: integer('created_at').notNull()
   },
   (t) => [
     uniqueIndex('board_match_player_key_uq').on(t.playerId, t.matchKey),
-    index('board_match_rank_idx').on(t.mode, t.endedAt),
+    index('board_match_board_idx').on(t.mode, t.difficulty, t.map),
     index('board_match_profile_idx').on(t.profileId, t.endedAt)
   ]
 );

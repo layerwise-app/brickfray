@@ -1,19 +1,9 @@
 import { CHARACTER_IDS } from '~/brickfray/characters/roster';
 import { MATCH } from '~/brickfray/sim/constants';
 import { botsThrough, secondsToReach } from '~/brickfray/sim/waves';
-import {
-  BoardError,
-  MODES,
-  NAME_MAX,
-  PERIODS,
-  SOLO_LEVELS,
-  UPLOAD_BATCH,
-  type BoardMode,
-  type LeaderboardQuery,
-  type MatchReport,
-  type MatchResult,
-  type SoloLevel
-} from './contract';
+import { BoardError, MODES, SOLO_LEVELS, UPLOAD_BATCH, type BoardMode, type LeaderboardQuery, type MatchReport, type MatchResult, type SoloLevel } from './contract';
+import { OVER, parseDetail } from './detail';
+import { cleanName } from './names';
 import type { Ticket } from './ticket';
 
 // The scores come from the browser. A report must fit the rules of the game (parseReport) and the ticket the server
@@ -26,9 +16,7 @@ const SLUG = /^[a-z][a-z0-9-]{0,23}$/;
 const RESULTS: MatchResult[] = ['win', 'loss', 'draw'];
 /** A match in a room lasts at most 15 minutes plus overtime; a solo run has no clock. */
 const MAX_SECONDS: Record<BoardMode, number> = { solo: 6 * 3600, ffa: 40 * 60, tdm: 40 * 60 };
-const MAX_PLAYERS = 10;
-/** Kills one explosion can add past a room's limit. */
-const OVER = 5;
+const MAX_PLAYERS = MATCH.maxPlayers;
 /** A ticket older than this no longer takes a report. */
 const TICKET_DAYS = 7;
 /** Seconds a report may run ahead of the server's count: clock steps, a slow ticket request. */
@@ -56,19 +44,6 @@ export function isPlayerId(value: unknown): value is string {
 export function playerId(value: unknown): string {
   if (!isPlayerId(value)) throw new BoardError('invalid', 'bad player id');
   return value;
-}
-
-/** A display name: one line of visible characters, at most NAME_MAX, or null when nothing usable is left. */
-export function cleanName(value: unknown): string | null {
-  if (typeof value !== 'string') return null;
-  const text = value
-    .normalize('NFKC')
-    // Controls, zero-width and direction overrides: they hide or reorder what others see.
-    .replace(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu, '')
-    .replace(/\s+/g, ' ')
-    .trim();
-  const chars = [...text].slice(0, NAME_MAX).join('').trim();
-  return chars.length ? chars : null;
 }
 
 /** Checks one reported match against what the game can produce; `now` is the server's clock. */
@@ -119,7 +94,7 @@ export function parseReport(raw: unknown, now: number): MatchReport {
   const ticket = r.ticket ?? null;
   if (ticket !== null && (typeof ticket !== 'string' || ticket.length > 1000)) throw new BoardError('invalid', 'bad ticket');
 
-  return {
+  const report = {
     key: r.key,
     ticket,
     mode,
@@ -138,6 +113,7 @@ export function parseReport(raw: unknown, now: number): MatchReport {
     players,
     result
   };
+  return { ...report, detail: parseDetail(r.detail, report) };
 }
 
 /**
@@ -191,12 +167,13 @@ export function parseMatchStart(raw: unknown) {
 export function parseLeaderboardQuery(raw: unknown): LeaderboardQuery {
   const r = record(raw);
   const mode = oneOf(r.mode, MODES, 'mode');
+  const map = r.map ?? null;
+  if (map !== null && (typeof map !== 'string' || !SLUG.test(map))) throw new BoardError('invalid', 'bad map');
   return {
     mode,
-    period: oneOf(r.period, PERIODS, 'period'),
     difficulty: mode === 'solo' ? oneOf(r.difficulty, SOLO_LEVELS, 'difficulty') : null,
+    map,
     page: count(r.page, 'page', 10_000),
-    tzOffset: typeof r.tzOffset === 'number' && Math.abs(r.tzOffset) <= 14 * 60 ? Math.round(r.tzOffset) : 0,
     playerId: isPlayerId(r.playerId) ? r.playerId : null
   };
 }
@@ -206,13 +183,16 @@ export function parseHistoryQuery(raw: unknown) {
   return { playerId: playerId(r.playerId), page: count(r.page, 'page', 10_000) };
 }
 
-/** Start of the period in the player's own calendar (weeks start on Monday). */
-export function periodStart(period: LeaderboardQuery['period'], now: number, tzOffset: number) {
-  if (period === 'all') return 0;
-  const local = now + tzOffset * 60_000;
-  const midnight = local - (((local % DAY) + DAY) % DAY);
-  if (period === 'day') return midnight - tzOffset * 60_000;
-  // 1970-01-01 was a Thursday, day 3 of a week that starts on Monday.
-  const weekday = (Math.floor(midnight / DAY) + 3) % 7;
-  return midnight - weekday * DAY - tzOffset * 60_000;
+/** The rank of a match the asker stored: their player id, the match's key and its mode. */
+export function parseRankQuery(raw: unknown) {
+  const r = record(raw);
+  if (typeof r.key !== 'string' || !KEY.test(r.key)) throw new BoardError('invalid', 'bad key');
+  return { playerId: playerId(r.playerId), key: r.key, mode: oneOf(r.mode, MODES, 'mode') };
+}
+
+/** A score panel asked for: a stored match's id, and who asks (their own match shows its date). */
+export function parseMatchQuery(raw: unknown) {
+  const r = record(raw);
+  if (typeof r.id !== 'number' || !Number.isSafeInteger(r.id) || r.id < 1) throw new BoardError('invalid', 'bad match id');
+  return { id: r.id, playerId: isPlayerId(r.playerId) ? r.playerId : null };
 }

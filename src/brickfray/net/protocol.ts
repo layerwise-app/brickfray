@@ -2,7 +2,7 @@ import type { BotKind, CharacterId } from '../characters/types';
 import type { GameEvent, MatchSettings, MatchState } from '../sim/types';
 import type { UpgradeId } from '../sim/upgrades';
 
-export const PROTOCOL_VERSION = 3;
+export const PROTOCOL_VERSION = 4;
 
 export interface LobbyPlayer {
   id: number;

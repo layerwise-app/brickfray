@@ -1,0 +1,171 @@
+/* Score panel: covers the board like a page of its own; Back (or Esc) returns to the list as it was. */
+.bf-board-detail {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: inherit;
+  border-radius: inherit;
+  background: #101a30;
+  animation: bf-fade-in 0.2s ease both;
+}
+.bf-board-detail .bf-board-head {
+  align-items: flex-start;
+}
+.bf-board-detail-title {
+  overflow: hidden;
+  font-size: 30px;
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bf-board-detail-title[data-result='win'] {
+  color: var(--bf-yellow);
+}
+.bf-board-facts {
+  margin-top: 2px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--bf-muted);
+}
+/* Each fact stays on one line; a long line breaks between them. */
+.bf-board-facts span {
+  white-space: nowrap;
+}
+.bf-board-owner {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 10px;
+  font-size: 17px;
+}
+.bf-board-detail-body {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 14px;
+  margin-right: -6px;
+  padding-right: 6px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.bf-board-detail-body[data-fetching] {
+  opacity: 0.6;
+}
+.bf-board-tiles {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+}
+.bf-board-tiles div {
+  display: flex;
+  min-width: 0;
+  flex-direction: column-reverse;
+  align-items: center;
+  padding: 12px 6px 10px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.07);
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.1),
+    inset 0 -3px 0 rgba(0, 0, 0, 0.25);
+}
+.bf-board-tiles dd {
+  max-width: 100%;
+  overflow: hidden;
+  font-size: 30px;
+  line-height: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bf-board-tiles [data-accent] dd {
+  color: var(--bf-yellow);
+}
+.bf-board-tiles dt {
+  margin-top: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: 0.1em;
+  text-align: center;
+  text-transform: uppercase;
+  color: var(--bf-muted);
+}
+.bf-board-hero {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+}
+.bf-board-team {
+  display: inline-flex;
+  align-self: flex-start;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 12px;
+  border-radius: 10px;
+  color: #fff;
+  font-size: 20px;
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.22),
+    inset 0 -3px 0 rgba(0, 0, 0, 0.25);
+}
+.bf-board-list.bf-board-score-list {
+  flex: none;
+  margin-right: 0;
+  padding-right: 0;
+  overflow: visible;
+}
+.bf-board-score-list .bf-board-th {
+  position: static;
+}
+.bf-board-score-list .bf-board-tr {
+  min-height: 44px;
+}
+.bf-board-bot {
+  display: grid;
+  flex-shrink: 0;
+  padding: 0 6px;
+  border-radius: 5px;
+  background: rgba(0, 0, 0, 0.3);
+  color: var(--bf-muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.bf-board-crown {
+  flex-shrink: 0;
+  color: var(--bf-yellow);
+}
+
+@media (max-width: 599.98px) {
+  .bf-board-detail-title {
+    font-size: 24px;
+  }
+  .bf-board-tiles {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .bf-board-tiles dd {
+    font-size: 24px;
+  }
+}
+
+/* A narrow scoreboard marks bots with the robot alone, so their names keep the room. */
+.bf-board-bot svg {
+  display: none;
+}
+@container (max-width: 470px) {
+  .bf-board-bot {
+    padding: 0;
+    background: none;
+  }
+  .bf-board-bot span {
+    display: none;
+  }
+  .bf-board-bot svg {
+    display: block;
+  }
+}

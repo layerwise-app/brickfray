@@ -2,22 +2,24 @@ import { and, eq, isNull, notExists, sql } from 'drizzle-orm';
 import { boardAvatar, boardMatch, boardPlayer, boardProfile } from '~/db/schema';
 import { avatarUrl, type ClaimResult, type ProfileView } from './contract';
 import { inOrder, newId, type BoardDb } from './db';
+import { DEFAULT_NAME } from './names';
+import { createProfile, renameProfile, repairProfile } from './tags';
 
 export interface PlayerRef {
   id: string;
   profileId: string;
   userId: string | null;
+  /** Null on a profile created before tags (see repairProfile). */
+  tag: number | null;
 }
 
-const DEFAULT_NAME = 'Player';
-
-export function profileView(p: { name: string; avatarHero: string | null; avatarImage: string | null }): ProfileView {
-  return { name: p.name, avatar: { hero: p.avatarHero, image: p.avatarImage ? avatarUrl(p.avatarImage) : null } };
+export function profileView(p: { name: string; tag: number | null; avatarHero: string | null; avatarImage: string | null }): ProfileView {
+  return { name: p.name, tag: p.tag, avatar: { hero: p.avatarHero, image: p.avatarImage ? avatarUrl(p.avatarImage) : null } };
 }
 
 export async function findPlayer(db: BoardDb, playerId: string): Promise<PlayerRef | null> {
   const row = await db
-    .select({ id: boardPlayer.id, profileId: boardPlayer.profileId, userId: boardProfile.userId })
+    .select({ id: boardPlayer.id, profileId: boardPlayer.profileId, userId: boardProfile.userId, tag: boardProfile.tag })
     .from(boardPlayer)
     .innerJoin(boardProfile, eq(boardProfile.id, boardPlayer.profileId))
     .where(eq(boardPlayer.id, playerId))
@@ -32,9 +34,10 @@ export async function getProfile(db: BoardDb, profileId: string) {
 /** The player behind an id, created with its own anonymous profile the first time the server hears of it. */
 export async function ensurePlayer(db: BoardDb, playerId: string, name: string | null, now: number): Promise<PlayerRef> {
   const found = await findPlayer(db, playerId);
+  if (found?.tag === null) await repairProfile(db, found.profileId, now);
   if (found) return found;
   const profileId = newId();
-  await db.insert(boardProfile).values({ id: profileId, name: name ?? DEFAULT_NAME, createdAt: now, updatedAt: now });
+  await createProfile(db, { id: profileId, userId: null, name: name ?? DEFAULT_NAME }, now);
   await db.insert(boardPlayer).values({ id: playerId, profileId, createdAt: now, lastSeenAt: now }).onConflictDoNothing();
   const player = await findPlayer(db, playerId);
   // Two first uploads at once: the other one's profile won, so ours goes.
@@ -69,11 +72,7 @@ export async function claimPlayer(db: BoardDb, playerId: string, userId: string,
     own = await db.select().from(boardProfile).where(eq(boardProfile.userId, userId)).get();
   }
   if (!own) {
-    const profileId = newId();
-    await db
-      .insert(boardProfile)
-      .values({ id: profileId, userId, name: name ?? DEFAULT_NAME, createdAt: now, updatedAt: now })
-      .onConflictDoNothing();
+    await createProfile(db, { id: newId(), userId, name: name ?? DEFAULT_NAME }, now);
     own = await db.select().from(boardProfile).where(eq(boardProfile.userId, userId)).get();
     if (!own) throw new Error('account profile missing after insert');
   }
@@ -85,7 +84,8 @@ export async function claimPlayer(db: BoardDb, playerId: string, userId: string,
       .onConflictDoUpdate({ target: boardPlayer.id, set: { profileId: own.id, lastSeenAt: now } });
   } else if (current.profileId !== own.id) {
     const old = await getProfile(db, current.profileId);
-    const adopt = !own.avatarHero && !own.avatarImage && old && (old.avatarHero || old.avatarImage);
+    // Every profile has a portrait; an uploaded picture only the merged browser had comes along.
+    const adopt = !own.avatarImage && old?.avatarImage;
     await inOrder(db, [
       db.update(boardPlayer).set({ profileId: own.id, lastSeenAt: now }).where(eq(boardPlayer.id, id)),
       db.update(boardMatch).set({ profileId: own.id }).where(eq(boardMatch.playerId, id)),
@@ -112,16 +112,13 @@ export async function claimPlayer(db: BoardDb, playerId: string, userId: string,
 
 /** Name and portrait changes from the profile screen or the menu's name field. */
 export async function updateProfile(db: BoardDb, player: PlayerRef, change: { name?: string; hero?: string }, now: number) {
-  const set: Partial<typeof boardProfile.$inferInsert> = { updatedAt: now };
-  if (change.name) set.name = change.name;
+  if (change.name) await renameProfile(db, player.profileId, change.name, now);
   if (change.hero) {
-    set.avatarHero = change.hero;
-    set.avatarImage = null;
+    await inOrder(db, [
+      db.update(boardProfile).set({ avatarHero: change.hero, avatarImage: null, updatedAt: now }).where(eq(boardProfile.id, player.profileId)),
+      db.delete(boardAvatar).where(eq(boardAvatar.profileId, player.profileId))
+    ]);
   }
-  await inOrder(db, [
-    db.update(boardProfile).set(set).where(eq(boardProfile.id, player.profileId)),
-    ...(change.hero ? [db.delete(boardAvatar).where(eq(boardAvatar.profileId, player.profileId))] : [])
-  ]);
   const profile = await getProfile(db, player.profileId);
   if (!profile) throw new Error('profile vanished');
   return profileView(profile);

@@ -127,7 +127,7 @@ describe('upgrade effects are real in the sim', () => {
     };
     const before = top();
     takeUpgrade(a, 'speed');
-    expect(top() / before).toBeCloseTo(1.1, 2);
+    expect(top() / before).toBeCloseTo(1 + UPGRADES.speed.steps[0]!, 2);
   });
 
   it('damage upgrades scale every hit; armour soaks damage before health', () => {
@@ -160,9 +160,9 @@ describe('upgrade effects are real in the sim', () => {
     const { match, a } = ffa();
     takeUpgrade(a, 'grenades');
     takeUpgrade(a, 'grenadeRefill');
-    expect([a.arms.grenades, a.arms.grenadeMax, a.arms.grenadeRefill]).toEqual([3, 3, 11]);
+    expect([a.arms.grenades, a.arms.grenadeMax, a.arms.grenadeRefill]).toEqual([3, 3, 7]);
     match.sim.spawn(a, { position: [5, 0, 5], yaw: 0 });
-    expect([a.arms.grenades, a.arms.grenadeMax, a.arms.grenadeRefill, a.arms.magScale]).toEqual([3, 3, 11, 1]);
+    expect([a.arms.grenades, a.arms.grenadeMax, a.arms.grenadeRefill, a.arms.magScale]).toEqual([3, 3, 7, 1]);
   });
 });
 
