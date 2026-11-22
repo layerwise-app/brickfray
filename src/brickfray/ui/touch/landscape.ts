@@ -98,21 +98,23 @@ export function holdFrame(on: boolean) {
 export function watchFrame() {
   const onResize = () => apply(true);
   // iOS can report the old size on the first resize after a turn; the settled size follows shortly.
-  let settle = 0;
+  let settle: number[] = [];
   const onTurn = () => {
-    clearTimeout(settle);
-    settle = window.setTimeout(() => apply(false), 350);
+    settle.forEach(clearTimeout);
+    settle = [120, 350, 800, 1500].map((ms) => window.setTimeout(() => apply(false), ms));
   };
   window.addEventListener('resize', onResize);
   window.addEventListener('orientationchange', onTurn);
+  window.visualViewport?.addEventListener('resize', onTurn);
   const offSheets = watchStyleSheets(() => {
     if (frame.rotated) fitStyleSheets(frame);
   });
   apply(true);
   return () => {
-    clearTimeout(settle);
+    settle.forEach(clearTimeout);
     window.removeEventListener('resize', onResize);
     window.removeEventListener('orientationchange', onTurn);
+    window.visualViewport?.removeEventListener('resize', onTurn);
     offSheets();
     fitStyleSheets(null);
     document.documentElement.classList.remove('bf-rotated');

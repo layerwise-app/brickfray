@@ -98,6 +98,8 @@ export class Game {
     if (net?.length) Object.assign(netConditions, { latency: net[0] || 0, jitter: net[1] || 0, loss: net[2] || 0 });
     this.resize();
     window.addEventListener('resize', this.resize);
+    // A phone settles its viewport after a turn without always sending a resize.
+    if (this.canvas.parentElement) this.boxWatch.observe(this.canvas.parentElement);
     this.loop();
   }
 
@@ -142,9 +144,13 @@ export class Game {
     setTimeout(() => this.hud.set({ hint: null }), 6000);
   }
 
+  private boxWatch = new ResizeObserver(() => this.resize());
+
   private resize = () => {
-    const w = this.canvas.clientWidth || window.innerWidth;
-    const h = this.canvas.clientHeight || window.innerHeight;
+    // The canvas carries the size the renderer last gave it, so the box to fill is its parent's.
+    const box = this.canvas.parentElement;
+    const w = box?.clientWidth || window.innerWidth;
+    const h = box?.clientHeight || window.innerHeight;
     this.showroom.resize(w, h);
     this.renderer.resize(w, h, this.match ? undefined : this.showroom.pixelRatio(w, h));
     this.view.resize(w, h);
@@ -441,6 +447,7 @@ export class Game {
     document.removeEventListener('visibilitychange', this.onVisibility);
     window.removeEventListener('beforeunload', this.onUnload);
     window.removeEventListener('resize', this.resize);
+    this.boxWatch.disconnect();
     this.input.dispose();
     this.view.dispose();
     this.showroom.dispose();
