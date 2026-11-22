@@ -14,8 +14,12 @@ export interface BuildingParams {
   z1: number;
   /** Top of the walls. */
   height: number;
-  /** The face that looks into the play area. */
+  /** The face that looks into the play area (shop, roof ridge). */
   face: Face;
+  /** Further dressed faces (windows only). */
+  faces?: Face[];
+  /** Bottom of the dressed walls when a walk-through or passage fills the ground floor. */
+  base?: number;
   wall: string[];
   trim: string;
   roof: RoofKind;
@@ -32,7 +36,7 @@ export interface BuildingParams {
 export const STOREY = 3.36;
 const BAY = 2.4;
 
-interface Hole {
+export interface Hole {
   u0: number;
   u1: number;
   y0: number;
@@ -40,25 +44,27 @@ interface Hole {
   kind: 'window' | 'shop' | 'door';
 }
 
-function holes(p: BuildingParams, length: number): Hole[] {
+function holes(p: BuildingParams, length: number, primary = true): Hole[] {
   const out: Hole[] = [];
+  const base = p.base ?? 0;
   const bays = Math.max(1, Math.floor(length / BAY));
   const margin = (length - bays * BAY) / 2;
   const floors = Math.floor((p.height - 0.6) / STOREY);
   const ww = p.windows === 'square' ? 1.2 : 0.8;
   const wh = p.windows === 'square' ? 1.44 : 1.92;
   for (let f = 1; f < floors; f++) {
+    if (f * STOREY < base) continue;
     for (let b = 0; b < bays; b++) {
       const c = margin + (b + 0.5) * BAY;
       out.push({ u0: c - ww / 2, u1: c + ww / 2, y0: f * STOREY + 0.96, y1: f * STOREY + 0.96 + wh, kind: 'window' });
     }
   }
-  if (p.noGroundFloor) return out;
+  if (p.noGroundFloor || base > 0) return out;
   const doorBay = Math.floor(bays / 2);
   for (let b = 0; b < bays; b++) {
     const c = margin + (b + 0.5) * BAY;
     if (b === doorBay) out.push({ u0: c - 0.6, u1: c + 0.6, y0: 0.16, y1: 2.56, kind: 'door' });
-    else if (p.shop) out.push({ u0: c - 0.8, u1: c + 0.8, y0: 0.64, y1: 2.56, kind: 'shop' });
+    else if (p.shop && primary) out.push({ u0: c - 0.8, u1: c + 0.8, y0: 0.64, y1: 2.56, kind: 'shop' });
     else out.push({ u0: c - ww / 2, u1: c + ww / 2, y0: 0.96, y1: 0.96 + wh, kind: 'window' });
   }
   return out;
@@ -85,32 +91,48 @@ export const BUILDING: Element<BuildingParams> = {
     return out;
   },
   draw(d, p) {
-    const { f, length, along } = faceFrame(p.face, p.x0, p.z0, p.x1, p.z1);
-    const t = new Pen(d, f);
     const rng = new Rng(p.seed ?? Math.round(p.x0 * 3 + p.z0 * 7));
-    const hs = holes(p, length);
+    const faces = [p.face, ...(p.faces ?? []).filter((x) => x !== p.face)];
+    const base = p.base ?? 0;
     const main = p.wall[0]!;
     const style = { colors: p.wall, variance: 0.26, lens: [4, 6, 3, 8] };
-    const openings: Opening[] = hs.map((h) => ({ from: along(h.u0), to: along(h.u1), y0: h.y0, y1: h.y1 }));
-    const depth = masonryFaces(d, [p.x0, 0.48, p.z0], [p.x1, p.height, p.z1], style, [p.face], { [p.face]: openings.map((o) => ({ ...o, y0: Math.max(o.y0, 0.48) })) });
-    const inset = (side: Face) => (side === p.face ? depth : 0);
-    slab(d, [p.x0 + inset('w'), 0, p.z0 + inset('n')], [p.x1 - inset('e'), p.height, p.z1 - inset('s')], shade(main, -0.3));
-    let u = 0;
-    for (const h of [...hs.filter((x) => x.kind === 'door').sort((a, b) => a.u0 - b.u0), { u0: length, u1: length }]) {
-      if (h.u0 - u > 0.05) t.box((u + h.u0) / 2, 0, 0.02, h.u0 - u, 0.48, 0.08, shade(p.trim, -0.15), undefined, 0.02);
-      u = h.u1;
-    }
+    const sides = faces.map((face, i) => {
+      const { f, length, along } = faceFrame(face, p.x0, p.z0, p.x1, p.z1);
+      return { face, f, length, along, hs: holes(p, length, i === 0) };
+    });
+    const openings: Partial<Record<Face, Opening[]>> = {};
+    for (const s of sides) openings[s.face] = s.hs.map((h) => ({ from: s.along(h.u0), to: s.along(h.u1), y0: Math.max(h.y0, 0.48), y1: h.y1 }));
+    const depth = masonryFaces(d, [p.x0, Math.max(base, 0.48), p.z0], [p.x1, p.height, p.z1], style, faces, openings);
+    const inset = (side: Face) => (faces.includes(side) ? depth : 0);
+    slab(d, [p.x0 + inset('w'), base, p.z0 + inset('n')], [p.x1 - inset('e'), p.height, p.z1 - inset('s')], shade(main, -0.3));
     const floors = Math.floor((p.height - 0.6) / STOREY);
-    for (let k = 1; k < floors; k++) t.box(length / 2, k * STOREY - 0.08, 0.03, length, PLATE, 0.1, p.trim, undefined, 0.02);
-    t.box(length / 2, p.height - 0.32, 0.08, length + 0.2, 0.32, 0.24, p.trim, undefined, 0.03);
-    if (d.detail > 0) t.box(length / 2, p.height - 0.48, 0.04, length + 0.1, PLATE, 0.14, shade(p.trim, -0.1), undefined, 0.02);
-    for (const h of hs) drawHole(t, d, p, h, rng);
-    if (p.shop) drawShop(t, d, p, length);
+    for (const s of sides) {
+      const t = new Pen(d, s.f);
+      if (base === 0) {
+        let u = 0;
+        for (const h of [...s.hs.filter((x) => x.kind === 'door').sort((a, b) => a.u0 - b.u0), { u0: s.length, u1: s.length }]) {
+          if (h.u0 - u > 0.05) t.box((u + h.u0) / 2, 0, 0.02, h.u0 - u, 0.48, 0.08, shade(p.trim, -0.15), undefined, 0.02);
+          u = h.u1;
+        }
+      } else t.box(s.length / 2, base - 0.24, 0.04, s.length, 0.24, 0.16, p.trim, undefined, 0.02);
+      for (let k = 1; k < floors; k++) if (k * STOREY > base) t.box(s.length / 2, k * STOREY - 0.08, 0.03, s.length, PLATE, 0.1, p.trim, undefined, 0.02);
+      t.box(s.length / 2, p.height - 0.32, 0.08, s.length + 0.2, 0.32, 0.24, p.trim, undefined, 0.03);
+      if (d.detail > 0) t.box(s.length / 2, p.height - 0.48, 0.04, s.length + 0.1, PLATE, 0.14, shade(p.trim, -0.1), undefined, 0.02);
+      for (const h of s.hs) drawHole(t, d, p, h, rng);
+      if (s.face === p.face && p.shop && base === 0) drawShop(t, d, p, s.length);
+    }
     drawRoof(d, p);
   }
 };
 
-function drawHole(t: Pen, d: Drawer, p: BuildingParams, h: Hole, rng: Rng) {
+export type HoleParams = Pick<BuildingParams, 'trim' | 'shop' | 'windows' | 'shutters' | 'balcony'>;
+
+/** One dressed window or door in a facade frame (local x along the face, +z out). */
+export function facadeHole(t: Pen, d: Drawer, p: HoleParams, h: Hole, rng: Rng) {
+  drawHole(t, d, p, h, rng);
+}
+
+function drawHole(t: Pen, d: Drawer, p: HoleParams, h: Hole, rng: Rng) {
   const w = h.u1 - h.u0;
   const hh = h.y1 - h.y0;
   const c = (h.u0 + h.u1) / 2;
@@ -173,7 +195,7 @@ function drawHole(t: Pen, d: Drawer, p: BuildingParams, h: Hole, rng: Rng) {
  * An opaque room with a lit ceiling band, a frame, a mullion and a sill instead of see-through glass: the flat
  * tier's opening, and the far stand-in on the others.
  */
-function flatHole(t: Pen, p: BuildingParams, h: Hole) {
+function flatHole(t: Pen, p: HoleParams, h: Hole) {
   const w = h.u1 - h.u0;
   const hh = h.y1 - h.y0;
   const c = (h.u0 + h.u1) / 2;
