@@ -241,7 +241,9 @@ export class BotDirector {
         b.aimPitch *= 0.9;
         cmd.forward = b.sidestep > 0 ? -0.4 : 1;
         cmd.right = b.sidestep > 0 ? b.strafe : 0;
-        if (bot.bot === 'rusher') cmd.buttons |= BUTTON.sprint;
+        // With nobody known nearby a match bot runs to the fight, as a player would; solo waves keep their walking pace.
+        const hurry = host.settings.mode !== 'solo' && b.lostFor > 2 && b.path.length > 2 && b.sidestep <= 0 && !(cmd.buttons & BUTTON.crouch);
+        if (bot.bot === 'rusher' || hurry) cmd.buttons |= BUTTON.sprint;
       }
     } else if (!visible && b.approach) {
       // Arrived where the enemy should be in sight: face it, or it stays out of the bot's view cone behind it.

@@ -18,6 +18,9 @@ export interface NavState {
   graphOnly: number;
 }
 
+/** How far from a goal its route may end when the nearest waypoint can't see it (m). */
+const GOAL_REACH = 7;
+
 /** Bot legwork: the waypoint route to a goal, and never stepping off a ledge into the kill zone. */
 export class BotNav {
   private readonly hits: number[] = [];
@@ -42,7 +45,7 @@ export class BotNav {
       b.repath = 1.5;
       const now = this.host.time;
       const blocked = (i: number) => (b.blocked.get(i) ?? 0) > now;
-      b.path = findPath(wps, nearestWaypoint(wps, m.x, m.y, m.z, blocked), nearestWaypoint(wps, gx, gy, gz), (from, to) => (b.avoid.get(`${from}>${to}`) ?? 0) > now || blocked(to));
+      b.path = findPath(wps, nearestWaypoint(wps, m.x, m.y, m.z, blocked), this.goalWaypoint(gx, gy, gz), (from, to) => (b.avoid.get(`${from}>${to}`) ?? 0) > now || blocked(to));
     }
     while (b.path.length) {
       const w = wps[b.path[0]!]!.position;
@@ -136,6 +139,27 @@ export class BotNav {
     const reach = 1.2 + pace * Math.sqrt((2 * fall) / MOVE.gravity);
     for (let d = 1.4; d < reach + 0.6; d += 0.6) if (this.deadly(x + dx * d, y, z + dz * d)) return true;
     return false;
+  }
+
+  /** The waypoint to route to for a goal: the nearest that sees it, as the plain nearest may stand behind the wall the goal is pressed against. */
+  private goalWaypoint(x: number, y: number, z: number) {
+    const wps = this.host.layout.waypoints;
+    const world = this.host.world;
+    const sees = (i: number) => {
+      const [wx, wy, wz] = wps[i]!.position;
+      return Math.hypot(wx - x, wz - z) < 0.5 || world.clearLine(wx, wy + 0.6, wz, x, y + 0.6, z) || world.clearLine(wx, wy + 1.6, wz, x, y + 1.2, z);
+    };
+    let best = nearestWaypoint(wps, x, y, z);
+    if (sees(best)) return best;
+    let bestD = GOAL_REACH;
+    wps.forEach((w, i) => {
+      const d = Math.hypot(w.position[0] - x, (w.position[1] - y) * 2, w.position[2] - z);
+      if (d < bestD && sees(i)) {
+        bestD = d;
+        best = i;
+      }
+    });
+    return best;
   }
 
   private deadly(x: number, y: number, z: number, lift = 0.6) {
