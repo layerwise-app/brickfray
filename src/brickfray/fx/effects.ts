@@ -6,6 +6,7 @@ import type { CollisionWorld } from '../sim/collision';
 import type { WeaponId } from '../weapons/defs';
 import { AoMask } from './ao-mask';
 import { BlobShadows } from './blob-shadows';
+import { Casings } from './casings';
 import { Debris } from './debris';
 import { Decals, type DecalKind } from './decals';
 import { explode } from './explosion';
@@ -13,6 +14,7 @@ import { remoteMuzzle } from './muzzle';
 import { buildGroundContact } from './ground-contact';
 import { ShatterField } from './shatter';
 import { Shockwaves } from './shockwave';
+import { Splashes } from './splash';
 import { SpritePool } from './sprites';
 import { Tracers } from './tracers';
 
@@ -69,6 +71,10 @@ export class Effects {
   readonly level: QualityLevel;
   readonly shockwaves = new Shockwaves();
   readonly decals: Decals;
+  /** Blast soot, multiplied over the floor. */
+  readonly scorches = new Decals(12, true);
+  readonly casings: Casings;
+  private readonly splashes: Splashes;
   private readonly blobs: BlobShadows | null = null;
   /** One light for explosions, dark between them: it stays in the scene so lighting it never recompiles a shader. */
   private readonly flash: THREE.PointLight | null = null;
@@ -87,13 +93,16 @@ export class Effects {
     this.debris = new Debris(kit, world);
     this.shatterField = new ShatterField(world, kit.profile.level === 'low' ? 60 : kit.profile.level === 'medium' ? 140 : 260);
     this.decals = new Decals(kit.profile.maxDecals);
+    this.casings = new Casings(kit, world);
+    this.splashes = new Splashes(this.smoke, this.shockwaves);
+    this.tracers.onAdd = (from, to, small) => this.splashes.shot(from, to, this.camera?.getWorldPosition(probe) ?? null, small);
     this.debris.onBounce = (p, s) => this.onChipBounce?.(p, s);
     this.shatterField.onClatter = (p, s) => this.onChipBounce?.(p, s);
     if (kit.profile.ambientOcclusion) {
       this.billows.mask = new AoMask(96, world);
       this.root.add(this.billows.mask.mesh);
     }
-    this.root.add(this.debris.mesh, this.shatterField.group, this.decals.mesh, this.billows.mesh, this.smoke.mesh, this.shockwaves.mesh, this.tracers.mesh, this.glow.mesh);
+    this.root.add(this.debris.mesh, this.shatterField.group, this.decals.mesh, this.scorches.mesh, this.billows.mesh, this.smoke.mesh, this.shockwaves.mesh, this.tracers.mesh, this.glow.mesh, this.casings.group);
     if (kit.profile.shadows) {
       this.flash = new THREE.PointLight(BLAST.color, 0, BLAST.distance, BLAST.decay);
       this.root.add(this.flash);
@@ -127,9 +136,7 @@ export class Effects {
   impact(point: THREE.Vector3, normal: THREE.Vector3, surface: string, color?: THREE.ColorRepresentation) {
     const c = color ?? SURFACE_COLOR[surface] ?? SURFACE_COLOR.plastic!;
     if (surface === 'water') {
-      for (let i = 0; i < 6; i++) {
-        this.smoke.emit({ position: point, velocity: v(jitter(1.5), 2 + Math.random() * 2.5, jitter(1.5)), size: 0.12, grow: 0.4, color: '#e8f6ff', alpha: 0.8, life: 0.5, gravity: 9 });
-      }
+      this.splashes.splash(this.splashes.lift(point));
       return;
     }
     if (surface === 'foliage') {
@@ -266,12 +273,18 @@ export class Effects {
     this.flashStrength = strength;
   }
 
+  /** A remote's spent case from `port`, when the camera is near enough to see it. */
+  casing(weapon: WeaponId, port: THREE.Object3D) {
+    if (this.camera) this.casings.eject(weapon, port, this.camera.getWorldPosition(probe));
+  }
+
   shatter(pieces: ShatterPiece[]) {
     this.shatterField.add(pieces);
   }
 
   update(dt: number, camera: THREE.Camera) {
     this.figures ??= this.root.parent?.getObjectByName('remotes') ?? null;
+    if (!this.splashes.ready && this.root.parent) this.splashes.find(this.root.parent);
     if (this.blobs) {
       this.blobs.update(this.figures?.children ?? [], camera);
     }
@@ -286,6 +299,7 @@ export class Effects {
     this.tracers.update(dt);
     this.debris.update(dt);
     this.shatterField.update(dt);
+    this.casings.update(dt);
     this.shockwaves.update(dt);
     this.glow.update(dt, camera);
     this.smoke.update(dt, camera);
@@ -296,11 +310,13 @@ export class Effects {
     this.tracers.clear();
     this.debris.clear();
     this.shatterField.clear();
+    this.casings.clear();
     this.shockwaves.clear();
     this.glow.clear();
     this.smoke.clear();
     this.billows.clear();
     this.decals.clear();
+    this.scorches.clear();
     if (this.flash) this.flash.intensity = 0;
     this.flashLeft = 0;
   }

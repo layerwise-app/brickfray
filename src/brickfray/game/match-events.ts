@@ -107,7 +107,7 @@ export class MatchEvents {
             mv.view.act({ type: 'hurt', strength: Math.min(1, e.amount / 50) });
             if (e.attacker !== me) mv.sound.hurt();
           } else {
-            mv.remotes.hurt(e.victim, e.from);
+            mv.remotes.hurt(e.victim, e.from, e.amount, e.attacker);
             if (e.attacker === me && !e.fatal) {
               const r = mv.remotes.map.get(e.victim);
               mv.hud.pulse({ type: 'hit', kind: e.kind, amount: e.amount, at: r ? [r.position.x, r.position.y + 1.8, r.position.z] : null });

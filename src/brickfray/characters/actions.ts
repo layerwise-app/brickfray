@@ -1,6 +1,7 @@
 import * as THREE from 'three';
-import type { WeaponId } from '../weapons/defs';
+import type { MeleeId, WeaponId } from '../weapons/defs';
 import { hprQuat, keyed, smooth, spline, window4 } from './ik';
+import { meleeLegs } from './swings';
 
 /** Where the left hand goes during an action, in model space about the shoulder center (x right, y up, z back). */
 export interface HandAction {
@@ -29,27 +30,6 @@ type ActionKey = readonly [number, number, number, number, number, number, numbe
 const k9 = [0, 0, 0, 0, 0, 0, 0, 0, 0];
 
 /**
- * Overhead chop with the off hand. The hand is drawn out to the left before it rises, cocks above and behind the left
- * shoulder and comes over in a plane outside the head, so no tool (the anchor and sword are long) or helmet ever meets;
- * it crosses in front of the body only below the chin, at the strike and in the follow-through.
- */
-const MELEE: readonly ActionKey[] = [
-  [0.0, -0.02, -0.12, -0.38, 0, 0, 0, -0.4, -1, 0.3],
-  [0.07, -0.29, 0.05, -0.27, 1.5, -0.15, 0, -0.7, -0.6, -0.4],
-  [0.12, -0.36, 0.2, -0.08, 2.0, -0.05, 0, -0.9, -0.2, -0.4],
-  [0.17, -0.34, 0.31, 0.1, 2.35, 0.04, 0, -0.8, 0, -0.5],
-  [0.23, -0.35, 0.33, 0.14, 2.5, 0.04, 0, -0.8, 0, -0.45],
-  [0.29, -0.34, 0.29, -0.14, 1.3, 0.02, 0, -0.9, -0.3, -0.3],
-  [0.36, -0.2, 0.02, -0.5, -0.45, 0.05, 0, -0.6, -1, 0.2],
-  [0.4, -0.13, -0.1, -0.54, -0.75, 0.1, 0, -0.5, -1, 0.3],
-  [0.44, -0.11, -0.14, -0.53, -0.85, 0.12, 0, -0.5, -1, 0.3],
-  [0.52, 0.0, -0.4, -0.42, -1.3, 0.22, 0, -0.3, -1, 0.4],
-  [0.64, 0.03, -0.42, -0.38, -1.4, 0.24, 0, -0.3, -1, 0.4],
-  [0.86, -0.02, -0.15, -0.38, -0.4, 0.05, 0, -0.4, -1, 0.3],
-  [1, -0.02, -0.15, -0.38, -0.4, 0.05, 0, -0.4, -1, 0.3]
-];
-
-/**
  * Overarm off-hand throw. The grenade is brought out low on the left and cocked high behind the shoulder, elbow up and
  * out, chest coiled away (cooking holds at 0.25). The bomb leaves the hand when the cook ends (0.25, when the match
  * spawns it): the elbow leads forward over the shoulder, the arm whips long toward the target with the wrist snapped
@@ -74,16 +54,6 @@ function path(keys: readonly ActionKey[], t: number, out: HandAction) {
   out.pos.set(k9[0]!, k9[1]!, k9[2]!);
   hprQuat(k9[4]!, k9[3]!, k9[5]!, out.q);
   out.pole.set(k9[6]!, k9[7]!, k9[8]!);
-}
-
-export function meleeAction(m: number, out: HandAction) {
-  path(MELEE, m, out);
-  out.weight = window4(m, 0, 0.07, 0.72, 0.92);
-  out.lower = window4(m, 0, 0.08, 0.75, 0.95);
-  out.twist = -0.5 * window4(m, 0.03, 0.17, 0.23, 0.32) + 0.5 * window4(m, 0.27, 0.38, 0.62, 0.88);
-  out.bend = 0.12 * window4(m, 0.05, 0.17, 0.23, 0.3) - 0.34 * window4(m, 0.29, 0.4, 0.64, 0.88);
-  out.mallet = window4(m, 0.0, 0.05, 0.82, 0.9);
-  out.grenade = 0;
 }
 
 export function throwAction(g: number, out: HandAction) {
@@ -116,10 +86,10 @@ const stepArc = (t: number, a: number, b: number, c: number, d: number) => (t < 
 
 /**
  * The thrower steps out toward the target with the right foot during the wind-up and holds the weight back while
- * cooking, then drives onto the lead foot after the release (hips drop and push forward, rear heel up). A swing coils
- * back onto the right foot, then steps in with the left as the blow comes down and lunges through it.
+ * cooking, then drives onto the lead foot after the release (hips drop and push forward, rear heel up). A swing's
+ * footwork is its tool's own (`meleeLegs`).
  */
-export function actionLegs(grenade: number, melee: number, out: ActionLegs) {
+export function actionLegs(grenade: number, melee: number, tool: MeleeId, out: ActionLegs) {
   out.reach.fill(0);
   out.side.fill(0);
   out.turn.fill(0);
@@ -142,24 +112,7 @@ export function actionLegs(grenade: number, melee: number, out: ActionLegs) {
     out.hip[2] = -0.12 * lunge - 0.06 * stride + 0.05 * coil;
     out.hip[3] = -0.28 * coil + 0.22 * lunge;
     out.hip[4] = -0.12 * lunge + 0.04 * coil;
-  } else if (melee >= 0) {
-    const m = melee;
-    const coil = window4(m, 0.02, 0.17, 0.24, 0.33);
-    const step = window4(m, 0.2, 0.36, 0.7, 0.95);
-    const drive = window4(m, 0.28, 0.42, 0.6, 0.9);
-    out.reach[0] = 0.3 * step;
-    out.reach[1] = -0.03 * drive;
-    out.side[0] = 0.02 * step;
-    out.turn[0] = 0.15 * step;
-    out.lift[0] = 0.07 * stepArc(m, 0.2, 0.36, 0.7, 0.95);
-    out.heel[0] = 0.45 * coil;
-    out.heel[1] = 0.55 * drive;
-    out.hip[0] = 0.055 * coil - 0.035 * drive;
-    out.hip[1] = -0.03 * coil - 0.075 * drive;
-    out.hip[2] = 0.07 * coil - 0.14 * drive;
-    out.hip[3] = -0.4 * coil + 0.3 * drive;
-    out.hip[4] = 0.05 * coil - 0.14 * drive;
-  }
+  } else if (melee >= 0) meleeLegs(tool, melee, out);
   return out;
 }
 

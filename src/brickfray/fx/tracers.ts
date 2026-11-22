@@ -101,6 +101,8 @@ export class Tracers {
   private rounds = 0;
   /** Which gun fired from a muzzle position, when the caller does not say. */
   weaponAt: ((from: THREE.Vector3) => WeaponId | null) | null = null;
+  /** Every shot as it is added (`small`: a pellet), for what it passes through on the way. */
+  onAdd: ((from: THREE.Vector3, to: THREE.Vector3, small: boolean) => void) | null = null;
 
   constructor() {
     const base = new THREE.PlaneGeometry(1, 1);
@@ -149,6 +151,7 @@ export class Tracers {
     // Pellets keep the caller's shorter streak.
     const streak = style && (options.streak ?? 9) > 2.5 ? style.streak : options.streak;
     const width = style?.width ?? options.width ?? 0.035;
+    this.onAdd?.(from, to, width < 0.03);
     // Pellets are too many and too short to carry tracer rounds.
     const tracer = width >= 0.03 && this.rounds++ % TRACER_EVERY === 0;
     this.list.push({

@@ -1,4 +1,4 @@
-import { WEAPON_IDS, type WeaponId } from '../weapons/defs';
+import { WEAPON_IDS, WEAPONS, type WeaponId } from '../weapons/defs';
 import type { Grenade } from '../sim/grenades';
 import type { MoveState } from '../sim/movement';
 import type { ArmsState, Command, HostPlayer, PlayerState, ShotTrace } from '../sim/types';
@@ -6,6 +6,8 @@ import { noUpgrades, UPGRADE_IDS, upgradeStats, type UpgradeLevels } from '../si
 import { Reader, Writer } from './bytes';
 
 export const PACKET = { input: 1, snapshot: 2 } as const;
+/** Seconds of a melee swing the snapshot's progress byte spans (longer than every tool's swing). */
+export const MELEE_SPAN = 0.6;
 
 // ---------- client → host: commands (last few unacked, newest last) ----------
 
@@ -57,8 +59,15 @@ export interface RemoteSnapshotPlayer {
   shots: number;
   ads: number;
   reload: number;
+  /** Melee swing progress over `MELEE_SPAN` seconds, or -1. */
   melee: number;
   grenade: number;
+  sliding?: boolean;
+  /**
+   * Weapon switch, -1 when none: 0…0.5 while the gun in hand (the loadout's other one, `weapon` being the one wanted)
+   * is put away, 0.5…1 while `weapon` is drawn.
+   */
+  swap?: number;
 }
 
 export interface SelfState {
@@ -194,7 +203,7 @@ export function encodeSnapshot(time: number, ack: number, self: HostPlayer | nul
     const m = p.move;
     const a = p.arms;
     w.u16(p.id);
-    w.u8((p.alive ? 1 : 0) | (m.grounded ? 2 : 0) | (m.sprinting ? 4 : 0));
+    w.u8((p.alive ? 1 : 0) | (m.grounded ? 2 : 0) | (m.sprinting ? 4 : 0) | (m.slide > 0 ? 8 : 0));
     w.f32(m.x);
     w.f32(m.y);
     w.f32(m.z);
@@ -209,8 +218,9 @@ export function encodeSnapshot(time: number, ack: number, self: HostPlayer | nul
     w.u16(a.shots & 0xffff);
     w.u8(a.ads * 255);
     w.u8(a.reload > 0 && a.reloadTotal > 0 ? (1 - a.reload / a.reloadTotal) * 254 + 1 : 0);
-    w.u8(a.meleeTime >= 0 ? Math.min(1, a.meleeTime / 0.5) * 254 + 1 : 0);
+    w.u8(a.meleeTime >= 0 ? Math.min(1, a.meleeTime / MELEE_SPAN) * 254 + 1 : 0);
     w.u8(a.cook >= 0 ? 1 : a.throwTime > 0 ? 2 + (1 - a.throwTime / 0.45) * 253 : 0);
+    w.u8(encodeSwap(a));
   }
   w.u8(grenades.length);
   for (const g of grenades) {
@@ -273,7 +283,9 @@ export function decodeSnapshot(r: Reader): Snapshot {
       ads: r.u8() / 255,
       reload: decodeProgress(r.u8()),
       melee: decodeProgress(r.u8()),
-      grenade: decodeGrenade(r.u8())
+      grenade: decodeGrenade(r.u8()),
+      sliding: (flags & 8) !== 0,
+      swap: decodeSwap(r.u8())
     });
   }
   const grenades: Snapshot['grenades'] = [];
@@ -296,6 +308,19 @@ export function decodeSnapshot(r: Reader): Snapshot {
 }
 
 const decodeProgress = (v: number) => (v === 0 ? -1 : (v - 1) / 254);
+
+/** 0 none, 1…127 putting the old gun away, 128…255 drawing the new one. */
+function encodeSwap(a: ArmsState) {
+  if (a.switchTime <= 0) return 0;
+  if (a.next) {
+    const draw = WEAPONS[a.next].drawTime;
+    const holster = Math.max(1e-3, WEAPONS[a.weapon].holsterTime);
+    return 1 + Math.round(Math.min(1, Math.max(0, 1 - (a.switchTime - draw) / holster)) * 126);
+  }
+  return 128 + Math.round(Math.min(1, Math.max(0, 1 - a.switchTime / Math.max(1e-3, WEAPONS[a.weapon].drawTime))) * 127);
+}
+
+const decodeSwap = (v: number) => (v === 0 ? -1 : v < 128 ? ((v - 1) / 126) * 0.5 : 0.5 + ((v - 128) / 127) * 0.5);
 /** -1 none, 0.25 cooking (holds at wind-up), 0.25…1 throwing. */
 const decodeGrenade = (v: number) => (v === 0 ? -1 : v === 1 ? 0.25 : 0.25 + ((v - 2) / 253) * 0.75);
 

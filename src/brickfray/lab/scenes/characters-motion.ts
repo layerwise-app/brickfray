@@ -6,6 +6,9 @@ import { createCharacter, type AnimState, type BotKind, type CharacterId, type S
 import { idleState, mergeState } from '../../characters/labState';
 import type { Rig } from '../../characters/rig';
 import { standInRifle } from '../../characters/standInRifle';
+import { STOW_BONE, stowPlaceOf, stowTransform, swapGrab } from '../../characters/stow';
+import { createWeaponModel } from '../../weapons';
+import { LOADOUTS } from '../../weapons/loadouts';
 import type { LabContext } from '../types';
 
 type Id = CharacterId | BotKind;
@@ -22,6 +25,10 @@ interface SheetOptions {
   vary?: { key: keyof AnimState; from: number; to: number };
   /** Scripted jump: frames sampled across take-off, flight and landing. */
   jump?: boolean;
+  /** Seconds after take-off of the first jump frame (to sample the landing closely). */
+  from?: number;
+  /** With `vary` on 'swap' and the loadout armed: the gun drawn; each copy holds what the remote would at its moment. */
+  swapTo?: 'primary' | 'secondary';
   /** Reverse the strip so a front three-quarter camera reads left to right. */
   flip?: boolean;
   fidget?: boolean;
@@ -47,14 +54,30 @@ export default function setup(ctx: LabContext) {
   let state = idleState();
   let live = true;
   let pieces: ShatterPiece[] = [];
+  /** null: the stand-in rifle; otherwise the loadout's own guns, this one in hand (or none) and the rest stowed. */
+  let armed: { hand: 'primary' | 'secondary' | null } | null = null;
 
+  const arm = (rig: Rig, hand: 'primary' | 'secondary' | null) => {
+    const loadout = LOADOUTS[id];
+    for (const slot of ['primary', 'secondary'] as const) {
+      const gun = createWeaponModel(loadout[slot], kit, 'third');
+      if (slot === hand) {
+        rig.setWeapon(gun.root, gun.supportGrip);
+        gun.root.visible = true;
+      } else rig.stow(gun.root, stowPlaceOf(loadout[slot]));
+    }
+    if (!hand) rig.setWeapon(null, null);
+  };
   const make = (count: number) => {
     for (const r of rigs) r.dispose();
     rigs = [];
     for (let i = 0; i < count; i++) {
       const rig = createCharacter(id, kit) as Rig;
-      const gun = standInRifle(kit);
-      rig.setWeapon(gun.root, gun.supportGrip);
+      if (armed) arm(rig, armed.hand);
+      else {
+        const gun = standInRifle(kit);
+        rig.setWeapon(gun.root, gun.supportGrip);
+      }
       scene.add(rig.root);
       rigs.push(rig);
     }
@@ -99,6 +122,11 @@ export default function setup(ctx: LabContext) {
         id = next as Id;
         make(rigs.length || 1);
       },
+      /** 'primary' | 'secondary' | 'none': the loadout's guns (one in hand, the rest stowed); 'stand-in' for the lab rifle. */
+      arm: (hand: unknown) => {
+        armed = hand === 'stand-in' ? null : { hand: hand === 'none' ? null : (hand as 'primary' | 'secondary') };
+        make(rigs.length || 1);
+      },
       setState: (patch: unknown) => {
         state = mergeState(idleState(), patch as Partial<AnimState>);
       },
@@ -129,10 +157,24 @@ export default function setup(ctx: LabContext) {
           const ui = n > 1 ? i / (n - 1) : 0;
           let lift = 0;
           if (o.vary) {
-            const s = mergeState(state, { [o.vary.key]: o.vary.from + (o.vary.to - o.vary.from) * ui } as Partial<AnimState>);
+            const value = o.vary.from + (o.vary.to - o.vary.from) * ui;
+            let s = mergeState(state, { [o.vary.key]: value } as Partial<AnimState>);
+            if (o.swapTo && armed) {
+              const loadout = LOADOUTS[id];
+              const other = o.swapTo === 'primary' ? 'secondary' : 'primary';
+              const from = loadout[other];
+              const to = loadout[o.swapTo];
+              const grab = swapGrab(stowPlaceOf(from), stowPlaceOf(to));
+              s = mergeState(s, { weapon: value < 0.5 ? from : to, swapFrom: value < 0.5 ? null : from });
+              const old: THREE.Object3D[] = [];
+              rig.root.traverse((c) => void (c.name.startsWith('weapon:') && old.push(c)));
+              rig.setWeapon(null, null);
+              for (const c of old) c.removeFromParent();
+              arm(rig, value < 0.5 ? other : value < grab ? null : o.swapTo);
+            }
             run(rig, t0, () => s);
           } else if (o.jump) {
-            const tEnd = t0 + (o.span ?? 1.5) * ui;
+            const tEnd = t0 + (o.from ?? 0) + (o.span ?? 1.5) * ui;
             run(rig, tEnd, (t) => jumpState(t, t0));
             const air = tEnd - t0;
             lift = air > 0 && air < 0.95 ? 4.6 * air - 4.9 * air * air : 0;
@@ -174,6 +216,33 @@ export default function setup(ctx: LabContext) {
         }
         live = false;
         pieces = pieces.map((p) => ({ ...p, velocity: new THREE.Vector3(), angularVelocity: new THREE.Vector3() }));
+      },
+      /** How far the gun in hand is from its stowed place at the moment it is let go (or taken), per slot: [m, rad]. */
+      probeSwap: () => {
+        const loadout = LOADOUTS[id];
+        const out: Record<string, number[]> = {};
+        for (const slot of ['primary', 'secondary'] as const) {
+          const weapon = loadout[slot];
+          for (const [label, value, from] of [['put', 0.4999, null], ['take', swapGrab(stowPlaceOf(loadout[slot === 'primary' ? 'secondary' : 'primary']), stowPlaceOf(weapon)) + 1e-4, loadout[slot === 'primary' ? 'secondary' : 'primary']]] as const) {
+            make(1);
+            const rig = rigs[0]!;
+            const s = mergeState(state, { weapon, swap: value, swapFrom: from });
+            run(rig, 1, () => s);
+            rig.root.updateMatrixWorld(true);
+            const hand = new THREE.Matrix4().copy(rig.rightHand.matrixWorld);
+            const pos = new THREE.Vector3();
+            const q = new THREE.Quaternion();
+            stowTransform(stowPlaceOf(weapon), rig.animator.fit, pos, q);
+            const bone = rig.bones[STOW_BONE[stowPlaceOf(weapon)]]!;
+            const stowed = new THREE.Matrix4().compose(pos, q, new THREE.Vector3(1, 1, 1)).premultiply(bone.matrixWorld);
+            const a = new THREE.Vector3().setFromMatrixPosition(hand);
+            const b = new THREE.Vector3().setFromMatrixPosition(stowed);
+            const qa = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().extractRotation(hand));
+            const qb = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().extractRotation(stowed));
+            out[`${slot}:${label}`] = [+a.distanceTo(b).toFixed(3), +qa.angleTo(qb).toFixed(3)];
+          }
+        }
+        return out;
       },
       tint: (c: unknown) => rigs.forEach((r) => r.setTint(c as string | null)),
       head: () => rigs[0]!.headPosition(new THREE.Vector3()).toArray(),

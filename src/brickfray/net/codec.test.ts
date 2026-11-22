@@ -5,7 +5,7 @@ import { createMoveState } from '../sim/movement';
 import type { HostPlayer } from '../sim/types';
 import { applyLevels, noUpgrades, takeUpgrade } from '../sim/upgrades';
 import { Reader } from './bytes';
-import { decodeSnapshot, encodeSnapshot, PACKET } from './codec';
+import { decodeSnapshot, encodeSnapshot, MELEE_SPAN, PACKET } from './codec';
 
 function player(id: number): HostPlayer {
   return {
@@ -69,5 +69,37 @@ describe('snapshot codec', () => {
     fresh.upgrades = { ...me.upgrades };
     applyLevels(fresh);
     expect(fresh.arms.magScale).toBe(self.arms.magScale);
+  });
+
+  it("carries a remote's weapon switch, slide and melee swing", () => {
+    const me = player(3);
+    const other = player(9);
+    other.arms.weapon = 'ar';
+    other.arms.next = 'pistol';
+    other.arms.switchTime = 0.1 + 0.2;
+    other.move.slide = 0.3;
+    other.arms.meleeTime = 0.3;
+    const decode = () => {
+      const r = new Reader(encodeSnapshot(1, 1, me, [me, other], [], []));
+      r.u8();
+      return decodeSnapshot(r).players.find((p) => p.id === 9)!;
+    };
+    let p = decode();
+    expect(p.weapon).toBe('pistol');
+    expect(p.sliding).toBe(true);
+    expect(p.melee).toBeCloseTo(0.3 / MELEE_SPAN, 2);
+    expect(p.swap).toBeGreaterThan(0.1);
+    expect(p.swap).toBeLessThan(0.5);
+    other.arms.weapon = 'pistol';
+    other.arms.next = null;
+    other.arms.switchTime = 0.05;
+    p = decode();
+    expect(p.swap).toBeGreaterThan(0.5);
+    expect(p.swap).toBeLessThanOrEqual(1);
+    other.arms.switchTime = 0;
+    other.move.slide = 0;
+    p = decode();
+    expect(p.swap).toBe(-1);
+    expect(p.sliding).toBe(false);
   });
 });

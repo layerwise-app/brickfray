@@ -4,7 +4,8 @@ import { hprQuat, twoBoneIK, UP } from './ik';
 import type { HandShape } from './parts';
 import type { Pose } from './pose';
 import { ANKLE_H, BALL, BONE, FOREARM, PELVIS_Y, SHIN, THIGH, type V3 } from './skeleton';
-import { limb, SOCKET_L, SOCKET_R } from './upper';
+import { limb } from './reach';
+import { SOCKET_L, SOCKET_R } from './upper';
 
 /** Rotations are [heading, pitch, roll] in radians: heading turns right, pitch tips up, roll raises the right side. */
 export interface Stance {

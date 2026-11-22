@@ -119,8 +119,8 @@ void main() {
       float n2 = texture2D(uNoise, nuv * 1.7 + vec2(0.53, age * 0.05)).b;
       a *= smoothstep(thin - 0.14, thin + 0.14, n2 * 0.7 + n * 0.3 + (1.0 - sr) * 0.12);
       float body = sqrt(max(0.0, 1.0 - sr * sr));
-      // Sun-lit tops, a darker core where it is thick, a lighter thin rim.
-      float light = 0.64 + 0.55 * sd.y + 0.18 * body + (n - 0.5) * 0.7 + 0.22 * smoothstep(0.55, 0.95, sr) - 0.14 * body * smoothstep(0.2, -0.5, sd.y);
+      // Sun-lit tops and a darker core where it is thick; no lighter rim, which outlines every puff as a disc.
+      float light = 0.64 + 0.55 * sd.y + 0.18 * body + (n - 0.5) * 0.7 - 0.14 * body * smoothstep(0.2, -0.5, sd.y);
       col *= clamp(light, 0.3, 1.45);
       // Lit from below by the fire for its first moments.
       float ember = (1.0 - smoothstep(0.0, 0.12, age)) * smoothstep(0.3, -0.9, sd.y);
@@ -128,7 +128,12 @@ void main() {
     } else {
       // Fire: each billow is shaded as a lump lit from above, in flat toon bands (white-hot, yellow, orange, deep
       // red, then soot as it cools), so the cluster reads as one solid fireball that hides what is behind it.
-      a = smoothstep(1.0, 0.9, edge);
+      // Crisp while it burns; as it cools to soot the edge softens and it tears apart on the noise instead of fading
+      // as a whole, which would leave see-through discs stacked in the smoke.
+      float cool = smoothstep(0.35, 0.8, age);
+      a = smoothstep(1.0, mix(0.9, 0.45, cool), edge);
+      float tear = smoothstep(0.55, 1.0, age) * 1.05;
+      a *= smoothstep(tear - 0.12, tear + 0.12, n * 0.75 + (1.0 - sr) * 0.3);
       float body = sqrt(max(0.0, 1.0 - sr * sr));
       float lit = dot(vec3(sd * 0.9, body), vec3(-0.36, 0.74, 0.57));
       float n1 = texture2D(uNoise, nuv + vec2(0.0, age * 0.16)).r;
@@ -298,9 +303,9 @@ export class SpritePool {
   }
 }
 
-/** Opacity over a sprite's life: smoke swells in and thins away, fire burns down to soot, the rest fade at the end. */
+/** Opacity over a sprite's life: smoke swells in and thins away, fire burns down to soot (and tears apart in the shader), the rest fade at the end. */
 function envelope(shape: number, age: number) {
   if (shape === SHAPES.smoke) return THREE.MathUtils.smoothstep(age, 0, 0.08) * (1 - THREE.MathUtils.smoothstep(age, 0.3, 1));
-  if (shape === SHAPES.fire) return 1 - THREE.MathUtils.smoothstep(age, 0.6, 1);
+  if (shape === SHAPES.fire) return 1 - THREE.MathUtils.smoothstep(age, 0.88, 1);
   return Math.min(1, (1 - age) * 2.2);
 }

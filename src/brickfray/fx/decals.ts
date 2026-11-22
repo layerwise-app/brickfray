@@ -28,6 +28,28 @@ void main() {
   #include <colorspace_fragment>
   #include <fog_fragment>
 }`;
+/** Soot multiplies what is under it (fogged toward no change), so studs and shading still show through the mark. */
+const MULTIPLY = /* glsl */ `
+uniform sampler2D map;
+varying vec2 vUv;
+varying float vAlpha;
+#include <fog_pars_fragment>
+void main() {
+  vec4 texel = texture2D(map, vUv);
+  float a = texel.a * vAlpha;
+  if (a < 0.01) discard;
+  vec3 m = mix(vec3(1.0), texel.rgb, a);
+  #ifdef USE_FOG
+    #ifdef FOG_EXP2
+      float fogFactor = 1.0 - exp(-fogDensity * fogDensity * vFogDepth * vFogDepth);
+    #else
+      float fogFactor = smoothstep(fogNear, fogFar, vFogDepth);
+    #endif
+    m = mix(m, vec3(1.0), fogFactor);
+  #endif
+  gl_FragColor = vec4(m, 1.0);
+  #include <colorspace_fragment>
+}`;
 
 /**
  * Marks left on scenery: chips, dents, cracks, splinters and scorch, one atlas and one instanced
@@ -46,7 +68,8 @@ export class Decals {
   private up = new THREE.Vector3();
   private y0 = new THREE.Vector3();
 
-  constructor(capacity: number) {
+  /** `multiply`: the marks darken what is under them (blast soot) instead of being painted over it. */
+  constructor(capacity: number, multiply = false) {
     const geometry = new THREE.PlaneGeometry(1, 1);
     this.cell = new THREE.InstancedBufferAttribute(new Float32Array(capacity * 3), 3);
     geometry.setAttribute('aCell', this.cell);
@@ -55,10 +78,11 @@ export class Decals {
     texture.anisotropy = 4;
     const material = new THREE.ShaderMaterial({
       vertexShader: VERTEX,
-      fragmentShader: FRAGMENT,
+      fragmentShader: multiply ? MULTIPLY : FRAGMENT,
       uniforms: THREE.UniformsUtils.merge([THREE.UniformsLib.fog, { map: { value: null } }]),
       fog: true,
       transparent: true,
+      ...(multiply ? { blending: THREE.CustomBlending, blendSrc: THREE.ZeroFactor, blendDst: THREE.SrcColorFactor, toneMapped: false } : {}),
       depthWrite: false,
       polygonOffset: true,
       polygonOffsetFactor: -2,

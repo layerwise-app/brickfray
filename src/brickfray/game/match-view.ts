@@ -10,7 +10,7 @@ import type { ClientSession } from '../net/client-session';
 import type { Snapshot } from '../net/codec';
 import type { ArmsHooks } from '../sim/arms';
 import { CollisionWorld } from '../sim/collision';
-import { INTERP_DELAY, TICK } from '../sim/constants';
+import { INTERP_DELAY, SNAPSHOT_HZ, TICK } from '../sim/constants';
 import { rayHitPlayer } from '../sim/hitboxes';
 import { eyeHeight } from '../sim/movement';
 import { StepSmoother } from './step-smoother';
@@ -21,6 +21,8 @@ import type { ViewModel } from '../weapons/types';
 import { MAPS } from '../world';
 import type { MapLayout, MapVisual } from '../world/types';
 import { FirstPersonCamera } from './camera';
+import { DeathCam } from './death-cam';
+import { thickenGuns } from './gun-thickness';
 import { GrenadeView } from './grenade-view';
 import type { HudStore } from './hud';
 import type { FrameInput } from './input';
@@ -53,13 +55,17 @@ export class MatchView {
   private readonly steps = new StepSmoother();
   private tmp = v3();
   private tmp2 = v3();
+  /** The local player's own pieces from the last death, which the death camera keeps in view. */
+  private ownPieces: THREE.Object3D[] = [];
   private lastSnapshot: Snapshot | null = null;
+  private shots: { time: number; traces: Snapshot['traces'] }[] = [];
   private pendingSnapshot: Snapshot | null = null;
   private readonly ownSteps = new OwnSteps();
   private wasGrounded = true;
   readonly sound: MatchAudio;
   scoped = false;
   deathCam: { at: THREE.Vector3; killer: number; t: number } | null = null;
+  private readonly deathView: DeathCam;
 
   constructor(
     readonly kit: Kit,
@@ -79,6 +85,7 @@ export class MatchView {
     const def = MAPS[settings.map];
     this.layout = def.layout();
     this.world = new CollisionWorld(this.layout.colliders);
+    this.deathView = new DeathCam(this.world);
     this.sound = new MatchAudio(
       audio,
       settings.map,
@@ -103,6 +110,8 @@ export class MatchView {
       const muzzle = this.remotes.muzzleOf(r, v3());
       const dir = new THREE.Vector3(-Math.sin(r.yaw), 0, -Math.cos(r.yaw));
       this.effects.muzzle(muzzle, dir, r.weapon ?? false);
+      const port = r.weapon && r.guns[r.weapon]?.ejectPort;
+      if (r.weapon && port) this.effects.casing(r.weapon, port);
     };
     this.remotes.onStep = (r, loud) => {
       const surface = this.world.surfaceBelow(r.position.x, r.position.y, r.position.z);
@@ -111,6 +120,7 @@ export class MatchView {
     this.effects.onChipBounce = (p, speed) => this.sound.debris.bounce(p, speed);
     this.remotes.syncRoster(session.roster);
     if (settings.mode === 'solo') this.remotes.prepare(BOT_KINDS);
+    this.remotes.prepareOwn(session.roster.get(session.you)?.character ?? 'rivet');
   }
 
   play(id: SoundId, at?: THREE.Vector3 | [number, number, number] | null, volume = 1, priority = 5, occlusion = 0) {
@@ -275,10 +285,13 @@ export class MatchView {
     this.events.adopt(from.events);
   }
 
-  /** Every snapshot as it arrives: shots are drawn right away; reconciliation waits for the frame. */
+  /**
+   * Every snapshot as it arrives; reconciliation waits for the frame. Other players' shots wait until their figures
+   * (drawn `INTERP_DELAY` in the past) reach that moment, so tracer, flash and the raised gun come together.
+   */
   receive(snap: Snapshot) {
     this.pendingSnapshot = snap;
-    this.events.traces(snap.traces);
+    if (snap.traces.length) this.shots.push({ time: snap.time, traces: snap.traces });
   }
 
   frame(dt: number, input: FrameInput, menuOpen: boolean) {
@@ -332,12 +345,17 @@ export class MatchView {
     });
     if (alive) {
       this.deathCam = null;
+      this.deathView.active = false;
       this.fp.place(this.eye);
     } else this.placeDeathCam(dt);
     this.footsteps(dt, speed);
 
     const renderTime = this.session.hostNow() - INTERP_DELAY;
     this.remotes.update(dt, this.session.snapshots, renderTime);
+    const fov = THREE.MathUtils.degToRad(this.fp.camera.fov);
+    thickenGuns(this.remotes.map.values(), this.fp.camera.position, (2 * Math.tan(fov / 2)) / Math.max(1, this.renderer.canvas.clientHeight * this.renderer.drawRatio));
+    // A remote shows a snapshot's state from halfway to it (it steps, not blends), so its shot is drawn from then too.
+    while (this.shots.length && this.shots[0]!.time <= renderTime + 0.5 / SNAPSHOT_HZ) this.events.traces(this.shots.shift()!.traces);
     for (const r of this.remotes.map.values()) if (r.state) this.sound.remotes.update(r.entry.id, r.state, r.position);
     this.grenades.update(this.session.snapshots, renderTime);
     this.view.setHidden(!alive || this.scoped);
@@ -427,15 +445,26 @@ export class MatchView {
   private placeDeathCam(dt: number) {
     if (!this.deathCam) this.deathCam = { at: this.eye.clone(), killer: 0, t: 0 };
     const d = this.deathCam;
-    d.t += dt;
     const killer = this.remotes.map.get(d.killer);
-    const focus = killer?.visible ? killer.position.clone().setY(killer.position.y + 1.4) : d.at;
-    const back = Math.min(1, d.t / 0.8);
-    const cam = this.fp.camera;
-    const from = d.at.clone().add(new THREE.Vector3(Math.sin(d.t * 0.4) * 2.5 * back, 1.2 * back, Math.cos(d.t * 0.4) * 2.5 * back));
-    cam.position.lerp(from, Math.min(1, dt * 4));
-    cam.lookAt(focus);
-    cam.updateMatrixWorld();
+    if (!this.deathView.active) {
+      this.deathView.begin(d.at, this.fp.camera.getWorldDirection(this.tmp));
+      if (d.t === 0) this.shatterOwn(killer?.position ?? null);
+    }
+    d.t += dt;
+    const focus = killer?.visible ? this.tmp2.copy(killer.position).setY(killer.position.y + 1.3) : null;
+    this.deathView.update(dt, this.fp.camera, focus, this.ownPieces);
+  }
+
+  /** The local player's own figure breaks apart where they fell, away from the killer, for the death camera. */
+  private shatterOwn(killer: THREE.Vector3 | null) {
+    const m = this.me.move;
+    const at = new THREE.Vector3(m.x, m.y, m.z);
+    const impulse = killer ? at.clone().sub(killer).setY(0) : this.fp.camera.getWorldDirection(new THREE.Vector3()).setY(0).negate();
+    if (impulse.lengthSq() < 1e-6) impulse.set(0, 0, 1);
+    impulse.normalize().multiplyScalar(this.hud.state.death?.weapon === 'grenade' ? 7 : 3.5).setY(2);
+    const pieces = this.remotes.shatterOwn(at, this.fp.yaw, this.me.arms.weapon, m.crouch, this.fp.pitch, impulse);
+    if (pieces.length) this.effects.shatter(pieces);
+    this.ownPieces = pieces.filter((p) => !p.head).map((p) => p.mesh);
   }
 
   private onSnapshot(snap: Snapshot) {

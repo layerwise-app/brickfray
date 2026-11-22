@@ -239,27 +239,41 @@ const splinter: Draw = (g, rand) => {
   g.fill();
 };
 
-/** Blast scorch: soot thick at the centre, streaked outward, ragged at the edge. */
+/**
+ * Blast scorch, drawn to be multiplied over the floor: soot thick at the centre in a few overlapping blotches so the
+ * edge is not a circle, soft wide streaks thrown outward rather than a hard star, and a few darker flecks.
+ */
 const scorch: Draw = (g, rand) => {
-  halo(g, 0.96, [[0, 'rgba(8,8,10,0.9)'], [0.32, 'rgba(14,13,13,0.8)'], [0.62, 'rgba(26,23,20,0.42)'], [1, 'rgba(30,26,22,0)']]);
-  g.lineCap = 'round';
-  for (let i = 0; i < 26; i++) {
+  halo(g, 0.8, [[0, 'rgba(10,9,9,0.86)'], [0.35, 'rgba(16,14,13,0.7)'], [0.7, 'rgba(26,23,20,0.3)'], [1, 'rgba(30,26,22,0)']]);
+  for (let i = 0; i < 6; i++) {
     const a = rand() * TAU;
-    const from = 0.2 + rand() * 0.3;
-    const to = Math.min(0.94, from + 0.2 + rand() * 0.4);
-    g.strokeStyle = `rgba(10,10,12,${(0.16 + rand() * 0.22).toFixed(2)})`;
-    g.lineWidth = 0.03 + rand() * 0.07;
+    const d = 0.25 + rand() * 0.3;
+    g.save();
+    g.translate(Math.cos(a) * d, Math.sin(a) * d);
+    halo(g, 0.22 + rand() * 0.2, [[0, 'rgba(18,16,14,0.5)'], [1, 'rgba(26,23,20,0)']]);
+    g.restore();
+  }
+  g.lineCap = 'round';
+  for (let i = 0; i < 14; i++) {
+    const a = rand() * TAU;
+    const from = 0.3 + rand() * 0.25;
+    const to = Math.min(0.95, from + 0.2 + rand() * 0.35);
+    const grad = g.createLinearGradient(Math.cos(a) * from, Math.sin(a) * from, Math.cos(a) * to, Math.sin(a) * to);
+    grad.addColorStop(0, `rgba(14,13,13,${(0.14 + rand() * 0.12).toFixed(2)})`);
+    grad.addColorStop(1, 'rgba(14,13,13,0)');
+    g.strokeStyle = grad;
+    g.lineWidth = 0.07 + rand() * 0.08;
     g.beginPath();
     g.moveTo(Math.cos(a) * from, Math.sin(a) * from);
     g.lineTo(Math.cos(a) * to, Math.sin(a) * to);
     g.stroke();
   }
-  g.fillStyle = 'rgba(70,62,54,0.5)';
-  for (let i = 0; i < 12; i++) {
+  g.fillStyle = 'rgba(12,11,10,0.45)';
+  for (let i = 0; i < 10; i++) {
     const a = rand() * TAU;
-    const d = 0.1 + rand() * 0.5;
+    const d = 0.15 + rand() * 0.55;
     g.beginPath();
-    g.arc(Math.cos(a) * d, Math.sin(a) * d, 0.012 + rand() * 0.022, 0, TAU);
+    g.arc(Math.cos(a) * d, Math.sin(a) * d, 0.012 + rand() * 0.02, 0, TAU);
     g.fill();
   }
 };

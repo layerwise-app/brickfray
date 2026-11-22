@@ -1,12 +1,16 @@
 import * as THREE from 'three';
+import { chamferBox } from '../engine/geometry';
 import type { Kit } from '../engine/kit';
 import { Animator } from './animator';
 import { HandProps } from './carried';
 import { patchCharacterMaterial, pieceMaterial, type CharacterMaterial } from './material';
+import { capeLength, farRim, type CapeUniforms } from './rig-shading';
 import { wristOffset } from './body-hands';
 import type { BakedCharacter, Hands } from './parts';
-import { BONE, createBones, type V3 } from './skeleton';
+import { BONE, createBones, restModelPositions, type V3 } from './skeleton';
 import { seatMelee, type Stance } from './stance';
+import { fitStow, STOW_BONE, stowTransform, type StowPlace } from './stow';
+import type { MeleeId } from '../weapons/defs';
 import type { Style } from './style';
 import type { AnimState, BotKind, CharacterId, CharacterRig, ShatterPiece } from './types';
 import { SOCKET_R } from './upper';
@@ -16,7 +20,6 @@ const tmpM = new THREE.Matrix4();
 const tmpV = new THREE.Vector3();
 const tmpV2 = new THREE.Vector3();
 const tmpE = new THREE.Euler();
-const capeLengths = new WeakMap<THREE.BufferGeometry, number>();
 
 export interface RigSource {
   id: CharacterId | BotKind;
@@ -26,102 +29,8 @@ export interface RigSource {
   rest: V3[];
   style: Style;
   scale: number;
-}
-
-/** The low tier's Phong has no roughness or metalness: the per-vertex surface sets its highlight instead. */
-const PHONG_SURFACE = `
-material.specularShininess = mix(90.0, 4.0, vSurface.x) * (1.0 - 0.75 * smoothstep(12.0, 30.0, length(vViewPosition)));
-material.specularColor = mix(vec3(0.24), diffuseColor.rgb, vSurface.y) * (1.2 - vSurface.x);`;
-/**
- * Sky light from above and dark bounce from below model the form instead of one flat fill; metal loses most of its
- * diffuse and reflects a sky-to-ground gradient, so armour keeps its shine without an environment map.
- */
-const PHONG_SKY = `
-vec3 skyN = inverseTransformDirection(normal, viewMatrix);
-float metal = vSurface.y;
-reflectedLight.directDiffuse *= 1.0 - 0.45 * metal;
-reflectedLight.indirectDiffuse *= mix(0.55, 1.25, skyN.y * 0.5 + 0.5) * (1.0 - 0.45 * metal);
-vec3 skyR = inverseTransformDirection(reflect(-normalize(vViewPosition), normal), viewMatrix);
-reflectedLight.indirectSpecular += mix(vec3(0.16, 0.15, 0.14), vec3(0.78, 0.84, 0.94), smoothstep(-0.25, 0.35, skyR.y)) * diffuseColor.rgb * metal * 0.65;`;
-
-/**
- * Far away a trim, rivet or stud is smaller than a pixel: a sharp highlight on it lights single pixels that sparkle as
- * the figure moves. Past ~12 m every surface turns rougher, so highlights spread instead of pinpointing.
- */
-const FAR_ROUGH = `
-material.roughness = max(material.roughness, 0.6 * smoothstep(12.0, 30.0, length(vViewPosition)));`;
-
-interface CapeUniforms {
-  /** Bind space to the back bone's space and back. */
-  into: { value: THREE.Matrix4 };
-  out: { value: THREE.Matrix4 };
-  /** The bone's swing away from the back (rad, <= 0), the cloth's length below it (m) and a clock (s). */
-  bend: { value: THREE.Vector3 };
-}
-
-/**
- * The back cloth rides one rigid bone: swung out it would stand off the back as a flat board. Instead it curves along
- * its length (an arc of the same length): the top stays near the back at 30% of the swing, the hem goes to 140%. The
- * swing also cups it (the sides trail the middle) and runs a ripple down to the hem; hanging still it is untouched.
- */
-const CAPE_PARS = `
-uniform mat4 uCapeIn;
-uniform mat4 uCapeOut;
-uniform vec3 uCapeBend;
-vec2 capeTurn(vec2 v, float a) { return vec2(v.x * cos(a) - v.y * sin(a), v.x * sin(a) + v.y * cos(a)); }`;
-const CAPE_NORMAL = `
-bool capeOn = false;
-vec3 capeP = vec3(0.0);
-#ifdef USE_SKINNING
-capeOn = uCapeBend.x < 0.0 && abs(skinIndex.x - ${BONE.dangleBack}.0) < 0.5;
-if (capeOn) {
-  capeP = (uCapeIn * vec4(position, 1.0)).xyz;
-  float capeL = uCapeBend.y;
-  float capeS = clamp(-capeP.y, 0.0, capeL);
-  float capeU = capeS / capeL;
-  float capeK = 1.1 * uCapeBend.x / capeL;
-  float capeTop = -0.7 * uCapeBend.x;
-  float capeAngle = capeTop + capeK * capeS;
-  float capeH = 0.5 * capeK * capeS;
-  float capeSinc = abs(capeH) < 1e-4 ? 1.0 : sin(capeH) / capeH;
-  float capeX = clamp(capeP.x / 0.3, -1.0, 1.0);
-  float capeWave = 13.0 * uCapeBend.z - 9.0 * capeS;
-  float capeD = -uCapeBend.x * (0.1 * capeX * capeX * capeU + 0.035 * pow(capeU, 1.5) * sin(capeWave));
-  float capeDs = -uCapeBend.x * (0.1 * capeX * capeX / capeL + 0.035 * (1.5 * sqrt(capeU) / capeL * sin(capeWave) - 9.0 * pow(capeU, 1.5) * cos(capeWave)));
-  float capeDx = -uCapeBend.x * 0.1 * 2.0 * capeX / 0.3 * capeU;
-  capeP.yz = -capeS * capeSinc * vec2(cos(capeTop + capeH), sin(capeTop + capeH)) + capeTurn(vec2(max(capeP.y, 0.0), capeP.z + capeD), capeAngle);
-  vec3 capeN = mat3(uCapeIn) * objectNormal;
-  capeN.xz = capeTurn(capeN.xz, atan(capeDx));
-  capeN.yz = capeTurn(capeN.yz, capeAngle - atan(capeDs));
-  objectNormal = mat3(uCapeOut) * capeN;
-}
-#endif`;
-
-/**
- * A soft warm rim on figures past ~10 m lifts their silhouette off foliage and shade at fighting range; close-ups and
- * the menu keep their lighting. Every figure gets it, so it favours no one, and walls still hide it. It fades where
- * the surface turns faster than a pixel (the very edge, small curved parts), which would light single pixels.
- */
-function farRim(mat: CharacterMaterial, phong: boolean, cape: CapeUniforms): CharacterMaterial {
-  const patch = mat.material.onBeforeCompile;
-  mat.material.onBeforeCompile = (shader, renderer) => {
-    patch.call(mat.material, shader, renderer);
-    Object.assign(shader.uniforms, { uCapeIn: cape.into, uCapeOut: cape.out, uCapeBend: cape.bend });
-    shader.vertexShader = shader.vertexShader
-      .replace('#include <common>', `#include <common>${CAPE_PARS}`)
-      .replace('#include <skinnormal_vertex>', `${CAPE_NORMAL}\n#include <skinnormal_vertex>`)
-      .replace('#include <skinning_vertex>', 'if (capeOn) transformed = (uCapeOut * vec4(capeP, 1.0)).xyz;\n#include <skinning_vertex>');
-    let fragment = shader.fragmentShader.replace(
-      '#include <emissivemap_fragment>',
-      `#include <emissivemap_fragment>
-      totalEmissiveRadiance += vec3(1.0, 0.95, 0.85) * pow(1.0 - saturate(dot(normal, normalize(vViewPosition))), 1.8) * smoothstep(9.0, 22.0, length(vViewPosition)) * 0.45 * (1.0 - smoothstep(0.2, 0.7, length(fwidth(normal))));`
-    );
-    if (!phong) fragment = fragment.replace('#include <lights_physical_fragment>', `#include <lights_physical_fragment>${FAR_ROUGH}`);
-    if (phong) fragment = fragment.replace('#include <lights_phong_fragment>', `#include <lights_phong_fragment>${PHONG_SURFACE}`).replace('#include <lights_fragment_end>', `#include <lights_fragment_end>${PHONG_SKY}`);
-    shader.fragmentShader = fragment;
-  };
-  mat.material.customProgramCacheKey = () => (phong ? 'bf-character-rim-phong' : 'bf-character-rim');
-  return mat;
+  /** The melee weapon on its 'mallet' bone, whose swing the animator plays. */
+  tool: MeleeId;
 }
 
 /** One rigidly skinned character: a SkinnedMesh (+ glass mesh) on a procedural skeleton. */
@@ -144,6 +53,9 @@ export class Rig implements CharacterRig {
   private magHoldMatrix = new THREE.Matrix4();
   private muzzleMatrix = new THREE.Matrix4();
   private readonly props: HandProps;
+  /** Guns carried on the figure (slung or holstered), with where. */
+  private readonly stowed = new Map<THREE.Object3D, StowPlace>();
+  private holster: THREE.Mesh | null = null;
   private flashT = 0;
   private seed = 1;
   private readonly cape: CapeUniforms = { into: { value: new THREE.Matrix4() }, out: { value: new THREE.Matrix4() }, bend: { value: new THREE.Vector3() } };
@@ -183,6 +95,8 @@ export class Rig implements CharacterRig {
     this.leftHold.visible = false;
     this.bones[BONE.handL]!.add(this.leftHold);
     this.animator = new Animator(src.rest, src.style);
+    this.animator.tool = src.tool;
+    this.animator.fit = fitStow(src.baked, restModelPositions(src.rest));
     if (src.hands) {
       this.animator.pose.wrist.L.set(...wristOffset(src.hands.L, 'L'));
       this.animator.pose.wrist.R.set(...wristOffset(src.hands.R, 'R'));
@@ -209,12 +123,44 @@ export class Rig implements CharacterRig {
     if (this.weapon) this.rightHand.remove(this.weapon);
     this.weapon = model;
     this.supportGrip = model ? supportGrip : null;
-    if (model) this.rightHand.add(model);
+    if (model) {
+      this.stowed.delete(model);
+      model.position.set(0, 0, 0);
+      model.quaternion.identity();
+      this.rightHand.add(model);
+      this.showHolster();
+    }
     this.props.setWeapon(model);
     const magHold = model?.getObjectByName('magHold');
     const muzzle = model?.getObjectByName('muzzle');
     this.animator.magHold = magHold && relativeMatrix(magHold, this.rightHand, this.magHoldMatrix) ? this.magHoldMatrix : null;
     this.animator.muzzle = muzzle && relativeMatrix(muzzle, this.rightHand, this.muzzleMatrix) ? this.muzzleMatrix : null;
+  }
+
+  stow(model: THREE.Object3D, place: StowPlace | null) {
+    if (place === null) {
+      this.stowed.delete(model);
+      this.root.add(model);
+      model.visible = false;
+    } else if (this.stowed.get(model) !== place || !model.visible) {
+      this.stowed.set(model, place);
+      this.bones[STOW_BONE[place]]!.add(model);
+      stowTransform(place, this.animator.fit, model.position, model.quaternion);
+      model.visible = true;
+    }
+    this.showHolster();
+  }
+
+  /** A holstered sidearm sits in a leather holster; a drawn one leaves it empty, so it goes with the gun. */
+  private showHolster() {
+    const holstered = [...this.stowed].find(([, at]) => at === 'hip')?.[0];
+    if (holstered) {
+      this.holster ??= holsterFor(holstered, this.kit);
+      this.bones[BONE.pelvis]!.add(this.holster);
+      this.holster.position.copy(holstered.position);
+      this.holster.quaternion.copy(holstered.quaternion);
+    }
+    if (this.holster) this.holster.visible = !!holstered;
   }
 
   setStance(stance: Stance | null) {
@@ -261,9 +207,11 @@ export class Rig implements CharacterRig {
       const angularVelocity = new THREE.Vector3(this.rand() - 0.5, this.rand() - 0.5, this.rand() - 0.5).multiplyScalar(14 + strength);
       pieces.push({ mesh, velocity, angularVelocity, head: HEAD_BONES.has(p.bone) });
     }
-    // The gun leaves the hand as its own pieces and drops where the character stood.
+    // The guns leave the hand and the back as their own pieces and drop where the character stood.
     this.props.update('none', 'seated', 0);
-    this.weapon?.traverse((o) => {
+    const guns = [...this.stowed.keys()];
+    if (this.weapon) guns.push(this.weapon);
+    for (const gun of guns) gun.traverse((o) => {
       const part = o as THREE.Mesh;
       if (!part.isMesh || !part.visible) return;
       const mesh = new THREE.Mesh(part.geometry, part.material);
@@ -307,18 +255,35 @@ export class Rig implements CharacterRig {
   }
 }
 
-/** How far the back cloth hangs below its bone (m, bone space); 0 when the figure has none. */
-function capeLength(geometry: THREE.BufferGeometry, into: THREE.Matrix4) {
-  let length = capeLengths.get(geometry);
-  if (length !== undefined) return length;
-  length = 0;
-  const bone = geometry.getAttribute('skinIndex');
-  const position = geometry.getAttribute('position');
-  for (let i = 0; i < position.count; i++) {
-    if (bone.getX(i) === BONE.dangleBack) length = Math.max(length, -tmpV.fromBufferAttribute(position, i).applyMatrix4(into).y);
+const holsters = new Map<string, THREE.BufferGeometry>();
+const holsterBox = new THREE.Box3();
+const partBox = new THREE.Box3();
+const relative = new THREE.Matrix4();
+
+/** A leather holster round the slide and barrel of a sidearm (in the gun's own space), the grip left out to draw by. */
+function holsterFor(gun: THREE.Object3D, kit: Kit) {
+  const key = `${gun.name}:${kit.profile.level}`;
+  let geometry = holsters.get(key);
+  if (!geometry) {
+    holsterBox.makeEmpty();
+    gun.traverse((o) => {
+      const mesh = o as THREE.Mesh;
+      if (!mesh.isMesh || !relativeMatrix(mesh, gun, relative)) return;
+      mesh.geometry.computeBoundingBox();
+      holsterBox.union(partBox.copy(mesh.geometry.boundingBox!).applyMatrix4(relative));
+    });
+    const x = Math.max(0.02, Math.max(-holsterBox.min.x, holsterBox.max.x)) + 0.008;
+    const top = holsterBox.max.y + 0.006;
+    const bottom = top - 0.095;
+    const front = holsterBox.min.z - 0.014;
+    const back = -0.025;
+    geometry = chamferBox(x * 2, top - bottom, back - front, 0.008).translate(0, (top + bottom) / 2, (front + back) / 2);
+    holsters.set(key, geometry);
   }
-  capeLengths.set(geometry, length);
-  return length;
+  const mesh = new THREE.Mesh(geometry, kit.materials.get('#3a2a20', 'plastic'));
+  mesh.name = 'holster';
+  mesh.castShadow = kit.profile.shadows;
+  return mesh;
 }
 
 /** Transform of `node` relative to `ancestor` from local matrices; false when it is not a descendant. */

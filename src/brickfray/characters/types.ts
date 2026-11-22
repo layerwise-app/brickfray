@@ -1,6 +1,7 @@
 import type * as THREE from 'three';
 import type { WeaponId } from '../weapons/defs';
 import type { Stance } from './stance';
+import type { StowPlace } from './stow';
 
 export type CharacterId = 'rivet' | 'vega' | 'clack' | 'coral' | 'moss' | 'nova';
 export type BotKind = 'grunt' | 'rusher' | 'sniper' | 'boss';
@@ -26,14 +27,26 @@ export interface AnimState {
   sinceShot: number;
   /** Reload progress 0…1, or -1 when not reloading. */
   reload: number;
-  /** Mallet swing progress 0…1, or -1. */
+  /** Melee swing progress 0…1 over the character's own tool's whole swing, or -1. */
   melee: number;
   /** Grenade throw progress 0…1 (cooking holds at 0.25), or -1. */
   grenade: number;
   /** Seconds since last damage taken (large when none). */
   sinceHurt: number;
-  /** Direction of the last hit in local space (for flinch). */
+  /** Direction toward the last hit's source in local space (x right, z forward), for the flinch. */
   hurtDirection: { x: number; z: number };
+  /** Damage of the last hit (sizes the flinch; a mid-sized hit when unknown). */
+  hurtAmount?: number;
+  /** Sliding: crouched and gliding on the ground. */
+  slide?: boolean;
+  /**
+   * Weapon switch, -1 or absent when none. 0…0.5: `weapon` (the gun in hand) is being put away; 0.5…1: `weapon` is
+   * being drawn, after `swapFrom` was put away.
+   */
+  swap?: number;
+  swapFrom?: WeaponId | null;
+  /** A shot is about to show (seen in a newer snapshot): the gun comes up ahead of it. */
+  alert?: boolean;
 }
 
 /** A part that flies off when the character shatters. */
@@ -55,6 +68,8 @@ export interface CharacterRig {
   readonly rightHand: THREE.Object3D;
   /** Holds the weapon model; the rig IKs the left hand to its `supportGrip` node when present. */
   setWeapon(model: THREE.Object3D | null, supportGrip: THREE.Object3D | null): void;
+  /** Carry a gun that is not in hand on the figure (slung on the back, holstered on the hip); null takes it off, hidden. */
+  stow(model: THREE.Object3D, place: StowPlace | null): void;
   /** Hold a showroom pose instead of the gameplay animation; null returns to it. */
   setStance(stance: Stance | null): void;
   /** A melee weapon model (origin at its grip, head up +Y) for the left hand; it shows where a stance's `melee` seats it. */

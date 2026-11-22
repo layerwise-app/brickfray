@@ -1,16 +1,17 @@
 import * as THREE from 'three';
-import { createCharacter } from '../characters';
 import { Rig } from '../characters/rig';
-import type { AnimState, BotKind, CharacterId, CharacterRig } from '../characters/types';
-import { FootStrikes } from '../audio/step-triggers';
+import { stowPlaceOf, swapGrab } from '../characters/stow';
+import type { AnimState, CharacterRig, ShatterPiece } from '../characters/types';
+import type { FootStrikes } from '../audio/step-triggers';
 import type { Kit } from '../engine/kit';
-import type { RemoteSnapshotPlayer, Snapshot } from '../net/codec';
+import { MELEE_SPAN, type RemoteSnapshotPlayer, type Snapshot } from '../net/codec';
 import type { RosterEntry } from '../net/protocol';
+import { INTERP_DELAY } from '../sim/constants';
 import type { HitPose } from '../sim/hitboxes';
-import { createWeaponModel } from '../weapons';
-import type { WeaponId } from '../weapons/defs';
+import { MELEES, type WeaponId } from '../weapons/defs';
 import { LOADOUTS } from '../weapons/loadouts';
 import type { WeaponModel } from '../weapons/types';
+import { Figures, type Look } from './figures';
 
 export const TEAM_COLORS = ['#2f7dff', '#ff7a1a'] as const;
 
@@ -18,7 +19,9 @@ export interface Remote {
   entry: RosterEntry;
   rig: CharacterRig;
   guns: Partial<Record<WeaponId, WeaponModel>>;
+  /** The gun in hand (none while the hand goes from one gun to the other). */
   weapon: WeaponId | null;
+  armed: boolean;
   state: RemoteSnapshotPlayer | null;
   alive: boolean;
   shots: number;
@@ -26,10 +29,13 @@ export interface Remote {
   sinceShot: number;
   sinceHurt: number;
   hurtDir: { x: number; z: number };
+  hurtAmount: number;
   position: THREE.Vector3;
   yaw: number;
   visible: boolean;
   knock: THREE.Vector3;
+  /** Direction of the last hit's shove. */
+  shove: THREE.Vector3;
   /** Heel strikes of the rig's walk, for footsteps. */
   feet: FootStrikes;
 }
@@ -49,19 +55,18 @@ const anim: AnimState = {
   melee: -1,
   grenade: -1,
   sinceHurt: 9,
-  hurtDirection: { x: 0, z: 0 }
+  hurtDirection: { x: 0, z: 0 },
+  hurtAmount: 30,
+  slide: false,
+  swap: -1,
+  swapFrom: null,
+  alert: false
 };
 
+/** Progress that runs forward between two snapshots is blended; a restart or an end is taken as it comes. */
+const between = (a: number, b: number, k: number, step: number) => (a >= 0 && b >= a ? a + (b - a) * k : step);
+
 const lerpAngle = (a: number, b: number, t: number) => a + Math.atan2(Math.sin(b - a), Math.cos(b - a)) * t;
-
-type Look = CharacterId | BotKind;
-
-/** A figure with both of its guns, in a remote's hands or hidden and waiting for one. */
-interface Figure {
-  rig: CharacterRig;
-  guns: Partial<Record<WeaponId, WeaponModel>>;
-  feet: FootStrikes;
-}
 
 /**
  * Other players, drawn 100 ms in the past between two snapshots (brief
@@ -73,36 +78,19 @@ export class Remotes {
   readonly map = new Map<number, Remote>();
   onFire: ((remote: Remote) => void) | null = null;
   onStep: ((remote: Remote, loud: boolean) => void) | null = null;
-  /** Hidden figures ready for whoever joins next with that look. */
-  private readonly spare = new Map<Look, Figure[]>();
-  /**
-   * Never shown, drawn only by the match's warm-up frame: one broken-up figure per look (its pieces fly at a kill)
-   * and the plain kit finishes that a hand carries during a reload (shells, rounds, bolts).
-   */
-  private readonly unseen = new THREE.Group();
-  private readonly shattered = new Set<Look>();
-  private readonly stub = new THREE.BoxGeometry(0.01, 0.01, 0.01);
+  private readonly figures: Figures;
 
   constructor(
-    private readonly kit: Kit,
+    kit: Kit,
     private self: number
   ) {
     this.group.name = 'remotes';
-    this.unseen.visible = false;
-    this.group.add(this.unseen);
-    for (const finish of ['plastic', 'metal'] as const) {
-      const mesh = new THREE.Mesh(this.stub, kit.materials.get('#ffffff', finish));
-      mesh.castShadow = kit.profile.shadows;
-      this.unseen.add(mesh);
-    }
+    this.figures = new Figures(kit, this.group);
   }
 
-  /**
-   * Build hidden figures with both guns for looks that join later (solo waves), so the match's first frame, which
-   * draws hidden objects once, compiles and uploads them: a first draw mid-match stalls a frame for up to ~250 ms.
-   */
+  /** Build hidden figures with both guns for looks that join later (solo waves), so the warm-up frame draws them. */
   prepare(looks: readonly Look[]) {
-    for (const look of looks) if (!this.spare.get(look)?.length) this.release(this.build(look));
+    this.figures.prepare(looks);
   }
 
   setSelf(id: number) {
@@ -116,9 +104,9 @@ export class Remotes {
       let r = this.map.get(id);
       if (!r || r.entry.character !== entry.character) {
         if (r) this.remove(id);
-        const { rig, guns, feet } = this.spare.get(entry.character)?.pop() ?? this.build(entry.character);
+        const { rig, guns, feet } = this.figures.take(entry.character);
         if (rig instanceof Rig) rig.animator.vary(id);
-        r = { entry, rig, guns, weapon: null, state: null, alive: false, shots: 0, sinceShot: 9, sinceHurt: 9, hurtDir: { x: 0, z: 0 }, position: new THREE.Vector3(), yaw: 0, visible: false, knock: new THREE.Vector3(), feet };
+        r = { entry, rig, guns, weapon: null, armed: false, state: null, alive: false, shots: -1, sinceShot: 9, sinceHurt: 9, hurtDir: { x: 0, z: 0 }, hurtAmount: 30, position: new THREE.Vector3(), yaw: 0, visible: false, knock: new THREE.Vector3(), shove: new THREE.Vector3(), feet };
         this.map.set(id, r);
       }
       r.entry = entry;
@@ -127,68 +115,22 @@ export class Remotes {
     for (const id of [...this.map.keys()]) if (!roster.has(id)) this.remove(id);
   }
 
-  /** A remote leaves: its figure waits, hidden, for the next one with the same look (solo waves come and go). */
+  /** The local player's own figure, built hidden at load, broken apart where they die for the death camera to watch. */
+  prepareOwn(look: Look) {
+    this.figures.prepareOwn(look);
+  }
+
+  /** Poses the local player's figure where they died and breaks it into pieces flying along `impulse`. */
+  shatterOwn(at: THREE.Vector3, yaw: number, weapon: WeaponId, crouch: number, pitch: number, impulse: THREE.Vector3): ShatterPiece[] {
+    return this.figures.shatterOwn(at, yaw, weapon, crouch, pitch, impulse);
+  }
+
+  /** A remote leaves: its figure waits, hidden, for the next one with the same look. */
   remove(id: number) {
     const r = this.map.get(id);
     if (!r) return;
     this.map.delete(id);
-    this.release(r);
-  }
-
-  /** A hidden figure with its loadout's guns stowed (hidden) on it; the first of each look also leaves its pieces. */
-  private build(look: Look): Figure {
-    const rig = createCharacter(look, this.kit);
-    const guns: Figure['guns'] = {};
-    const loadout = LOADOUTS[look];
-    for (const weapon of [loadout.primary, loadout.secondary]) {
-      const gun = (guns[weapon] ??= createWeaponModel(weapon, this.kit, 'third'));
-      gun.root.visible = false;
-      rig.root.add(gun.root);
-    }
-    if (!this.shattered.has(look)) {
-      this.shattered.add(look);
-      for (const piece of rig.shatter(new THREE.Vector3())) this.unseen.add(piece.mesh);
-      rig.reset();
-    }
-    rig.root.visible = false;
-    this.group.add(rig.root);
-    return { rig, guns, feet: new FootStrikes(rig.root) };
-  }
-
-  private release(figure: Figure) {
-    const { rig, guns } = figure;
-    rig.setWeapon(null, null);
-    for (const gun of Object.values(guns)) {
-      gun!.root.visible = false;
-      rig.root.add(gun!.root);
-    }
-    rig.reset();
-    rig.setTint(null);
-    rig.root.visible = false;
-    rig.root.userData.gun = undefined;
-    const spare = this.spare.get(rig.id) ?? [];
-    spare.push({ rig, guns, feet: figure.feet });
-    this.spare.set(rig.id, spare);
-  }
-
-  private equip(r: Remote, weapon: WeaponId) {
-    if (r.weapon === weapon) return;
-    let gun = r.guns[weapon];
-    if (!gun) {
-      gun = createWeaponModel(weapon, this.kit, 'third');
-      r.guns[weapon] = gun;
-    }
-    const held = r.weapon ? r.guns[r.weapon] : undefined;
-    r.rig.setWeapon(gun.root, gun.supportGrip);
-    gun.root.visible = true;
-    // The gun put away stays on the figure, hidden, so it is never drawn for the first time mid-match.
-    if (held) {
-      held.root.visible = false;
-      r.rig.root.add(held.root);
-    }
-    r.weapon = weapon;
-    // Effects tell which gun fired (its flash and tracer) from the muzzle a shot starts at.
-    r.rig.root.userData.gun = { weapon, muzzle: gun.muzzle };
+    this.figures.release(r);
   }
 
   /** Interpolate every remote at `renderTime` (host clock) from the snapshot buffer. */
@@ -216,6 +158,7 @@ export class Remotes {
       const b = newer?.players.find((p) => p.id === r.entry.id) ?? a;
       const s = k < 0.5 ? a : b;
       r.state = s;
+      const latest = snapshots[snapshots.length - 1]?.players.find((p) => p.id === r.entry.id);
       if (s.alive && !r.alive) {
         r.rig.reset();
         r.feet.reset();
@@ -227,16 +170,22 @@ export class Remotes {
       r.visible = s.alive;
       r.rig.root.visible = s.alive;
       if (!s.alive) continue;
-      this.equip(r, s.weapon);
+      // A switch: the gun in hand (the loadout's other one) goes to its place, then the hand fetches `weapon`.
+      const loadout = LOADOUTS[r.entry.character];
+      const other = s.weapon === loadout.primary ? loadout.secondary : loadout.primary;
+      const swap = between(a.swap ?? -1, b.swap ?? -1, k, s.swap ?? -1);
+      const putting = swap >= 0 && swap < 0.5;
+      const from = swap >= 0.5 ? other : null;
+      const empty = from !== null && swap < swapGrab(stowPlaceOf(from), stowPlaceOf(s.weapon));
+      this.figures.arm(r, putting ? other : empty ? null : s.weapon);
+      let fired = false;
       if (s.shots !== r.shots) {
-        const fresh = r.shots !== 0;
+        fired = r.shots !== -1;
         r.shots = s.shots;
-        if (fresh) {
-          r.sinceShot = 0;
-          this.onFire?.(r);
-        }
+        if (fired) r.sinceShot = 0;
       }
       r.sinceShot += dt;
+      if (r.sinceHurt < 0 && r.sinceHurt + dt >= 0) this.jolt(r);
       r.sinceHurt += dt;
       r.knock.multiplyScalar(Math.exp(-dt * 14));
       r.rig.root.position.copy(r.position).add(r.knock);
@@ -255,30 +204,48 @@ export class Remotes {
       anim.sprint = s.sprinting;
       anim.aimPitch = pitch;
       anim.ads = s.ads;
-      anim.weapon = s.weapon;
+      anim.weapon = putting ? other : s.weapon;
+      anim.swap = swap;
+      anim.swapFrom = from;
+      anim.slide = s.sliding ?? false;
       anim.sinceShot = r.sinceShot;
-      anim.reload = s.reload;
-      anim.melee = s.melee;
-      anim.grenade = s.grenade;
+      anim.alert = !!latest && latest.alive && latest.shots !== r.shots;
+      anim.reload = between(a.reload, b.reload, k, s.reload);
+      const melee = between(a.melee, b.melee, k, s.melee);
+      anim.melee = melee < 0 ? -1 : Math.min(1, (melee * MELEE_SPAN) / (MELEES[loadout.melee].cooldown * 0.62));
+      anim.grenade = between(a.grenade, b.grenade, k, s.grenade);
       anim.sinceHurt = r.sinceHurt;
       anim.hurtDirection = r.hurtDir;
+      anim.hurtAmount = r.hurtAmount;
       r.rig.update(dt, anim);
+      // After the pose, so the flash leaves the gun where it is drawn this frame.
+      if (fired) this.onFire?.(r);
       if (r.feet.update() > 0 && anim.grounded && anim.speed > 1.2 && anim.crouch < 0.5) this.onStep?.(r, s.sprinting);
     }
   }
 
-  hurt(id: number, from: [number, number, number]) {
+  /**
+   * A hit on a remote. Another remote's shot shows when that shooter is drawn firing, `INTERP_DELAY` after the event
+   * arrives, so the jolt waits for it; the local player's own hit shows at once.
+   */
+  hurt(id: number, from: [number, number, number], amount = 30, attacker = this.self) {
     const r = this.map.get(id);
     if (!r) return;
-    r.sinceHurt = 0;
+    r.sinceHurt = attacker === this.self ? 0 : -INTERP_DELAY;
+    r.hurtAmount = amount;
     const dx = from[0] - r.position.x;
     const dz = from[2] - r.position.z;
     const len = Math.hypot(dx, dz) || 1;
     const sin = Math.sin(r.yaw);
     const cos = Math.cos(r.yaw);
     r.hurtDir = { x: (dx * cos - dz * sin) / len, z: -(dx * sin + dz * cos) / len };
-    // A small shove away from the shooter sells the hit.
-    r.knock.set(-dx / len, 0, -dz / len).multiplyScalar(0.07);
+    r.shove.set(-dx / len, 0, -dz / len);
+    if (r.sinceHurt >= 0) this.jolt(r);
+  }
+
+  /** A small shove away from the shooter and the white flash; the body's own jolt is the animator's flinch. */
+  private jolt(r: Remote) {
+    r.knock.copy(r.shove).multiplyScalar(0.04);
     r.rig.flash();
   }
 
@@ -300,14 +267,6 @@ export class Remotes {
 
   dispose() {
     for (const id of [...this.map.keys()]) this.remove(id);
-    for (const figures of this.spare.values()) {
-      for (const { rig, guns } of figures) {
-        rig.dispose();
-        for (const gun of Object.values(guns)) gun?.dispose();
-      }
-    }
-    this.spare.clear();
-    this.unseen.clear();
-    this.stub.dispose();
+    this.figures.dispose();
   }
 }
