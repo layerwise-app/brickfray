@@ -285,7 +285,8 @@ export const GRENADE = {
   radius: 5,
   damage: 100,
   perLife: 2,
-  throwSpeed: 17,
+  /** The overhand throw's release speed, m/s (sim/grenades.ts THROW); the underhand lob's. */
+  throwSpeed: 28,
   lobSpeed: 8
 } as const;
 

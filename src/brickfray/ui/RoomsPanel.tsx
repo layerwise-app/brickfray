@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { MATCH } from '../sim/constants';
+import { roomSize } from '../sim/seats';
 import { useApp, useGame } from './App';
 import { useT } from './i18n';
 import { BackIcon, LockIcon, RefreshIcon, UsersIcon } from './icons';
@@ -77,7 +77,7 @@ export function RoomsPanel({ onClose }: { onClose: () => void }) {
                 </span>
                 <span className='ml-auto text-sm font-semibold'>{lobby.phase === 'playing' ? t('inMatch') : t('inLobby')}</span>
                 <span className='bf-display text-lg'>
-                  {lobby.count}/{Math.max(lobby.count, Math.min(lobby.settings.seats, MATCH.maxPlayers))}
+                  {lobby.count}/{roomSize(lobby.settings, lobby.count)}
                 </span>
               </button>
             ))}

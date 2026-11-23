@@ -13,6 +13,7 @@ export const playDe: Record<keyof typeof playEn, string> = {
   'rule.ffa': 'Bei {n} Kills endet das Match. Die meisten Punkte gewinnen.',
   'rule.tdm': 'Das Team, das zuerst {n} Kills hat, gewinnt.',
   'lobby.size': 'Raumgröße',
+  'lobby.perTeam': 'Spieler pro Team',
   'lobby.count': '{h} + {b} Bots',
   'lobby.open': 'Freier Platz',
   'death.health': 'Leben übrig',

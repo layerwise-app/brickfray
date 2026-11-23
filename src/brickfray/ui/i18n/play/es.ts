@@ -13,6 +13,7 @@ export const playEs: Record<keyof typeof playEn, string> = {
   'rule.ffa': 'La partida acaba cuando alguien llega a {n} bajas. Gana quien tenga más puntos.',
   'rule.tdm': 'Gana el primer equipo en llegar a {n} bajas.',
   'lobby.size': 'Tamaño de la sala',
+  'lobby.perTeam': 'Jugadores por equipo',
   'lobby.count': '{h} + {b} bots',
   'lobby.open': 'Plaza libre',
   'death.health': 'Vida restante',

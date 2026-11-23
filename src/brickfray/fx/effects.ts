@@ -71,6 +71,8 @@ export class Effects {
   readonly smoke = new SpritePool('alpha', 220);
   readonly billows = new SpritePool('billow', 192);
   readonly level: QualityLevel;
+  /** Frames can't keep up: explosions are drawn as the tier below draws them. */
+  lean = false;
   readonly shockwaves = new Shockwaves();
   readonly decals: Decals;
   /** Blast soot, multiplied over the floor. */

@@ -13,6 +13,7 @@ export const playJa: Record<keyof typeof playEn, string> = {
   'rule.ffa': '誰かが {n} キルで試合終了。スコア最多のプレイヤーが勝ちです。',
   'rule.tdm': '先に {n} キルしたチームの勝ちです。',
   'lobby.size': 'ルーム人数',
+  'lobby.perTeam': 'チームの人数',
   'lobby.count': '{h} + ボット {b}',
   'lobby.open': '空き',
   'death.health': '残り体力',

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { MATCH } from '../sim/constants';
+import { perTeam, roomSize } from '../sim/seats';
 import { DIFFICULTIES, type MatchSettings } from '../sim/types';
 import { mapPreview } from './map-preview';
 import { useApp, useGame } from './App';
@@ -110,7 +111,7 @@ export function Lobby() {
                   ))}
                 </div>
               </Field>
-              <SeatsSlider seats={s.seats} min={Math.max(1, lobby.players.length)} disabled={!host} onSeats={(seats) => set({ seats })} />
+              <SeatsSlider settings={s} humans={lobby.players.length} disabled={!host} onSeats={(seats) => set({ seats })} />
             </div>
             )}
           </section>
@@ -118,7 +119,7 @@ export function Lobby() {
           <section className='bf-panel bf-studs flex flex-col gap-3 p-5'>
             <div className='flex items-baseline justify-between gap-3'>
               <h2 className='bf-display text-2xl'>{solo ? t('soloCaption') : t('players')}</h2>
-              {!solo && <SeatCount humans={lobby.players.length} seats={s.seats} />}
+              {!solo && <SeatCount humans={lobby.players.length} settings={s} />}
             </div>
             {solo ? (
               <ul className='flex flex-col gap-2'>
@@ -153,9 +154,9 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 /** "1 + 5 bots / 6": players in the room, the bots that will fill the other seats, and the room's size. */
-function SeatCount({ humans, seats }: { humans: number; seats: number }) {
+function SeatCount({ humans, settings }: { humans: number; settings: MatchSettings }) {
   const { t } = useT();
-  const size = Math.max(humans, Math.min(seats, MATCH.maxPlayers));
+  const size = roomSize(settings, humans);
   const bots = size - humans;
   return (
     <span className='bf-display whitespace-nowrap text-xl text-[var(--bf-muted)]'>
@@ -164,16 +165,22 @@ function SeatCount({ humans, seats }: { humans: number; seats: number }) {
   );
 }
 
-/** The room's size, 1 to 10, never below the players already in it: the number large, a tick for every size. */
-function SeatsSlider({ seats, min, disabled, onSeats }: { seats: number; min: number; disabled: boolean; onSeats: (seats: number) => void }) {
+/**
+ * The room's size, never below the players already in it: a free-for-all 1 to 10 seats, a team match 1 to 5 players
+ * per side ("3 v 3", sent as the room's total). The number large, a tick for every size.
+ */
+function SeatsSlider({ settings, humans, disabled, onSeats }: { settings: MatchSettings; humans: number; disabled: boolean; onSeats: (seats: number) => void }) {
   const { t } = useT();
-  const max = MATCH.maxPlayers;
-  const value = Math.max(min, Math.min(max, seats));
+  const teams = settings.mode === 'tdm';
+  const max = teams ? MATCH.maxPlayers / 2 : MATCH.maxPlayers;
+  const min = Math.max(1, teams ? Math.ceil(humans / 2) : humans);
+  const value = Math.max(min, Math.min(max, teams ? perTeam(settings.seats) : settings.seats));
+  const label = t(teams ? 'lobby.perTeam' : 'lobby.size');
   return (
     <div className='flex flex-col gap-1'>
       <div className='flex items-baseline justify-between gap-3'>
-        <span className='text-xs font-semibold uppercase tracking-[0.2em] text-[var(--bf-muted)]'>{t('lobby.size')}</span>
-        <span className='bf-display text-4xl leading-none text-[var(--bf-yellow)]'>{value}</span>
+        <span className='text-xs font-semibold uppercase tracking-[0.2em] text-[var(--bf-muted)]'>{label}</span>
+        <span className='bf-display whitespace-nowrap text-4xl leading-none text-[var(--bf-yellow)]'>{teams ? `${value} v ${value}` : value}</span>
       </div>
       <input
         type='range'
@@ -182,9 +189,12 @@ function SeatsSlider({ seats, min, disabled, onSeats }: { seats: number; min: nu
         max={max}
         value={value}
         disabled={disabled}
-        aria-label={t('lobby.size')}
+        aria-label={label}
         style={{ ['--fill' as string]: `${((value - 1) / (max - 1)) * 100}%` }}
-        onChange={(e) => onSeats(Math.max(min, Number(e.target.value)))}
+        onChange={(e) => {
+          const n = Math.max(min, Number(e.target.value));
+          onSeats(teams ? n * 2 : n);
+        }}
       />
       <div className='bf-ticks' aria-hidden>
         {Array.from({ length: max }, (_, i) => (

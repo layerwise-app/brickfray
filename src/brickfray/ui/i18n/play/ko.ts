@@ -13,6 +13,7 @@ export const playKo: Record<keyof typeof playEn, string> = {
   'rule.ffa': '누군가 {n}킬을 하면 경기가 끝나고, 점수가 가장 높은 플레이어가 이깁니다.',
   'rule.tdm': '먼저 {n}킬을 한 팀이 이깁니다.',
   'lobby.size': '방 인원',
+  'lobby.perTeam': '팀당 인원',
   'lobby.count': '{h} + 봇 {b}',
   'lobby.open': '빈자리',
   'death.health': '남은 체력',

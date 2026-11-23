@@ -21,9 +21,9 @@ export interface Grenade {
 
 /**
  * The overhand throw: one speed, raised a little above a level aim, the rise fading out by 45° of aim. Carry on flat
- * ground from standing: 13 m level, 28 m at most (aim 40–45°), nearer again above that; a sprint adds about 3 m.
+ * ground from standing: 16 m level, 37 m at most (aim 40–45°), nearer again above that; a sprint adds about 4 m.
  */
-export const THROW = { speed: 24, lift: 0.14, liftFade: Math.PI / 4, inherit: 0.3 } as const;
+export const THROW = { speed: GRENADE.throwSpeed, lift: 0.14, liftFade: Math.PI / 4, inherit: 0.3 } as const;
 
 const RADIUS = 0.09;
 const RESTITUTION = 0.38;

@@ -51,6 +51,11 @@ function lodMaterial(base: THREE.Material, mode: LodMode, range: number, role: R
   const m = base.clone();
   const span = fadeSpan(mode, range);
   const uniforms = { uLodFrom: { value: span.from }, uLodTo: { value: span.to } };
+  m.userData.lodSpan = (reach: number) => {
+    const s = fadeSpan(mode, range * reach);
+    uniforms.uLodFrom.value = s.from;
+    uniforms.uLodTo.value = s.to;
+  };
   if (role !== 'plain') {
     m.transparent = true;
     m.colorWrite = role === 'blend';
@@ -107,13 +112,15 @@ export class DetailFades {
   readonly tracker: THREE.Mesh;
   private readonly materials = new Map<string, THREE.Material>();
   private readonly draws: Draw[] = [];
+  /** Share of `range` in use: the renderer lowers it (scene.userData.detailReach) when frames can't keep up. */
+  private reach = 1;
 
   constructor(private readonly range: number) {
     const material = new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false, depthTest: false });
     this.tracker = new THREE.Mesh(new THREE.BufferGeometry().setAttribute('position', new THREE.Float32BufferAttribute([], 3)), material);
     this.tracker.frustumCulled = false;
     this.tracker.raycast = () => {};
-    this.tracker.onBeforeRender = (_renderer, _scene, camera) => this.track(camera);
+    this.tracker.onBeforeRender = (_renderer, scene, camera) => this.track(camera, (scene.userData.detailReach as number | undefined) ?? 1);
   }
 
   /** Turns a chunk built with origins into its plain draw; returns the twins, for the caller to add. */
@@ -145,10 +152,14 @@ export class DetailFades {
     (this.tracker.material as THREE.Material).dispose();
   }
 
-  private track(camera: THREE.Camera) {
+  private track(camera: THREE.Camera, reach: number) {
+    if (reach !== this.reach) {
+      this.reach = reach;
+      for (const m of this.materials.values()) (m.userData.lodSpan as (reach: number) => void)(reach);
+    }
     eye.setFromMatrixPosition(camera.matrixWorld);
     for (const d of this.draws) {
-      const span = fadeSpan(d.mode, this.range);
+      const span = fadeSpan(d.mode, this.range * this.reach);
       const near = d.origins.distanceToPoint(eye);
       const far = farthest(d.origins, eye);
       if (d.role !== 'plain') d.mesh.visible = near < span.to + MARGIN && far >= span.from - MARGIN;

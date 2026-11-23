@@ -12,6 +12,7 @@ export const playEn = {
   'rule.ffa': 'First to {n} kills ends the match. Most points wins.',
   'rule.tdm': 'First team to {n} kills wins.',
   'lobby.size': 'Room size',
+  'lobby.perTeam': 'Players per team',
   'lobby.count': '{h} + {b} bots',
   'lobby.open': 'Open seat',
   'death.health': 'Health left',

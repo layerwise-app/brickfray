@@ -1,9 +1,10 @@
 import * as THREE from 'three';
-import { QUALITY, type QualityLevel, type QualityProfile } from './quality';
+import { QUALITY, type QualityLevel, type QualityProfile, type Shed } from './quality';
 import { Materials } from './materials';
 import { FrameTimer } from './frame-timer';
 import { FramePacer } from './frame-pacer';
 import { AutoResolution } from './auto-resolution';
+import { DETAIL_REACH, fitSunShadow, tierRatio, tierScale, type GovernorState } from './tier-scale';
 import { installSmoothShadows } from './shadow-filter';
 import { PostAA } from './post-aa';
 import { CanvasAO } from './canvas-ao';
@@ -16,6 +17,7 @@ type View = [THREE.Scene, THREE.Camera];
 
 /** How far the environment's zenith is pulled to a grey of the same luminance (0 = sky blue, 1 = grey). */
 const ENV_ZENITH_GREY = 0.45;
+
 
 export class GameRenderer {
   readonly renderer: THREE.WebGLRenderer;
@@ -40,6 +42,8 @@ export class GameRenderer {
   /** The view model last drawn: compiled with a new scene before the player spawns into it. */
   private lastView: View | null = null;
   private readonly shadowFocus = new THREE.Vector3();
+  /** The shadow map is the tier below's while the governor has given shadows up. */
+  private shadowsShed = false;
   private readonly bufferSize = new THREE.Vector2();
   atmosphere: Atmosphere = DEFAULT_ATMOSPHERE;
 
@@ -56,7 +60,7 @@ export class GameRenderer {
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
     this.renderer.info.autoReset = false;
     this.timer = new FrameTimer(this.renderer.getContext() as WebGL2RenderingContext);
-    this.resolution = new AutoResolution(this.renderer, this.timer, this.pixelRatio);
+    this.resolution = new AutoResolution(this.renderer, this.timer, tierScale(this.profile));
     // AO renders the scene a second time; shadows only need one update per frame.
     this.renderer.shadowMap.autoUpdate = false;
     this.materials = new Materials(this.profile);
@@ -152,7 +156,7 @@ export class GameRenderer {
     this.profile = QUALITY[level];
     this.materials.dispose();
     this.materials = new Materials(this.profile);
-    this.resolution.restart(this.pixelRatio);
+    this.resolution.restart(tierScale(this.profile));
     this.pacer.restart();
     this.applyProfile();
     if (scene) this.applyAtmosphere(scene);
@@ -163,21 +167,8 @@ export class GameRenderer {
     const p = this.profile;
     this.renderer.shadowMap.enabled = p.shadows;
     this.sun.castShadow = p.shadows;
-    if (p.shadows) {
-      this.sun.shadow.mapSize.set(p.shadowMapSize, p.shadowMapSize);
-      this.sun.shadow.map?.dispose();
-      this.sun.shadow.map = null;
-      const cam = this.sun.shadow.camera;
-      const half = p.level === 'high' ? 34 : 26;
-      cam.left = -half;
-      cam.right = half;
-      cam.top = half;
-      cam.bottom = -half;
-      cam.near = 1;
-      cam.far = 160;
-      cam.updateProjectionMatrix();
-      this.sun.shadow.radius = p.shadowRadius;
-    }
+    this.shadowsShed = false;
+    fitSunShadow(this.sun, p, false);
     this.ao?.dispose();
     this.ao = null;
     if (p.antialias) {
@@ -189,8 +180,18 @@ export class GameRenderer {
 
   /** The tier's pixel ratio on this screen: the canvas's during a match. */
   get pixelRatio() {
-    const dpr = typeof window === 'undefined' ? 1 : window.devicePixelRatio || 1;
-    return Math.min(dpr, this.profile.maxPixelRatio) * this.profile.resolutionScale;
+    return tierRatio(this.profile);
+  }
+
+  /** Whether the governor has given up this extra of the tier for now. */
+  shedding(what: Shed) {
+    const i = this.profile.sheds.findIndex((s) => s.what === what);
+    return i >= 0 && i < this.resolution.shed;
+  }
+
+  get governor(): GovernorState {
+    const shed = this.profile.sheds.slice(0, this.resolution.shed).map((s) => s.what);
+    return { ratio: this.drawRatio, base: this.pixelRatio, shed, paced: this.pacer.divisor > 1 };
   }
 
   /** What a match renders at: the tier's ratio, or lower while automatic resolution keeps frames on the refresh. */
@@ -205,7 +206,7 @@ export class GameRenderer {
   set autoScale(on: boolean) {
     if (on === this.resolution.enabled) return;
     this.resolution.enabled = on;
-    this.resolution.restart(this.pixelRatio);
+    this.resolution.restart(tierScale(this.profile));
   }
 
   /** For the stats overlay: frames delivered against the display's rate, the longest gap, then what a frame costs. */
@@ -226,7 +227,7 @@ export class GameRenderer {
     }
     this.width = width;
     this.height = height;
-    this.resolution.setBase(this.pixelRatio);
+    this.resolution.setBase(tierScale(this.profile));
     // One call: setPixelRatio followed by setSize reallocates the canvas twice.
     this.renderer.setDrawingBufferSize(this.width, this.height, ratio ?? this.drawRatio);
   }
@@ -240,7 +241,7 @@ export class GameRenderer {
   followShadow(focus: THREE.Vector3) {
     const dir = this.atmosphere.sunDirection;
     const cam = this.sun.shadow.camera;
-    const texel = (cam.right - cam.left) / Math.max(1, this.profile.shadowMapSize);
+    const texel = (cam.right - cam.left) / Math.max(1, this.sun.shadow.mapSize.x);
     const snapped = this.shadowFocus.copy(focus);
     snapped.x = Math.round(snapped.x / texel) * texel;
     snapped.z = Math.round(snapped.z / texel) * texel;
@@ -261,9 +262,16 @@ export class GameRenderer {
     this.sky.position.copy((camera as THREE.PerspectiveCamera).position);
     this.clouds.position.copy(this.sky.position);
     this.clouds.rotation.y = (performance.now() / 1000) * CLOUD_DRIFT;
-    if (!this.resolution.prepare(this.pixelRatio, this.width, this.height, interval, t.refresh * this.pacer.divisor, this.pacer.divisor === 1)) return t.skip();
+    if (!this.resolution.prepare(tierScale(this.profile), this.width, this.height, interval, t.refresh * this.pacer.divisor, this.pacer.divisor === 1)) return t.skip();
     this.renderer.info.reset();
+    const shadowsShed = this.shedding('shadows');
+    if (shadowsShed !== this.shadowsShed) {
+      this.shadowsShed = shadowsShed;
+      fitSunShadow(this.sun, this.profile, shadowsShed);
+    }
     this.renderer.shadowMap.needsUpdate = this.profile.shadows;
+    const ao = this.profile.ambientOcclusion && !this.shedding('ao');
+    scene.userData.detailReach = this.shedding('distance') ? DETAIL_REACH : 1;
     const scale = this.resolution.viewport(this.drawRatio);
     const views: View[] = viewScene && viewCamera ? [[scene, camera], [viewScene, viewCamera]] : [[scene, camera]];
     if (viewScene && viewCamera) this.lastView = [viewScene, viewCamera];
@@ -281,7 +289,7 @@ export class GameRenderer {
         for (const [s, c] of drawn) this.renderer.compile(s, c);
       }
       // Everything off the canvas first (shadow map, AO), so the canvas is drawn in one pass and its samples stay on tile.
-      if (this.profile.ambientOcclusion) {
+      if (ao) {
         const size = this.renderer.getDrawingBufferSize(this.bufferSize);
         (this.ao ??= new CanvasAO(scene, camera)).draw(this.renderer, scene, camera, size.x * scale, size.y * scale);
       }
@@ -289,7 +297,7 @@ export class GameRenderer {
       this.renderer.autoClear = false;
       this.renderer.clear();
       this.renderer.render(scene, camera);
-      if (this.profile.ambientOcclusion) this.ao!.composite(this.renderer);
+      if (ao) this.ao!.composite(this.renderer);
       for (const [s, c] of drawn.slice(1)) {
         this.renderer.clearDepth();
         this.renderer.render(s, c);

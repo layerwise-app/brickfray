@@ -23,8 +23,8 @@ function outward(flat: number) {
  * `ground` is the floor height under the blast, or null in mid-air.
  */
 export function explode(fx: Effects, position: THREE.Vector3, ground: number | null, palette: readonly THREE.ColorRepresentation[]) {
-  const low = fx.level === 'low';
-  const high = fx.level === 'high';
+  const low = fx.level === 'low' || (fx.lean && fx.level === 'medium');
+  const high = fx.level === 'high' && !fx.lean;
   const base = ground ?? position.y - 0.4;
   const core = position.clone().setY(Math.max(position.y, base) + 0.75);
 

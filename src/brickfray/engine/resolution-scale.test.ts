@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { estimateRefresh, ResolutionScaler, scaleLadder, type FrameCost } from './resolution-scale';
+import { estimateRefresh, governorLadder, ResolutionScaler, scaleLadder, type FrameCost } from './resolution-scale';
+import { QUALITY, type QualityLevel } from './quality';
 
 const HZ120 = 1000 / 120;
 
@@ -27,6 +28,19 @@ describe('scaleLadder', () => {
     expect(scaleLadder(2)).toEqual([2, 1.75, 1.5, 1.25, 1, 0.85, 0.7]);
     expect(scaleLadder(1)).toEqual([1, 0.85, 0.7]);
     expect(scaleLadder(1.1)).toEqual([1.1, 1, 0.85, 0.7]);
+  });
+
+  it('stops at the floor: the next tier ratio', () => {
+    expect(scaleLadder(2, 1.5)).toEqual([2, 1.75, 1.5]);
+    expect(scaleLadder(1.5, 1)).toEqual([1.5, 1.25, 1]);
+    expect(scaleLadder(1.8, 1.5)).toEqual([1.8, 1.5]);
+    expect(scaleLadder(1, 1)).toEqual([1]);
+  });
+
+  it('gives up every extra at the tier ratio before the first lower ratio', () => {
+    const rungs = governorLadder(2, 1.5, [0.1, 0.5]);
+    expect(rungs.map((r) => [r.ratio, r.shed])).toEqual([[2, 0], [2, 1], [2, 2], [1.75, 2], [1.5, 2]]);
+    expect(rungs.map((r) => +r.cost.toFixed(3))).toEqual([1, 0.9, 0.45, 0.345, 0.253]);
   });
 });
 
@@ -133,5 +147,58 @@ describe('ResolutionScaler', () => {
     expect(s.ratio).toBe(1.25);
     run(s, 4, 0, { cpu: 2, gpu: null });
     expect(s.ratio).toBe(1.5);
+  });
+});
+
+const HZ144 = 1000 / 144;
+/** GPU ms a tier's frame costs on a made-up GPU: `load` ms per megapixel-equivalent, its fixed passes, less its extras given up. */
+const tierCost = (level: QualityLevel, ratio: number, shed: number, load: number) => {
+  const sheds = QUALITY[level].sheds.slice(0, shed).map((s) => s.what);
+  const fixed = level === 'high' ? (sheds.includes('shadows') ? 0.3 : 1.4) : level === 'medium' ? 0.3 : 0;
+  let perPixel = level === 'high' ? 2.5 : level === 'medium' ? 1 : 0.85;
+  if (sheds.includes('ao')) perPixel *= 0.55;
+  if (sheds.includes('shadows')) perPixel *= 0.95;
+  return fixed + load * perPixel * ratio * ratio;
+};
+/** Two minutes on a 144 Hz display: frames take whole refreshes; returns where the governor settled. */
+const settle = (level: QualityLevel, dpr: number, load: number, timed: boolean) => {
+  const ratioOf = (l: QualityLevel) => Math.min(dpr, QUALITY[l].maxPixelRatio);
+  const below = QUALITY[level].below;
+  const s = new ResolutionScaler(ratioOf(level), below ? ratioOf(below) : undefined, QUALITY[level].sheds.map((x) => x.saves));
+  for (let t = 0; t < 120_000; ) {
+    const gpu = tierCost(level, s.ratio, s.shed, load);
+    const gap = HZ144 * Math.max(1, Math.ceil(gpu / HZ144 - 1e-9));
+    t += gap;
+    s.frame(gap, HZ144, { cpu: 2, gpu: timed ? gpu : null });
+  }
+  return { ratio: s.ratio, shed: s.shed };
+};
+
+describe('tiers under load', () => {
+  it('gives up the extras before any resolution, and resolution never below the next tier', () => {
+    const s = new ResolutionScaler(2, 1.5, QUALITY.high.sheds.map((x) => x.saves));
+    const seen: string[] = [];
+    for (let k = 0; k < 30; k++) {
+      run(s, 1.05, 2, { cpu: 2, gpu: null });
+      const at = `${s.ratio}/${s.shed}`;
+      if (seen.at(-1) !== at) seen.push(at);
+    }
+    expect(seen).toEqual(['2/1', '2/2', '2/3', '2/4', '1.75/4', '1.5/4']);
+  });
+
+  it('a higher tier never settles below a lower tier on the same screen and load', () => {
+    for (const dpr of [1, 1.5, 2])
+      for (const load of [0.25, 1, 2, 3, 6])
+        for (const timed of [true, false]) {
+          const [low, medium, high] = (['low', 'medium', 'high'] as const).map((l) => settle(l, dpr, load, timed).ratio);
+          expect(high, `dpr ${dpr} load ${load} ${timed ? 'timed' : 'untimed'}`).toBeGreaterThanOrEqual(medium!);
+          expect(medium).toBeGreaterThanOrEqual(low!);
+        }
+  });
+
+  it('high keeps its full resolution by giving up extras when that is enough', () => {
+    // At this load high's frame is too heavy with everything on and fits once the big shadow map is given up.
+    expect(settle('high', 2, 0.55, true)).toEqual({ ratio: 2, shed: 2 });
+    expect(settle('high', 2, 0.55, false).ratio).toBe(2);
   });
 });

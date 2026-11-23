@@ -5,6 +5,7 @@ import { BotDirector } from './bots';
 import { MATCH, PLAYER, REGEN } from './constants';
 import { HostSim } from './host';
 import type { MapLayout } from '../world/types';
+import { perTeam } from './seats';
 import { Streaks } from './streaks';
 import type { GameEvent, HostPlayer, KillCause, MatchSettings, MatchState } from './types';
 import { drawOffer, idleCards, takeUpgrade, type UpgradeId } from './upgrades';
@@ -37,6 +38,7 @@ export class Match {
   /** Solo: the cards each player still has to pick from. */
   private offers = new Map<number, UpgradeId[]>();
   private readonly seed: number;
+  private started = false;
 
   constructor(layout: MapLayout, readonly settings: MatchSettings, seed = Math.floor(Math.random() * 4294967296)) {
     this.seed = seed >>> 0;
@@ -54,15 +56,20 @@ export class Match {
     this.state = { phase: 'warmup', phaseEnds: this.time + WARMUP, teamScore: [0, 0], wave: 0, winner: null, waveLeft: 0, theme: null, cause: null };
     this.offers.clear();
     this.sim.damageEnabled = false;
+    this.started = true;
     this.fill(false);
     for (const p of this.sim.players.values()) this.sim.spawn(p);
   }
 
+  /** The newcomer takes a bot's seat: any bot in a free-for-all, one on the side with fewer humans in a team match. */
   addHuman(name: string, character: CharacterId): HostPlayer {
-    // The bot leaves first, so the newcomer takes its side in a team match.
-    if (this.settings.mode !== 'solo' && this.humans().length + this.botCount() >= this.seats()) this.dropBot();
-    const p = this.sim.addPlayer(name, character, null, this.teamFor());
-    if (this.state.phase === 'warmup' || this.state.phase === 'playing') this.sim.spawn(p);
+    const team = this.teamFor();
+    if (this.settings.mode === 'ffa' && this.sim.players.size >= this.seats()) this.dropBot(-1);
+    if (team !== -1) this.dropBot(team);
+    const p = this.sim.addPlayer(name, character, null, team);
+    const live = this.state.phase === 'warmup' || this.state.phase === 'playing';
+    if (live) this.sim.spawn(p);
+    if (this.started) this.fill(live);
     return p;
   }
 
@@ -83,47 +90,63 @@ export class Match {
     return Math.min(this.settings.seats, MATCH.maxPlayers);
   }
 
-  /** Bots take the seats no human holds. */
+  /**
+   * Bots take the seats no human holds. A team match keeps both sides the same size: the size the room asks for, or
+   * the larger side of humans when that is more, and gives up the bots a side no longer needs.
+   */
   private fill(spawn: boolean) {
     if (this.settings.mode === 'solo') return;
-    while (this.sim.players.size < this.seats()) {
-      const bot = this.addBot();
+    if (this.settings.mode === 'ffa') {
+      while (this.sim.players.size < this.seats()) {
+        const bot = this.addBot();
+        if (spawn) this.sim.spawn(bot);
+      }
+      return;
+    }
+    const size = Math.max(perTeam(this.settings.seats), ...this.sideHumans());
+    for (const team of [0, 1] as const) while (this.side(team).length > size && this.dropBot(team));
+    for (;;) {
+      const a = this.side(0).length;
+      const b = this.side(1).length;
+      if (a >= size && b >= size) return;
+      const bot = this.addBot('grunt', a <= b ? 0 : 1);
       if (spawn) this.sim.spawn(bot);
     }
-  }
-
-  private humans() {
-    return [...this.sim.players.values()].filter((p) => !p.bot);
   }
 
   private botCount() {
     return [...this.sim.players.values()].filter((p) => p.bot).length;
   }
 
-  private teamFor(): 0 | 1 | -1 {
-    if (this.settings.mode !== 'tdm') return -1;
-    let a = 0;
-    let b = 0;
-    for (const p of this.sim.players.values()) {
-      if (p.team === 0) a++;
-      else if (p.team === 1) b++;
-    }
-    return a <= b ? 0 : 1;
+  private side(team: 0 | 1) {
+    return [...this.sim.players.values()].filter((p) => p.team === team);
   }
 
-  private addBot(kind: BotKind = 'grunt') {
+  private sideHumans() {
+    return ([0, 1] as const).map((team) => this.side(team).filter((p) => !p.bot).length);
+  }
+
+  private teamFor(): 0 | 1 | -1 {
+    if (this.settings.mode !== 'tdm') return -1;
+    const [a, b] = this.sideHumans();
+    return a! <= b! ? 0 : 1;
+  }
+
+  private addBot(kind: BotKind = 'grunt', team: 0 | 1 | -1 = -1) {
     const solo = this.settings.mode === 'solo';
     const index = this.sim.players.size;
     const name = solo ? SNAPBOT_NAMES[kind] : BOT_NAMES[index % BOT_NAMES.length]!;
     const look: CharacterId | BotKind = solo ? kind : CHARACTER_IDS[index % CHARACTER_IDS.length]!;
-    const bot = this.sim.addPlayer(name, look, kind, this.teamFor());
+    const bot = this.sim.addPlayer(name, look, kind, team);
     this.bots.add(bot);
     return bot;
   }
 
-  private dropBot() {
-    const bot = [...this.sim.players.values()].reverse().find((p) => p.bot);
+  /** The newest bot, on one side or (-1) anywhere, leaves. */
+  private dropBot(team: 0 | 1 | -1): boolean {
+    const bot = [...this.sim.players.values()].reverse().find((p) => p.bot && (team === -1 || p.team === team));
     if (bot) this.drop(bot.id);
+    return !!bot;
   }
 
   private onKill(victim: HostPlayer, killer: HostPlayer | null, weapon: KillCause, kill: Extract<GameEvent, { type: 'kill' }>) {

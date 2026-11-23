@@ -13,6 +13,7 @@ export const playFr: Record<keyof typeof playEn, string> = {
   'rule.ffa': 'Le match s’arrête dès {n} éliminations. Le plus de points l’emporte.',
   'rule.tdm': 'La première équipe à {n} éliminations gagne.',
   'lobby.size': 'Taille du salon',
+  'lobby.perTeam': 'Joueurs par équipe',
   'lobby.count': '{h} + {b} bots',
   'lobby.open': 'Place libre',
   'death.health': 'Vie restante',

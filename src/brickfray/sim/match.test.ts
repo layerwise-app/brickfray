@@ -4,6 +4,7 @@ import { CHARACTER_IDS } from '../characters/roster';
 import { MATCH, TICK } from './constants';
 import { WEAPONS } from '../weapons/defs';
 import { byStanding, Match } from './match';
+import { roomSize } from './seats';
 import { botsThrough, secondsToReach, waveRoster, waveTuning } from './waves';
 import { BUTTON, DIFFICULTIES, type Difficulty } from './types';
 
@@ -280,7 +281,54 @@ describe('room seats', () => {
 
   it('fills the room with bots up to its size', () => {
     expect(count(room(6).match)).toEqual({ humans: 1, bots: 5, sides: [3, 3] });
-    expect(count(room(1).match)).toEqual({ humans: 1, bots: 0, sides: [1, 0] });
+    expect(count(room(1).match)).toEqual({ humans: 1, bots: 1, sides: [1, 1] });
+    expect(count(room(9).match)).toEqual({ humans: 1, bots: 9, sides: [5, 5] });
+  });
+
+  it('a free-for-all keeps seats as the room total', () => {
+    const match = new Match(arena(), { mode: 'ffa', map: 'plaza', minutes: 3, seats: 5, difficulty: 'normal' });
+    match.addHuman('Host', CHARACTER_IDS[0]!);
+    match.start();
+    expect(count(match)).toEqual({ humans: 1, bots: 4, sides: [0, 0] });
+  });
+
+  it('team deathmatch starts even for every human count and team size, as the lobby shows it', () => {
+    for (let size = 1; size <= MATCH.maxPlayers / 2; size++) {
+      for (let humans = 1; humans <= MATCH.maxPlayers; humans++) {
+        const settings = { mode: 'tdm', map: 'plaza', minutes: 3, seats: size * 2, difficulty: 'normal' } as const;
+        const match = new Match(arena(), settings);
+        for (let i = 0; i < humans; i++) match.addHuman(`P${i}`, CHARACTER_IDS[i % CHARACTER_IDS.length]!);
+        match.start();
+        const c = count(match);
+        const side = Math.max(size, Math.ceil(humans / 2));
+        expect(c, `${humans} humans, ${size} per team`).toEqual({ humans, bots: side * 2 - humans, sides: [side, side] });
+        expect(roomSize(settings, humans)).toBe(side * 2);
+      }
+    }
+  });
+
+  it('team deathmatch stays even through joins and leaves mid-match', () => {
+    let seed = 7;
+    const rand = () => ((seed = (seed * 1103515245 + 12345) >>> 0) / 4294967296);
+    for (let size = 1; size <= MATCH.maxPlayers / 2; size++) {
+      for (let start = 1; start <= MATCH.maxPlayers; start++) {
+        const match = new Match(arena(), { mode: 'tdm', map: 'plaza', minutes: 3, seats: size * 2, difficulty: 'normal' });
+        const humans: number[] = [];
+        for (let i = 0; i < start; i++) humans.push(match.addHuman(`P${i}`, CHARACTER_IDS[0]!).id);
+        match.start();
+        for (let step = 0; step < 40; step++) {
+          if (humans.length && (humans.length >= MATCH.maxPlayers || rand() < 0.5)) match.remove(humans.splice(Math.floor(rand() * humans.length), 1)[0]!);
+          else humans.push(match.addHuman(`J${step}`, CHARACTER_IDS[1]!).id);
+          const all = [...match.sim.players.values()];
+          const onSide = (t: number, human: boolean) => all.filter((p) => p.team === t && !p.bot === human).length;
+          const side = Math.max(size, onSide(0, true), onSide(1, true));
+          const c = count(match);
+          expect(c.sides, `${size} per team, step ${step}`).toEqual([side, side]);
+          expect(c.humans).toBe(humans.length);
+          expect(all.every((p) => p.alive)).toBe(true);
+        }
+      }
+    }
   });
 
   it('gives a bot seat to a human who joins and fills it again when they leave', () => {
@@ -292,10 +340,13 @@ describe('room seats', () => {
     expect([...match.sim.players.values()].every((p) => p.alive)).toBe(true);
   });
 
-  it('lets humans in past the room size', () => {
+  it('lets humans in past the team size, and a bot evens the other side', () => {
     const { match } = room(2);
     match.addHuman('A', CHARACTER_IDS[1]!);
-    match.addHuman('B', CHARACTER_IDS[2]!);
-    expect(count(match)).toEqual({ humans: 3, bots: 0, sides: [2, 1] });
+    expect(count(match)).toEqual({ humans: 2, bots: 0, sides: [1, 1] });
+    const b = match.addHuman('B', CHARACTER_IDS[2]!);
+    expect(count(match)).toEqual({ humans: 3, bots: 1, sides: [2, 2] });
+    match.remove(b.id);
+    expect(count(match)).toEqual({ humans: 2, bots: 0, sides: [1, 1] });
   });
 });

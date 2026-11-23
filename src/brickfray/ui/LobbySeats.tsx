@@ -1,6 +1,6 @@
 import type { LobbyPlayer } from '../net/protocol';
 import { TEAM_COLORS } from '../game/remotes';
-import { MATCH } from '../sim/constants';
+import { roomSize } from '../sim/seats';
 import type { MatchSettings } from '../sim/types';
 import { Avatar } from './board/Avatar';
 import { useT } from './i18n';
@@ -11,11 +11,16 @@ type Seat = { player: LobbyPlayer | null; team: 0 | 1 | -1 };
 
 /**
  * The room's seats as the match will fill them: the players in the order they joined, then a bot for every seat no
- * player holds. A team match deals the seats out in turn, Blue first, as the host does when it starts.
+ * player holds. A team match deals the players out in turn, Blue first, as the host does when it starts, and gives
+ * each side the same number of seats.
  */
 export function seatsOf(players: readonly LobbyPlayer[], settings: MatchSettings): Seat[] {
-  const size = Math.max(players.length, Math.min(settings.seats, MATCH.maxPlayers));
-  return Array.from({ length: size }, (_, i) => ({ player: players[i] ?? null, team: settings.mode === 'tdm' ? ((i % 2) as 0 | 1) : -1 }));
+  const size = roomSize(settings, players.length);
+  if (settings.mode !== 'tdm') return Array.from({ length: size }, (_, i) => ({ player: players[i] ?? null, team: -1 }));
+  return ([0, 1] as const).flatMap((team) => {
+    const mine = players.filter((_, i) => i % 2 === team);
+    return Array.from({ length: size / 2 }, (_, i) => ({ player: mine[i] ?? null, team }));
+  });
 }
 
 /** The players list: a row per seat, bots greyed; in a team match, the two teams side by side. */

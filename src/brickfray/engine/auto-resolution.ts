@@ -2,13 +2,21 @@ import * as THREE from 'three';
 import type { FrameTimer } from './frame-timer';
 import { ResolutionScaler } from './resolution-scale';
 
+/** A tier on this screen: its ratio, the ratio it never goes below, and what each extra it may give up saves. */
+export interface TierScale {
+  base: number;
+  floor: number;
+  saves: readonly number[];
+}
+
 /** A lower ratio that never settles on the refresh still gets its smaller canvas after this long. */
 const SHRINK_AFTER_MS = 4000;
 /** Frames left undrawn at most while the GPU finishes its queue before the canvas shrinks. */
 const MAX_SKIPS = 2;
 
 /**
- * Keeps a match's frames on the display's refresh by drawing fewer pixels (ResolutionScaler picks how many).
+ * Keeps a match's frames on the display's refresh by giving up a tier's extras, then drawing fewer pixels
+ * (ResolutionScaler picks which).
  * Resizing the canvas waits for the GPU to finish every queued frame (100+ ms when it is the bottleneck), so a lower
  * ratio is first drawn into the canvas's lower-left corner and the compositor stretches the element over the screen;
  * the canvas shrinks to it once frames are back on the refresh, on a frame where the GPU has caught up. Drawing
@@ -27,9 +35,9 @@ export class AutoResolution {
   constructor(
     private readonly renderer: THREE.WebGLRenderer,
     private readonly timer: FrameTimer,
-    base: number
+    tier: TierScale
   ) {
-    this.scaler = new ResolutionScaler(base);
+    this.scaler = new ResolutionScaler(tier.base, tier.floor, tier.saves);
     // The menu draws the whole canvas: a frame without a match frame takes the stretch off before it is shown.
     timer.onEnd = () => {
       if (this.renderedFrame !== timer.frame) this.stretch(1, 1);
@@ -41,13 +49,19 @@ export class AutoResolution {
     return this.enabled ? this.scaler.ratio : base;
   }
 
-  /** A new tier or switch: start again from the tier's ratio. */
-  restart(base: number) {
-    this.scaler = new ResolutionScaler(base);
+  /** How many of the tier's extras a match gives up now. */
+  get shed() {
+    return this.enabled ? this.scaler.shed : 0;
   }
 
-  setBase(base: number) {
-    this.scaler.setBase(base);
+
+  /** A new tier or switch: start again from the tier's ratio. */
+  restart(tier: TierScale) {
+    this.scaler = new ResolutionScaler(tier.base, tier.floor, tier.saves);
+  }
+
+  setBase(tier: TierScale) {
+    this.scaler.setBase(tier.base, tier.floor, tier.saves);
   }
 
   /** A match frame, drawn or left undrawn by pacing: the menu's frames take the stretch off, these keep it. */
@@ -67,15 +81,14 @@ export class AutoResolution {
    * the frame does not follow the game loop's previous one. False means leave this frame undrawn while the GPU
    * catches up before a shrink.
    */
-  prepare(base: number, width: number, height: number, interval: number, due: number, mayRise: boolean): boolean {
+  prepare(tier: TierScale, width: number, height: number, interval: number, due: number, mayRise: boolean): boolean {
     const t = this.timer;
-    if (this.enabled && this.scaler.ladder[0] !== base) {
+    if (this.enabled && this.scaler.setBase(tier.base, tier.floor, tier.saves)) {
       t.remeasure();
-      this.scaler.setBase(base);
     } else if (this.enabled) {
       this.scaler.frame(interval, due, { cpu: t.cpuMs, gpu: t.gpuMs }, mayRise);
     }
-    const want = this.ratio(base);
+    const want = this.ratio(tier.base);
     const canvas = this.renderer.getPixelRatio();
     if (want >= canvas) {
       this.largerSince = -1;

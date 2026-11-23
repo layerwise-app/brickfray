@@ -17,6 +17,29 @@ const TABS: Tab[] = ['graphics', 'controls', 'audio', 'interface'];
 const ACTIONS: Action[] = ['forward', 'back', 'left', 'right', 'jump', 'crouch', 'sprint', 'fire', 'ads', 'reload', 'melee', 'grenade', 'weapon1', 'weapon2', 'scoreboard', 'chat'];
 const CROSSHAIR_COLORS = ['#ffffff', '#ffe14d', '#4dff88', '#4de3ff', '#ff4dd2'];
 
+/** The resolution a match draws at now and what the governor has eased off to keep frames on the display's refresh. */
+function RenderScale() {
+  const game = useGame();
+  const { t, lang } = useT();
+  const [, setTick] = useState(0);
+  // Polls the renderer: the governor changes with the frames drawn behind the panel, not with React state.
+  useEffect(() => {
+    const id = setInterval(() => setTick((n) => n + 1), 1000);
+    return () => clearInterval(id);
+  }, []);
+  const g = game.renderer.governor;
+  const eased = [...g.shed, ...(g.ratio < g.base ? (['resolution'] as const) : [])].map((what) => t(`shed.${what}`));
+  return (
+    <div className='flex flex-col gap-1 text-sm text-[var(--bf-muted)]'>
+      <span>
+        <span className='bf-display text-base tabular-nums text-white'>{t('renderScale', { n: +g.ratio.toFixed(2) })}</span>
+        {eased.length > 0 && ` · ${t('governor.shed', { list: eased.join(lang === 'zh' || lang === 'ja' ? '、' : ', ') })}`}
+      </span>
+      {g.paced && <span className='text-[var(--bf-yellow)]'>{t('governor.paced')}</span>}
+    </div>
+  );
+}
+
 export function SettingsPanel({ onClose }: { onClose: () => void }) {
   const game = useGame();
   const { t, lang } = useT();
@@ -95,6 +118,7 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
                       </button>
                     ))}
                   </div>
+                  <RenderScale />
                 </div>
                 {toggle(
                   'autoResolution',

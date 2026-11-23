@@ -367,6 +367,7 @@ export class MatchView {
     this.view.setHidden(!alive || this.scoped);
     this.view.orient(this.fp.camera.quaternion);
     this.view.update(dt, { speed, sprint: m.sprinting, grounded: m.grounded, crouch: m.crouch, sliding: m.slide > 0, ads: p.arms.ads, look: { yaw: input.lookYaw, pitch: input.lookPitch }, time: performance.now() / 1000 });
+    this.effects.lean = this.renderer.shedding('effects');
     this.effects.update(dt, this.fp.camera);
     this.tags.update(this.fp.camera, this.remotes, alive ? this.aimedRemote() : 0, this.myTeam, this.renderer.canvas.clientWidth, this.renderer.canvas.clientHeight);
     this.visual.update(dt, performance.now() / 1000);

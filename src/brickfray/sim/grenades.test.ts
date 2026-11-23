@@ -24,18 +24,21 @@ function flight(pitch: number, low = false, run: [number, number, number] = [0, 
 describe('grenade throw', () => {
   it('goes farther the higher the aim up to about 45°, then comes down nearer, with a hard limit', () => {
     const carries = [0, 15, 30, 45, 60].map((d) => flight(deg(d)).carry);
-    expect(carries[0]).toBeGreaterThan(12);
-    expect(carries[0]).toBeLessThan(14);
+    expect(carries[0]).toBeGreaterThan(15);
+    expect(carries[0]).toBeLessThan(17.5);
     expect(carries[1]).toBeGreaterThan(carries[0]!);
     expect(carries[2]).toBeGreaterThan(carries[1]!);
     expect(carries[3]).toBeGreaterThan(carries[2]!);
     expect(carries[4]).toBeLessThan(carries[3]!);
     let longest = 0;
     for (let d = 0; d <= 89; d++) longest = Math.max(longest, flight(deg(d)).burst);
-    expect(longest).toBeGreaterThan(28);
-    expect(longest).toBeLessThan(33);
+    expect(longest).toBeGreaterThan(38);
+    expect(longest).toBeLessThan(45);
+    // About a third farther than the 28 m carry it had before.
+    expect(carries[3]).toBeGreaterThan(36);
+    expect(carries[3]).toBeLessThan(39);
     // A sprint adds a little, not a new range.
-    expect(flight(deg(45), false, [0, 0, -7.2]).carry - carries[3]!).toBeLessThan(4);
+    expect(flight(deg(45), false, [0, 0, -7.2]).carry - carries[3]!).toBeLessThan(carries[3]! * 0.12);
   });
 
   it('the underhand lob stays short at any aim', () => {
@@ -50,7 +53,7 @@ describe('grenade throw', () => {
   });
 
   it('the pitch a bot asks for lands its throw where it wants, up to the longest throw', () => {
-    for (const want of [6, 10, 15, 20, 25]) {
+    for (const want of [6, 10, 15, 20, 25, 30, 35]) {
       const pitch = throwPitchFor(want, -PLAYER.eye)!;
       expect(Math.abs(flight(pitch).carry - want)).toBeLessThan(0.6);
     }

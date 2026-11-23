@@ -13,6 +13,7 @@ export const playZh: Record<keyof typeof playEn, string> = {
   'rule.ffa': '先拿到 {n} 次击倒即结束比赛，得分最高者获胜。',
   'rule.tdm': '先拿到 {n} 次击倒的队伍获胜。',
   'lobby.size': '房间人数',
+  'lobby.perTeam': '每队人数',
   'lobby.count': '{h} + {b} 个机器人',
   'lobby.open': '空位',
   'death.health': '剩余生命',

@@ -1,5 +1,12 @@
 export type QualityLevel = 'low' | 'medium' | 'high';
 
+/**
+ * What the frame-time governor gives up when frames can't keep up, in its order, before it lowers the resolution:
+ * explosions drawn as the tier below draws them, the tier below's shadow map and reach, no ambient occlusion, small
+ * detail dissolving nearer.
+ */
+export type Shed = 'effects' | 'shadows' | 'ao' | 'distance';
+
 export interface QualityProfile {
   level: QualityLevel;
   /** Multiplier on devicePixelRatio, capped by maxPixelRatio. */
@@ -23,6 +30,10 @@ export interface QualityProfile {
   maxDebris: number;
   maxDecals: number;
   drawDistance: number;
+  /** Given up in this order under load, each with the share of the tier's GPU time it saves (r7 timings, 1440p). */
+  sheds: readonly { what: Shed; saves: number }[];
+  /** The tier whose ratio is this tier's resolution floor: a tier never renders below the one under it. */
+  below: QualityLevel | null;
 }
 
 export const QUALITY: Record<QualityLevel, QualityProfile> = {
@@ -42,7 +53,9 @@ export const QUALITY: Record<QualityLevel, QualityProfile> = {
     detail: 0,
     maxDebris: 96,
     maxDecals: 48,
-    drawDistance: 140
+    drawDistance: 140,
+    sheds: [],
+    below: null
   },
   medium: {
     level: 'medium',
@@ -60,7 +73,13 @@ export const QUALITY: Record<QualityLevel, QualityProfile> = {
     detail: 1,
     maxDebris: 220,
     maxDecals: 96,
-    drawDistance: 220
+    drawDistance: 220,
+    sheds: [
+      { what: 'effects', saves: 0.02 },
+      { what: 'shadows', saves: 0.1 },
+      { what: 'distance', saves: 0.04 }
+    ],
+    below: 'low'
   },
   high: {
     level: 'high',
@@ -78,6 +97,13 @@ export const QUALITY: Record<QualityLevel, QualityProfile> = {
     detail: 2,
     maxDebris: 420,
     maxDecals: 160,
-    drawDistance: 320
+    drawDistance: 320,
+    sheds: [
+      { what: 'effects', saves: 0.02 },
+      { what: 'shadows', saves: 0.12 },
+      { what: 'ao', saves: 0.3 },
+      { what: 'distance', saves: 0.03 }
+    ],
+    below: 'medium'
   }
 };
