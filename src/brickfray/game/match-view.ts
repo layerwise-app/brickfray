@@ -109,7 +109,7 @@ export class MatchView {
     this.remotes.onFire = (r) => {
       // Flash at the gun; the tracer and sound come with the shot trace.
       const muzzle = this.remotes.muzzleOf(r, v3());
-      const dir = new THREE.Vector3(-Math.sin(r.yaw), 0, -Math.cos(r.yaw));
+      const dir = new THREE.Vector3(-Math.sin(r.aim), 0, -Math.cos(r.aim));
       this.effects.muzzle(muzzle, dir, r.weapon ?? false);
       const port = r.weapon && r.guns[r.weapon]?.ejectPort;
       if (r.weapon && port) this.effects.casing(r.weapon, port);

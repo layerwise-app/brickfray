@@ -172,7 +172,8 @@ export function poseUpper(pose: Pose, I: UpperInput) {
   const shoulder = SIDEARMS.has(s.weapon) || HELD_OUT.has(s.weapon) ? 0 : I.ads;
   const blade = -0.3 - 0.06 * I.ads + 0.55 * shoulder + 0.16 * I.sprint;
   // Reaching over the shoulder for a slung gun turns the gun shoulder back; going to the hip leans over it.
-  const heading = blade - I.gaitYaw * 0.8 + action.twist + f.chest[1] + rb[0]! * watch + 0.32 * sw.back + 0.1 * (sw.weight - sw.back) - 0.8 * jolt.x;
+  const aimYaw = s.aimYaw ?? 0;
+  const heading = blade - I.gaitYaw * 0.8 + action.twist + f.chest[1] + rb[0]! * watch + 0.32 * sw.back + 0.1 * (sw.weight - sw.back) - 0.8 * jolt.x - aimYaw;
   const swagger = Math.sin(I.phase * Math.PI * 2) * 0.035 * st.shoulderRoll * I.moving * (1 - I.run * 0.5);
   const chestPitch = pitch * 0.42 + st.posture - st.lean - 0.5 * I.crouch * (1 - I.slide) + SLIDE.chest * I.slide - 0.1 * (sw.weight - sw.back) - 0.1 * I.sprint + 0.012 * breath * (1 - I.moving) + 0.12 * kickT + action.bend + f.chest[0] - I.landing * 0.6 - (0.05 + rb[1]!) * watch;
   const chestRoll = -I.gaitRoll * 0.6 + swagger + f.chest[2];
@@ -189,7 +190,7 @@ export function poseUpper(pose: Pose, I: UpperInput) {
   // Head: aims, stays level, tilts onto the stock when aiming down sights.
   const headPitch = pitch * 0.92 * (1 - 0.5 * watch) - st.hunch * 0.5 + f.head[0] - 0.12 * I.ads - 0.08 * shoulder - (0.2 + rb[3]!) * watch;
   const look = I.seed ? 0.1 * Math.sin(t * 0.31 + I.seed * 2.3) * I.ready * (1 - busy) : 0;
-  hprQuat(f.head[1] + 0.05 * I.ads + (rb[2]! - 0.08) * watch + look, headPitch, 0.14 * I.ads + f.head[2] + 0.1 * watch, q2);
+  hprQuat(f.head[1] + 0.05 * I.ads + (rb[2]! - 0.08) * watch + look - aimYaw, headPitch, 0.14 * I.ads + f.head[2] + 0.1 * watch, q2);
   // The head snaps further than the chest.
   if (joltSize > 1e-4) q2.premultiply(tilt(v2.set(jolt.x, 0, jolt.y).multiplyScalar(1.3), q3));
   qa.copy(pose.mq[BONE.chest]!).invert().multiply(q2);
@@ -244,7 +245,7 @@ export function poseUpper(pose: Pose, I: UpperInput) {
   }
   const chestM = pose.mq[BONE.chest]!;
   pose.toModel(BONE.chest, v2.set(0, 0.19, 0), aim.pos);
-  aim.q.copy(hprQuat(0, pitch * (1 - 0.75 * I.sprint) * (1 - lower * 0.7) * (1 - 0.5 * ready), 0, q1));
+  aim.q.copy(hprQuat(-aimYaw, pitch * (1 - 0.75 * I.sprint) * (1 - lower * 0.7) * (1 - 0.5 * ready), 0, q1));
   gun.pos.copy(pos).applyQuaternion(aim.q).add(aim.pos);
   gun.q.copy(aim.q).multiply(hprQuat(rot[0], rot[1], rot[2], q2));
   swapGun(pose, swap, place, from, I.fit, gun.pos, gun.q);

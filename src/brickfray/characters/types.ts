@@ -50,6 +50,8 @@ export interface AnimState {
   alert?: boolean;
   /** Where the figure stands in a match (absent in labs and portraits): planted feet then hold their spots. */
   place?: Place;
+  /** How far (radians, left positive) the aim is turned past the way the figure stands: a flick faster than the legs turn, which the chest, head and gun take. */
+  aimYaw?: number;
 }
 
 /** A part that flies off when the character shatters. */

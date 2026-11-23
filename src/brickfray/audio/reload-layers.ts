@@ -44,6 +44,8 @@ const PLANS: Record<string, Plan> = {
   arReloadEmpty: { beats: 2.4, layers: [[0.09, 'gripOff'], [0.74, 'pouch'], [1.15, 'magScrape'], [2.16, 'regrip']] },
   pistolReload: { beats: 1.4, layers: [[0.07, 'gripOff'], [0.61, 'pouch'], [0.95, 'magScrape'], [1.3, 'regrip']] },
   pistolReloadEmpty: { beats: 1.7, layers: [[0.07, 'gripOff'], [0.42, 'pouch'], [0.72, 'magScrape'], [1.6, 'regrip']] },
+  buzzerReload: { beats: 1.5, layers: [[0.07, 'gripOff'], [0.63, 'pouch'], [1.0, 'magScrape'], [1.34, 'regrip']] },
+  buzzerReloadEmpty: { beats: 1.8, layers: [[0.05, 'gripOff'], [0.45, 'pouch'], [0.9, 'magScrape'], [1.28, 'regrip']] },
   sniperReload: { beats: 2.6, layers: [[0.14, 'gripOff'], [1.12, 'pouch'], [1.68, 'magScrape'], [2.34, 'regrip']] },
   sniperReloadEmpty: { beats: 3.2, layers: [[0.64, 'gripOff'], [1.46, 'pouch'], [1.96, 'magScrape'], [3.0, 'regrip']] },
   revolverReload: { beats: 2.1, layers: [[0.95, 'pouch'], [1.92, 'regrip']] },

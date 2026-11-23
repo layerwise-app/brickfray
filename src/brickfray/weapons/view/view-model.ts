@@ -276,7 +276,6 @@ class FirstPersonView implements ViewModel {
     f.reset();
     this.player.update(this.hitStop.step(dt, this.player), this.onEvent);
     if (this.hitStop.started) this.motion.knock(meleeWeight(this.held.meleeId));
-    // The new gun comes in on the frame after the old one has left the picture, whenever along its holster that is.
     this.switcher.update();
     if (!this.player.clip && this.parts.lacks('magazine') && this.parts.refilled.has('magazine')) this.play(reseatClip(this.gun.id));
     this.ctx.ads = input.ads;
@@ -297,13 +296,24 @@ class FirstPersonView implements ViewModel {
     this.sprintCue = sprinting;
 
     this.scope.update(dt, this.gun.id, input.ads, this.motion.rot, this.motion.pos.z);
+    this.place(f, ads, dt);
+    // On the frame the old gun leaves the picture, whenever along its holster that is, the new one already shows coming in.
+    if (this.switcher.due()) {
+      this.switcher.swap(dt);
+      f.reset();
+      this.player.clip?.sample(this.player.u, f, this.ctx);
+      this.place(f, ads, dt);
+    }
+    this.fx.update(dt);
+    this.drops.update(dt);
+    this.camera.updateMatrixWorld();
+  }
+
+  private place(f: Frame, ads: number, dt: number) {
     this.showGun();
     this.saddle.show(this.gun);
     this.pose.gun(this.gun, f, ads, dt);
     this.pose.hands(this.gun, f, this.ctx.goals, dt);
-    this.fx.update(dt);
-    this.drops.update(dt);
-    this.camera.updateMatrixWorld();
   }
 
   meleeLanded(hit: boolean) {

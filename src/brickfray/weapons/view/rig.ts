@@ -152,6 +152,7 @@ export function buildGunRig(id: WeaponId, kit: Kit): GunRig {
     const q = L([0.7, -0.7, 0], [0, 0, -1]);
     goals.spear = goal(node('spearHold'), [-0.008, 0.008, 0], q);
     goals.spearHead = goal(node('spearHead'), [-0.008, 0.008, 0], q);
+    goals.readyHead = goal(node('readyHead'), [-0.008, 0.008, 0], q);
   }
   if (rigged.nodes.has('cylHold')) Object.assign(goals, revolverGoals(node));
   // Where each hand-carried part sits when seated, so clips can hand it over to the hand in view space.

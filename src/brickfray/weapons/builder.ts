@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import type { Kit } from '../engine/kit';
 import { lensMaterial, paint, surfaceMaterial, type Surface } from './surface';
-import { useLod, type Lod } from './shapes';
+import { edgesOf, useLod, type Lod } from './shapes';
 
 export type View = 'first' | 'third';
 
@@ -98,7 +98,7 @@ export class ModelBuilder {
 
   add(geometry: THREE.BufferGeometry, color: THREE.ColorRepresentation, surface: Surface, matrix: THREE.Matrix4 = new THREE.Matrix4()) {
     const g = geometry.clone();
-    paint(g, color, surface);
+    paint(g, color, surface, this.lod.third ? undefined : edgesOf(geometry));
     this.current.opaque.push({ geometry: g, matrix });
     return this;
   }
@@ -162,10 +162,10 @@ export interface Instance {
 }
 
 /** New scene objects around a template's shared geometry. */
-export function instantiate(template: Template, kit: Kit): Instance {
+export function instantiate(template: Template, kit: Kit, worn = false): Instance {
   const root = new THREE.Group();
   const parts = new Map<string, THREE.Group>();
-  const material = surfaceMaterial(kit.materials);
+  const material = surfaceMaterial(kit.materials, worn);
   for (const part of template.parts) {
     let holder = root;
     if (part.name !== 'body') {

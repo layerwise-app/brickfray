@@ -63,7 +63,7 @@ export function createRiggedModel(id: ModelId, kit: Kit, view: View): RiggedMode
     template = builder.bake();
     templates.set(key, template);
   }
-  const inst: Instance = instantiate(template, kit);
+  const inst: Instance = instantiate(template, kit, view === 'first');
   inst.root.name = `weapon:${id}`;
   const node = (name: string) => inst.nodes.get(name) ?? null;
   const part = (name: string) => inst.parts.get(name);

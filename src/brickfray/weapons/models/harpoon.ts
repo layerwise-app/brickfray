@@ -13,6 +13,7 @@ const C = {
   dark: '#1d2328',
   steel: '#d3d8dc',
   dial: '#f3eee0',
+  can: '#2f3a44',
   needle: '#d3302a',
   lens: '#bfe8f2',
   bead: '#ffcf4a'
@@ -24,6 +25,11 @@ const MZ = -0.545;
 const SIGHT_Y = 0.153;
 const REAR_Z = 0.012;
 const FRONT_Z = -0.448;
+/** The spear standing ready in the mouth of the spare-spear canister, as an offset from the loaded spear's seat. */
+export const READY_SPEAR = [-0.045, -0.026, 0.436] as const;
+/** The canister's mouth and closed back along the gun. */
+const CAN_MOUTH = -0.13;
+const CAN_BACK = 0.04;
 
 /** Harpooner: pneumatic speargun with a teal air tube, brass fittings, porthole peep sight and a barbed spear. */
 export function buildHarpoon(b: ModelBuilder) {
@@ -140,13 +146,31 @@ export function buildHarpoon(b: ModelBuilder) {
     for (const s of [1, -1]) b.add(box(0.0022, 0.012, 0.004), C.brass, 'metal', T(s * 0.0064, 0.1385, FRONT_Z));
   }
 
+  // Spare-spear canister strapped along the left of the housing, mouth forward, where the eye sees it; a spring feeds the next spear up into its mouth.
+  const qx = READY_SPEAR[0];
+  const qy = BORE + READY_SPEAR[1];
+  const readyMz = MZ + READY_SPEAR[2];
+  const [m, back] = [CAN_MOUTH, CAN_BACK];
+  b.add(latheZ([[0, back], [0.008, back], [0.0118, back - 0.005], [0.013, back - 0.014], [0.013, m + 0.005], [0.0121, m], [0.0098, m], [0.0098, m + 0.004], [0, m + 0.004]], lod.seg), C.can, 'satin', T(qx, qy, 0));
+  b.add(tube(0.0097, 0.002, lod.seg), '#0b0d10', 'dark', T(qx, qy, m + 0.005));
+  b.add(torus(0.0118, 0.002, lod.seg), C.brass, 'metal', T(qx, qy, m + 0.001));
+  b.add(torus(0.0122, 0.0018, lod.seg), C.brass, 'metal', T(qx, qy, back - 0.012));
+  for (const z of b.minor ? [0.005, -0.09] : [-0.04]) b.add(torus(0.0134, 0.0016, lod.segSmall + 6), C.coral, 'plastic', T(qx, qy, z));
+  for (const z of [0.005, -0.09]) b.add(box(0.008, 0.01, 0.012, 0.002), C.brass, 'metal', T(-0.0285, qy, z));
+  if (d >= 1) {
+    // A window down the outer side shows the spares' shafts stacked inside.
+    b.add(box(0.0022, 0.0062, 0.07, 0.001), '#14181c', 'dark', T(qx - 0.0123, qy, -0.042));
+    for (const dy of [-0.0016, 0.0016]) b.add(box(0.002, 0.0016, 0.064), C.steel, 'chrome', T(qx - 0.0126, qy + dy, -0.042));
+  }
+  b.part('ready', new THREE.Vector3(qx, qy, readyMz));
+  spearHead(b, qx, qy, readyMz);
+  b.add(tube(0.0054, 0.04, lod.segSmall + 2, 0.001), C.steel, 'chrome', T(qx, qy, readyMz - 0.01));
+  b.node('readyHead', qx, qy, readyMz - 0.036);
+
   // Loaded spear (animated): shaft hidden in the tube, barbed head out of the muzzle.
   b.part('spear', new THREE.Vector3(0, BORE, MZ));
   b.add(tube(0.0054, 0.215, lod.segSmall + 2, 0.001), C.steel, 'chrome', T(0, BORE, MZ + 0.0745));
-  b.add(tube(0.0078, 0.012, lod.segSmall + 2, 0.0015), C.brass, 'metal', T(0, BORE, MZ - 0.036));
-  b.add(latheZ([[0, MZ - 0.042], [0.0085, MZ - 0.042], [0.0085, MZ - 0.054], [0.0058, MZ - 0.09], [0.0024, MZ - 0.118], [0, MZ - 0.134]], lod.segSmall + 2), C.steel, 'chrome', T(0, BORE, 0));
-  const barb = slab([[MZ - 0.104, 0.004], [MZ - 0.056, 0.0185], [MZ - 0.049, 0.0155], [MZ - 0.08, 0.0035]], 0.003, lod, 0.001);
-  for (const rz of [0, Math.PI / 2, -Math.PI / 2]) b.add(barb, C.coral, 'plastic', T(0, BORE, 0, 0, 0, rz));
+  spearHead(b, 0, BORE, MZ);
   b.node('spearHold', 0, BORE, MZ + 0.11);
   b.node('spearHead', 0, BORE, MZ - 0.036);
 
@@ -156,5 +180,14 @@ export function buildHarpoon(b: ModelBuilder) {
   b.node('support', 0, 0.068, -0.325);
   b.node('sight', 0, SIGHT_Y, FRONT_Z);
   b.node('grip', 0, 0, 0, -0.28);
+}
+
+/** A spear's brass collar and barbed head, for a spear on the axis (x, y) whose head end (the muzzle, loaded) is at z `mz`. */
+function spearHead(b: ModelBuilder, x: number, y: number, mz: number) {
+  const { lod } = b;
+  b.add(tube(0.0078, 0.012, lod.segSmall + 2, 0.0015), C.brass, 'metal', T(x, y, mz - 0.036));
+  b.add(latheZ([[0, mz - 0.042], [0.0085, mz - 0.042], [0.0085, mz - 0.054], [0.0058, mz - 0.09], [0.0024, mz - 0.118], [0, mz - 0.134]], lod.segSmall + 2), C.steel, 'chrome', T(x, y, 0));
+  const barb = slab([[mz - 0.104, 0.004], [mz - 0.056, 0.0185], [mz - 0.049, 0.0155], [mz - 0.08, 0.0035]], 0.003, lod, 0.001);
+  for (const rz of [0, Math.PI / 2, -Math.PI / 2]) b.add(barb, C.coral, 'plastic', T(x, y, 0, 0, 0, rz));
 }
 

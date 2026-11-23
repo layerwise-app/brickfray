@@ -116,7 +116,7 @@ export function actionLegs(grenade: number, melee: number, tool: MeleeId, out: A
   return out;
 }
 
-export type ReloadFamily = 'rifle' | 'pistol' | 'pump' | 'revolver' | 'harpoon';
+export type ReloadFamily = 'rifle' | 'pistol' | 'buzzer' | 'pump' | 'revolver' | 'harpoon';
 
 export const RELOAD_FAMILY: Record<WeaponId, ReloadFamily> = {
   ar: 'rifle',
@@ -124,7 +124,7 @@ export const RELOAD_FAMILY: Record<WeaponId, ReloadFamily> = {
   pulse: 'rifle',
   sniper: 'rifle',
   pistol: 'pistol',
-  buzzer: 'pistol',
+  buzzer: 'buzzer',
   shotgun: 'pump',
   cannon: 'revolver',
   harpoon: 'harpoon'
@@ -201,6 +201,17 @@ const MOTION: Record<ReloadFamily, ReloadMotion> = {
     gun: [REST, [0.12, -0.1, -0.02, 0.16, 0.35, 0.6, -0.7], [0.2, -0.09, 0.02, 0.15, 0.3, 0.8, -0.8], [0.36, -0.03, -0.12, 0.18, 0.2, 0.3, -0.4], [0.52, -0.05, -0.1, 0.17, 0.26, 0.4, -0.5], [0.64, -0.1, -0.03, 0.16, 0.38, 0.62, -0.75], [0.72, -0.1, 0.0, 0.15, 0.4, 0.7, -0.78], [0.8, -0.07, -0.02, 0.12, 0.18, 0.4, -0.15], [0.88, -0.06, 0.01, 0.1, 0.1, 0.3, 0.05], at(REST, 0.97)],
     body: [STILL, [0.12, 0.07, 0.12, 0.05, 0.16, 0.025, 0.012], [0.22, 0.04, 0.16, 0.02, 0.22, 0.04, 0.018], [0.4, -0.38, 0.16, -0.46, 0.3, 0.06, -0.04], [0.5, -0.36, 0.14, -0.42, 0.28, 0.06, -0.04], [0.64, 0.06, 0.2, 0.05, 0.26, 0.05, 0.025], [0.74, 0.03, 0.08, 0.02, 0.14, 0.035, 0.018], [0.86, 0.15, 0.08, 0.12, 0.1, 0.03, 0.025], still(1)],
     magazine: { out: 0.15, stow: 0.38, draw: 0.48, seat: 0.71 }
+  },
+  /**
+   * The machine pistol is laid flat on its side out in front of the belly, its long magazine pulled out sideways and
+   * swapped at the belt, the fresh one driven home with a heel slap that knocks the gun; then it is snapped up muzzle
+   * high as the slide drops.
+   */
+  buzzer: {
+    hand: [[0, support, 0, 0], [0.1, magazine, 0, 0], [0.2, magazine, -0.26, 0.04], [0.38, pouch, 0, 0], [0.48, pouch, 0, 0], [0.6, magazine, -0.24, 0.04], [0.68, magazine, -0.02, 0], [0.7, magazine, -0.11, 0], [0.735, magazine, 0.03, 0], [0.8, magazine, -0.05, 0], [0.86, support, 0, 0], [1, support, 0, 0]],
+    gun: [REST, [0.1, -0.06, -0.1, 0.2, 0.55, 0.05, -1.4], [0.2, -0.05, -0.12, 0.21, 0.6, 0.0, -1.5], [0.38, 0.0, -0.2, 0.14, 0.4, -0.15, -0.95], [0.5, -0.02, -0.18, 0.15, 0.42, -0.1, -1.05], [0.62, -0.06, -0.1, 0.2, 0.55, 0.05, -1.4], [0.72, -0.06, -0.1, 0.2, 0.55, 0.05, -1.4], [0.75, -0.02, -0.08, 0.2, 0.5, 0.12, -1.1], [0.84, -0.03, 0.06, 0.12, 0.2, 0.75, -0.15], [0.9, -0.03, 0.04, 0.1, 0.15, 0.6, -0.05], at(REST, 0.98)],
+    body: [STILL, [0.1, 0.18, 0.1, 0.16, 0.12, 0.03, 0.02], [0.22, 0.22, 0.14, 0.2, 0.2, 0.04, 0.025], [0.4, -0.34, 0.14, -0.42, 0.26, 0.06, -0.04], [0.5, -0.32, 0.12, -0.4, 0.24, 0.06, -0.04], [0.64, 0.2, 0.16, 0.16, 0.22, 0.045, 0.025], [0.74, 0.26, 0.04, 0.2, 0.08, 0.03, 0.03], [0.85, 0.06, -0.06, 0.04, -0.06, 0.015, 0.005], still(1)],
+    magazine: { out: 0.13, stow: 0.38, draw: 0.48, seat: 0.72 }
   },
   /** Loading port turned up; each cycle carries one shell from the belt and thumbs it into the tube, the gun bumping as it goes in. */
   pump: {

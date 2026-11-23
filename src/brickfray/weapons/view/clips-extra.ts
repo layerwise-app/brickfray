@@ -57,9 +57,6 @@ const inArc = (from: WeaponId | null, to: WeaponId) => (SIDEARMS.has(to) ? HIP :
 /** How far along its way in (away to mid) a gun brought straight back up starts. */
 const EDGE = 0.5;
 
-/** Grown frame a drawn gun must start wholly outside of, so not even a corner of it shows before its hands. */
-export const DRAW_MARGIN = 1.05;
-
 /**
  * Where along its way in (away 0, mid 1) a gun drawn after `from` starts: the furthest in at which `outside` (the gun
  * at that clip offset) still finds it wholly out of the picture, so the first frame it shows it is already moving in.
@@ -67,11 +64,14 @@ export const DRAW_MARGIN = 1.05;
 export function drawEdge(from: WeaponId, to: WeaponId, stow: number, outside: (offset: readonly number[]) => boolean) {
   const a = inArc(from, to);
   const k = SIDEARMS.has(to) ? 1 : stow;
+  const out = (e: number) => outside(a.away.map((x, i) => (x + (a.mid[i]! - x) * e) * k));
   let edge = -0.7;
   for (let e = -0.65; e < 0.85; e += 0.05) {
-    if (!outside(a.away.map((x, i) => (x + (a.mid[i]! - x) * e) * k))) break;
+    if (!out(e)) break;
     edge = e;
   }
+  // Narrowed down to just short of the frame's edge: a draw started there shows on the very next frame.
+  for (let step = 0.025; step > 0.001; step /= 2) if (out(edge + step)) edge += step;
   return edge;
 }
 

@@ -27,12 +27,12 @@ function boxOutside(mesh: THREE.Mesh) {
   return false;
 }
 
-/** Whether any of a sample of the mesh's vertices lands inside the frame: a long gun's box still crosses a corner of the frustum after the gun itself has left. */
-function vertexInside(mesh: THREE.Mesh) {
+/** Whether any of a sample of the mesh's vertices (all of them when `exact`) lands inside the frame: a long gun's box still crosses a corner of the frustum after the gun itself has left. */
+function vertexInside(mesh: THREE.Mesh, exact: boolean) {
   const pos = mesh.geometry.getAttribute('position');
   const inst = mesh as THREE.InstancedMesh;
   const copies = inst.isInstancedMesh ? inst.count : 1;
-  const step = Math.max(1, Math.floor((pos.count * copies) / SAMPLES));
+  const step = exact ? 1 : Math.max(1, Math.floor((pos.count * copies) / SAMPLES));
   for (let k = 0; k < copies; k++) {
     mvp.multiplyMatrices(viewProj, mesh.matrixWorld);
     if (inst.isInstancedMesh) {
@@ -49,14 +49,14 @@ function vertexInside(mesh: THREE.Mesh) {
 
 const widen = new THREE.Matrix4();
 
-/** Whether a model, as last posed, has nothing left inside the camera's frame, grown `margin` times about its center. */
-export function outOfFrame(root: THREE.Object3D, camera: THREE.Camera, margin = 1) {
+/** Whether a model, as last posed, has nothing left inside the camera's frame, grown `margin` times about its center; `exact` tests every vertex, not a sample. */
+export function outOfFrame(root: THREE.Object3D, camera: THREE.Camera, margin = 1, exact = false) {
   viewProj.multiplyMatrices(widen.makeScale(1 / margin, 1 / margin, 1), camera.projectionMatrix).multiply(camera.matrixWorldInverse);
   frustum.setFromProjectionMatrix(viewProj);
   let seen = false;
   root.traverseVisible((o) => {
     const mesh = o as THREE.Mesh;
-    if (!seen && mesh.isMesh && !boxOutside(mesh) && vertexInside(mesh)) seen = true;
+    if (!seen && mesh.isMesh && !boxOutside(mesh) && vertexInside(mesh, exact)) seen = true;
   });
   return !seen;
 }

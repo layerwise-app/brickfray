@@ -1,5 +1,6 @@
 import type { WeaponId } from '../defs';
 import type { Clip } from './clip';
+import { buzzerReload } from './clips-buzzer';
 import { harpoonReload } from './clips-harpoon';
 import { pistolReload } from './clips-pistol';
 import { revolverReload } from './clips-revolver';
@@ -10,7 +11,7 @@ import { sniperCycle, sniperReload } from './clips-sniper';
 export { shotgunLoadOut, shotgunShell } from './clips-shotgun';
 
 /** Which reload and cycling animations each gun uses. */
-const RELOAD: Record<WeaponId, 'rifle' | 'pistol' | 'pump' | 'bolt' | 'revolver' | 'harpoon'> = {
+const RELOAD: Record<WeaponId, 'rifle' | 'pistol' | 'buzzer' | 'pump' | 'bolt' | 'revolver' | 'harpoon'> = {
   ar: 'rifle',
   nailer: 'rifle',
   pulse: 'rifle',
@@ -19,7 +20,7 @@ const RELOAD: Record<WeaponId, 'rifle' | 'pistol' | 'pump' | 'bolt' | 'revolver'
   harpoon: 'harpoon',
   pistol: 'pistol',
   cannon: 'revolver',
-  buzzer: 'pistol'
+  buzzer: 'buzzer'
 };
 
 /** Shell-by-shell loaders hold a loading pose between shells and finish with their own clip. */
@@ -36,6 +37,8 @@ export function reloadClip(id: WeaponId, empty: boolean, duration: number, slot:
       return sniperReload(empty, duration);
     case 'pistol':
       return pistolReload(empty, duration);
+    case 'buzzer':
+      return buzzerReload(empty, duration);
     case 'revolver':
       return revolverReload(empty, duration);
     case 'harpoon':

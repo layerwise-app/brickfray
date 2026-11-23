@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { toCreasedNormals } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { chamferBox, normalizeGeometry } from '../engine/geometry';
+import type { Edges } from './surface';
 
 /** Geometry detail for one model build; derived from the quality tier and view. */
 export interface Lod {
@@ -84,7 +85,7 @@ function dropDegenerate(g: THREE.BufferGeometry): THREE.BufferGeometry {
 
 export function box(w: number, h: number, d: number, bevel = 0): THREE.BufferGeometry {
   if (active && active.bevel === 0 && active.detail === 0) bevel = 0;
-  return cached(`box:${w}:${h}:${d}:${bevel}`, () => chamferBox(w, h, d, bevel));
+  return edged(cached(`box:${w}:${h}:${d}:${bevel}`, () => chamferBox(w, h, d, bevel)), 'box', bevel);
 }
 
 /**
@@ -190,17 +191,36 @@ export type Outline = readonly (readonly [number, number])[];
  */
 export function slab(outline: Outline, width: number, lod: Lod, round: number | readonly number[] = 0, holes: Outline[] = [], chamfer = 0): THREE.BufferGeometry {
   const key = `slab:${width}:${lod.bevel}:${lod.curve}:${chamfer}:${JSON.stringify(round)}:${JSON.stringify(outline)}:${JSON.stringify(holes)}`;
-  return cached(key, () => {
-    const g = extrude(outline, width, lod, round, holes, chamfer);
-    g.rotateY(-Math.PI / 2);
-    return toCreasedNormals(g, lod.curve >= 6 ? 0.36 : 0.44);
-  });
+  return edged(
+    cached(key, () => {
+      const g = extrude(outline, width, lod, round, holes, chamfer);
+      g.rotateY(-Math.PI / 2);
+      return toCreasedNormals(g, lod.curve >= 6 ? 0.36 : 0.44);
+    }),
+    'x',
+    Math.max(lod.bevel, chamfer)
+  );
 }
 
 /** Same as `slab` but extruded along Z (a front cross-section [x, y]). */
 export function prism(outline: Outline, length: number, lod: Lod, round: number | readonly number[] = 0, holes: Outline[] = [], chamfer = 0): THREE.BufferGeometry {
   const key = `prism:${length}:${lod.bevel}:${lod.curve}:${chamfer}:${JSON.stringify(round)}:${JSON.stringify(outline)}:${JSON.stringify(holes)}`;
-  return cached(key, () => toCreasedNormals(extrude(outline, length, lod, round, holes, chamfer), lod.curve >= 6 ? 0.36 : 0.44));
+  return edged(cached(key, () => toCreasedNormals(extrude(outline, length, lod, round, holes, chamfer), lod.curve >= 6 ? 0.36 : 0.44)), 'z', Math.max(lod.bevel, chamfer));
+}
+
+const EDGES = new WeakMap<THREE.BufferGeometry, Edges>();
+/** Wider chamfers are faces of their own (a stock's bevelled sides), not edges that wear. */
+const WEAR_CHAMFER = 0.0045;
+
+/** Marks how a shape's chamfers lie, for first-person edge wear (`paint`). */
+function edged(g: THREE.BufferGeometry, edges: Edges, size: number) {
+  if (size > 0 && size <= WEAR_CHAMFER) EDGES.set(g, edges);
+  return g;
+}
+
+/** How the chamfers of a shape made here lie; null for anything else, a copy turned or bent included. */
+export function edgesOf(g: THREE.BufferGeometry): Edges | null {
+  return EDGES.get(g) ?? null;
 }
 
 function extrude(outline: Outline, depth: number, lod: Lod, round: number | readonly number[], holes: Outline[], chamfer: number) {

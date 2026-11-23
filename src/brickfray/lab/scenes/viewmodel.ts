@@ -4,6 +4,7 @@ import { buildGround } from '../../engine/ground';
 import { PLASTIC } from '../../engine/palette';
 import type { CharacterId } from '../../characters/types';
 import { createViewModel, type ViewAction, type ViewInput } from '../../weapons';
+import { outOfFrame } from '../../weapons/view/frame-out';
 import type { WeaponId } from '../../weapons/defs';
 import type { LabContext } from '../types';
 
@@ -172,7 +173,27 @@ export default function setup(ctx: LabContext) {
         }
         return { min: [+lo.x.toFixed(3), +lo.y.toFixed(3)], max: [+hi.x.toFixed(3), +hi.y.toFixed(3)] };
       },
-      hide: (hidden: unknown) => view.setHidden(Boolean(hidden))
+      hide: (hidden: unknown) => view.setHidden(Boolean(hidden)),
+      /** Which drawn gun has any part inside the frame (grown `margin` times), and whether the arms do. */
+      inFrame: (margin: unknown) => {
+        const m = Number(margin ?? 1);
+        view.scene.updateMatrixWorld(true);
+        let gun: string | null = null;
+        let held: string | null = null;
+        for (const o of view.scene.children) {
+          if (!o.visible || !o.name.startsWith('weapon:')) continue;
+          held = o.name.slice(7);
+          if (!outOfFrame(o, view.camera, m, true)) gun = held;
+        }
+        const p = new THREE.Vector3();
+        const hands = ['hand:left', 'hand:right', 'forearm:left', 'forearm:right'].filter((n) => {
+          const o = view.scene.getObjectByName(n);
+          if (!o || !o.parent?.visible) return false;
+          o.getWorldPosition(p).project(view.camera);
+          return p.z < 1 && Math.abs(p.x) < m && Math.abs(p.y) < m;
+        });
+        return { gun, hands, held };
+      }
     }
   };
 }

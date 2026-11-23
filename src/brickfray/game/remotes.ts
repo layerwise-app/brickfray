@@ -32,7 +32,9 @@ export interface Remote {
   hurtDir: { x: number; z: number };
   hurtAmount: number;
   position: THREE.Vector3;
+  /** The way the figure stands, and the aim as drawn; both unwrapped, so a flick of half a turn keeps the direction it was made in. */
   yaw: number;
+  aim: number;
   visible: boolean;
   knock: THREE.Vector3;
   /** Direction of the last hit's shove. */
@@ -72,8 +74,10 @@ const anim: AnimState = {
 const between = (a: number, b: number, k: number, step: number) => (a >= 0 && b >= a ? a + (b - a) * k : step);
 
 const lerpAngle = (a: number, b: number, t: number) => a + Math.atan2(Math.sin(b - a), Math.cos(b - a)) * t;
-/** The fastest a figure turns (rad/s): a flick of the aim shows as a quick turn, not a snap. */
+/** The fastest a figure's legs turn (rad/s): a flick of the aim shows as a quick turn of the body, not a snap. */
 const TURN_RATE = 18;
+/** The most the body trails the aim in a flick: the chest, head and gun turn the rest, so the gun is always where they aim. */
+const MAX_TRAIL = 0.7;
 
 /**
  * Other players, drawn 100 ms in the past between two snapshots (brief
@@ -116,7 +120,7 @@ export class Remotes {
         if (r) this.remove(id);
         const { rig, guns, feet } = this.figures.take(entry.character);
         if (rig instanceof Rig) rig.animator.vary(id);
-        r = { entry, rig, guns, weapon: null, armed: false, state: null, alive: false, shots: -1, sinceShot: 9, sinceHurt: 9, hurtDir: { x: 0, z: 0 }, hurtAmount: 30, position: new THREE.Vector3(), yaw: 0, visible: false, knock: new THREE.Vector3(), shove: new THREE.Vector3(), hitOffset: new THREE.Vector3(), markedAt: -1, feet };
+        r = { entry, rig, guns, weapon: null, armed: false, state: null, alive: false, shots: -1, sinceShot: 9, sinceHurt: 9, hurtDir: { x: 0, z: 0 }, hurtAmount: 30, position: new THREE.Vector3(), yaw: 0, aim: 0, visible: false, knock: new THREE.Vector3(), shove: new THREE.Vector3(), hitOffset: new THREE.Vector3(), markedAt: -1, feet };
         this.map.set(id, r);
       }
       r.entry = entry;
@@ -180,8 +184,11 @@ export class Remotes {
       r.alive = s.alive;
       r.position.set(a.x + (b.x - a.x) * k + a.vx * extra, a.y + (b.y - a.y) * k, a.z + (b.z - a.z) * k + a.vz * extra);
       const aim = lerpAngle(a.yaw, b.yaw, k);
-      const turn = Math.atan2(Math.sin(aim - r.yaw), Math.cos(aim - r.yaw));
-      r.yaw = respawn || !seen ? aim : r.yaw + THREE.MathUtils.clamp(turn, -TURN_RATE * dt, TURN_RATE * dt);
+      if (respawn || !seen || Math.abs(r.aim) > 1e3) r.aim = r.yaw = aim;
+      else r.aim += Math.atan2(Math.sin(aim - r.aim), Math.cos(aim - r.aim));
+      const body = r.yaw + THREE.MathUtils.clamp(r.aim - r.yaw, -TURN_RATE * dt, TURN_RATE * dt);
+      r.yaw = r.aim - THREE.MathUtils.clamp(r.aim - body, -MAX_TRAIL, MAX_TRAIL);
+      anim.aimYaw = r.aim - r.yaw;
       const pitch = a.pitch + (b.pitch - a.pitch) * k;
       r.visible = s.alive;
       r.rig.root.visible = s.alive;
