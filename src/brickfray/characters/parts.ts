@@ -222,14 +222,11 @@ export class PartSet {
 }
 
 const nm = new THREE.Matrix3();
-const pv = new THREE.Vector3();
 
+/** Pieces gathered into one geometry, written straight into typed arrays once all of them are in. */
 class Batch {
-  private pos: number[] = [];
-  private nrm: number[] = [];
-  private col: number[] = [];
-  private bone: number[] = [];
-  private surf: number[] = [];
+  private entries: { piece: Piece; matrix: THREE.Matrix4 }[] = [];
+  private vertices = 0;
 
   constructor(
     private withSurface: boolean,
@@ -237,43 +234,65 @@ class Batch {
   ) {}
 
   get count() {
-    return this.pos.length / 3;
+    return this.vertices;
   }
 
   push(p: Piece, matrix: THREE.Matrix4) {
-    const g = p.geometry;
-    const pa = g.getAttribute('position') as THREE.BufferAttribute;
-    const na = g.getAttribute('normal') as THREE.BufferAttribute;
-    nm.getNormalMatrix(matrix);
-    const look = p.look === 'glass' ? LOOKS.gloss : LOOKS[p.look];
-    for (let i = 0; i < pa.count; i++) {
-      pv.fromBufferAttribute(pa, i).applyMatrix4(matrix);
-      this.pos.push(pv.x, pv.y, pv.z);
-      pv.fromBufferAttribute(na, i).applyMatrix3(nm).normalize();
-      this.nrm.push(pv.x, pv.y, pv.z);
-      this.col.push(p.color.r, p.color.g, p.color.b);
-      this.bone.push(p.bone);
-      if (this.withSurface) this.surf.push(...look);
-    }
+    this.entries.push({ piece: p, matrix: matrix.clone() });
+    this.vertices += p.geometry.getAttribute('position').count;
   }
 
   build() {
-    const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.Float32BufferAttribute(this.pos, 3));
-    g.setAttribute('normal', new THREE.Float32BufferAttribute(this.nrm, 3));
-    g.setAttribute('color', new THREE.Float32BufferAttribute(this.col, 3));
-    if (this.withSurface) g.setAttribute('surface', new THREE.Float32BufferAttribute(this.surf, 4));
-    if (!this.piece) {
-      const n = this.count;
-      const idx = new Uint16Array(n * 4);
-      const w = new Float32Array(n * 4);
-      for (let i = 0; i < n; i++) {
-        idx[i * 4] = this.bone[i]!;
-        w[i * 4] = 1;
+    const n = this.vertices;
+    const pos = new Float32Array(n * 3);
+    const nrm = new Float32Array(n * 3);
+    const col = new Float32Array(n * 3);
+    const surf = this.withSurface ? new Float32Array(n * 4) : null;
+    const bone = this.piece ? null : new Uint16Array(n * 4);
+    let v = 0;
+    for (const { piece: p, matrix } of this.entries) {
+      const pa = (p.geometry.getAttribute('position') as THREE.BufferAttribute).array;
+      const na = (p.geometry.getAttribute('normal') as THREE.BufferAttribute).array;
+      const m = matrix.elements;
+      const k = nm.getNormalMatrix(matrix).elements;
+      const look = p.look === 'glass' ? LOOKS.gloss : LOOKS[p.look];
+      const { r, g, b } = p.color;
+      for (let i = 0; i < pa.length; i += 3, v++) {
+        const x = pa[i]!;
+        const y = pa[i + 1]!;
+        const z = pa[i + 2]!;
+        const w = 1 / (m[3]! * x + m[7]! * y + m[11]! * z + m[15]!);
+        pos[v * 3] = (m[0]! * x + m[4]! * y + m[8]! * z + m[12]!) * w;
+        pos[v * 3 + 1] = (m[1]! * x + m[5]! * y + m[9]! * z + m[13]!) * w;
+        pos[v * 3 + 2] = (m[2]! * x + m[6]! * y + m[10]! * z + m[14]!) * w;
+        const nx = na[i]!;
+        const ny = na[i + 1]!;
+        const nz = na[i + 2]!;
+        const tx = k[0]! * nx + k[3]! * ny + k[6]! * nz;
+        const ty = k[1]! * nx + k[4]! * ny + k[7]! * nz;
+        const tz = k[2]! * nx + k[5]! * ny + k[8]! * nz;
+        const s = 1 / (Math.sqrt(tx * tx + ty * ty + tz * tz) || 1);
+        nrm[v * 3] = tx * s;
+        nrm[v * 3 + 1] = ty * s;
+        nrm[v * 3 + 2] = tz * s;
+        col[v * 3] = r;
+        col[v * 3 + 1] = g;
+        col[v * 3 + 2] = b;
+        if (surf) surf.set(look, v * 4);
+        if (bone) bone[v * 4] = p.bone;
       }
-      g.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(idx, 4));
-      g.setAttribute('skinWeight', new THREE.Float32BufferAttribute(w, 4));
     }
-    return g;
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    geometry.setAttribute('normal', new THREE.BufferAttribute(nrm, 3));
+    geometry.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    if (surf) geometry.setAttribute('surface', new THREE.BufferAttribute(surf, 4));
+    if (bone) {
+      const weight = new Float32Array(n * 4);
+      for (let i = 0; i < n; i++) weight[i * 4] = 1;
+      geometry.setAttribute('skinIndex', new THREE.BufferAttribute(bone, 4));
+      geometry.setAttribute('skinWeight', new THREE.BufferAttribute(weight, 4));
+    }
+    return geometry;
   }
 }

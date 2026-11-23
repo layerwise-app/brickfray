@@ -1,8 +1,9 @@
-import { CHARACTER_IDS, ROSTER } from '../../characters/roster';
+import { CHARACTER_IDS } from '../../characters/roster';
 import type { CharacterId } from '../../characters/types';
 import type { Avatar as AvatarData } from '../../../lib/board/contract';
 import type { BotKind } from '../../characters/types';
 import { useApp } from '../App';
+import { heroTile } from '../hero-tile';
 import { BotFace } from '../hud/SoloHud';
 import './avatar.css';
 
@@ -31,9 +32,8 @@ export function Avatar({ avatar, character, size = 40, className = '' }: { avata
     );
   }
   const id = hero(avatar?.hero ?? character);
-  const info = ROSTER[id];
   return (
-    <span className={`bf-av bf-av-hero ${className}`} style={{ ...style, background: `linear-gradient(160deg, ${info.primary} 0 calc(66% - 0.7px), ${info.secondary} calc(66% + 0.7px) 100%)` }}>
+    <span className={`bf-av bf-av-hero ${className}`} style={{ ...style, background: heroTile(id) }}>
       {app.portraits[id] && <img src={app.portraits[id]} alt='' draggable={false} />}
     </span>
   );

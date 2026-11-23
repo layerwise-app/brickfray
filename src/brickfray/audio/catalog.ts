@@ -73,22 +73,31 @@ export const CATEGORIES: Record<Category, CategoryMix> = {
   stinger: { loudness: -19, priority: 10, bus: 'ui', reverb: 0, falloff: 'normal', jitter: 0, burst: 1 }
 };
 
+/** Carry past the inverse law: from `from` m a sound gains up to `gain` dB (even steps in log distance) by `peak` m, eased back to nothing by `to` m. */
+export interface Carry {
+  from: number;
+  peak: number;
+  to: number;
+  gain: number;
+}
+
 /**
- * Inverse distance model parameters. `loud`: a gunshot at 60 m is quiet but clearly audible; `carry`: the sniper,
- * about 1 dB over `loud` at 30 m and 2 dB at 60 m. `boom`: an explosion
- * at 3 m sits 6–8 dB above the player's own rifle. `step`: flatter than the physical law so another player is heard
- * coming: at 3 m their step is as loud as the player's own, at 15 m still clear of every map's bed, yet ~9 dB under
- * their rifle at any distance. `handling`: another player's reload carries a little further than their steps.
- * `impact`: a bullet strike still reads at 15-20 m over the gunfire around it. `quiet`: debris, heard within ~10 m.
- * `far`: scenery heard from tens of metres away.
+ * Inverse distance model parameters (the panner's), and a carry on top for footsteps. `loud`: a gunshot at 60 m is
+ * quiet but clearly audible; `carry`: the sniper, about 1 dB over `loud` at 30 m and 2 dB at 60 m. `boom`: an
+ * explosion at 3 m sits 6–8 dB above the player's own rifle. `step`: flatter than the physical law so another player
+ * is heard coming: at 3 m their step is as loud as the player's own; its carry leaves steps within 8 m as they are,
+ * falls about 2 dB per doubling of distance from there so a step at 25 m stays over every map's bed in a quiet
+ * moment, then fades it under the bed by 45 m. `handling`: another player's reload carries a little further than
+ * their steps. `impact`: a bullet strike still reads at 15-20 m over the gunfire around it. `quiet`: debris, heard
+ * within ~10 m. `far`: scenery heard from tens of metres away.
  */
-export const FALLOFF: Record<Falloff, { ref: number; rolloff: number }> = {
+export const FALLOFF: Record<Falloff, { ref: number; rolloff: number; carry?: Carry }> = {
   loud: { ref: 2, rolloff: 0.45 },
   carry: { ref: 2, rolloff: 0.35 },
   boom: { ref: 2.5, rolloff: 0.35 },
   normal: { ref: 2, rolloff: 1 },
   impact: { ref: 3, rolloff: 0.8 },
-  step: { ref: 1.3, rolloff: 0.8 },
+  step: { ref: 1.55, rolloff: 0.8, carry: { from: 8, peak: 25, to: 45, gain: 6.2 } },
   handling: { ref: 2.5, rolloff: 1 },
   quiet: { ref: 2, rolloff: 1.1 },
   far: { ref: 30, rolloff: 1 }
@@ -96,7 +105,22 @@ export const FALLOFF: Record<Falloff, { ref: number; rolloff: number }> = {
 
 export const DEFAULT_VARIANTS = 4;
 
+/** How much of its carry (0…1) a sound with this falloff has at `distance` m. */
+export function carryAt(falloff: Falloff, distance: number): number {
+  const c = FALLOFF[falloff].carry;
+  if (!c || distance <= c.from || distance >= c.to) return 0;
+  if (distance <= c.peak) return Math.log(distance / c.from) / Math.log(c.peak / c.from);
+  const t = (distance - c.peak) / (c.to - c.peak);
+  return 1 - t * t * (3 - 2 * t);
+}
+
+/** The carry's own gain at `distance` m (the panner applies the inverse law). */
+export function carryGain(falloff: Falloff, distance: number): number {
+  return 10 ** (((FALLOFF[falloff].carry?.gain ?? 0) * carryAt(falloff, distance)) / 20);
+}
+
+/** Distance gain: the inverse law and the carry. */
 export function inverseGain(falloff: Falloff, distance: number): number {
   const { ref, rolloff } = FALLOFF[falloff];
-  return ref / (ref + rolloff * (Math.max(distance, ref) - ref));
+  return (ref / (ref + rolloff * (Math.max(distance, ref) - ref))) * carryGain(falloff, distance);
 }

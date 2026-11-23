@@ -2,7 +2,8 @@ import type { SampleMap } from './samples';
 
 /**
  * Hit and kill feedback, player state, interface and match stingers, scenery one-shots. Sources: public/audio/CREDITS-ui.md and CREDITS-ambience.md.
- * A musical cue is one take: its "variants" were the same performance (review 7, cross-correlation 0.98-1.0).
+ * A musical cue is one take: its "variants" were the same performance (review 7, cross-correlation 0.98-1.0; review 10:
+ * wave clear and upgrade taken, 0.60-0.77).
  */
 export const FEEDBACK_SAMPLES: SampleMap = {
   hitmarker: ['ui/hit-1.mp3', 'ui/hit-2.mp3', 'ui/hit-3.mp3', 'ui/hit-4.mp3', 'ui/hit-5.mp3'],
@@ -18,9 +19,9 @@ export const FEEDBACK_SAMPLES: SampleMap = {
   matchStart: ['ui/match-start-1.mp3', 'ui/match-start-2.mp3', 'ui/match-start-3.mp3'],
   waveStart: ['ui/wave-start-1.mp3'],
   bossWave: ['ui/boss-wave-1.mp3'],
-  waveClear: ['ui/wave-clear-1.mp3', 'ui/wave-clear-2.mp3'],
+  waveClear: ['ui/wave-clear-1.mp3'],
   upgradeOffer: ['ui/upgrade-offer-1.mp3'],
-  upgradeTaken: ['ui/upgrade-taken-1.mp3', 'ui/upgrade-taken-2.mp3', 'ui/upgrade-taken-3.mp3'],
+  upgradeTaken: ['ui/upgrade-taken-1.mp3'],
   grenadeReady: ['ui/grenade-ready-1.mp3', 'ui/grenade-ready-2.mp3', 'ui/grenade-ready-3.mp3'],
   victory: ['ui/victory-1.mp3', 'ui/victory-2.mp3'],
   defeat: ['ui/defeat-1.mp3'],

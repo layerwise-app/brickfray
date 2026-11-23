@@ -21,12 +21,13 @@ export { loadHeroAssets } from './hero-assets';
 export type { Stance } from './stance';
 
 const cache = new Map<string, BakedCharacter>();
+const heroKey = (id: CharacterId, hands: Hands) => `${id}:hero:${hands.L}:${hands.R}`;
 
 /** Builds a rigged, animated character; geometry is shared per (id, quality). */
 export function createCharacter(id: CharacterId | BotKind, kit: Kit, hero?: { hands: Hands }): CharacterRig {
   const design = DESIGNS[id];
   const rest = restOffsets(design.rest);
-  const key = hero ? `${id}:hero:${hero.hands.L}:${hero.hands.R}` : `${id}:${kit.profile.level}`;
+  const key = hero ? heroKey(id as CharacterId, hero.hands) : `${id}:${kit.profile.level}`;
   let baked = cache.get(key);
   if (!baked) {
     const parts = new PartSet(kit.profile, hero ? { hero: true, hands: hero.hands } : { lean: id in ROSTER });
@@ -38,6 +39,22 @@ export function createCharacter(id: CharacterId | BotKind, kit: Kit, hero?: { ha
   }
   const hands = hero ? hero.hands : kit.profile.detail === 2 ? DEFAULT_HANDS : null;
   return new Rig({ id, baked, hands, rest, style: STYLES[id], scale: design.scale ?? 1, grip: design.grip ?? 1, tool: LOADOUTS[id].melee }, kit);
+}
+
+/** A fingerprint of a hero's showroom model as built (its vertices' positions, colours and surfaces), or null before it is built. */
+export function heroFingerprint(id: CharacterId, hands: Hands) {
+  const baked = cache.get(heroKey(id, hands));
+  if (!baked) return null;
+  let h = 0x811c9dc5;
+  for (const geometry of baked.glass ? [baked.main, baked.glass] : [baked.main]) {
+    for (const name of ['position', 'color', 'surface']) {
+      const array = geometry.getAttribute(name)?.array as Float32Array | undefined;
+      if (!array) continue;
+      const words = new Uint32Array(array.buffer, array.byteOffset, array.length);
+      for (let i = 0; i < words.length; i++) h = Math.imul(h ^ words[i]!, 0x01000193);
+    }
+  }
+  return (h >>> 0).toString(36);
 }
 
 /** Frees every cached character geometry (after a quality change or when leaving the game). */

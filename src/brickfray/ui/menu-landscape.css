@@ -94,11 +94,30 @@
     content: '';
     pointer-events: none;
   }
+  /* The tools go under the logo and the player keeps the corner: nothing sits over the figure, which stands up to the top margin. */
+  .bf-menu-header {
+    display: grid;
+    grid-template-areas: 'logo me' 'tools .';
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 6px 12px;
+  }
+  .bf-menu-logo {
+    grid-area: logo;
+  }
   .bf-menu-corner {
-    gap: 12px;
+    display: contents;
+  }
+  .bf-btn.bf-menu-me {
+    grid-area: me;
+    justify-self: end;
   }
   .bf-menu-tools {
+    grid-area: tools;
     gap: 6px;
+  }
+  .bf-menu-tools .bf-panel {
+    right: auto;
+    left: 0;
   }
   .bf-menu-sheet {
     gap: 12px;

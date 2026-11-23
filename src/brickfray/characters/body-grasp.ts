@@ -36,6 +36,8 @@ export interface ForeEnd {
   fan?: number;
   /** Where the thumb goes: over the top edge, or along the near face toward the muzzle (the default under a tube). */
   thumb?: 'over' | 'along';
+  /** How far a thumb along the near face curls its tip in against it (radians). */
+  thumbTip?: number;
 }
 
 /**

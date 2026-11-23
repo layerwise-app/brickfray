@@ -2,7 +2,7 @@ import type * as THREE from 'three';
 import type { MapId } from '../world/types';
 import { Ambience } from './ambience';
 import { Announcer } from './announcer';
-import { CATEGORIES, inverseGain, type Category } from './catalog';
+import { CATEGORIES, carryGain, inverseGain, type Category } from './catalog';
 import { applyMix, busInput, createMixer, outputPeak, setRoom, type Mixer } from './mixer';
 import { MATCH_TRACKS } from './music';
 import { MusicPlayer } from './music-player';
@@ -12,6 +12,7 @@ import { renderBank, yieldToMain } from './render';
 import { ROOMS } from './rooms';
 import { SOUNDS } from './sounds';
 import { loadSpace, neutralSpace, roomAt, roomSpace } from './space';
+import { takeRate } from './takes';
 import type { AudioEngine, AudioMix, HeldSound, MusicTrack, PlayOptions, SoundId } from './types';
 import { VariantPicker } from './variants';
 import { VoicePool } from './voices';
@@ -160,9 +161,10 @@ export class WebAudioEngine implements AudioEngine {
     if (fade <= 0) return null;
     const now = ctx.currentTime;
     const start = now + travel + Math.max(options.delay ?? 0, 0);
-    const buffer = buffers[options.variant === undefined ? this.variants.pick(sound, buffers.length) : Math.min(options.variant, buffers.length - 1)]!;
+    const take = options.variant === undefined ? this.variants.pick(sound, buffers.length) : Math.min(options.variant, buffers.length - 1);
+    const buffer = buffers[take]!;
     if (offset >= buffer.duration) return null;
-    const rate = (options.rate ?? 1) * (1 + (Math.random() * 2 - 1) * cat.jitter);
+    const rate = (options.rate ?? 1) * takeRate(sound, take) * (1 + (Math.random() * 2 - 1) * cat.jitter);
     const level = 10 ** (((Math.random() * 2 - 1) * (cat.levelJitter ?? 0)) / 20);
     const key = options.source === undefined ? sound : `${sound}#${options.source}`;
     // A fading voice yields to a full one up to two priorities below it.
@@ -181,7 +183,7 @@ export class WebAudioEngine implements AudioEngine {
       source.loopEnd = buffer.duration - HELD_MARGIN;
     }
     const amp = ctx.createGain();
-    amp.gain.value = volume * fade * admission.gain * level;
+    amp.gain.value = volume * fade * admission.gain * level * (pos ? carryGain(falloff, distance) : 1);
     source.connect(amp);
     const nodes: AudioNode[] = [source, amp];
     let out: AudioNode = amp;
@@ -192,11 +194,11 @@ export class WebAudioEngine implements AudioEngine {
       out = placed[placed.length - 1]!;
     }
     const bus = pos ? 'effects' : cat.bus;
-    out.connect(busInput(graph, bus));
+    out.connect(pos ? graph.placed : busInput(graph, bus));
     if (cat.reverb > 0 && bus !== 'ui') {
       const send = ctx.createGain();
       send.gain.value = cat.reverb * Math.min(1 + distance / 25, 1.8);
-      out.connect(send).connect(graph.reverb);
+      out.connect(send).connect(pos ? graph.placedSend : graph.reverb);
       nodes.push(send);
     }
     if (!pos && cat.near) {

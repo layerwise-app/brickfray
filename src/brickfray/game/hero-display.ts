@@ -29,6 +29,15 @@ const CLOTH: Partial<Record<CharacterId, Partial<Record<'back' | 'hip', ClothSwi
 const CLOTH_BONES = { back: BONE.dangleBack, hip: BONE.dangleHip } as const;
 const clothLengths = new WeakMap<THREE.BufferGeometry, Map<number, number>>();
 
+/** A hero's figure as the stage shows it: the model in its stance with its weapons and lids, and its measured outline. */
+interface Figure {
+  rig: CharacterRig;
+  gun: WeaponModel;
+  melee: WeaponModel | null;
+  lids: Eyelids | null;
+  outline: Float32Array;
+}
+
 /** The stance each hero model is baked for; portraits ask for the same hands so they share the geometry. */
 export function heroHands(id: CharacterId) {
   const { arms } = STANCES[id];
@@ -58,18 +67,16 @@ export class HeroDisplay {
    * The posed figure's extent with everything it holds and wears: corners of the boxes around its rigid parts,
    * eight points each in the figure's frame, gathered over a couple of seconds of its idle.
    */
-  outline = new Float32Array(0);
-  private rig: CharacterRig | null = null;
+  outline: Float32Array = new Float32Array(0);
   /**
-   * The figure shown before this one, off stage. Its material goes one pick late: disposed while it is the only user of
-   * its shader program, the program is thrown away and the next figure links it again, a stalled frame on every pick.
+   * Every figure built so far, kept off stage once shown or warmed: showing one again only swaps it in, and its
+   * materials keep their shader programs linked (a figure disposed while the only user of one throws it away).
    */
-  private retired: CharacterRig | null = null;
+  private readonly figures = new Map<CharacterId, Figure>();
+  private rig: CharacterRig | null = null;
   private life: HeroLife | null = null;
   private lids: Eyelids | null = null;
   private cloth: { uniforms: ClothSway; swings: [number, ClothSwing][] } | null = null;
-  private gun: WeaponModel | null = null;
-  private melee: WeaponModel | null = null;
   private flash = 0;
   private frame = 0;
 
@@ -111,8 +118,14 @@ export class HeroDisplay {
     this.group.add(this.figure, this.blob, this.contact.mesh, this.contact.camera);
   }
 
-  /** A throwaway build of `id`'s figure, weapons and lids as setCharacter makes them: it fills the shared caches ahead of a pick. */
-  ghost(id: CharacterId) {
+  /** `id`'s figure off stage, built the first time it is asked for: a warm-up builds it ahead of the pick that shows it. */
+  prepare(id: CharacterId): THREE.Object3D {
+    return this.build(id).rig.root;
+  }
+
+  private build(id: CharacterId): Figure {
+    const known = this.figures.get(id);
+    if (known) return known;
     const stance = STANCES[id];
     const rig = createCharacter(id, this.kit, { hands: heroHands(id) });
     rig.setStance(stance);
@@ -120,45 +133,28 @@ export class HeroDisplay {
     rig.setWeapon(gun.root, gun.supportGrip);
     const melee = stance.melee ? createWeaponModel(LOADOUTS[id].melee, this.kit, 'first') : null;
     rig.setMelee(melee?.root ?? null);
-    measure(rig, rig.root);
-    const lids = rig instanceof Rig ? Eyelids.fit(rig) : null;
-    return {
-      root: rig.root,
-      dispose() {
-        lids?.dispose();
-        rig.dispose();
-        gun.dispose();
-        melee?.dispose();
-      }
-    };
+    rig.root.traverse((o) => o.layers.enable(SHADOW_LAYER));
+    // Measured in a frame like the figure's, which turns and scales the whole of it.
+    const frame = new THREE.Group().add(rig.root);
+    const outline = measure(rig, frame);
+    frame.remove(rig.root);
+    const figure = { rig, gun, melee, lids: rig instanceof Rig ? Eyelids.fit(rig) : null, outline };
+    this.figures.set(id, figure);
+    return figure;
   }
 
   setCharacter(id: CharacterId) {
-    this.retired?.dispose();
-    this.retired = this.rig;
     this.rig?.root.removeFromParent();
-    const stance = STANCES[id];
-    this.rig = createCharacter(id, this.kit, { hands: heroHands(id) });
-    this.rig.setStance(stance);
-    const primary = LOADOUTS[id].primary;
-    if (this.gun?.id !== primary) {
-      this.gun?.dispose();
-      this.gun = createWeaponModel(primary, this.kit, 'first');
-    }
-    this.rig.setWeapon(this.gun.root, this.gun.supportGrip);
-    this.melee?.dispose();
-    this.melee = stance.melee ? createWeaponModel(LOADOUTS[id].melee, this.kit, 'first') : null;
-    this.rig.setMelee(this.melee?.root ?? null);
-    this.figure.add(this.rig.root);
-    this.figure.traverse((o) => o.layers.enable(SHADOW_LAYER));
-    this.outline = measure(this.rig, this.figure);
+    const figure = this.build(id);
+    this.rig = figure.rig;
+    this.lids = figure.lids;
+    this.outline = figure.outline;
+    figure.rig.root.position.setScalar(0);
+    this.figure.add(figure.rig.root);
     this.life = new HeroLife(id);
-    this.lids?.dispose();
-    this.lids = null;
     if (this.rig instanceof Rig) {
       this.rig.animator.vary(TEMPO[id]);
       this.rig.animator.life = this.life;
-      this.lids = Eyelids.fit(this.rig);
       this.cloth = swingCloth(this.rig, CLOTH[id]);
     } else this.cloth = null;
     this.flash = 1;
@@ -208,11 +204,13 @@ export class HeroDisplay {
   }
 
   dispose() {
-    this.lids?.dispose();
-    this.retired?.dispose();
-    this.rig?.dispose();
-    this.gun?.dispose();
-    this.melee?.dispose();
+    for (const { rig, gun, melee, lids } of this.figures.values()) {
+      lids?.dispose();
+      rig.dispose();
+      gun.dispose();
+      melee?.dispose();
+    }
+    this.figures.clear();
     this.blob.geometry.dispose();
     this.blob.material.map?.dispose();
     this.blob.material.dispose();

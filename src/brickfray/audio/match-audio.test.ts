@@ -90,24 +90,25 @@ describe('MatchAudio', () => {
     const { sound, played, run } = setup();
     let clock = 0;
     const at: [SoundId, number][] = [];
-    const audio = played;
+    // The scenery's first spot sound falls at a random 4-10 s, inside this test's 4.3 s when the draw is low.
+    const audio = () => played.filter((p) => !p.id.startsWith('spot:'));
     sound.action({ type: 'reload', empty: false, duration: 1.9 }, 'ar');
     for (; clock < 2; clock += 1 / 60) {
-      const before = audio.length;
+      const before = audio().length;
       run(1 / 60);
-      for (const p of audio.slice(before)) at.push([p.id, clock + 1 / 60 + (p.options?.delay ?? 0)]);
+      for (const p of audio().slice(before)) at.push([p.id, clock + 1 / 60 + (p.options?.delay ?? 0)]);
     }
     expect(at.map(([id]) => id)).toEqual(['foley:gripOff', 'foley:pouch', 'foley:magScrape', 'foley:regrip']);
     const when = Object.fromEntries(at);
     expect(when['foley:pouch']! + PEAK_AT['foley:pouch']!).toBeCloseTo(0.77, 1);
     expect(when['foley:magScrape']! + PEAK_AT['foley:magScrape']!).toBeCloseTo(1.2, 1);
     expect(when['foley:regrip']!).toBeCloseTo(1.66, 1);
-    audio.length = 0;
+    played.length = 0;
     sound.action({ type: 'reload', empty: false, duration: 1.9 }, 'ar');
     run(0.3);
     sound.action({ type: 'switch', to: 'pistol', holster: 0.3, draw: 0.3 }, 'ar');
     run(2);
-    expect(audio.map((p) => p.id)).toEqual(['foley:gripOff']);
+    expect(audio().map((p) => p.id)).toEqual(['foley:gripOff']);
   });
 
   it('counts down the last three seconds of warmup a semitone higher each second, then plays the start and the outcome once', () => {

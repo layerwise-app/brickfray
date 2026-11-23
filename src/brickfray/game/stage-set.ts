@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import type { CharacterId } from '../characters/types';
 import { roundedCylinder } from '../engine/geometry';
 import { StageDeck, TILE_HEIGHT } from './stage-deck';
-import { StageProps } from './stage-props';
+import { StageProps, type Column } from './stage-props';
 
 /** The deck the figure stands on, and the foot under it that carries the light ring. */
 export const STAND_RADIUS = 0.62;
@@ -233,9 +233,10 @@ export class StageSet {
 
   /**
    * Follows the lens; `pulse` is the reveal's flash, 1 fading to 0, `left` and `right` where the screen's edges fall
-   * in meters across the stand, and `turn` the figure's, which the stand's top turns with.
+   * in meters across the stand, `turn` the figure's, which the stand's top turns with, and `columns` the menu's
+   * columns left and right of the figure, which the far builds keep clear of.
    */
-  update(camera: THREE.PerspectiveCamera, time: number, pulse: number, left: number, right: number, turn: number) {
+  update(camera: THREE.PerspectiveCamera, time: number, pulse: number, left: number, right: number, turn: number, columns: (Column | null)[] = []) {
     this.deck.top.rotation.y = turn;
     const u = this.wall.material.uniforms;
     const lit = pulse ** 2;
@@ -250,7 +251,7 @@ export class StageSet {
     const distance = Math.hypot(camera.position.x, camera.position.z);
     const stretch = distance / DESIGN_DISTANCE;
     this.props.group.scale.z = stretch;
-    this.props.fit(left, right, camera.position, stretch);
+    this.props.fit(left, right, camera.position, stretch, camera, columns);
     this.fog.near = distance + 4 * stretch;
     this.fog.far = distance + 75 * stretch;
   }

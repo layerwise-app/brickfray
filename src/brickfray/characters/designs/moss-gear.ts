@@ -150,7 +150,9 @@ export function pouches(b: PartSet) {
 
 /** Rolled blanket strapped across the shoulders, over the cloak's top edge. */
 export function bedroll(b: PartSet) {
-  const at: V3 = [0, 0.165, 0.17];
+  // Out on the mantle and the cloak, clear of them as they swing. The showroom's cloak is draped around the roll
+  // where it was baked, closer in.
+  const at: V3 = [0, 0.165, b.hero ? 0.17 : 0.21];
   const across: V3 = [0, 0, Math.PI / 2];
   const seg = pick(b, 10, 12, 22);
   b.cyl('chest', 0.052, 0.052, 0.4, C.tan, { at, rot: across, look: 'cloth', seg });

@@ -16,13 +16,14 @@ export interface AppState {
   error: AppError;
   lobbies: PublicLobby[] | null;
   audioReady: boolean;
-  /** Character picker images (data URLs), rendered shortly after start. */
-  /** Picker head shots, filled in as each one is rendered. */
+  /** Picker head shots (image URLs), filled in as each one is ready shortly after start. */
   portraits: Partial<Record<CharacterId, string>>;
+  /** Wider head-and-shoulders shots for the results podium, ready with the portraits. */
+  busts: Partial<Record<CharacterId, string>>;
 }
 
 export class AppStore {
-  state: AppState = { screen: 'menu', busy: null, lobby: null, isHost: false, paused: false, error: null, lobbies: null, audioReady: false, portraits: {} };
+  state: AppState = { screen: 'menu', busy: null, lobby: null, isHost: false, paused: false, error: null, lobbies: null, audioReady: false, portraits: {}, busts: {} };
   private listeners = new Set<() => void>();
 
   subscribe = (fn: () => void) => {

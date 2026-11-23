@@ -2,7 +2,7 @@
 
 /* Podium: gold, silver and bronze bricks on a dark baseplate, a figure on each; a slate brick for a lower place. */
 .bf-pod {
-  --fig: calc(150 * var(--u));
+  --fig: calc(170 * var(--u));
   --block: calc(168 * var(--u));
   --pk: 1;
   position: relative;

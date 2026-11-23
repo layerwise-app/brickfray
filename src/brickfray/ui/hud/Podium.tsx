@@ -67,11 +67,11 @@ function PodiumSpot({ spot, teams, floor }: { spot: Spot; teams: boolean; floor?
   );
 }
 
-/** The character's head-and-shoulders shot from the menu, or its colours until the shot is drawn. */
+/** The character's bust, or the menu's head-and-shoulders shot until the bust is drawn, or its colours until either is. */
 function Figure({ row }: { row: ScoreRow }) {
   const app = useApp();
   const id = CHARACTER_IDS.includes(row.character as CharacterId) ? (row.character as CharacterId) : null;
-  const shot = id ? app.portraits[id] : undefined;
+  const shot = id ? (app.busts[id] ?? app.portraits[id]) : undefined;
   if (shot) return <img src={shot} alt='' draggable={false} />;
   const info = ROSTER[id ?? 'rivet'];
   return <span className='bf-pod-blank' style={{ background: `linear-gradient(160deg, ${info.primary} 0 55%, ${info.secondary} 55%)` }} />;

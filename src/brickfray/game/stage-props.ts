@@ -226,11 +226,28 @@ const NARROW: Record<CharacterId, { piece: number; inset: number }> = {
   nova: { piece: 1, inset: 0.3 }
 };
 
+/**
+ * Where the menu's column on one side of the figure stands, in the lens's clip space (y −1 at the bottom, 1 at the
+ * top): a build behind it is lifted until its foot clears the column's top, as far as the header over it allows.
+ */
+export interface Column {
+  left: number;
+  right: number;
+  top: number;
+  ceiling: number;
+}
+
+/** Clip-space room kept between a lifted build and the column under it or the header over it. */
+const CLEAR = 0.03;
+
 interface Piece {
   mesh: THREE.Mesh;
   side: number;
   depth: number;
 }
+
+const near = new THREE.Vector3();
+const far = new THREE.Vector3();
 
 /** The far sets, one mesh per build, built the first time a character is shown. */
 export class StageProps {
@@ -249,6 +266,7 @@ export class StageProps {
     const group = new THREE.Group();
     const pieces = SETS[id]().map((cluster): Piece => {
       const mesh = new THREE.Mesh(mergeGeometries(cluster.parts)!, this.look.material);
+      mesh.geometry.computeBoundingBox();
       for (const part of cluster.parts) part.dispose();
       mesh.frustumCulled = false;
       group.add(mesh);
@@ -276,9 +294,10 @@ export class StageProps {
 
   /**
    * Lays the shown set out for a view from `left` to `right`, in meters across the screen at the stand, seen by a lens
-   * circling the stand at `eye` with the sets stretched `stretch` times in depth.
+   * circling the stand at `eye` with the sets stretched `stretch` times in depth; `lens` and `columns` lift a build
+   * that would stand behind one of the menu's columns.
    */
-  fit(left: number, right: number, eye: THREE.Vector3, stretch: number) {
+  fit(left: number, right: number, eye: THREE.Vector3, stretch: number, lens?: THREE.Camera, columns: (Column | null)[] = []) {
     if (!this.shown) return;
     const wide = right - left > PROPS_SPAN;
     const keep = NARROW[this.shown];
@@ -290,6 +309,7 @@ export class StageProps {
       const kept = !wide && i === keep.piece;
       piece.mesh.visible = wide || kept;
       piece.mesh.position.x = 0;
+      piece.mesh.position.y = 0;
       if (!kept) return;
       // Where on the floor that far back the build must stand to show at `at` on the screen from where the lens is now.
       const at = piece.side < 0 ? left + keep.inset : right - keep.inset;
@@ -297,6 +317,27 @@ export class StageProps {
       const x = (at * (distance + back * cos) - distance * back * sin) / (distance * cos + at * sin);
       piece.mesh.position.x = x - (piece.side * (LENS + piece.depth)) / LENS;
     });
+    if (!lens || !columns.some(Boolean)) return;
+    this.group.updateMatrixWorld(true);
+    for (const piece of this.sets.get(this.shown)!.pieces) {
+      const column = columns[piece.side < 0 ? 0 : 1];
+      if (piece.mesh.visible && column) this.lift(piece, lens, column);
+    }
+  }
+
+  /** Raises a build whose foot would show behind `column`, by what its foot is short of the column's top. */
+  private lift(piece: Piece, lens: THREE.Camera, column: Column) {
+    const box = piece.mesh.geometry.boundingBox!;
+    const at = (x: number, y: number, out: THREE.Vector3) => out.set(x + piece.mesh.position.x, y, box.max.z).applyMatrix4(this.group.matrixWorld).project(lens);
+    const x0 = at(box.min.x, box.min.y, near).x;
+    const x1 = at(box.max.x, box.min.y, far).x;
+    if (Math.max(x0, x1) < column.left || Math.min(x0, x1) > column.right) return;
+    const foot = at((box.min.x + box.max.x) / 2, box.min.y, near).y;
+    const top = at((box.min.x + box.max.x) / 2, box.max.y, far).y;
+    const short = column.top + CLEAR - foot;
+    if (short <= 0) return;
+    const rise = Math.min(short, column.ceiling - CLEAR - top);
+    if (rise > 0) piece.mesh.position.y = (rise * (box.max.y - box.min.y)) / (top - foot);
   }
 
   dispose() {

@@ -84,6 +84,6 @@ function thumbAlong(f: ForeEnd, centre: V3): Grasp['thumb'] {
     if (clear > -0.002) break;
   }
   const dir = target.sub(root).normalize();
-  return { dir: dir.toArray() as V3, toward: along.toArray() as V3, flex: [0, Math.acos(Math.min(1, dir.dot(along))), 0.12] };
+  return { dir: dir.toArray() as V3, toward: along.toArray() as V3, flex: [0, Math.acos(Math.min(1, dir.dot(along))), f.thumbTip ?? 0.12] };
 }
 

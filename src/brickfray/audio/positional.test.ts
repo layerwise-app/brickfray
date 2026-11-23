@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { FALLOFF, inverseGain } from './catalog';
 import { AUDIBLE, audibility, behind } from './positional';
 
 describe('positional', () => {
@@ -10,6 +11,19 @@ describe('positional', () => {
       const g = audibility(e);
       expect(g).toBeLessThanOrEqual(last);
       expect(last - g).toBeLessThan(0.1);
+      last = g;
+    }
+  });
+
+  it('carries footsteps further without touching near ones or letting a farther step sound louder', () => {
+    const { ref, rolloff } = FALLOFF.step;
+    const plain = (d: number) => ref / (ref + rolloff * (Math.max(d, ref) - ref));
+    for (const d of [1, 3, 5, 8, 45, 60]) expect(inverseGain('step', d)).toBeCloseTo(plain(d), 9);
+    expect(inverseGain('step', 25) / plain(25)).toBeGreaterThan(1.9);
+    let last = Infinity;
+    for (let d = 2; d <= 60; d += 0.25) {
+      const g = inverseGain('step', d);
+      expect(g).toBeLessThan(last);
       last = g;
     }
   });

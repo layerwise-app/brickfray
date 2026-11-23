@@ -37,7 +37,7 @@ export function moss(b: PartSet) {
     sleeve: C.tunic,
     glove: '#5b4630',
     gloveLook: 'cloth',
-    fore: { half: [0.017, 0.025], corner: 0.01, yaw: 0.45, roll: 0.3, over: { r: 0.0128, at: 0.023 }, seat: 0.004, sink: 0.011, arch: 3.2, fan: 0.35 },
+    fore: { half: [0.017, 0.025], corner: 0.01, yaw: 0.45, roll: 0.3, over: { r: 0.0128, at: 0.023 }, seat: 0.004, sink: 0.011, arch: 3.2, fan: 0.35, thumbTip: 0.45 },
     pants: '#3f4a35',
     boot: '#5b4630',
     bootLook: b.detail === 0 ? 'rubber' : HIDE,

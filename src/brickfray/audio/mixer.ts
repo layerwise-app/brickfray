@@ -14,6 +14,14 @@ export const LOW_HEALTH = { dip: 0.5, dull: -7, shelf: 2500 };
 const ROOM_FADE = 0.25;
 /** While the announcer speaks, the world and the player's own sounds dip by `depth` (4 dB) so the voice reads over a fight. */
 export const VOICE_DIP = { depth: 0.63, attack: 0.03, lead: 0.04, release: 0.25 };
+/**
+ * Chromium's HRTF panner colours every positioned sound: averaged over the directions within 30° of the horizon it
+ * adds 3 dB around 200 Hz and takes 2-7 dB from 1 kHz up, so the world sounded dull beside the player's own sounds.
+ * Positioned voices and their reverb sends pass this inverse of that average (what is left: 0.35 dB rms from 80 Hz
+ * to 13 kHz); the differences between directions, which carry left/right, front/back and height, stay as the panner
+ * makes them. `trim` keeps the loudness (K-weighted pink noise) the mix was balanced at.
+ */
+export const HRTF_EQ = { cut: { frequency: 209, q: 0.38, gain: -6.7 }, shelf: { frequency: 8500, gain: 3.2 }, trim: 1.97 };
 
 export type Bus = 'effects' | 'feedback' | 'marker' | 'ui';
 
@@ -28,6 +36,10 @@ export interface Mixer {
   meter: AnalyserNode;
   /** Voices on the effects bus connect here. */
   effectsIn: GainNode;
+  /** Positioned voices connect here instead: the HRTF compensation, then `effectsIn`. */
+  placed: GainNode;
+  /** Positioned voices' reverb sends: the HRTF compensation, then `reverb`. */
+  placedSend: GainNode;
   muffle: BiquadFilterNode;
   effects: GainNode;
   feedback: GainNode;
@@ -101,7 +113,25 @@ export function createMixer(ctx: BaseAudioContext): Mixer {
   music.connect(master);
   const ui = ctx.createGain();
   ui.connect(master);
-  return { master, meter, effectsIn, muffle, effects, feedback, body, dips: [worldDip, ownDip], music, ui, reverb, space, room, outdoor, indoor, near };
+  const placed = hrtfCompensation(ctx, effectsIn);
+  const placedSend = hrtfCompensation(ctx, reverb);
+  return { master, meter, effectsIn, placed, placedSend, muffle, effects, feedback, body, dips: [worldDip, ownDip], music, ui, reverb, space, room, outdoor, indoor, near };
+}
+
+function hrtfCompensation(ctx: BaseAudioContext, to: AudioNode): GainNode {
+  const input = ctx.createGain();
+  input.gain.value = 10 ** (HRTF_EQ.trim / 20);
+  const cut = ctx.createBiquadFilter();
+  cut.type = 'peaking';
+  cut.frequency.value = HRTF_EQ.cut.frequency;
+  cut.Q.value = HRTF_EQ.cut.q;
+  cut.gain.value = HRTF_EQ.cut.gain;
+  const shelf = ctx.createBiquadFilter();
+  shelf.type = 'highshelf';
+  shelf.frequency.value = HRTF_EQ.shelf.frequency;
+  shelf.gain.value = HRTF_EQ.shelf.gain;
+  input.connect(cut).connect(shelf).connect(to);
+  return input;
 }
 
 /** Where a voice of the given bus connects. */

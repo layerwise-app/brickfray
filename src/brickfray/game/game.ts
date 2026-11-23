@@ -22,7 +22,7 @@ import { MatchView } from './match-view';
 import { MAP_IDS, saveSettings, type Settings } from './settings';
 import { enemyInSights } from './touch-aim';
 import { IDLE, Showroom } from './showroom';
-import { renderPortraits } from './portraits';
+import { RECHECK_STORED, renderPortraits } from './portraits';
 import type { MatchReport } from '../../lib/board/contract';
 import { recordMatch } from '../../lib/board/client/sync';
 import { MatchTally } from '../../lib/board/client/tally';
@@ -81,11 +81,23 @@ export class Game {
     requestAnimationFrame(() =>
       setTimeout(() => {
         if (this.disposed) return;
-        void renderPortraits(this.showroom.display.kit, this.renderer, IDLE, this.showroom.display.environment, (id, url) => {
-          if (this.disposed) return false;
-          this.app.set({ portraits: { ...this.app.state.portraits, [id]: url } });
-          return true;
-        }).then(() => this.prewarmHeroes());
+        const draw = (redraw?: 'changed') =>
+          renderPortraits(
+            this.showroom.display.kit,
+            this.renderer,
+            IDLE,
+            this.showroom.display.environment,
+            (id, kind, url) => {
+              if (this.disposed) return false;
+              const { portraits, busts } = this.app.state;
+              this.app.set(kind === 'portrait' ? { portraits: { ...portraits, [id]: url } } : { busts: { ...busts, [id]: url } });
+              return true;
+            },
+            { redraw }
+          );
+        void draw()
+          .then(() => this.prewarmHeroes())
+          .then(() => (RECHECK_STORED && !this.disposed ? draw('changed') : undefined));
       })
     );
     this.input = new Input(canvas, settings.input);
@@ -146,6 +158,8 @@ export class Game {
   }
 
   private boxWatch = new ResizeObserver(() => this.resize());
+  /** When a hero was last picked on the menu. */
+  private pickedAt = -Infinity;
 
   private resize = () => {
     // The canvas carries the size the renderer last gave it, so the box to fill is its parent's.
@@ -170,6 +184,8 @@ export class Game {
   private async prewarmHeroes() {
     for (const id of CHARACTER_IDS) {
       await idle();
+      // Not while a pick's figure rises and its name fades in: a build holds the frames they are drawn in.
+      while (performance.now() - this.pickedAt < SETTLE_MS) await new Promise((resolve) => setTimeout(resolve, SETTLE_MS));
       if (this.disposed || this.match || id === this.settings.character) continue;
       await this.showroom.prewarm(id);
       if (this.disposed || this.match) continue;
@@ -180,6 +196,7 @@ export class Game {
   }
 
   setCharacter(id: CharacterId) {
+    this.pickedAt = performance.now();
     this.settings = { ...this.settings, character: id };
     saveSettings(this.settings);
     this.showroom.setCharacter(id);
@@ -477,6 +494,9 @@ export class Game {
 }
 
 /** Resolves in the browser's next idle period (a short wait where there is none). */
+/** How long after a pick the menu builds nothing in the background: the figure's rise and the name's fade. */
+const SETTLE_MS = 800;
+
 function idle() {
   return new Promise<void>((resolve) => {
     if ('requestIdleCallback' in window) requestIdleCallback(() => resolve(), { timeout: 2000 });

@@ -15,9 +15,12 @@ interface Manifest {
 const occlusion = new Map<string, Uint8Array>();
 const drapes = new Map<string, Drape>();
 let pending: Promise<void> | null = null;
+let manifestText = '';
 
 export const heroOcclusion = (id: string) => occlusion.get(id);
 export const heroDrape = (name: string) => drapes.get(name);
+/** The loaded bake's manifest as text: it changes whenever any figure is baked again. */
+export const heroAssetsVersion = () => manifestText;
 
 /** Fetches every asset once; resolves when they are usable, also when some are missing. */
 export function loadHeroAssets(options: { occlusion?: boolean; drapes?: boolean } = {}, base = '/models/hero') {
@@ -32,7 +35,8 @@ async function load(base: string, shaded: boolean, draped: boolean) {
     if (!response.ok) throw new Error(`${file}: ${response.status}`);
     return response.arrayBuffer();
   };
-  const manifest = JSON.parse(new TextDecoder().decode(await bytes('manifest.json'))) as Manifest;
+  manifestText = new TextDecoder().decode(await bytes('manifest.json'));
+  const manifest = JSON.parse(manifestText) as Manifest;
   await Promise.all([
     ...(shaded ? manifest.occlusion : []).map(async ({ id, vertices }) => occlusion.set(id, unpack(new Uint8Array(await bytes(`${id}.ao`)), vertices))),
     ...manifest.drapes.map(async (drape) =>

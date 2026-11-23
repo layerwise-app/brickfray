@@ -18,6 +18,7 @@ import { ProfileChip } from './board/ProfileChip';
 import { canFullscreen, setFullscreen } from '../game/touch-screen';
 import { InstallButton } from './touch/InstallGuide';
 import { frameRect, toFrame } from './touch/landscape';
+import { heroTile } from './hero-tile';
 import { flushMatches } from '../../lib/board/client/sync';
 import './menu.css';
 import './menu-motion.css';
@@ -123,8 +124,9 @@ export function MainMenu({ openSettings }: { openSettings: () => void }) {
 
   const pick = (id: CharacterId) => {
     setCharacter(id);
-    game.setCharacter(id);
     game.audio.play('uiHover', { volume: 0.6 });
+    // The figure changes once the menu has drawn the new name, so building a figure not built yet cannot hold it back.
+    requestAnimationFrame(() => setTimeout(() => game.setCharacter(id)));
   };
 
   // A transition: the open dialog (or the bare menu) stays until the next one has its code, instead of a blank beat.
@@ -203,7 +205,7 @@ export function MainMenu({ openSettings }: { openSettings: () => void }) {
           <div data-cover className='bf-menu-picker'>
             {CHARACTER_IDS.map((id) => (
               <button key={id} onClick={() => pick(id)} aria-pressed={id === character} className='bf-menu-pick'>
-                <span className='bf-menu-thumb' style={{ background: `linear-gradient(160deg, ${ROSTER[id].primary} 0 calc(66% - 0.7px), ${ROSTER[id].secondary} calc(66% + 0.7px) 100%)` }}>
+                <span className='bf-menu-thumb' style={{ background: heroTile(id) }}>
                   {app.portraits[id] && <img src={app.portraits[id]} alt='' draggable={false} />}
                 </span>
                 <span className='bf-menu-pick-name'>{ROSTER[id].name}</span>

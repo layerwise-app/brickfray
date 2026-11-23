@@ -2,9 +2,10 @@ import * as THREE from 'three';
 import type { AnimState, CharacterId } from '../characters/types';
 import type { Kit } from '../engine/kit';
 import type { Atmosphere, GameRenderer } from '../engine/renderer';
-import { frame, silhouette, type Framing, type StageCover } from './framing';
+import { frame, silhouette, type Framing, type Rect, type StageCover } from './framing';
 import { HeroDisplay } from './hero-display';
 import { TILE_RADIUS } from './stage-deck';
+import type { Column } from './stage-props';
 import { BASE_RADIUS, STAND_TOP, StageSet } from './stage-set';
 import { turntable } from './stage-turn';
 
@@ -91,6 +92,10 @@ export class Showroom {
   /** The figure's turn last frame, and how fast it is turning (radians per second, smoothed over a few frames); NaN after a cut. */
   private yaw = NaN;
   private spin = 0;
+  /** The menu's columns beside the figure, left and right, in clip space; none when it is stacked or gone. */
+  private columns: (Column | null)[] = [];
+  /** The shadow map holds a warm-up's figure: the next frame draws it again. */
+  private reshadow = false;
 
   constructor(
     _kit: Kit,
@@ -123,46 +128,53 @@ export class Showroom {
   }
 
   /**
-   * Builds what a hero's first pick would build (their far set, their figure and weapons) and compiles its shaders, so
-   * the pick itself only swaps built things. For idle time, one hero at a time.
+   * Builds what a hero's first pick would build (their far set, their figure and weapons, kept for the pick) and
+   * compiles its shaders, so the pick itself only swaps built things. For idle time, one hero at a time.
    */
   async prewarm(id: CharacterId) {
     this.stage.prebuild(id);
-    const ghost = this.display.ghost(id);
+    const root = this.display.prepare(id);
+    if (root.parent) return;
     // Out of every view while its shaders compile.
-    ghost.root.position.y = -200;
-    this.scene.add(ghost.root);
+    root.position.y = -200;
+    this.scene.add(root);
+    const renderer = this.renderer.renderer;
+    const shadows = renderer.shadowMap.enabled;
     try {
-      const renderer = this.renderer.renderer;
-      const shadows = renderer.shadowMap.enabled;
       renderer.shadowMap.enabled = true;
       await renderer.compileAsync(this.scene, this.camera);
-      if (ghost.root.parent) this.warmDraw(ghost.root);
-      renderer.shadowMap.enabled = shadows;
     } finally {
-      ghost.root.removeFromParent();
-      ghost.dispose();
+      renderer.shadowMap.enabled = shadows;
+      // A pick while it compiled has put it on the stand.
+      if (root.parent === this.scene) {
+        root.removeFromParent();
+        root.position.y = 0;
+      }
     }
+    if (!root.parent) this.warmDraw(root);
   }
 
   /**
-   * Draws `root` once into a single pixel of the canvas: a compiled program's first draw still links it, and that must
-   * not land on a pick. The menu's next frame clears and redraws the whole canvas, and the shadow map is left as it was.
+   * Draws `root` once where it will stand, into a single pixel of the canvas and into the key light's shadow map: a
+   * compiled program's first draw still links it, and that must not land on a pick. The menu's next frame clears and
+   * redraws the whole canvas and the shadow map.
    */
   private warmDraw(root: THREE.Object3D) {
     const renderer = this.renderer.renderer;
-    const eye = new THREE.PerspectiveCamera(FOV, 1, 0.1, 30);
-    eye.position.set(root.position.x, root.position.y + 1, root.position.z + 8);
-    eye.lookAt(root.position.x, root.position.y + 1, root.position.z);
     const scissor = renderer.getScissorTest();
+    const shadows = renderer.shadowMap.enabled;
+    this.display.figure.add(root);
     renderer.shadowMap.enabled = true;
-    renderer.shadowMap.needsUpdate = false;
+    renderer.shadowMap.needsUpdate = true;
     renderer.setRenderTarget(null);
     renderer.setScissorTest(true);
     renderer.setScissor(0, 0, 1, 1);
     renderer.autoClear = false;
-    renderer.render(this.scene, eye);
+    renderer.render(this.scene, this.camera);
     renderer.setScissorTest(scissor);
+    renderer.shadowMap.enabled = shadows;
+    root.removeFromParent();
+    this.reshadow = true;
   }
 
   resize(width: number, height: number) {
@@ -185,6 +197,7 @@ export class Showroom {
       distance = this.reach(goal.scale);
     }
     this.goal = goal;
+    this.columns = cover ? columnsOf(cover, this.width, this.height) : [];
   }
 
   /** Distance along the floor from the stand's axis to the lens for a scale in pixels per meter. */
@@ -227,7 +240,7 @@ export class Showroom {
     this.camera.position.set(Math.sin(drift) * this.distance, y, Math.cos(drift) * this.distance);
     this.camera.lookAt(0, STAND_TOP + LENS.aim, 0);
     this.camera.updateMatrixWorld();
-    this.stage.update(this.camera, this.time, this.display.pulse, -this.now.x / this.now.scale, (this.width - this.now.x) / this.now.scale, yaw);
+    this.stage.update(this.camera, this.time, this.display.pulse, -this.now.x / this.now.scale, (this.width - this.now.x) / this.now.scale, yaw, this.columns);
   }
 
   /** The pixel ratio the menu draws at on a screen of this size: the screen's own on every tier, up to `MAX_PIXELS`. */
@@ -244,7 +257,8 @@ export class Showroom {
     const shadows = renderer.shadowMap.enabled;
     renderer.shadowMap.enabled = true;
     // The idle is slow: a shadow map drawn every other frame is indistinguishable, and half the figure's triangles.
-    renderer.shadowMap.needsUpdate = this.reveal < 1 || turntable.engaged || this.frame++ % 2 === 0;
+    renderer.shadowMap.needsUpdate = this.reshadow || this.reveal < 1 || turntable.engaged || this.frame++ % 2 === 0;
+    this.reshadow = false;
     renderer.info.reset();
     renderer.setRenderTarget(null);
     renderer.autoClear = false;
@@ -258,4 +272,18 @@ export class Showroom {
     this.stage.dispose();
     this.scene.clear();
   }
+}
+
+/** The panels standing beside the figure, gathered into a column on each side with the header over it; a sheet across the bottom has none. */
+function columnsOf(cover: StageCover, width: number, height: number): (Column | null)[] {
+  if (cover.panels.some((r) => r.left < width / 2 && r.right > width / 2)) return [];
+  const x = (px: number) => (px / width) * 2 - 1;
+  const y = (px: number) => 1 - (px / height) * 2;
+  return [cover.panels.filter((r) => r.right <= width / 2), cover.panels.filter((r) => r.left >= width / 2)].map((side: Rect[]) => {
+    if (!side.length) return null;
+    const left = Math.min(...side.map((r) => r.left));
+    const right = Math.max(...side.map((r) => r.right));
+    const over = cover.header.filter((r) => r.right > left && r.left < right);
+    return { left: x(left), right: x(right), top: y(Math.min(...side.map((r) => r.top))), ceiling: over.length ? y(Math.max(...over.map((r) => r.bottom))) : 1 };
+  });
 }
