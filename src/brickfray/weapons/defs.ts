@@ -54,8 +54,8 @@ export const WEAPONS: Record<WeaponId, WeaponDef> = {
     holsterTime: 0.2,
     zoom: 1.45,
     pellets: 1,
-    spread: 0.022,
-    adsSpread: 0.0025,
+    spread: 0.03,
+    adsSpread: 0.01,
     falloffStart: 20,
     falloffEnd: 45,
     recoil: [
@@ -77,7 +77,7 @@ export const WEAPONS: Record<WeaponId, WeaponDef> = {
     body: 16,
     head: 23,
     minDamage: 3,
-    rpm: 70,
+    rpm: 82,
     mag: 6,
     reload: 0.5,
     reloadEmpty: 0.5,
@@ -92,7 +92,7 @@ export const WEAPONS: Record<WeaponId, WeaponDef> = {
     falloffEnd: 25,
     recoil: [[0.05, 0.004]],
     moveScale: 0.92,
-    cycle: 0.55
+    cycle: 0.5
   },
   sniper: {
     id: 'sniper',
@@ -158,9 +158,9 @@ export const WEAPONS: Record<WeaponId, WeaponDef> = {
     zoom: 1.3,
     pellets: 1,
     spread: 0.026,
-    adsSpread: 0.006,
-    falloffStart: 10,
-    falloffEnd: 24,
+    adsSpread: 0.009,
+    falloffStart: 8,
+    falloffEnd: 22,
     recoil: [
       [0.007, 0.001],
       [0.008, -0.002],
@@ -188,16 +188,16 @@ export const WEAPONS: Record<WeaponId, WeaponDef> = {
     zoom: 1.7,
     pellets: 1,
     spread: 0.02,
-    adsSpread: 0.0008,
-    falloffStart: 30,
-    falloffEnd: 55,
+    adsSpread: 0.007,
+    falloffStart: 22,
+    falloffEnd: 47,
     recoil: [
       [0.01, 0.001],
       [0.011, -0.002],
       [0.012, 0.002]
     ],
     moveScale: 0.95,
-    burst: { count: 3, pause: 0.3 }
+    burst: { count: 3, pause: 0.33 }
   },
   harpoon: {
     id: 'harpoon',

@@ -41,6 +41,13 @@ describe('character loadouts', () => {
     }
   });
 
+  it('aimed automatics keep their home-range speed and leave long range to the scoped guns', () => {
+    // Round 9's limit: at most 10% slower than before it (AR 0.55 s out to 26 m, Pulse 0.64 s out to 32 m).
+    for (const d of [12, 20, 26]) expect(timeToKill('ar', d)).toBeLessThan(0.605);
+    for (const d of [15, 25, 32]) expect(timeToKill('pulse', d)).toBeLessThan(0.704);
+    for (const auto of ['ar', 'pulse'] as const) for (const scoped of ['sniper', 'harpoon'] as const) expect(timeToKill(scoped, 40)).toBeLessThan(timeToKill(auto, 40));
+  });
+
   it('every melee weapon kills in two hits, or one from behind', () => {
     for (const m of Object.values(MELEES)) {
       expect(m.damage * 2).toBeGreaterThanOrEqual(PLAYER.health);
