@@ -22,8 +22,10 @@ def moss_cloak():
         # Two layers of folds: broad ones from the shoulders and narrow ones between them, deepening toward the hem.
         pleat = math.cos(x * math.pi * 3.5 + 0.6 * math.sin(v * 3)) + 0.4 * math.cos(x * math.pi * 7.5 + 1.3 + v)
         w = 0.21 + 0.22 * v ** 0.8  # cut wider than it hangs, so it gathers into folds
-        y = -0.07 - v * 0.7 * (1 - 0.06 * x * x) + 0.02 * pleat * v
-        return [x * w, y - 0.02, 0.022 - (0.05 + 0.08 * v) * x * x + 0.5 * v + (0.008 + 0.065 * v ** 1.2) * pleat]
+        # The top is sewn on below the bedroll (moss-gear.ts), just outside the mantle's back dag: the back bone swings
+        # the cloak out about a pivot above the roll, so cloth tucked up under it would swing into it.
+        y = -0.092 - v * 0.678 * (1 - 0.06 * x * x) + 0.02 * pleat * v
+        return [x * w, y - 0.02, 0.029 - (0.05 + 0.08 * v) * x * x + 0.5 * v + (0.002 + 0.071 * v ** 1.2) * pleat]
     return dict(character='moss', bone='dangleBack', frames=240, cloth=dict(bending=0.6),
                 sheets=[dict(nu=36, nv=40, at=at, pin=2, thick=0.026, hem=(0.93, 0.985, 0.4), outer='outer', inner='lining', bands=[(0.9, 0.975, 'trim')])])
 

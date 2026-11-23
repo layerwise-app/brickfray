@@ -150,9 +150,8 @@ export function pouches(b: PartSet) {
 
 /** Rolled blanket strapped across the shoulders, over the cloak's top edge. */
 export function bedroll(b: PartSet) {
-  // Out on the mantle and the cloak, clear of them as they swing. The showroom's cloak is draped around the roll
-  // where it was baked, closer in.
-  const at: V3 = [0, 0.165, b.hero ? 0.17 : 0.21];
+  // Out on the mantle and the cloak, clear of them as they swing; the showroom's draped cloak hangs from under it.
+  const at: V3 = [0, 0.165, 0.21];
   const across: V3 = [0, 0, Math.PI / 2];
   const seg = pick(b, 10, 12, 22);
   b.cyl('chest', 0.052, 0.052, 0.4, C.tan, { at, rot: across, look: 'cloth', seg });
@@ -171,7 +170,7 @@ export function bedroll(b: PartSet) {
 
 /** The hatchet riding on top of the bedroll, head out past his left shoulder with the bit hanging down, under a loop off each strap. */
 export function hatchetOnPack(b: PartSet) {
-  const at: V3 = [0.03, 0.229, 0.2];
+  const at: V3 = [0.03, 0.229, 0.24];
   stow(b, 'chest', buildHatchet, at, [-Math.PI / 2, 0, Math.PI / 2]);
   for (const [x, r] of [[-0.115, 0.0185], [0.115, 0.0215]] as const) b.cyl('chest', r, r, 0.022, C.leatherDark, { at: [x, at[1], at[2]], rot: [0, 0, Math.PI / 2], look: HIDE, seg: 12, open: true });
 }

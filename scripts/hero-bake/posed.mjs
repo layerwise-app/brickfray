@@ -1,10 +1,12 @@
 // usage: node posed.mjs <outdir> [ids…]  — dumps each showroom figure as posed (positions + indices per mesh) for Blender.
-import { chromium } from '/private/tmp/claude-501/pw/node_modules/playwright-core/index.mjs';
 import { writeFileSync, mkdirSync } from 'node:fs';
-// usage: node posed.mjs <outdir> <unshaded|bare> [ids…]
+import { homedir } from 'node:os';
+// usage: node posed.mjs <outdir> <unshaded|bare> [ids…]   (PW_CORE / CHROME override where playwright-core and Chromium live)
+const { chromium } = await import(process.env.PW_CORE ?? `${homedir()}/tmp/pw/node_modules/playwright-core/index.mjs`);
+const CHROME = process.env.CHROME ?? `${homedir()}/Library/Caches/ms-playwright/chromium-1208/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing`;
 const [out, mode, ...ids] = process.argv.slice(2);
 mkdirSync(out, { recursive: true });
-const browser = await chromium.launch({ executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', headless: true, args: ['--use-angle=metal', '--ignore-gpu-blocklist', '--enable-gpu'] });
+const browser = await chromium.launch({ executablePath: CHROME, headless: true, args: ['--use-angle=metal', '--ignore-gpu-blocklist', '--enable-gpu'] });
 const page = await browser.newPage({ viewport: { width: 800, height: 600 } });
 page.on('pageerror', (e) => console.log('[pageerror]', e.message));
 await page.goto(`http://127.0.0.1:5390/lab?scene=hero&quality=high&${mode}`, { waitUntil: 'load' });

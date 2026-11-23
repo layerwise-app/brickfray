@@ -1,7 +1,10 @@
+import * as THREE from 'three';
 import { buildBody } from '../body';
+import { SIZE, THUMB, type ForeEnd } from '../body-grasp';
 import { HEAD } from '../body-head';
+import { foreAt, foreGrip } from '../body-hold';
 import type { PartSet } from '../parts';
-import { loftFrontZ } from '../shapes';
+import { blob, loftFrontZ } from '../shapes';
 import type { V3 } from '../skeleton';
 import type { Stance } from '../stance';
 import { lowBeard, lowBlob, kneePads, lowTaper } from '../body-low';
@@ -29,15 +32,19 @@ export const stance: Stance = {
   life: { breath: 0.6, sway: 0.3, look: 0 }
 };
 
+const GLOVE = '#5b4630';
+/** The long rifle's fore-end in the support hand. */
+const FORE: ForeEnd = { half: [0.017, 0.025], corner: 0.01, yaw: 0.45, roll: 0.3, over: { r: 0.0128, at: 0.023 }, seat: 0.004, sink: 0.011, arch: 3.2, fan: 0.35, thumbTip: 0.45 };
+
 /** Moss: forest ranger in a pointed hood and dagged mantle over a long cloak, bushy beard, bandolier, satchel and wrapped boots. */
 export function moss(b: PartSet) {
   buildBody(b, {
     skin: '#d9a27a',
     shirt: C.tunic,
     sleeve: C.tunic,
-    glove: '#5b4630',
+    glove: GLOVE,
     gloveLook: 'cloth',
-    fore: { half: [0.017, 0.025], corner: 0.01, yaw: 0.45, roll: 0.3, over: { r: 0.0128, at: 0.023 }, seat: 0.004, sink: 0.011, arch: 3.2, fan: 0.35, thumbTip: 0.45 },
+    fore: FORE,
     pants: '#3f4a35',
     boot: '#5b4630',
     bootLook: b.detail === 0 ? 'rubber' : HIDE,
@@ -88,7 +95,25 @@ export function moss(b: PartSet) {
   if (!b.hero) return;
   mantleStitches(b);
   hoodStitches(b);
+  thumbHeel(b);
   if (!stance.melee) hatchetOnPack(b);
+}
+
+/**
+ * The support thumb's heel: a padded mound from the palm's heel along the thumb's first bone, bulging away from the
+ * fore-end, so from below the thumb grows out of the hand instead of standing off its edge as a plain rod.
+ */
+function thumbHeel(b: PartSet) {
+  const along = new THREE.Vector3(...foreGrip(FORE, 1, [0, 0, 0, 0]).thumb.dir).normalize();
+  const at = new THREE.Vector3(...THUMB.at).addScaledVector(along, THUMB.len[0] * 0.3);
+  const out = at.clone().sub(new THREE.Vector3(...foreAt(FORE)).divideScalar(SIZE));
+  out.addScaledVector(along, -out.dot(along)).normalize();
+  at.addScaledVector(out, 0.002).multiplyScalar(SIZE);
+  // Hands are worked out as a right hand; the left one is its mirror image across X.
+  const y = new THREE.Vector3(-along.x, along.y, along.z);
+  const z = new THREE.Vector3(-out.x, out.y, out.z);
+  const turn = new THREE.Euler().setFromRotationMatrix(new THREE.Matrix4().makeBasis(new THREE.Vector3().crossVectors(y, z), y, z), 'YXZ');
+  b.add('handL', blob(0.034, 0.056, 0.026, 0.8, 18), GLOVE, { at: [-at.x, at.y, at.z], rot: [turn.x, turn.y, turn.z], scale: [SIZE, SIZE, SIZE], look: 'cloth' });
 }
 
 /** Sculpted beard: chin mass, sideburns, a row of locks, a drooping mustache and a fringe under the hood. */

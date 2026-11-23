@@ -11,8 +11,8 @@ All of it is tied to the exact showroom model, stance and primary weapon. After 
 those, bake again; a figure whose vertex count no longer matches skips its occlusion and logs a
 warning, and a drape made for another stance will hang wrong.
 
-Needs Blender 5.x, Chrome and the dev server on :5390 (`posed.mjs` imports playwright-core; fix its
-import path for your machine).
+Needs Blender 5.x, Chromium and the dev server on :5390. `posed.mjs` loads playwright-core from `~/tmp/pw` and
+Playwright's Chromium from `~/Library/Caches/ms-playwright`; set `PW_CORE` / `CHROME` to use others.
 
 ```sh
 B=/Applications/Blender.app/Contents/MacOS/Blender

@@ -13,7 +13,7 @@ calm() {
   while true; do
     local l=$(uptime | awk -F'load averages: ' '{print $2}' | awk '{print $1}')
     local m=$(memory_pressure | tail -1 | grep -o '[0-9]*')
-    (( ${l%.*} < 10 && m >= 20 )) && return
+    (( ${l%.*} < 8 && m >= 25 )) && return
     echo "busy (load $l, free $m%); waiting"; sleep 90
   done
 }
