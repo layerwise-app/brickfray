@@ -3,7 +3,7 @@ import type { Drawer } from './plan';
 import { SIDE_STREETS } from './plaza-edges';
 import { EDGE } from './plaza-layout';
 import { Pen } from './props-kit';
-import { Frame, mix, Rng, shade } from './util';
+import { faceFrame, Frame, mix, Rng, shade } from './util';
 
 const X = EDGE.x;
 const Z = EDGE.z;
@@ -42,27 +42,39 @@ export function plazaBackdrop(d: Drawer) {
 const fadeAt = (x: number, z: number) => Math.min(0.45, Math.max(0, (Math.hypot(x, z) - 50) / 120));
 
 /** A town house or store facing (nx, nz): window bays on that face, shopfronts below, a gable or flat roof. */
-function house(t: Pen, rng: Rng, x0: number, z0: number, x1: number, z1: number, h: number, nx: number, nz: number, colors = HOUSES, ridgeAcross = false) {
+function house(t: Pen, rng: Rng, x0: number, z0: number, x1: number, z1: number, h: number, nx: number, nz: number, colors = HOUSES, ridgeAcross = false, dress = true) {
   const k = fadeAt((x0 + x1) / 2, (z0 + z1) / 2);
   const c = (s: string) => mix(s, HAZE, k);
   const wall = rng.pick(colors);
   t.span(x0, 0, z0, x1, h, z1, c(wall), undefined, 0);
   t.span(x0 - 0.12, h - 0.36, z0 - 0.12, x1 + 0.12, h, z1 + 0.12, c(shade(wall, -0.22)), undefined, 0);
-  const along = nz ? x1 - x0 : z1 - z0;
+  const { f: frame, length: along } = faceFrame(nz ? (nz > 0 ? 's' : 'n') : nx > 0 ? 'e' : 'w', x0, z0, x1, z1);
+  const p = t.at(frame);
   const bays = Math.max(1, Math.round(along / 2.4));
-  const face = nz ? (nz > 0 ? z1 : z0) : nx > 0 ? x1 : x0;
   const floors = Math.max(1, Math.floor((h - 0.6) / 3.36));
-  const pane = (u: number, y: number, w: number, hh: number, color: string) => {
-    if (nz) t.box(u, y, face + nz * 0.05, w, hh, 0.1, c(color), undefined, 0);
-    else t.box(face + nx * 0.05, y, u, 0.1, hh, w, c(color), undefined, 0);
-  };
+  // Front-row houses facing the town get window frames, sills, a fascia over the shops and doors; the rest stay plain.
+  const near = dress && (nz ? Math.abs((x0 + x1) / 2) - X : Math.abs((z0 + z1) / 2) - Z) < 20;
+  const trim = c(mix(wall, '#f2f2ee', 0.7));
+  const dark = c(shade(wall, -0.3));
   for (let f = 0; f < floors; f++) {
+    if (near && f > 0) p.box(along / 2, f * 3.36 - 0.12, 0.04, along, 0.16, 0.08, c(shade(wall, -0.12)), undefined, 0);
     for (let b = 0; b < bays; b++) {
-      const u = (nz ? x0 : z0) + (along / bays) * (b + 0.5);
-      if (f === 0) pane(u, 0.3, Math.min(1.8, along / bays - 0.4), 2.3, SHOP);
-      else pane(u, f * 3.36 + 0.9, 0.9, 1.6, GLASS);
+      const u = (along / bays) * (b + 0.5);
+      if (f === 0) {
+        const w = Math.min(1.8, along / bays - 0.4);
+        const door = near && b % 3 === 1;
+        p.box(u, door ? 0 : 0.3, 0.05, door ? 1.0 : w, 2.3, 0.1, c(door ? shade(wall, -0.45) : SHOP), undefined, 0);
+        if (near) p.frame(u, door ? 0 : 0.22, 0.08, (door ? 1.0 : w) + 0.24, door ? 2.42 : 2.5, 0.12, 0.16, trim);
+        continue;
+      }
+      const y = f * 3.36 + 0.9;
+      p.box(u, y, 0.05, 0.9, 1.6, 0.1, c(GLASS), undefined, 0);
+      if (!near) continue;
+      p.frame(u, y - 0.1, 0.08, 1.14, 1.82, 0.12, 0.16, trim);
+      p.box(u, y - 0.2, 0.14, 1.34, 0.1, 0.28, trim, undefined, 0);
     }
   }
+  if (near) p.box(along / 2, 2.8, 0.1, along - 0.3, 0.5, 0.2, dark, undefined, 0);
   if (h > 15 || rng.chance(0.3)) return;
   const roof = c(rng.pick(ROOFS));
   const ridgeX = nz ? !ridgeAcross : ridgeAcross;
@@ -74,7 +86,7 @@ function house(t: Pen, rng: Rng, x0: number, z0: number, x1: number, z1: number,
 }
 
 /** A row of houses from a to b along x (nz != 0) or z, of depth dd, facing the map. */
-function row(t: Pen, rng: Rng, a: number, b: number, front: number, dd: number, nx: number, nz: number, h: [number, number], skip: [number, number][] = []) {
+function row(t: Pen, rng: Rng, a: number, b: number, front: number, dd: number, nx: number, nz: number, h: [number, number], skip: [number, number][] = [], dress = true) {
   for (let u = a; u < b - 3; ) {
     const w = Math.min(rng.pick(WIDTHS), b - u);
     const gap = skip.find(([s0, s1]) => u < s1 && u + w > s0);
@@ -84,8 +96,8 @@ function row(t: Pen, rng: Rng, a: number, b: number, front: number, dd: number, 
     }
     const hh = rng.range(h[0], h[1]);
     const back = front - (nz || nx) * dd;
-    if (nz) house(t, rng, u, Math.min(front, back), u + w, Math.max(front, back), hh, 0, nz);
-    else house(t, rng, Math.min(front, back), u, Math.max(front, back), u + w, hh, nx, 0);
+    if (nz) house(t, rng, u, Math.min(front, back), u + w, Math.max(front, back), hh, 0, nz, HOUSES, false, dress);
+    else house(t, rng, Math.min(front, back), u, Math.max(front, back), u + w, hh, nx, 0, HOUSES, false, dress);
     u += w;
   }
 }
@@ -125,7 +137,23 @@ function cutting(t: Pen, rng: Rng) {
   t.span(xa, -0.04, s0 - 2.4, 110, 0, s0, PAVE, undefined, 0);
   t.span(xa, -0.06, s0 - 9.6, 110, -0.02, s0 - 2.4, ASPHALT, undefined, 0);
   t.span(xa, -0.04, s0 - 12, 110, 0, s0 - 9.6, PAVE, undefined, 0);
+  street(t, s0);
   row(t, rng, -96, 96, s0 - 12, 9.6, 0, 1, [9.6, 17.6], [[X, X + 9.2]]);
+}
+
+/** The cutting's far wall and the street over it: brick courses, kerbs, a centre line, paving joints and lamp posts. */
+function street(t: Pen, s0: number) {
+  const { z1, y } = CUT;
+  for (let yy = y + 0.9; yy < 0; yy += 0.9) t.span(-72, yy, z1 + 0.01, CUT.portal, yy + 0.06, z1 + 0.05, '#8a3b2a', undefined, 0);
+  for (const z of [s0 - 2.4, s0 - 9.6]) t.span(-110, 0, z - 0.1, 110, 0.12, z + 0.1, '#e3d6bc', undefined, 0);
+  if (t.detail === 0) return;
+  for (let x = -72; x < 72; x += 4.8) t.box(x, -0.02, s0 - 6, 2.4, 0.03, 0.16, '#f2f2ee', undefined, 0);
+  for (const [a, b] of [[s0 - 2.4, s0], [s0 - 12, s0 - 9.6]] as const) for (let x = -72; x < 72; x += 1.2) t.box(x, -0.01, (a + b) / 2, 0.05, 0.02, b - a, '#b7ad9a', undefined, 0);
+  for (let x = -66; x < 72; x += 14.4) {
+    t.cyl(x, 0, s0 - 1.2, 0.09, 4.2, IRON, 'metal');
+    t.box(x, 4.2, s0 - 1.5, 0.36, 0.3, 0.8, IRON, 'metal', 0);
+    t.box(x, 4.14, s0 - 1.7, 0.26, 0.06, 0.4, '#fff3c4', 'glow', 0);
+  }
 }
 
 /** East: the canal past the quay railings, two narrowboats, the far towpath and its brick warehouses. */
@@ -174,7 +202,7 @@ function west(t: Pen, rng: Rng) {
   const gaps = SIDE_STREETS;
   t.span(-X - 4.8, -0.04, -12, -X, 0, 12, PAVE, undefined, 0);
   row(t, rng, -Z - 0.8, Z + 0.8, -X - 4.8, 9.6, 1, 0, [13.6, 18.4], gaps);
-  row(t, rng, -Z - 0.8, Z + 0.8, -X - 14.4, 9.6, 1, 0, [15.2, 20.8], gaps);
+  row(t, rng, -Z - 0.8, Z + 0.8, -X - 14.4, 9.6, 1, 0, [15.2, 20.8], gaps, false);
   for (const [a, b] of gaps) {
     t.span(-X - 24, -0.04, a, -X - 0.4, 0, b, PAVE, undefined, 0);
     house(t, rng, -X - 33.6, a - 4, -X - 24, b + 4, 14.4, 1, 0);

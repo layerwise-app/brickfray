@@ -1,11 +1,13 @@
 import { drawBlock } from './blocks';
 import type { Element } from './plan';
 import { passageFronts } from './plaza-buildings';
+import { plazaInteriors } from './plaza-interiors';
 import { basin, bridge, canalBed, canopy, fountainColumn, hallGables, hallRoof, plinth, stage, townHall, tram } from './plaza-landmarks';
 import type { Layout, Piece } from './plaza-layout';
 import { CONCRETE, masonryBox, sidesOf, STONE, styleOf, TIMBER, TRIM } from './plaza-style';
 import { counter, garden, hoarding, kiosk, pieceFrame, railing, shelf, stack } from './plaza-things';
 import { Pen } from './props-kit';
+import type { Surface } from './types';
 import { box, Frame, Rng, shade, type PlanCollider } from './util';
 import type { Drawer } from './plan';
 import { HALL } from './plaza-middle';
@@ -14,16 +16,38 @@ import { HALL } from './plaza-middle';
 export const PLAZA_TOWN: Element<Layout> = {
   colliders(L) {
     const out: PlanCollider[] = [];
-    for (const p of L.pieces) out.push(box(p.min, p.max, p.surface ?? 'stone', { walk: p.walk, bulletsPass: p.pass }));
+    for (const p of L.pieces) out.push(box(p.min, p.max, p.surface ?? surfaceOf(p), { walk: p.walk, bulletsPass: p.pass }));
     return out;
   },
   draw(d, L) {
     for (const p of L.pieces) piece(d, p);
     townHall(d);
     passageFronts(d, L);
+    plazaInteriors(d, L);
     for (const s of [-1, 1] as const) hallGables(d, HALL.x0, HALL.x1, s * HALL.z1, s, HALL.top);
   }
 };
+
+/** What a hit finds under the paint: hedges are leaves, kiosks, counters, shelves and hoardings timber, iron is metal. */
+function surfaceOf(p: Piece): Surface {
+  switch (p.kind) {
+    case 'garden':
+      return 'foliage';
+    case 'kiosk':
+      return p.tag === 'site-office' ? 'metal' : 'wood';
+    case 'shelf':
+      return p.tag === 'laundrette' ? 'metal' : 'wood';
+    case 'counter':
+    case 'hoarding':
+      return 'wood';
+    case 'pillar':
+      return p.tag === 'hall' && p.max[0] - p.min[0] < 0.9 ? 'metal' : 'stone';
+    case 'stack':
+      return p.tag === 'skip' ? 'metal' : 'stone';
+    default:
+      return 'stone';
+  }
+}
 
 function piece(d: Drawer, p: Piece) {
   switch (p.kind) {
@@ -136,12 +160,26 @@ function pillar(d: Drawer, p: Piece) {
   const w = x1 - x0;
   const dd = z1 - z0;
   if (p.tag === 'fountain') return fountainColumn(d, p);
+  if (p.tag === 'poster') return posterColumn(t, cx, y0, cz, Math.min(w, dd) / 2, y1 - y0, d.detail);
   const iron = p.tag === 'hall' && w < 0.9 && y1 - y0 > 6;
   const color = iron ? '#2f5a3a' : p.tag === 'square' || p.tag === 'park' ? '#f2f2ee' : '#efe5cf';
   t.box(cx, y0, cz, w * 0.84, y1 - y0, dd * 0.84, color, iron ? 'metal' : undefined, 0.03);
   t.box(cx, y0, cz, w, Math.min(0.32, (y1 - y0) / 6), dd, shade(color, -0.12), undefined, 0.02);
   t.box(cx, y1 - Math.min(0.3, (y1 - y0) / 6), cz, w, Math.min(0.3, (y1 - y0) / 6), dd, shade(color, -0.12), undefined, 0.02);
   if (iron && d.detail > 0) for (const s of [-1, 1]) t.box(cx + s * w * 0.6, y1 - 1.6, cz, w * 0.4, 0.12, 0.12, color, 'metal', 0);
+}
+
+/** Advertising column: a green drum pasted with posters under a domed cap. */
+function posterColumn(t: Pen, cx: number, y0: number, cz: number, r: number, h: number, detail: number) {
+  t.cyl(cx, y0, cz, r, 0.3, '#2f5a3a', 'metal');
+  t.cyl(cx, y0 + 0.3, cz, r - 0.06, h - 0.62, '#efe5cf');
+  const posters = ['#c8231b', '#f6c624', '#1f62c7', '#2f8a3e', '#c43a85', '#f58a1f'];
+  for (let i = 0; i < (detail === 0 ? 3 : 6); i++) {
+    const a = (i / (detail === 0 ? 3 : 6)) * Math.PI * 2;
+    t.box(cx + Math.sin(a) * (r - 0.04), y0 + 0.6, cz + Math.cos(a) * (r - 0.04), 0.42, 1.1, 0.03, posters[i]!, undefined, 0, a);
+  }
+  t.cyl(cx, y0 + h - 0.32, cz, r + 0.04, 0.12, '#2f5a3a', 'metal');
+  t.cone(cx, y0 + h - 0.2, cz, r, 0.08, 0.2, '#2f5a3a', 'metal');
 }
 
 /** Bare concrete frame column with starter bars poking out of the top. */
@@ -154,17 +192,23 @@ function column(d: Drawer, p: Piece) {
   for (const sx of [0.2, 0.6]) for (const sz of [0.2, 0.6]) t.box(x0 + sx, y1, z0 + sz, 0.04, 0.6, 0.04, '#8a5a3a', 'metal', 0);
 }
 
-/** Site cabin: blue ribbed walls, windows and a door, a flat roof. */
+/** Site cabin (two stacked when tall): blue or green ribbed walls, windows and a door, a flat roof. */
 function cabin(d: Drawer, p: Piece) {
-  const { f, len, wid, h } = pieceFrame(p);
+  const { f, len, wid, h: total } = pieceFrame(p);
   const t = new Pen(d, f);
-  t.box(0, 0, 0, len, h - 0.2, wid, '#2a5fa8', undefined, 0.02);
-  t.box(0, h - 0.2, 0, len + 0.1, 0.2, wid + 0.1, '#e9e6dc', undefined, 0.02);
-  for (const s of [-1, 1]) {
-    for (let u = -len / 2 + 0.8; u < len / 2 - 0.4; u += 1.6) t.box(u, 1.1, s * (wid / 2 + 0.01), 0.9, 0.8, 0.04, '#2c3c4a', undefined, 0);
-    if (d.detail > 0) for (let u = -len / 2 + 0.1; u < len / 2; u += 0.3) t.box(u, 0.1, s * (wid / 2 + 0.005), 0.06, h - 0.4, 0.02, '#244f8a', undefined, 0);
+  const levels = total > 4 ? 2 : 1;
+  const h = total / levels;
+  for (let k = 0; k < levels; k++) {
+    const y = k * h;
+    const [wall, rib] = k ? ['#2f8a3e', '#287a35'] : ['#2a5fa8', '#244f8a'];
+    t.box(0, y, 0, len, h - 0.2, wid, wall, undefined, 0.02);
+    t.box(0, y + h - 0.2, 0, len + 0.1, 0.2, wid + 0.1, '#e9e6dc', undefined, 0.02);
+    for (const s of [-1, 1]) {
+      for (let u = -len / 2 + 0.8; u < len / 2 - 0.4; u += 1.6) t.box(u, y + 1.1, s * (wid / 2 + 0.01), 0.9, 0.8, 0.04, '#2c3c4a', undefined, 0);
+      if (d.detail > 0) for (let u = -len / 2 + 0.1; u < len / 2; u += 0.3) t.box(u, y + 0.1, s * (wid / 2 + 0.005), 0.06, h - 0.4, 0.02, rib, undefined, 0);
+    }
+    t.box(len / 2 - 0.02, y + 0.1, 0, 0.06, 2.1, 0.9, '#e9e6dc', undefined, 0.01);
   }
-  t.box(len / 2 - 0.02, 0.1, 0, 0.06, 2.1, 0.9, '#e9e6dc', undefined, 0.01);
 }
 
 /** Tram shelter: a lit advert panel between posts (the glass roof is a roof piece). */

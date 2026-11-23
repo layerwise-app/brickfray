@@ -77,7 +77,7 @@ export function passageFronts(d: Drawer, L: Layout) {
     const [x1, top, z1] = c.max;
     const faces: Face[] = x1 - x0 < z1 - z0 ? ['e', 'w'] : ['n', 's'];
     const civic = c.tag === 'station' || c.tag === 'townhall';
-    const wall = c.tag === 'bakery' ? ['#f6c624', '#ecb91a'] : c.tag === 'laundrette' ? ['#7fc8e8', '#71b9d8'] : civic ? ['#efe5cf', '#e3d6bc', '#f5eedc'] : ['#efe5cf', '#e3d6bc'];
+    const wall = c.tag === 'bakery' ? ['#f6c624', '#ecb91a'] : c.tag === 'laundrette' ? ['#7fc8e8', '#71b9d8'] : c.tag === 'florist' ? ['#f3a6c3', '#e898b6'] : civic ? ['#efe5cf', '#e3d6bc', '#f5eedc'] : ['#efe5cf', '#e3d6bc'];
     const all: Face[] = ['n', 's', 'e', 'w'];
     BUILDING.draw(d, {
       x0, z0, x1, z1, height: top + 0.16, base, face: faces[0]!, faces: civic ? all.filter((f) => f !== faces[0]) : [faces[1]!], wall,
@@ -97,9 +97,10 @@ function shopSign(d: Drawer, tag: string, x0: number, z0: number, x1: number, z1
     t.cylZ(length / 2, base + 0.9, 0.2, 0.4, 0.06, '#c99a3e', 'chrome', 0.02);
     return;
   }
-  const color = tag === 'bakery' ? '#c8231b' : '#1f62c7';
+  const color = tag === 'bakery' ? '#c8231b' : tag === 'florist' ? '#2f8a3e' : '#1f62c7';
   t.box(length / 2, base - 0.9, 0.06, length - 1.2, 0.6, 0.12, color, undefined, 0.03);
   t.box(length / 2, base - 0.95, 0.04, length - 1.0, 0.7, 0.08, shade(color, -0.3), undefined, 0.02);
-  if (d.detail > 0) for (let k = 0; k < 3; k++) t.ball(length / 2 - 0.5 + k * 0.5, base - 0.6, 0.15, 0.14, tag === 'bakery' ? '#e0b46a' : '#f2f2ee', [1.3, 0.8, 0.6]);
+  const bead = tag === 'bakery' ? ['#e0b46a'] : tag === 'florist' ? ['#c43a85', '#f6c624', '#f2f2ee'] : ['#f2f2ee'];
+  if (d.detail > 0) for (let k = 0; k < 3; k++) t.ball(length / 2 - 0.5 + k * 0.5, base - 0.6, 0.15, 0.14, bead[k % bead.length]!, [1.3, 0.8, 0.6]);
   t.box(length / 2, base - 1.6, 0.03, length - 0.6, 0.08, 0.5, IRON, 'metal', 0);
 }

@@ -7,13 +7,14 @@ export const STATION = { x0: -11.2, x1: 11.2, z0: -Z - 0.8, z1: -29.6, wall: 0.8
 /** North row between the terminus and the square: bakery shop, Gate Street under its arch, the boatyard. */
 export const NORTH_ROW = { z0: -22.4, z1: -16.0 } as const;
 
-/** Tram Terminus (team 1), Bakery Lane, the station, the north row with the bakery and the Town Gate, the boatyard. */
+/** Tram Terminus (team 1), Bakery Lane, the station, the north row with the bakery, the Town Gate and the flower shop, the boatyard. */
 export function northDistrict(L: Layout) {
   row(L);
   station(L);
   terminus(L);
   bakery(L);
   gate(L);
+  florist(L);
   boatyard(L);
 }
 
@@ -21,8 +22,22 @@ function row(L: Layout) {
   const { z0, z1 } = NORTH_ROW;
   L.block(-21.6, z0, -18.4, z1, 10.56, ['n', 's'], 'row-n');
   L.block(-8.8, z0, 2.4, z1, 10.56, ['n', 's', 'w'], 'row-n');
-  L.block(2.4, z0, 13.6, z1, 13.92, ['n', 's'], 'row-n');
   L.block(13.6, z0, 20.8, z1, 10.56, ['n', 's'], 'row-n');
+}
+
+/** Walk-through flower shop east of the gate: doors at opposite corners and a plant stand between, so no line runs through. */
+function florist(L: Layout) {
+  const { z0, z1 } = NORTH_ROW;
+  const top = 3.6;
+  const tag = 'florist';
+  L.run('wall', true, 2.4, 13.6, z0, z0 + 0.8, 0, top, [[8.8, 11.2, 2.72]], { tag });
+  L.run('wall', true, 2.4, 13.6, z1 - 0.8, z1, 0, top, [[4.8, 7.2, 2.72]], { tag });
+  L.add('wall', 2.4, 0, z0 + 0.8, 3.2, top, z1 - 0.8, { tag });
+  L.add('wall', 12.8, 0, z0 + 0.8, 13.6, top, z1 - 0.8, { tag });
+  L.add('ceiling', 2.4, top, z0, 13.6, 13.92, z1, { tag });
+  L.add('shelf', 5.6, 0, -19.6, 9.6, 2.4, -18.8, { tag });
+  L.add('counter', 10.4, 0, -18.4, 12.0, 1.28, -17.6, { tag });
+  for (const [x, z] of [[4.4, -20.4], [4.4, -18.0], [8.0, -20.8], [10.8, -20.0], [8.0, -17.6], [11.6, -19.6]] as const) L.seed(x, 0, z);
 }
 
 /** Concourse: doors to the forecourt and both platforms, a ticket booth and benches, iron columns. */
@@ -46,7 +61,7 @@ function station(L: Layout) {
   L.add('ceiling', x0, top, z0, x1, STATION.roof, z1, { tag });
   L.add('kiosk', -1.6, 0, -37.6, 1.6, 2.72, -33.6, { tag });
   for (const x of [-5.6, 5.6]) L.add('pillar', x - 0.3, 0, -35.9, x + 0.3, top, -35.3, { surface: 'metal', tag });
-  for (const x of [-8.0, 8.0]) L.add('counter', x - 1.2, 0, -33.2, x + 1.2, 1.04, -32.4, { tag: 'bench' });
+  for (const x of [-8.0, 8.0]) L.add('counter', x - 1.2, 0, -33.2, x + 1.2, 1.28, -32.4, { tag: 'bench' });
   for (const [x, z] of [[-8.0, -38.4], [-4.0, -38.4], [4.0, -38.4], [8.0, -38.4], [-4.0, -32.0], [4.0, -32.0], [-8.0, -35.2], [8.0, -35.2]] as const) L.seed(x, 0, z);
 }
 
@@ -65,7 +80,7 @@ function terminus(L: Layout) {
   L.add('kiosk', 13.6, 0, -31.2, 16.0, 2.72, -25.2, { tag });
   L.add('kiosk', 12.0, 0, -25.6, 14.4, 2.72, -22.4, { tag });
   // Platform cover: crates on the west wing, ticket booths at both ends (too tall to climb, out of reach of the railings).
-  for (const [a, b] of [[-38.4, -33.6], [-36.0, -28.0]] as const) L.add('stack', a, 0, b, a + 1.6, 1.04, b + 1.6, { surface: 'wood', tag: 'crates' });
+  for (const [a, b] of [[-38.4, -33.6], [-36.0, -28.0]] as const) L.add('stack', a, 0, b, a + 1.6, 1.28, b + 1.6, { surface: 'wood', tag: 'crates' });
   for (const [a, b] of [[-34.4, -39.2], [39.2, -38.4]] as const) L.add('kiosk', a, 0, b, a + 1.6 + (a > 0 ? 0.8 : 0), 2.72, b + 1.6, { tag });
   // A pump house in Bakery Lane against the west houses: no line runs down the lane into the market hall.
   L.add('kiosk', -44.0, 0, -20.0, -38.4, 2.72, -17.6, { tag: 'lane' });
@@ -120,6 +135,8 @@ function boatyard(L: Layout) {
   L.add('rail', 27.8, 0, -24.8, 28.0, 4.8, -18.4, { pass: true, surface: 'wood', tag });
   // The boat on its cradle: waist-high cover, no line in from the quay doors to the west door.
   L.add('stack', 24.8, 0, -22.4, 26.4, 1.6, -18.4, { surface: 'wood', tag });
+  // Timber stood by the street door: nothing sees from the boatyard across the square into the market hall.
+  L.add('stack', 23.2, 0, -16.0, 24.0, 2.4, -14.8, { surface: 'wood', tag: 'crates' });
   for (const [x, z] of [[27.2, -17.6], [25.6, -23.2], [22.4, -16.9], [29.0, -16.9], [25.2, -27.2]] as const) L.seed(x, 0, z);
   L.seed(25.6, 3.2, -26.4).seed(29.0, 3.2, -26.4);
 }

@@ -59,7 +59,7 @@ function quay(L: Layout) {
     [30.4, -27.2, 37.6, -25.6, 2.8], [36.0, -22.4, X, -20.8, 2.8],
     [36.0, 20.8, X, 22.4, 2.8], [30.4, 25.6, 37.6, 27.2, 2.8],
     // Timber at the mouths of the streets past the town hall.
-    [30.4, -16.0, 32.8, -13.6, 2.8], [33.6, 15.2, 36.0, 17.6, 2.8]
+    [30.4, -16.0, 32.8, -12.8, 2.8], [33.6, 15.2, 36.0, 17.6, 2.8]
   ];
   for (const [a, b, c, e, h] of full) L.add('stack', a, 0, b, c, h, e, { surface: 'wood', tag });
   // Crate clusters at the bridge heads: the middle of the lane is one 35 m field crossed from cover to cover.
@@ -69,5 +69,5 @@ function quay(L: Layout) {
     [36.8, 7.2, 38.4, 8.8], [32.0, 10.4, 33.6, 12.0], [36.0, 30.4, 37.6, 32.0],
     [37.6, -27.2, 39.2, -25.6], [37.6, -14.4, 39.2, -12.8], [37.6, 12.8, 39.2, 14.4], [37.6, 24.8, 39.2, 26.4]
   ];
-  for (const [a, b, c, e] of low) L.add('stack', a, 0, b, c, 1.04, e, { surface: 'wood', tag: 'crates' });
+  for (const [a, b, c, e] of low) L.add('stack', a, 0, b, c, 1.28, e, { surface: 'wood', tag: 'crates' });
 }

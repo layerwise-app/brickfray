@@ -27,7 +27,7 @@ function laundrette(L: Layout) {
   const { z0, z1 } = SOUTH_ROW;
   const top = 3.6;
   const tag = 'laundrette';
-  L.run('wall', true, -32.8, -21.6, z0, z0 + 0.8, 0, top, [[-25.6, -22.4, 2.72]], { tag });
+  L.run('wall', true, -32.8, -21.6, z0, z0 + 0.8, 0, top, [[-24.8, -22.4, 2.72]], { tag });
   L.run('wall', true, -32.8, -21.6, z1 - 0.8, z1, 0, top, [[-31.2, -28.0, 2.72]], { tag });
   L.add('wall', -32.8, 0, z0 + 0.8, -32.0, top, z1 - 0.8, { tag });
   L.add('wall', -22.4, 0, z0 + 0.8, -21.6, top, z1 - 0.8, { tag });
@@ -48,7 +48,7 @@ function park(L: Layout) {
   L.add('roof', -11.8, 3.36, 29.8, -5.0, 4.0, 35.8, { tag });
   L.add('basin', 8.8, 0, 30.4, 16.0, 0.48, 34.4, { walk: true, tag });
   // Planters along the railings: crouch cover on the open lawns; the yews stand taller than anyone on them.
-  for (const [a, b] of [[-41.6, -38.4], [-23.2, -21.6], [-16.8, -13.6], [-1.6, 3.2], [30.4, 33.6], [36.8, 39.2]] as const) L.add('garden', a, 0, 34.4, b, 1.04, 35.2, { tag: 'planter' });
+  for (const [a, b] of [[-41.6, -38.4], [-23.2, -21.6], [-16.8, -13.6], [-1.6, 3.2], [30.4, 33.6], [36.8, 39.2]] as const) L.add('garden', a, 0, 34.4, b, 1.28, 35.2, { tag: 'planter' });
   // A gatehouse at the alley mouth and garden walls by the road: no line runs the length of the lawns.
   L.add('kiosk', -31.2, 0, 26.4, -28.8, 2.72, 30.4, { tag });
   // A well head in Laundry Alley in front of the hall door.
@@ -79,21 +79,23 @@ function site(L: Layout) {
   L.add('wall', x0, fl, z0, x0 + 0.8, 6.4, z1, { tag });
   L.add('wall', x1 - 0.8, fl, z0, x1, 6.4, z1, { tag });
   L.add('wall', x0 + 0.8, fl, z1 - 0.8, x1 - 0.8, 6.4, z1, { tag });
+  // The window is over the yard's west half: the town hall stands behind what it sees, not the canal quay.
   L.add('wall', x0 + 0.8, fl, z0, 24.0, 6.4, z0 + 0.4, { tag });
-  L.add('wall', 28.0, fl, z0, x1 - 0.8, 6.4, z0 + 0.4, { tag });
-  L.add('wall', 24.0, fl, z0, 28.0, fl + 1.0, z0 + 0.4, { tag });
-  L.add('rail', 24.0, fl + 1.0, z0, 28.0, fl + 1.44, z0 + 0.4, { pass: true, surface: 'metal', tag });
-  L.add('lintel', 24.0, fl + 2.4, z0, 28.0, 6.4, z0 + 0.4, { tag });
+  L.add('wall', 26.4, fl, z0, x1 - 0.8, 6.4, z0 + 0.4, { tag });
+  L.add('wall', 24.0, fl, z0, 26.4, fl + 1.0, z0 + 0.4, { tag });
+  L.add('rail', 24.0, fl + 1.0, z0, 26.4, fl + 1.44, z0 + 0.4, { pass: true, surface: 'metal', tag });
+  L.add('lintel', 24.0, fl + 2.4, z0, 26.4, 6.4, z0 + 0.4, { tag });
   // Two flights up from the yard side: the west one boarded in (the floor cannot watch it), the east one open.
   L.flight(23.2, 23.2, 0, 's', 1.6, 8, fl / 8, tag);
   L.flight(28.8, 23.2, 0, 's', 1.6, 8, fl / 8, tag);
-  L.add('wall', 24.0, 0, 23.2, 24.2, fl + 1.6, 29.6, { surface: 'wood', tag });
-  L.add('rail', 27.8, 0, 23.2, 28.0, fl + 1.44, 29.6, { pass: true, surface: 'metal', tag });
+  // Both stop two steps short of the top, so each stair head opens onto the floor (a loop, not a landing pocket).
+  L.add('wall', 24.0, 0, 23.2, 24.2, fl + 1.6, 28.0, { surface: 'wood', tag });
+  L.add('rail', 27.8, 0, 23.2, 28.0, fl + 1.44, 28.0, { pass: true, surface: 'metal', tag });
   for (const [x, z] of [[26.0, 24.8], [26.0, 28.0], [23.2, 30.0], [28.8, 30.0]] as const) L.seed(x, fl, z);
   for (const [x, z] of [[26.0, 23.6], [26.0, 27.2], [26.0, 29.6]] as const) L.seed(x, 0, z);
-  // Site office, a skip and stacks in the yard.
+  // Site office, the welfare cabins stacked two high (they hide the quay from the window), a skip and stacks.
   L.add('kiosk', 20.8, 0, 17.6, 24.0, 2.72, 20.0, { tag: 'site-office' });
-  L.add('stack', 26.8, 0, 16.8, 30.4, 2.8, 20.8, { tag });
+  L.add('kiosk', 26.8, 0, 16.0, 30.4, 5.44, 20.4, { tag: 'site-office' });
   L.add('stack', 25.2, 0, 26.0, 26.8, 2.0, 27.6, { tag });
   L.add('stack', 24.0, 0, 34.4, 26.4, 1.6, 35.6, { tag: 'skip' });
 }

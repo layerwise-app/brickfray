@@ -35,6 +35,8 @@ export function plazaGround(p: Plan) {
   // Terminus: tram rails along both wings and the forecourt in front of the station.
   for (const zr of [-35.2, -34.4]) paint([-EDGE.x, zr - 0.06, EDGE.x, zr + 0.06], '#5f656b', true, 0.008);
   paint([-21.6, STATION.z1, 20.8, -22.4], '#d9d2c1');
+  // Platform paving along the cutting railings, so the walk beside the rail is studded stone like the rest of town.
+  for (const r of [[-EDGE.x, -EDGE.z, STATION.x0, -36.8], [STATION.x1, -EDGE.z, EDGE.x, -36.8]] as Rect[]) paint(r, '#c9c6bd');
   // Park: lawns and gravel paths; the pavilion and pond sit on the lawn.
   paint([-32.8, 22.4, 20.8, EDGE.z], '#e0c890');
   for (const r of [[-27.2, 27.2, -8.8, 38.4], [1.6, 27.2, 16.0, 38.4]] as Rect[]) paint(r, '#5aa83f', false, 0.008);
@@ -43,8 +45,9 @@ export function plazaGround(p: Plan) {
   paint([SITE.x0 + 0.8, SITE.z0 + 0.8, SITE.x1 - 0.8, SITE.z1 - 0.8], '#b9aa92', false, 0.008);
   // Cobbled lanes: Bakery Lane, Laundry Alley, Gate Street and Café Steps.
   for (const r of [[-EDGE.x, -EDGE.z, -32.8, HALL.z0], [-EDGE.x, HALL.z1, -32.8, EDGE.z], [-18.4, -22.4, -8.8, -16.0], [2.4, 16.0, 12.0, 22.4]] as Rect[]) paint(r, '#9a8f80');
-  // Interiors: bakery boards, laundrette tiles, boatyard concrete.
+  // Interiors: bakery boards, florist terracotta, laundrette tiles, boatyard concrete.
   paint([-32.0, -21.6, -22.4, -16.8], '#b98a5a');
+  checker([3.2, -21.6, 12.8, -16.8], '#c4553a', '#d98c5f', 1.6);
   checker([-32.0, 16.8, -22.4, 21.6], '#f2f2ee', '#7fc8e8', 0.8);
   paint([21.6, -28.0, 29.6, -16.8], '#a9aaa5');
 }

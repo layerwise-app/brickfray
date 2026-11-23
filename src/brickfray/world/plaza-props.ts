@@ -11,8 +11,8 @@ const LAMPS: Spot[] = [
   [43.75, 12.8], [43.75, 32.0], [-43.75, -24.0], [-43.75, 24.0], [27.2, -15.75], [24.0, 15.2], [-20.0, 37.6], [12.0, 37.6]
 ];
 /** Benches: x, z, quarter turns (the sitter faces local -z). */
-const BENCHES: Spot[] = [[-14.4, 29.6, 2], [5.6, 33.2, 3], [14.4, 37.6, 2]];
-const BINS: Spot[] = [[27.7, -15.68]];
+const BENCHES: Spot[] = [[-14.4, 29.6, 2], [5.6, 28.2, 2], [14.4, 39.4, 0]];
+const BINS: Spot[] = [[22.4, -15.68]];
 const TREES: [number, number, TreeKind][] = [[-36.8, 30.4, 'oak'], [-19.2, 29.6, 'blossom'], [-1.6, 31.2, 'oak'], [19.2, 32.8, 'poplar'], [6.4, 24.0, 'birch']];
 const BUSHES: Spot[] = [];
 const CAFE: Spot[] = [[3.2, 14.4], [5.6, 12.4]];

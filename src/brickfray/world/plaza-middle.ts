@@ -12,7 +12,10 @@ export const TOWER = {
 /** Colonnade along the town hall's west face under the loggia deck; the hall wall behind it (audio/rooms.ts). */
 export const ARCADE = { x0: 10.4, x1: 13.6, z0: -10.4, z1: 10.4, deck: 3.84, slab: 0.48, back: 13.6 } as const;
 /** Market hall: its west wall is the edge of town, its east front the square's west side, the gallery over its square doors. */
-export const HALL = { x0: -EDGE.x, x1: -16.8, z0: -12.0, z1: 12.0, wall: 0.8, top: 7.2, gallery: 3.2, galleryX: -20.8 } as const;
+export const HALL = {
+  x0: -EDGE.x, x1: -16.8, z0: -12.0, z1: 12.0, wall: 0.8, top: 7.2, gallery: 3.2, galleryX: -20.8,
+  windows: [[-4.4, -3.6], [3.6, 4.4]] as [number, number][]
+} as const;
 /** Canal arm from the town hall's back door to the east canal; footbridge at its head, road bridge for the quay. */
 export const CANAL = { x0: TOWER.x1, z: 2.4, parapet: 1.44, foot: [26.4, 29.6], road: [33.6, 42.4] } as const;
 /** The square between the hall yard and the arcade, the north and south rows. */
@@ -41,7 +44,19 @@ function hall(L: Layout) {
     at = b;
   }
   L.add('wall', x0, 0, at, x0 + w, top, z1 - w, { tag });
-  L.run('wall', false, z0 + w, z1 - w, x1 - w, x1, 0, top, [[-10.4, -7.2, 2.72], [7.2, 10.4, 2.72]], { tag });
+  L.run('wall', false, z0 + w, z1 - w, x1 - w, x1, 0, g, [[-10.4, -7.2, 2.72], [7.2, 10.4, 2.72]], { tag });
+  // Over the gallery the square front has two windows facing the loggia across the square: the gallery's rival.
+  at = z0 + w;
+  for (const [a, b] of HALL.windows) {
+    L.add('wall', x1 - w, g, at, x1, top, a, { tag });
+    L.add('wall', x1 - w, g, a, x1, g + 1.0, b, { tag });
+    L.add('lintel', x1 - w, g + 2.4, a, x1, top, b, { tag });
+    L.add('rail', x1 - w, g + 1.0, a, x1, g + 1.44, b, { pass: true, surface: 'metal', tag });
+    at = b;
+  }
+  L.add('wall', x1 - w, g, at, x1, top, z1 - w, { tag });
+  // Each window sits at the back of a 1.6 m bay: it frames the loggia and a strip of the square, not the whole square.
+  for (const [a, b] of HALL.windows) for (const [c0, c1] of [[a - 0.4, a], [b, b + 0.4]]) L.add('wall', x1 - w - 1.6, g, c0, x1 - w, top, c1, { tag });
   L.add('roof', x0, top, z0, x1, top + 0.4, z1, { tag });
   // Gallery along the east wall over the square doors, reached by a stair along each end wall.
   L.add('slab', gx, g - 0.4, z0 + w, x1 - w, g, z1 - w, { walk: true, surface: 'wood', tag });
@@ -52,11 +67,11 @@ function hall(L: Layout) {
   // The north stair climbs behind a solid wall (an approach the gallery cannot watch); the south one has a banister.
   L.add('wall', gx - 6.4, 0, -9.6, gx, 4.8, -9.4, { tag });
   L.add('rail', gx - 6.4, 0, 9.4, gx, 4.8, 9.6, { pass: true, surface: 'metal', tag });
-  for (const z of [-8.0, -3.2, 3.2, 8.0]) L.seed(-19.2, g, z);
+  for (const z of [-8.0, -3.2, 3.2, 8.0]) L.seed(-20.0, g, z);
   // Iron columns, stall counters (too tall to hop) and stall stands: half cover on the floor, 20 m aisles kept across.
   for (const [px, pz] of [[-36.0, -4.8], [-36.0, 4.8], [-28.0, -4.8], [-28.0, 4.8]] as const) L.add('pillar', px - 0.4, 0, pz - 0.4, px + 0.4, top, pz + 0.4, { tag });
   for (const [cx, cz] of [[-32.0, -7.2], [-32.0, 0], [-32.0, 7.2], [-24.4, -2.4], [-24.4, 2.4]] as const) L.add('counter', cx - 1.6, 0, cz - 0.6, cx + 1.6, 1.28, cz + 0.6, { tag });
-  L.add('shelf', -41.6, 0, -1.6, -38.4, 2.4, 1.6, { tag });
+  L.add('shelf', -40.8, 0, -1.6, -37.6, 2.4, 1.6, { tag });
   L.add('shelf', -40.0, 0, 6.4, -39.2, 2.4, 8.8, { tag });
   L.add('shelf', -40.0, 0, -8.8, -39.2, 2.4, -6.4, { tag });
   for (const s of [-1, 1]) L.add('shelf', -25.6, 0, s > 0 ? 5.6 : -9.6, -24.8, 2.4, s > 0 ? 9.6 : -5.6, { tag });
@@ -89,22 +104,26 @@ function square(L: Layout) {
   for (const [a, b, c, e] of [[2.4, 6.0, 5.6, 7.2], [-5.6, 8.8, -2.4, 10.0], [2.4, -14.4, 5.6, -13.2]] as const) {
     L.add('counter', a, 0, b, c, 1.28, e, { tag: 'stall' });
   }
-  for (const [a, b, c, e] of [[8.0, -12.8, 9.6, -10.4], [8.0, 10.4, 9.6, 12.8]] as const) L.add('garden', a, 0, b, c, 1.04, e, { tag: 'planter' });
+  for (const [a, b, c, e] of [[8.0, -12.8, 9.6, -10.4], [8.0, 10.4, 9.6, 12.8]] as const) L.add('garden', a, 0, b, c, 1.28, e, { tag: 'planter' });
   // Flower and news stands against the rows: they close the strips along the square's edges, so the streets past the
   // town hall never line up with the hall doors.
-  for (const [a, b, c, e] of [[-16.8, 13.6, -13.6, 16.0], [-13.6, 13.6, -10.4, 16.0], [-1.6, 12.8, 0.8, 16.0], [-4.8, -16.0, -2.4, -13.6]] as const) L.add('kiosk', a, 0, b, c, 2.72, e, { tag });
+  for (const [a, b, c, e] of [[-16.8, 13.6, -13.6, 16.0], [-13.6, 13.6, -10.4, 16.0], [-1.6, 11.6, 0.8, 16.0], [-4.8, -16.0, -2.4, -13.6]] as const) L.add('kiosk', a, 0, b, c, 2.72, e, { tag });
   // A news stand against the bandstand where the gate opens: the gate shows the yard or the bandstand, never the square's length.
   L.add('kiosk', -19.2, 0, -15.2, -15.2, 2.72, -12.0, { tag });
+  // A poster column at the east arch's mouth and a flower stall on the hall's south-east corner: no line runs from the
+  // terminus through the gate to Café Steps, or from the laundrette across the square to the town hall door.
+  L.add('pillar', -9.2, 0, -14.8, -8.0, 2.72, -13.6, { tag: 'poster' });
+  L.add('kiosk', -18.4, 0, 12.0, -16.8, 2.72, 13.2, { tag: 'flowers' });
   // Market stalls across the hall's side streets: the lanes reach the hall doors, the yard the shops.
   L.add('kiosk', -30.4, 0, -16.0, -28.0, 2.72, -12.0, { tag: 'lane' });
   L.add('kiosk', -30.4, 0, 12.0, -28.0, 2.72, 16.0, { tag: 'lane' });
   // Half walls (planters) every few metres: crouch cover across the open stone.
   for (const [a, b, c, e] of [[4.0, -12.0, 7.2, -11.2], [-1.6, 8.8, 0.8, 9.6], [6.4, -0.8, 7.2, 2.4], [-14.4, -1.6, -13.6, 1.6], [-4.8, -10.4, -1.6, -9.6]] as const) {
-    L.add('garden', a, 0, b, c, 1.04, e, { tag: 'planter' });
+    L.add('garden', a, 0, b, c, 1.28, e, { tag: 'planter' });
   }
 }
 
-/** Colonnade with two small loggias above (one window each, a grenade's throw from the square), reached from the town hall stairs. */
+/** Colonnade with a loggia above (a window at each end, a grenade's throw from the square), one town hall stair up each end. */
 function arcade(L: Layout) {
   const { x0, x1, z0, z1, deck, slab } = ARCADE;
   const tag = 'arcade';
@@ -126,9 +145,11 @@ function arcade(L: Layout) {
   L.add('wall', x0, deck, at, x0 + 0.4, roof, z1, { tag });
   L.add('wall', x0 + 0.4, deck, z0, x1, roof, z0 + 0.4, { tag });
   L.add('wall', x0 + 0.4, deck, z1 - 0.4, x1, roof, z1, { tag });
-  L.add('wall', x0 + 0.4, deck, -5.6, x1, roof, 5.6, { tag });
+  // Two staggered piers halfway along: the loggia between the stairs is a loop with a dog-leg, not one 20 m line.
+  L.add('wall', x0 + 0.4, deck, -2.4, 12.4, roof, -1.6, { tag });
+  L.add('wall', 12.0, deck, 1.6, x1, roof, 2.4, { tag });
   L.add('roof', x0, roof, z0, x1, roof + 0.4, z1, { tag });
-  for (const z of [-8.8, -6.4, 6.4, 8.8]) L.seed(12.0, deck, z);
+  for (const [x, z] of [[12.0, -8.8], [12.0, -6.4], [12.0, -4.0], [13.0, -2.0], [12.2, 0], [11.4, 2.0], [12.0, 4.0], [12.0, 6.4], [12.0, 8.8]] as const) L.seed(x, deck, z);
   for (const z of [-8.8, -4.0, 4.0, 8.8]) L.seed(9.2, 0, z);
 }
 
@@ -167,8 +188,8 @@ function townHall(L: Layout) {
   L.add('shelf', 23.6, 0, 4.0, 24.0, 2.72, h - w, { tag });
   for (const [x, z] of [[21.0, -8.0], [21.0, 8.0], [17.4, -6.4], [17.4, 6.4], [24.8, -6.4], [24.8, 6.4], [21.0, -2.8], [21.0, 2.8], [16.8, 0], [25.0, 0]] as const) L.seed(x, 0, z);
   for (const s of [-1, 1]) L.seed(inner + 0.8, deck, s * 9.0);
-  // A poster column in the street behind the town hall: no line runs from the square down to the quay.
-  L.add('pillar', 23.4, 0, 12.4, 24.6, 2.72, 13.6, { tag: 'poster' });
+  // A news stand in the street behind the town hall, overlapping the lock hut's line: no line runs from the square to the quay.
+  L.add('kiosk', 22.4, 0, 12.4, 24.8, 2.72, 16.0, { tag: 'news' });
 }
 
 /** Canal arm from the town hall's back door to the east canal: a flat footbridge at its head, a road bridge for the quay. */

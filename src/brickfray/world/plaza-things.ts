@@ -34,7 +34,10 @@ export function kiosk(d: Drawer, p: Piece) {
     const hw = Math.min(len - 0.8, 1.6);
     t.box(0, 1.05, z, hw, 0.9, 0.04, '#23303b', undefined, 0);
     t.box(0, 1.0, z + s * 0.12, hw + 0.2, 0.08, 0.3, trim, undefined, 0.01);
-    t.prism('kiosk-awn', [[0, 2.2], [0.5, 1.98], [0.5, 1.92], [0, 2.14]], hw + 0.3, 0, 0, z, s > 0 ? panel : shade(panel, -0.05), undefined, s > 0 ? 0 : Math.PI);
+    // A striped awning: from below it reads as cloth, not a flat slab.
+    const aw = hw + 0.3;
+    const strips = 5;
+    for (let i = 0; i < strips; i++) t.prism('kiosk-awn', [[0, 2.2], [0.5, 1.98], [0.5, 1.92], [0, 2.14]], aw / strips, -aw / 2 + (aw / strips) * (i + 0.5), 0, z, i % 2 ? trim : s > 0 ? panel : shade(panel, -0.05), undefined, s > 0 ? 0 : Math.PI);
     if (d.detail > 0) for (let k = 0; k < 4; k++) t.box(-hw / 2 + 0.2 + k * ((hw - 0.4) / 3), 1.08, z + s * 0.16, 0.22, rng.range(0.12, 0.26), 0.16, rng.pick(BLOOMS), undefined, 0.01);
   }
   t.box(0, cap, 0, len + 0.3, 0.14, wid + 0.3, trim, undefined, 0.03);
@@ -90,7 +93,10 @@ export function shelf(d: Drawer, p: Piece) {
     for (let i = 0; i < n; i++) {
       const x = -len / 2 + (len / n) * (i + 0.5);
       const z = s * (wid / 4 + 0.03);
-      if (p.tag === 'bakery') t.ball(x, y + 0.16, z, 0.13, rng.pick(['#c99a3e', '#b07a3a', '#e0b46a']), [1.3, 0.75, 0.9]);
+      if (p.tag === 'florist') {
+        t.cyl(x, y + 0.06, z, 0.1, 0.18, '#b44a31', undefined, 0.01, 8);
+        t.ball(x, y + 0.34, z, 0.15, rng.pick(BLOOMS), [1, 0.8, 1]);
+      } else if (p.tag === 'bakery') t.ball(x, y + 0.16, z, 0.13, rng.pick(['#c99a3e', '#b07a3a', '#e0b46a']), [1.3, 0.75, 0.9]);
       else t.box(x, y + 0.06, z, len / n - 0.06, rng.range(0.18, 0.4), 0.26, rng.pick([...PANELS, '#f2f2ee', '#f6c624']), undefined, 0.01);
     }
   }

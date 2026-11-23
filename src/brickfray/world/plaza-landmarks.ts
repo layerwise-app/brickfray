@@ -140,12 +140,17 @@ export function fountainColumn(d: Drawer, p: Piece) {
   const cx = (p.min[0] + p.max[0]) / 2;
   const cz = (p.min[2] + p.max[2]) / 2;
   const W = new Pen(d, WORLD);
+  const half = Math.min(p.max[0] - p.min[0], p.max[2] - p.min[2]) / 2;
   W.cyl(cx, p.min[1], cz, 0.36, p.max[1] - p.min[1], '#e3d6bc', undefined, 0.04);
-  for (const [y, r] of [[1.1, 1.0], [1.9, 0.7], [2.5, 0.42]] as const) {
+  // A stone drum and the lowest bowl fill the collider's width, so a player wading in stops at the stone.
+  W.cyl(cx, p.min[1], cz, half - 0.05, 0.9, '#e3d6bc', undefined, 0.05);
+  for (const [y, r] of [[1.1, half], [1.9, 0.7], [2.5, 0.42]] as const) {
     W.cyl(cx, y, cz, r, 0.16, '#efe5cf', undefined, 0.05);
     W.cyl(cx, y + 0.12, cz, r - 0.08, 0.05, '#7fc8e8', 'glass');
   }
-  W.ball(cx, p.max[1] + 0.35, cz, 0.16, '#c99a3e', undefined, 0, 1, 'chrome');
+  W.cyl(cx, p.max[1], cz, 0.2, 0.1, '#efe5cf', undefined, 0.03);
+  W.cyl(cx, p.max[1] + 0.1, cz, 0.05, 0.16, '#c99a3e', 'chrome');
+  W.ball(cx, p.max[1] + 0.36, cz, 0.16, '#c99a3e', undefined, 0, 1, 'chrome');
 }
 
 /** Statue plinth with a bronze obelisk and a gilded ball (the needle has its own collider piece). */
