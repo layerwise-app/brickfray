@@ -9,7 +9,7 @@ import { explosionDamage, stepGrenade, throwGrenade, type Grenade } from './gren
 import type { HitPose } from './hitboxes';
 import { resolveMelee, resolveShot } from './hits';
 import { createMoveState, eyeHeight, stepMove } from './movement';
-import { pickSpawn, type RecentDeath } from './spawns';
+import { pickSpawn, spawnWatch, type RecentDeath, type SpawnWatch } from './spawns';
 import { KILL_SCORE } from './streaks';
 import { BUTTON, type Command, type GameEvent, type HitKind, type HostPlayer, type KillCause, type MatchSettings, type PlayerState, type ShotTrace } from './types';
 
@@ -51,6 +51,8 @@ export class HostSim {
   private nextId = 1;
   private nextGrenade = 1;
   private seed: number;
+  /** Room matches judge spawns by how soon an enemy could see them too (built on the first spawn); undefined = not yet. */
+  private watch: SpawnWatch | null | undefined;
 
   /** `seed` fixes spawns and bot choices for tests; matches roll a new one so spawns differ every game. */
   constructor(
@@ -110,7 +112,10 @@ export class HostSim {
   }
 
   spawn(player: HostPlayer, at?: { position: [number, number, number]; yaw: number }) {
-    const spot = at ?? pickSpawn(this.world, this.layout.spawns, player, this.players.values(), this.deaths, this.time, () => this.random());
+    const rooms = this.settings.mode !== 'solo';
+    if (!at && rooms && this.watch === undefined) this.watch = spawnWatch(this.world, this.layout);
+    const runs = rooms ? this.watch : null;
+    const spot = at ?? pickSpawn(this.world, this.layout.spawns, player, this.players.values(), this.deaths, this.time, () => this.random(), runs ? { layout: this.layout, runs } : null);
     player.move = createMoveState(...spot.position);
     player.move.grounded = true;
     player.yaw = spot.yaw;
@@ -124,7 +129,8 @@ export class HostSim {
     player.arms.grenades = player.arms.grenadeMax;
     player.health = player.maxHealth;
     player.alive = true;
-    player.protectedUntil = this.time + (player.bot ? 0 : PLAYER.spawnProtection);
+    // Solo's snapbots come in waves balanced without it; in rooms bots get what a player gets.
+    player.protectedUntil = this.time + (player.bot && !rooms ? 0 : PLAYER.spawnProtection);
     player.damagers.clear();
     this.history.set(player.id, []);
     this.events.push({ type: 'spawn', player: player.id });
@@ -149,10 +155,19 @@ export class HostSim {
   }
 
   private hooks(viewTime: number): ArmsHooks {
+    // Spawn protection ends with the first attack: nobody fights from behind it.
+    const attack = (player: PlayerState) => (player.protectedUntil = Math.min(player.protectedUntil, this.time));
     return {
-      fire: (player, weapon, dirs) => resolveShot(this, player, weapon, dirs, viewTime),
-      melee: (player) => resolveMelee(this, player, viewTime),
+      fire: (player, weapon, dirs) => {
+        attack(player);
+        resolveShot(this, player, weapon, dirs, viewTime);
+      },
+      melee: (player) => {
+        attack(player);
+        resolveMelee(this, player, viewTime);
+      },
       grenade: (player, cook, low) => {
+        attack(player);
         const m = player.move;
         const eye: [number, number, number] = [m.x, m.y + eyeHeight(m) * player.scale, m.z];
         const g = throwGrenade(this.nextGrenade++, player.id, eye, aimDirection(player.yaw, player.pitch), [m.vx, m.vy, m.vz], cook, low);

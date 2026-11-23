@@ -35,10 +35,17 @@ const IDLE = 2;
 const HUNT_SLACK = 4;
 /** A fill bot steps right onto its firing spot (m): a metre off it, the post or crate edge the line passes can block it. */
 const SPOT_REACH = 0.3;
+/**
+ * In rooms a bot does not know where an enemy came back in: it hunts one that respawned less than this long ago (s) only
+ * once it has fired (or the bot sees it). Hunting everyone's true position made bots converge on every fresh spawn.
+ */
+const FRESH = 4;
 
 /** Snapbot and fill-bot brains: perceive, navigate the waypoint graph, aim with human-like lag, shoot. */
 export class BotDirector {
   private brains = new Map<number, Brain>();
+  /** Each player's life and the host time it began (-Infinity for a life already under way when first seen). */
+  private lives = new Map<number, { life: number; at: number }>();
   /** 0 = easy … 1 = sharp; solo raises it each wave. */
   skill = 0.4;
   /** Seconds the aim trails a moving target (solo: early waves miss a strafing player); 0 aims where it is. */
@@ -108,7 +115,9 @@ export class BotDirector {
       graphOnly: 0,
       fireHeld: false,
       reloadHeld: false,
-      slot: 0
+      slot: 0,
+      post: null,
+      postRest: 0
     });
   }
 
@@ -117,6 +126,11 @@ export class BotDirector {
   }
 
   tick() {
+    for (const p of this.host.players.values()) {
+      const known = this.lives.get(p.id);
+      if (!known) this.lives.set(p.id, { life: p.life, at: -Infinity });
+      else if (known.life !== p.life) this.lives.set(p.id, { life: p.life, at: this.host.time });
+    }
     this.grenades.update();
     for (const [id, brain] of this.brains) {
       const bot = this.host.players.get(id);
@@ -193,7 +207,7 @@ export class BotDirector {
         else if (!b.fireHeld) cmd.buttons |= BUTTON.fire;
       }
       b.fireHeld = (cmd.buttons & BUTTON.fire) !== 0;
-      if (wantsSights(gun, bot.arms.weapon, dist)) cmd.buttons |= BUTTON.ads;
+      if (wantsSights(gun, bot.arms.weapon, dist, closingSpeed(bot, target))) cmd.buttons |= BUTTON.ads;
       const swing = dist < 1.9 && bot.arms.meleeCooldown <= 0;
       if (swing) cmd.buttons |= BUTTON.melee;
       if (bot.bot === 'rusher') rush(b, dist, cmd, swing, () => this.random());
@@ -275,6 +289,8 @@ export class BotDirector {
     b.noticed.clear();
     b.hunt = 0;
     b.lane = pickLane(this.host, bot, b, this.brains, () => this.random());
+    b.post = null;
+    b.postRest = 0;
   }
 
   /** Out of a fight a kit with a sidearm for far fights carries it while the enemy it hunts is well beyond its primary's reach. */
@@ -286,10 +302,18 @@ export class BotDirector {
 
   /** Nobody in sight: where to go for the enemy it hunts (a fill bot to a spot in its band, from its flank). */
   private hunt(bot: PlayerState, b: Brain, prof: BotProfile, closer: boolean, chose: (enemy: Spot) => void): Spot | null {
-    const enemy = huntTarget(this.host, bot, b, this.brains, closer);
+    const enemy = huntTarget(this.host, bot, b, this.brains, closer, (p) => this.unheard(p));
     if (!enemy) return null;
     chose(enemy);
+    const post = prof.patient ? this.roam.perch(bot, b, enemy, prof.band) : null;
+    if (post) return post;
     return prof.standoff ? this.roam.standoff(bot, b, enemy, prof.band, prof.range, this.roam.flank(bot, b.lane, enemy)) : this.roam.approach(bot, b, enemy, prof.range);
+  }
+
+  /** A room enemy that respawned under FRESH s ago and has not fired since. */
+  private unheard(p: PlayerState) {
+    const since = this.host.time - (this.lives.get(p.id)?.at ?? -Infinity);
+    return this.host.settings.mode !== 'solo' && since < FRESH && p.arms.shots === 0;
   }
 
   /** Turn the aim toward `at` (with the bot's aim error) at its turn rate; the distance in plan and how far off it still is. */
@@ -313,3 +337,11 @@ export class BotDirector {
 }
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
+
+/** How fast (m/s) `target` is coming at `bot` in plan. */
+function closingSpeed(bot: PlayerState, target: PlayerState) {
+  const dx = bot.move.x - target.move.x;
+  const dz = bot.move.z - target.move.z;
+  const d = Math.hypot(dx, dz);
+  return d < 1e-3 ? 0 : (target.move.vx * dx + target.move.vz * dz) / d;
+}

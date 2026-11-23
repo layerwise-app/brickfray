@@ -165,6 +165,7 @@ describe('upgrade cards for the character', () => {
       match.sim.spawn(coral, { position: [0, 0, 0], yaw: 0 });
       const bot = match.sim.addPlayer('Snap', 'grunt', 'grunt');
       match.sim.spawn(bot, { position: [0, 0, -10], yaw: 0 });
+      bot.protectedUntil = 0;
       match.sim.damageEnabled = true;
       const pitch = Math.atan2(PLAYER.eye - 0.35 - 1.1 - PLAYER.eye + 1.1, 10);
       match.sim.applyCommand(coral.id, { seq: 1, forward: 0, right: 0, yaw: 0, pitch, buttons: BUTTON.fire, slot: 0, viewTime: match.time, life: coral.life });
@@ -191,7 +192,7 @@ describe('bots reach a player anywhere', () => {
     const bot = match.sim.addPlayer('Snap', 'grunt', 'grunt');
     match.sim.spawn(bot, { position: [5, 0, 1], yaw: 0 });
     const roam = new BotRoam(match.sim, () => 0.5);
-    const state: RoamState = { path: [], lastSeen: null, patrol: null, patrolUntil: 0, approach: null };
+    const state: RoamState = { path: [], lastSeen: null, patrol: null, patrolUntil: 0, approach: null, post: null, postRest: 0 };
     expect(roam.approach(bot, state, on, 34)).toEqual([-18, 0, 0]);
     // On the graph, the bot goes for the player itself.
     expect(roam.approach(bot, { ...state, approach: null }, [-4, 0, 0.5], 34)).toEqual([-4, 0, 0.5]);

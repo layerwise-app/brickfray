@@ -31,7 +31,7 @@ export interface BotProfile {
   patient?: boolean;
   /** One heavy round at a time (hand cannon, pistol): fired with the body under the crosshair, not once roughly on. */
   steady?: boolean;
-  /** Aims down the sights beyond this distance (m). */
+  /** Aims down the sights beyond this distance (m); an automatic not while the enemy is rushing it. */
   sights?: number;
   /** Fill bots: a fight nearer than `near` or farther than `far` (m) is fought with the kit's sidearm. */
   sidearm?: { near?: number; far?: number };
@@ -56,16 +56,17 @@ const FILL = { reaction: 0.42, turn: 4.2, error: 0.08 };
  * close-range guns walk in. Each kit's sidearm takes the fights at the range its primary is poor at, as the kit is built.
  */
 const ENGAGE: Record<WeaponId, Omit<BotProfile, keyof typeof FILL | 'standoff'>> = {
-  ar: { range: 34, band: { min: 12, max: 26 } },
+  // Automatics go to the sights about where the hip cone grows wider than a body.
+  ar: { range: 34, band: { min: 12, max: 26 }, sights: 14 },
   // The pattern kills in one shot only from the hip within about 5 m, aimed within about 7 m.
   shotgun: { range: 24, band: { min: 0, max: 4 }, sights: 4, sidearm: { far: 10 } },
   sniper: { range: 70, band: { min: 22, max: 55 }, patient: true, sidearm: { near: 8 } },
   pistol: { range: 26, band: { min: 6, max: 16 }, steady: true, sights: 6 },
-  nailer: { range: 26, band: { min: 6, max: 16 }, sidearm: { far: 22 } },
-  pulse: { range: 45, band: { min: 14, max: 32 } },
+  nailer: { range: 26, band: { min: 6, max: 16 }, sights: 12, sidearm: { far: 22 } },
+  pulse: { range: 45, band: { min: 14, max: 32 }, sights: 15 },
   harpoon: { range: 55, band: { min: 18, max: 42 }, patient: true, sidearm: { near: 8 } },
   cannon: { range: 30, band: { min: 0, max: 10 }, steady: true, sights: 6 },
-  buzzer: { range: 20, band: { min: 0, max: 7 } }
+  buzzer: { range: 20, band: { min: 0, max: 7 }, sights: 10 }
 };
 
 /** How a bot reacts, turns, misses and spaces itself: by snapbot kind, or for a fill bot by the gun it holds (default its primary). */

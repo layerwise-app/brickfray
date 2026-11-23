@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { MapLayout } from '../world/types';
 
 const layout: MapLayout = {
@@ -18,7 +18,35 @@ const { netConditions } = await import('./channel');
 const { Predictor } = await import('../game/predictor');
 const { CollisionWorld } = await import('../sim/collision');
 
-const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+// Virtual time: the host ticker, the link's latency and the test's own pacing share one clock, so a loaded machine
+// can't stretch one against another. The channel's reliable-order clock is module state, so the fake clock runs on
+// across the tests instead of restarting.
+const wait = (ms: number) => vi.advanceTimersByTimeAsync(ms);
+
+/** A client resends its newest unacknowledged commands every frame: after the scripted input, keep doing so until the host has them all. */
+async function settle(predictor: InstanceType<typeof Predictor>, client: InstanceType<typeof ClientSession>, last: number) {
+  for (let i = 0; i < 120 && (client.snapshots.at(-1)?.ack ?? 0) < last; i++) {
+    client.sendCommands(predictor.unacked(4));
+    await wait(1000 / 60);
+  }
+  await wait(400);
+}
+
+beforeAll(() => {
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'performance'] });
+});
+afterAll(() => {
+  vi.useRealTimers();
+});
+beforeEach(() => {
+  // The lossy lane drops and delays packets with Math.random: a fixed sequence plays the same run every time.
+  let s = 12345;
+  vi.spyOn(Math, 'random').mockImplementation(() => ((s = (Math.imul(s, 1664525) + 1013904223) >>> 0) / 4294967296));
+});
+afterEach(() => {
+  vi.restoreAllMocks();
+  Object.assign(netConditions, { latency: 0, jitter: 0, loss: 0 });
+});
 
 describe('host and client over a lossy loopback', () => {
   it('predicts movement that matches the host after reconciliation', async () => {
@@ -45,11 +73,11 @@ describe('host and client over a lossy loopback', () => {
       if (snap?.self) predictor.reconcile(snap.ack, snap.self);
       await wait(1000 / 60);
     }
-    await wait(400);
+    await settle(predictor, client, seq);
     const last = client.snapshots.at(-1)!;
     predictor.reconcile(last.ack, last.self!);
     const hostPlayer = host.match!.sim.players.get(client.you)!;
-    expect(last.ack).toBeGreaterThan(80);
+    expect(last.ack).toBe(seq);
     expect(Math.hypot(hostPlayer.move.x - predictor.player.move.x, hostPlayer.move.z - predictor.player.move.z)).toBeLessThan(0.05);
     expect(Math.hypot(hostPlayer.move.x, hostPlayer.move.z - 0)).toBeGreaterThan(3);
     expect(client.roster.size).toBe(3);
@@ -92,7 +120,7 @@ describe('host and client over a lossy loopback', () => {
       if (snap?.self) predictor.reconcile(snap.ack, snap.self);
       await wait(1000 / 60);
     }
-    await wait(400);
+    await settle(predictor, client, 150);
     expect(Math.min(...predicted.values())).toBe(0);
     expect(hostPlayer.arms.grenades).toBe(2);
     const mismatched = [...atHost].filter(([seq, n]) => predicted.get(seq) !== n);
@@ -137,7 +165,7 @@ describe('host and client over a lossy loopback', () => {
       if (snap?.self) predictor.reconcile(snap.ack, snap.self);
       await wait(1000 / 60);
     }
-    await wait(400);
+    await settle(predictor, client, 170);
     const last = client.snapshots.at(-1)!;
     predictor.reconcile(last.ack, last.self!);
     // Vega's AR: 30 rounds, +40% and +30% = 51; the empty reload of 2.4 s runs 35% shorter.

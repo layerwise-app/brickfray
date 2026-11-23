@@ -19,6 +19,7 @@ function duel(character: CharacterId, d: number, dir: [number, number] = [0, -1]
   const bots = new BotDirector(sim);
   const bot = sim.addPlayer('Bot', character, 'grunt');
   sim.spawn(bot, { position: [0, 0, 0], yaw: 0 });
+  bot.protectedUntil = 0;
   bots.add(bot);
   const me = sim.addPlayer('Me', 'vega');
   sim.spawn(me, { position: [dir[0] * d, 0, dir[1] * d], yaw: 0 });

@@ -56,9 +56,16 @@ export function onTarget(gun: BotProfile, ads: number, offAim: number, dist: num
   return offAim < 0.12 + (1.5 / Math.max(4, dist)) * 0.1;
 }
 
-/** Aim down the sights: a scoped gun always (a snapbot's only beyond 12 m), others beyond their profile's `sights`. */
-export function wantsSights(gun: BotProfile, weapon: WeaponId, dist: number) {
-  return gun.patient || (gun.sights !== undefined && dist > gun.sights) || (WEAPONS[weapon].zoom > 2 && dist > 12);
+/** An enemy coming at a bot faster than this (m/s) is rushing it: an automatic stays at the hip and keeps its feet. */
+export const RUSHED = 3.5;
+
+/**
+ * Aim down the sights: a scoped gun always (a snapbot's only beyond 12 m), others beyond their profile's `sights`,
+ * an automatic only while the enemy is not rushing it (`closing`, m/s).
+ */
+export function wantsSights(gun: BotProfile, weapon: WeaponId, dist: number, closing = 0) {
+  const auto = WEAPONS[weapon].mode === 'auto' || WEAPONS[weapon].mode === 'burst';
+  return gun.patient || (gun.sights !== undefined && dist > gun.sights && !(auto && closing > RUSHED)) || (WEAPONS[weapon].zoom > 2 && dist > 12);
 }
 
 /**

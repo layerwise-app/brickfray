@@ -1,5 +1,5 @@
 import { appendFileSync } from 'node:fs';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { CharacterId } from '../characters/types';
 import { MAPS } from '../world';
 import type { MapId } from '../world/types';
@@ -158,8 +158,8 @@ interface Run {
  * A whole solo run with a bot brain at a fixed skill standing in for the player. `upgrades: false` takes the card and
  * then strips it again, so the run has the same breaks and refills but no upgrades.
  */
-export function playRun(map: MapId, difficulty: Difficulty, character: CharacterId, skill: Skill, upgrades: boolean, cover: number, maxMinutes = 60): Run {
-  const match = new Match(MAPS[map].layout(), { mode: 'solo', map, minutes: 0, seats: 0, difficulty });
+export function playRun(map: MapId, difficulty: Difficulty, character: CharacterId, skill: Skill, upgrades: boolean, cover: number, maxMinutes = 60, seed?: number): Run {
+  const match = new Match(MAPS[map].layout(), { mode: 'solo', map, minutes: 0, seats: 0, difficulty }, seed);
   const me = match.addHuman('Sim', character);
   match.start();
   const player = new Stand(match.sim, me, skill);
@@ -186,6 +186,18 @@ export function playRun(map: MapId, difficulty: Difficulty, character: Character
     }
   }
   return { wave: match.state.wave, minutes: Math.round(match.time / 6) / 10, kills: me.kills, picks: summarize(picks), death, ended: match.state.phase === 'ended' };
+}
+
+/** A repeatable stand-in for Math.random (mulberry32). */
+function seeded(seed: number) {
+  let s = seed >>> 0;
+  return () => {
+    s = (s + 0x6d2b79f5) >>> 0;
+    let t = s;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
 }
 
 function strip(p: HostPlayer) {
@@ -222,7 +234,15 @@ describe.runIf(process.env.BALANCE)('solo balance (BALANCE=1, slow)', () => {
     const unended: string[] = [];
     for (const upgrades of [false, true]) {
       for (let i = 0; i < runs; i++) {
-        const r = playRun(map, difficulty, character, skill, upgrades, cover);
+        // Seeded run by run (match and stand-in alike) so a balance check repeats; SEED shifts the whole set.
+        const seed = Number(process.env.SEED ?? 1000) + i * 7 + (upgrades ? 500 : 0);
+        const random = vi.spyOn(Math, 'random').mockImplementation(seeded(seed));
+        let r: Run;
+        try {
+          r = playRun(map, difficulty, character, skill, upgrades, cover, 60, seed);
+        } finally {
+          random.mockRestore();
+        }
         result[upgrades ? 'with' : 'without']!.push(r.wave);
         if (!r.ended) unended.push(`${upgrades ? 'with' : 'without'} run ${i + 1}`);
         table.push(`${difficulty} ${upgrades ? 'with   ' : 'without'} run ${i + 1}: wave ${r.wave}, ${r.kills} kills, ${r.minutes} min, died ${r.death}; ${r.picks}`);

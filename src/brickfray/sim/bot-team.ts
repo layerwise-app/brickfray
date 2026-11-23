@@ -34,13 +34,14 @@ export function pickLane(host: HostSim, bot: PlayerState, b: TeamState, brains: 
 
 /**
  * The enemy to go after with nobody in sight: the nearest, kept unless another is clearly nearer; team bots leave
- * enemies their teammates are after, and a close-range bot picks on one busy fighting someone else.
+ * enemies their teammates are after, and a close-range bot picks on one busy fighting someone else. `unheard` enemies
+ * (just respawned, see BotDirector) are not known to be anywhere yet.
  */
-export function huntTarget(host: HostSim, bot: PlayerState, b: TeamState, brains: ReadonlyMap<number, TeamState>, closer: boolean): Spot | null {
+export function huntTarget(host: HostSim, bot: PlayerState, b: TeamState, brains: ReadonlyMap<number, TeamState>, closer: boolean, unheard: (p: PlayerState) => boolean = () => false): Spot | null {
   let best: PlayerState | null = null;
   let bestScore = Infinity;
   for (const p of host.players.values()) {
-    if (!p.alive || !host.hostile(bot, p)) continue;
+    if (!p.alive || !host.hostile(bot, p) || unheard(p)) continue;
     let score = Math.hypot(p.move.x - bot.move.x, p.move.z - bot.move.z) - (p.id === b.hunt ? STICK : 0);
     const other = brains.get(p.id);
     if (closer && other && other.target && other.target !== bot.id && other.lostFor === 0) score -= BUSY;

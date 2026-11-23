@@ -33,7 +33,7 @@ describe.each(ALL_MAPS)('team bots on %s', (id) => {
   it('never stand idle, respawned or not', () => {
     const match = new Match(MAPS[id].layout(), { mode: 'tdm', map: id, minutes: 30, seats: 10, difficulty: 'normal' }, 1);
     match.start();
-    const brains = (match.bots as unknown as { brains: Map<number, { target: number; lostFor: number }> }).brains;
+    const brains = (match.bots as unknown as { brains: Map<number, { target: number; lostFor: number; post: { on: number } | null }> }).brains;
     const trail = new Map<number, { t: number; x: number; y: number; z: number; contact: boolean }[]>();
     const idle: string[] = [];
     let deaths = 0;
@@ -49,8 +49,9 @@ describe.each(ALL_MAPS)('team bots on %s', (id) => {
           continue;
         }
         const brain = brains.get(p.id)!;
-        // A fight round a corner flickers in and out of sight; holding ground in one is deliberate.
-        const contact = brain.target !== 0 && brain.lostFor <= 1;
+        // A fight round a corner flickers in and out of sight; holding ground in one is deliberate, as is a long gun
+        // holding a high post (it comes down after a while).
+        const contact = (brain.target !== 0 && brain.lostFor <= 1) || (brain.post?.on ?? -1) >= 0;
         const h = trail.get(p.id) ?? [];
         h.push({ t: match.time, x: p.move.x, y: p.move.y, z: p.move.z, contact });
         while (h[0]!.t < match.time - STILL) h.shift();

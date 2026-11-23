@@ -1,4 +1,4 @@
-import { nearestWaypoint } from './bot-nav';
+import { findPath, nearestWaypoint } from './bot-nav';
 import type { Band } from './bot-profile';
 import { PLAYER } from './constants';
 import type { HostSim } from './host';
@@ -16,6 +16,10 @@ export interface RoamState {
   patrolUntil: number;
   /** The last `approach` worked out: the enemy spot it was for, when, and where it said to go. */
   approach: { for: Spot; at: number; spot: Spot } | null;
+  /** A long gun's high post (see `perch`): where, the host time to be on it by, and since when it is on it (-1 not yet). */
+  post: { spot: Spot; by: number; on: number } | null;
+  /** Host time until which it takes no post. */
+  postRest: number;
 }
 
 /** Closer than this (m, in plan, same floor) a bot has reached a spot. */
@@ -36,6 +40,12 @@ const FLANK = 18;
 const FLANK_PULL = 1.5;
 /** Cheapest standoff spots tried for a line on the enemy, per look. */
 const TRIES = 48;
+/**
+ * A long gun hunting takes a high post within a `reach` m walk when one stands about its band from the enemy (`tries`
+ * nearest looked up on the graph); it gives up on one not reached in time, holds one `hold` s at most, then takes none
+ * for `rest` s, so it never camps.
+ */
+const PERCH = { reach: 60, tries: 6, hold: 20, rest: 20, retry: 3 };
 
 /** Bot goals out of a fight: the last sighting, a patrol, or the nearest enemy; never nothing for long. */
 export class BotRoam {
@@ -107,6 +117,59 @@ export class BotRoam {
     const spot = keep ? last.spot : this.standoffSpot(bot, enemy, band, range, flank);
     b.approach = { for: enemy, at: this.host.time, spot };
     return spot;
+  }
+
+  /**
+   * A long gun's high post while it hunts `enemy` (see `PERCH`): the nearest lookout about its band from the enemy, held
+   * until it has stood there long enough; null when it is resting from one or none is near.
+   */
+  perch(bot: PlayerState, b: RoamState, enemy: Spot, band: Band): Spot | null {
+    const now = this.host.time;
+    if (now < b.postRest) return null;
+    const m = bot.move;
+    const post = b.post;
+    if (post) {
+      if (post.on < 0 && Math.hypot(post.spot[0] - m.x, post.spot[2] - m.z) < HEADWAY && Math.abs(post.spot[1] - m.y) < 1.2) post.on = now;
+      if (post.on < 0 ? now < post.by : now - post.on < PERCH.hold) {
+        // Facing the enemy it hunts once up there (see BotDirector.steer).
+        b.approach = { for: enemy, at: now, spot: post.spot };
+        return post.spot;
+      }
+      b.post = null;
+      b.approach = null;
+      b.postRest = now + PERCH.rest;
+      return null;
+    }
+    const wps = this.host.layout.waypoints;
+    const mid = (band.min + band.max) / 2;
+    const near: [number, number][] = [];
+    for (const i of this.lookouts()) {
+      const p = wps[i]!.position;
+      const d = Math.hypot(p[0] - enemy[0], p[2] - enemy[2]);
+      const plan = Math.hypot(p[0] - m.x, p[2] - m.z);
+      if (plan <= PERCH.reach && d >= band.min && d <= band.max + 10) near.push([plan + 0.3 * Math.abs(d - mid), i]);
+    }
+    near.sort((a, c) => a[0] - c[0]);
+    const from = nearestWaypoint(wps, m.x, m.y, m.z);
+    let best: { spot: Spot; walk: number; cost: number } | null = null;
+    for (const [, i] of near.slice(0, PERCH.tries)) {
+      let walk = 0;
+      let at = from;
+      const route = findPath(wps, from, i);
+      for (const n of route) {
+        const p = wps[at]!.position;
+        const q = wps[n]!.position;
+        walk += Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]);
+        at = n;
+      }
+      const spot = wps[i]!.position;
+      const cost = walk + 0.3 * Math.abs(Math.hypot(spot[0] - enemy[0], spot[2] - enemy[2]) - mid);
+      if (at === i && walk <= PERCH.reach && (!best || cost < best.cost)) best = { spot, walk, cost };
+    }
+    // Time to walk there (with room for a fight on the way) before it gives up on the post.
+    if (best) b.post = { spot: best.spot, by: now + 4 + best.walk / 3, on: -1 };
+    else b.postRest = now + PERCH.retry;
+    return best?.spot ?? null;
   }
 
   /** In team matches, the point `FLANK` m to the bot's lane side of an enemy, across the line from its team's spawns. */
@@ -182,14 +245,41 @@ export class BotRoam {
   }
 
   private posts: Spot[] | null = null;
+  private ground: number | null = null;
+
+  /** Whether height `y` is a high post's: well above the map's usual walking level (the median waypoint's). */
+  private high(y: number) {
+    if (this.ground === null) {
+      const ys = this.host.layout.waypoints.map((w) => w.position[1]).sort((a, b) => a - b);
+      this.ground = ys[Math.floor(ys.length / 2)] ?? 0;
+    }
+    return y > this.ground + HIGH;
+  }
 
   /** Waypoints well above the map's usual walking level, found once. */
   private highPosts(): Spot[] {
-    if (!this.posts) {
-      const ys = this.host.layout.waypoints.map((w) => w.position[1]).sort((a, b) => a - b);
-      const ground = ys[Math.floor(ys.length / 2)] ?? 0;
-      this.posts = this.host.layout.waypoints.map((w) => w.position).filter((p) => p[1] > ground + HIGH);
-    }
+    this.posts ??= this.host.layout.waypoints.map((w) => w.position).filter((p) => this.high(p[1]));
     return this.posts;
+  }
+
+  private looks: number[] | null = null;
+
+  /** High waypoints with the wider view (the better half by waypoints in sight within 50 m, every fourth tried), found once. */
+  private lookouts(): number[] {
+    if (!this.looks) {
+      const wps = this.host.layout.waypoints;
+      const view = (p: Spot) => {
+        let n = 0;
+        for (let i = 0; i < wps.length; i += 4) {
+          const q = wps[i]!.position;
+          if (Math.hypot(q[0] - p[0], q[2] - p[2]) < 50 && this.host.world.clearLine(p[0], p[1] + PLAYER.eye, p[2], q[0], q[1] + 1.2, q[2])) n++;
+        }
+        return n;
+      };
+      const rated = wps.flatMap((w, i) => (this.high(w.position[1]) ? [[view(w.position), i] as const] : []));
+      rated.sort((a, c) => c[0] - a[0]);
+      this.looks = rated.slice(0, Math.ceil(rated.length / 2)).map(([, i]) => i);
+    }
+    return this.looks;
   }
 }
