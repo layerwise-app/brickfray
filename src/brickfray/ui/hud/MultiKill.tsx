@@ -4,15 +4,14 @@ import { useHud } from '../App';
 import { useT } from '../i18n';
 import './streaks.css';
 
-type Tier = 2 | 3 | 4 | 5 | 6;
+type Tier = 2 | 3 | 4 | 5;
 
 /** The brick a chain builds, warming as it grows: face, the shaded lip below, the lettering. */
 export const CHAIN_LOOK: Record<Tier, { face: string; lip: string; ink: string; scale: number }> = {
   2: { face: '#ffcd2e', lip: '#c98f00', ink: '#2a1a00', scale: 1 },
   3: { face: '#ff8a1f', lip: '#b35000', ink: '#2a1000', scale: 1.08 },
   4: { face: '#ea3d32', lip: '#8f1a12', ink: '#ffffff', scale: 1.16 },
-  5: { face: '#8a4dff', lip: '#4c1fae', ink: '#ffffff', scale: 1.24 },
-  6: { face: '#1b2234', lip: '#04060c', ink: '#ffd23f', scale: 1.32 }
+  5: { face: '#8a4dff', lip: '#4c1fae', ink: '#ffffff', scale: 1.24 }
 };
 
 /** Languages whose callout falls back from Lilita One to the system's CJK face. */
@@ -45,7 +44,7 @@ export function MultiKill() {
         <span className='bf-display bf-mk-text' data-cjk={CJK.has(lang) || undefined}>
           {t(`streak.${tier}`)}
         </span>
-        {chain.count > CHAIN_TOP && <span className='bf-display bf-mk-more'>×{chain.count}</span>}
+
       </div>
     </div>
   );
@@ -59,7 +58,7 @@ export function ChainChip({ count }: { count: number }) {
   return (
     <span className='bf-display bf-mk-chip shrink-0 whitespace-nowrap rounded-md px-1.5 py-px text-[13px] uppercase leading-tight' style={{ background: look.face, color: look.ink, boxShadow: `inset 0 -2px 0 ${look.lip}` }}>
       {t(`streak.${tier}`)}
-      {count > CHAIN_TOP && ` ×${count}`}
+
     </span>
   );
 }

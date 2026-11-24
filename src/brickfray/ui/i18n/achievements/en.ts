@@ -38,7 +38,6 @@ export const achievementsEn = {
   'ach.triple': 'Triple Stack',
   'ach.quad': 'Quad Stack',
   'ach.penta': 'Penta Stack',
-  'ach.hexa': 'Hexa Stack',
   'ach.chain.how': 'Knock out {n} enemies in a row, each within {s} seconds of the last.',
   'ach.bounty': 'Bounty Hunter',
   'ach.bounty.how': 'Knock out a player with a bounty on their head.',

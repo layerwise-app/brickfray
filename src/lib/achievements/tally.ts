@@ -1,3 +1,4 @@
+import { CHAIN_TOP } from '~/brickfray/sim/streaks';
 import type { MatchDetail, MatchReport } from '../board/contract';
 import { BEST_PREFIX, type BestStat, type StatKey, type SumStat } from './catalogue';
 
@@ -47,7 +48,7 @@ export function matchTally(r: TallySource): MatchTally {
   }
   if (f) {
     Object.assign(sum, { sidearm: f.sidearm, melee: f.melee, grenade: f.grenade, longshot: f.longshot, airborne: f.airborne, bounty: f.bounty, megabot: f.megabot });
-    f.chains.forEach((n, i) => (sum[`chain${i + 2}` as SumStat] = n));
+    f.chains.slice(0, CHAIN_TOP - 1).forEach((n, i) => (sum[`chain${i + 2}` as SumStat] = n));
   }
   for (const key of Object.keys(sum) as SumStat[]) if (!sum[key]) delete sum[key];
   const best: MatchTally['best'] = r.mode === 'solo' && r.difficulty ? { [`best.wave.${r.difficulty}`]: r.wave } : {};

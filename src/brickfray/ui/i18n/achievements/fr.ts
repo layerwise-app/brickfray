@@ -39,7 +39,6 @@ export const achievementsFr: Record<keyof typeof achievementsEn, string> = {
   'ach.triple': 'Triple pile',
   'ach.quad': 'Quadruple pile',
   'ach.penta': 'Quintuple pile',
-  'ach.hexa': 'Sextuple pile',
   'ach.chain.how': 'Élimine {n} ennemis d’affilée, chacun moins de {s} secondes après le précédent.',
   'ach.bounty': 'Chasseur de primes',
   'ach.bounty.how': 'Élimine un joueur dont la tête est mise à prix.',

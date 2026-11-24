@@ -28,6 +28,12 @@ describe('feats a report carries', () => {
     expect(parseFeats(undefined, r)).toBeNull();
   });
 
+  it('still takes a report an older build queued with chains of six, and drops that count', () => {
+    const r = report({ kills: 12 });
+    expect(parseFeats(feats({ chains: [2, 2, 1, 1, 1] }), r)?.chains).toEqual([2, 2, 1, 1, 0]);
+    expect(parseReport({ ...r, feats: feats({ chains: [1, 1, 1, 1, 1] }) }, NOW).feats?.chains).toEqual([1, 1, 1, 1, 0]);
+  });
+
   it('refuses forged counters', () => {
     const r = report({ kills: 10, character: 'rivet' });
     const ok = feats();
@@ -92,10 +98,10 @@ describe('counting in the browser', () => {
     expect(f).toEqual(feats({ sidearm: 1, melee: 1, grenade: 1, longshot: 1, airborne: 1, bounty: 1, megabot: 1 }));
   });
 
-  it('counts each chain once at every length it reaches, seven and more as six', () => {
+  it('counts each chain once at every length it reaches, six and more as five', () => {
     let f = noFeats();
     for (const n of [2, 3, 4, 2, 2, 3, 4, 5, 6, 7, 8, 1]) f = countChain(f, n);
-    expect(f.chains).toEqual([3, 2, 2, 1, 1]);
+    expect(f.chains).toEqual([3, 2, 2, 1, 0]);
   });
 
   it('trims what it sends to what the server takes', () => {

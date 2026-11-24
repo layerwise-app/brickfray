@@ -127,6 +127,28 @@ describe('profiles and accounts', () => {
     expect(await db.select().from(boardStat)).not.toHaveLength(0);
   });
 
+  it('skips what the retired six-kill achievement left behind, carried into an account too, and deletes none of it', async () => {
+    await db.insert(user).values({ id: 'u1', name: 'u1', email: 'u1@example.com' });
+    await upload(1, [report({ kills: 6, result: 'loss' })], NOW);
+    const { player: phone } = await upload(2, [report({ kills: 6, result: 'loss' })], NOW);
+    await db.insert(boardUnlock).values([1, 2].map((tier) => ({ profileId: phone.profileId, achievement: 'hexa', tier, unlockedAt: NOW - tier })));
+    await db.insert(boardStat).values({ playerId: phone.id, stat: 'chain6', value: 3 });
+    await claimPlayer(db, id(1), 'u1', 'Ace', NOW + 1000);
+    await claimPlayer(db, id(2), 'u1', 'Ace', NOW + 2000);
+    const { player, news } = await upload(2, [report({ kills: 1, result: 'loss' })], NOW + 3000);
+    expect(tiers(news)).toEqual(['kills:1']);
+    const page = await achievementsPage(db, player.profileId, NOW + 4000);
+    expect(page.items.map((a) => a.id)).toEqual(ACHIEVEMENTS.map((a) => a.id));
+    expect(page).toMatchObject({ unlocked: 2, total: TIER_COUNT });
+    expect(await profileTotals(db, player.profileId)).not.toHaveProperty('chain6');
+    const unlocks = await db.select().from(boardUnlock);
+    expect(unlocks.filter((r) => r.achievement === 'hexa').map((r) => [r.profileId, r.tier])).toEqual([
+      [player.profileId, 1],
+      [player.profileId, 2]
+    ]);
+    expect(await db.select().from(boardStat)).toContainEqual({ playerId: phone.id, stat: 'chain6', value: 3 });
+  });
+
   it('shows every achievement, locked ones with their goals, to a player the server has not met', async () => {
     const page = await achievementsPage(db, null, NOW);
     expect(page.items.map((a) => a.id)).toEqual(ACHIEVEMENTS.map((a) => a.id));

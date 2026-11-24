@@ -3,7 +3,8 @@ import type { CharacterId } from '~/brickfray/characters/types';
 import { SOLO_LEVELS, type SoloLevel } from '../board/contract';
 
 // Every achievement, as data. Unlocks are stored by id and tier number, so ids never change and tiers are only ever
-// appended. Names, descriptions and art live in the UI (ui/achievements), keyed by id.
+// appended. A retired id or stat keeps its stored rows, which reads skip ('hexa' and 'chain6', for chains of six):
+// never reuse one. Names, descriptions and art live in the UI (ui/achievements), keyed by id.
 
 export const CATEGORIES = ['combat', 'weapons', 'streaks', 'matches', 'solo', 'heroes'] as const;
 export type Category = (typeof CATEGORIES)[number];
@@ -25,7 +26,6 @@ export const SUM_STATS = [
   'chain3',
   'chain4',
   'chain5',
-  'chain6',
   'winFfa',
   'winTdm',
   'flawless',
@@ -71,7 +71,7 @@ export const ACHIEVEMENTS = [
   { id: 'triple', category: 'streaks', source: { stat: 'chain3' }, tiers: [1, 10, 50, 100] },
   { id: 'quad', category: 'streaks', source: { stat: 'chain4' }, tiers: [1, 5, 25, 100] },
   { id: 'penta', category: 'streaks', source: { stat: 'chain5' }, tiers: [1, 5, 25] },
-  { id: 'hexa', category: 'streaks', source: { stat: 'chain6' }, tiers: [1, 3, 10] },
+
   { id: 'bounty', category: 'streaks', source: { stat: 'bounty' }, tiers: [1, 10, 50, 100, 500] },
   { id: 'matches', category: 'matches', source: { stat: 'matches' }, tiers: [1, 10, 50, 100, 500, 1000] },
   { id: 'winFfa', category: 'matches', source: { stat: 'winFfa' }, tiers: [1, 10, 50, 100, 500] },

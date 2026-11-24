@@ -4,7 +4,6 @@ export const streaksEn = {
   'streak.3': 'Triple kill',
   'streak.4': 'Quadra kill',
   'streak.5': 'Penta kill',
-  'streak.6': 'Hexa kill',
   'bounty.collected': '+{n} bounty',
   'bounty.on': 'Bounty {n}',
   'bounty.rule': 'A streak of 3 or more puts a bounty on a player: +25 a kill, up to +150, scored by whoever stops them.'

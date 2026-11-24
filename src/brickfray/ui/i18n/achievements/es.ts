@@ -39,7 +39,6 @@ export const achievementsEs: Record<keyof typeof achievementsEn, string> = {
   'ach.triple': 'Pila triple',
   'ach.quad': 'Pila cuádruple',
   'ach.penta': 'Pila quíntuple',
-  'ach.hexa': 'Pila séxtuple',
   'ach.chain.how': 'Elimina a {n} enemigos seguidos, cada uno a menos de {s} segundos del anterior.',
   'ach.bounty': 'Cazarrecompensas',
   'ach.bounty.how': 'Elimina a un jugador con recompensa por su cabeza.',

@@ -39,7 +39,6 @@ export const achievementsDe: Record<keyof typeof achievementsEn, string> = {
   'ach.triple': 'Dreierstapel',
   'ach.quad': 'Viererstapel',
   'ach.penta': 'Fünferstapel',
-  'ach.hexa': 'Sechserstapel',
   'ach.chain.how': 'Schalte {n} Gegner nacheinander aus, jeden höchstens {s} Sekunden nach dem letzten.',
   'ach.bounty': 'Kopfgeldjäger',
   'ach.bounty.how': 'Schalte Spieler aus, auf die ein Kopfgeld ausgesetzt ist.',

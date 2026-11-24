@@ -2,11 +2,10 @@ import { loudness, peakOf } from './analysis';
 import { busInput, dipUnderVoice, type Mixer } from './mixer';
 
 /**
- * public/audio/announcer/<line>.mp3 for chains of 2, 3, 4, 5 and 6+ kills, one voice (CREDITS-announcer.md): "Double
- * kill", "Triple kill", "Quadra kill", "Penta kill", then a wordless brass sting for the top tier, whose banner the voice
- * has no word for.
+ * public/audio/announcer/<line>.mp3 for chains of 2, 3, 4 and 5+ kills, one voice (CREDITS-announcer.md): "Double
+ * kill", "Triple kill", "Quadra kill", "Penta kill"; longer chains (sim/streaks.ts CHAIN_TOP) repeat the last.
  */
-export const ANNOUNCER_LINES = ['chain-2', 'chain-3', 'chain-4', 'chain-5', 'chain-6'] as const;
+export const ANNOUNCER_LINES = ['chain-2', 'chain-3', 'chain-4', 'chain-5'] as const;
 const FIRST_CHAIN = 2;
 /** Every line is matched to this loudness (analysis.ts, loudest 100 ms): over the kill marker, and over a fight the voice dips. */
 export const ANNOUNCER_LOUDNESS = -14;

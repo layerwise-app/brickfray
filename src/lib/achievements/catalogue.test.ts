@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CHARACTER_IDS } from '~/brickfray/characters/roster';
-import { achievement, ACHIEVEMENTS, CATEGORIES, progressOf, STAT_KEYS, statsOf, TIER_COUNT, tiersReached } from './catalogue';
+import { achievement, ACHIEVEMENTS, CATEGORIES, isAchievementId, progressOf, STAT_KEYS, statsOf, TIER_COUNT, tiersReached } from './catalogue';
 
 describe('catalogue', () => {
   it('has unique ids, known stats and goals that only rise', () => {
@@ -22,11 +22,14 @@ describe('catalogue', () => {
     expect(achievement('kills').tiers).toEqual(big);
     expect(achievement('assists').tiers).toEqual(big);
     expect(achievement('headshots').tiers).toEqual(big);
-    for (const id of ['sidearm', 'melee', 'double', 'triple', 'quad', 'penta', 'hexa'] as const) expect(achievement(id).tiers[0]).toBeLessThanOrEqual(10);
-    expect(['double', 'triple', 'quad', 'penta', 'hexa'].map((id) => achievement(id as 'double').source)).toEqual(
-      [2, 3, 4, 5, 6].map((n) => ({ stat: `chain${n}` }))
+    for (const id of ['sidearm', 'melee', 'double', 'triple', 'quad', 'penta'] as const) expect(achievement(id).tiers[0]).toBeLessThanOrEqual(10);
+    expect(['double', 'triple', 'quad', 'penta'].map((id) => achievement(id as 'double').source)).toEqual(
+      [2, 3, 4, 5].map((n) => ({ stat: `chain${n}` }))
     );
-    for (const id of ['double', 'triple', 'quad', 'penta', 'hexa'] as const) expect(achievement(id).tiers[0]).toBe(1);
+    for (const id of ['double', 'triple', 'quad', 'penta'] as const) expect(achievement(id).tiers[0]).toBe(1);
+    // Chains top out at five (sim/streaks.ts CHAIN_TOP): the six-kill achievement and its stat are gone.
+    expect(isAchievementId('hexa')).toBe(false);
+    expect(STAT_KEYS).not.toContain('chain6');
   });
 
   it('reads progress from the totals', () => {

@@ -3,7 +3,7 @@ import type { HostPlayer } from './types';
 /** A kill within this many seconds of the same player's previous one extends their chain: a double, triple … kill. */
 export const CHAIN_WINDOW = 4;
 /** The longest chain with its own name; longer chains repeat it. */
-export const CHAIN_TOP = 6;
+export const CHAIN_TOP = 5;
 
 /** What a kill scores before any bounty. */
 export const KILL_SCORE = { body: 100, head: 150 } as const;

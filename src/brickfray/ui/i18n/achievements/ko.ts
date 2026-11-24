@@ -39,7 +39,6 @@ export const achievementsKo: Record<keyof typeof achievementsEn, string> = {
   'ach.triple': '트리플 스택',
   'ach.quad': '쿼드라 스택',
   'ach.penta': '펜타 스택',
-  'ach.hexa': '헥사 스택',
   'ach.chain.how': '직전 킬 후 {s}초 안에 계속 쓰러뜨려 {n}명을 연달아 쓰러뜨리세요.',
   'ach.bounty': '현상금 사냥꾼',
   'ach.bounty.how': '현상금이 걸린 플레이어를 쓰러뜨리세요.',

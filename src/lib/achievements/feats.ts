@@ -1,3 +1,4 @@
+import { CHAIN_TOP } from '~/brickfray/sim/streaks';
 import { waveRoster } from '~/brickfray/sim/waves';
 import type { KillCause } from '~/brickfray/sim/types';
 import { MELEE_IDS, type WeaponId } from '~/brickfray/weapons/defs';
@@ -21,14 +22,17 @@ export interface MatchFeats {
   bounty: number;
   /** Solo: Megabots downed. */
   megabot: number;
-  /** Kill chains (sim/streaks.ts) that reached 2, 3, 4, 5 and 6 kills. */
+  /**
+   * Kill chains (sim/streaks.ts) that reached 2, 3, 4 and 5 kills, then the count of chains of six from when they had
+   * their own callout: always 0 now, kept so the reports older builds queued (board/client/history.ts) still parse.
+   */
   chains: [number, number, number, number, number];
 }
 
 export const LONG_GUNS: readonly WeaponId[] = ['sniper', 'harpoon'];
 /** Metres from the killer's feet to the victim's. */
 export const LONG_SHOT = 40;
-export const CHAIN_COUNTED = 6;
+const CHAIN_SLOTS = 5;
 
 type Report = Pick<MatchReport, 'mode' | 'difficulty' | 'wave' | 'character' | 'kills'>;
 
@@ -86,10 +90,11 @@ export function parseFeats(raw: unknown, r: Report): MatchFeats | null {
   if (feats.sidearm + feats.melee + feats.grenade > k) fail('weapon kinds over kills');
   if (feats.longshot + feats.melee + feats.grenade > k) fail('long shots over gun kills');
   if (feats.airborne + feats.grenade > k) fail('airborne over gun kills');
-  if (!Array.isArray(f.chains) || f.chains.length !== CHAIN_COUNTED - 1) fail('chains');
+  if (!Array.isArray(f.chains) || f.chains.length !== CHAIN_SLOTS) fail('chains');
   feats.chains = f.chains.map((n: unknown, i) => count(n, `chain${i + 2}`, k)) as MatchFeats['chains'];
   for (let i = 1; i < feats.chains.length; i++) if (feats.chains[i]! > feats.chains[i - 1]!) fail('longer chains than shorter ones');
   if (chainKills(feats.chains) > k) fail('chains over kills');
+  feats.chains.fill(0, CHAIN_TOP - 1);
   return feats;
 }
 
@@ -145,9 +150,9 @@ export function countKill(f: MatchFeats, kill: SeenKill): MatchFeats {
   };
 }
 
-/** A multikill event of the local player: chains of seven and more were already counted at six. */
+/** A multikill event of the local player: chains longer than the top callout (CHAIN_TOP) were already counted at it. */
 export function countChain(f: MatchFeats, chain: number): MatchFeats {
-  if (chain < 2 || chain > CHAIN_COUNTED) return f;
+  if (chain < 2 || chain > CHAIN_TOP) return f;
   const chains = [...f.chains] as MatchFeats['chains'];
   chains[chain - 2]!++;
   return { ...f, chains };

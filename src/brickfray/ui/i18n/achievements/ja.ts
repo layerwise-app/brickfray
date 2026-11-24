@@ -39,7 +39,6 @@ export const achievementsJa: Record<keyof typeof achievementsEn, string> = {
   'ach.triple': 'トリプルスタック',
   'ach.quad': 'クアドラスタック',
   'ach.penta': 'ペンタスタック',
-  'ach.hexa': 'ヘキサスタック',
   'ach.chain.how': '前のキルから {s} 秒以内に倒し続けて、{n} 体連続で倒す。',
   'ach.bounty': '賞金稼ぎ',
   'ach.bounty.how': '賞金首のプレイヤーを倒す。',

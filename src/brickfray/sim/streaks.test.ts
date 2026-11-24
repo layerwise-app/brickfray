@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
+import { ANNOUNCER_LINES, lineFor } from '../audio/announcer';
 import type { MapLayout } from '../world/types';
 import { TICK } from './constants';
 import { Match } from './match';
-import { BOUNTY, bountyFor, CHAIN_WINDOW, MAX_KILL_SCORE, Streaks } from './streaks';
+import { BOUNTY, bountyFor, CHAIN_TOP, CHAIN_WINDOW, MAX_KILL_SCORE, Streaks } from './streaks';
 import type { GameEvent, HostPlayer, ModeId } from './types';
 
 function arena(): MapLayout {
@@ -141,6 +142,20 @@ describe('multi-kill chains', () => {
       const last = events.map((e) => e.type).lastIndexOf('kill');
       expect(events[last + 1]).toMatchObject({ type: 'multikill', count: 3 });
     }
+  });
+
+  it('a chain of six counts on, while its fifth and sixth kills both get the five-kill call', () => {
+    const { match, players } = room('ffa', ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']);
+    const a = players[0]!;
+    drained(match);
+    for (const v of players.slice(1, 7)) {
+      kill(match, a, v);
+      run(match, 1);
+    }
+    const counts = chains(drained(match)).map(([, n]) => n!);
+    expect(counts).toEqual([2, 3, 4, 5, 6]);
+    expect(CHAIN_TOP).toBe(5);
+    expect(counts.map((n) => ANNOUNCER_LINES[lineFor(n)])).toEqual(['chain-2', 'chain-3', 'chain-4', 'chain-5', 'chain-5']);
   });
 
   it('solo waves chain too', () => {

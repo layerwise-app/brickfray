@@ -39,7 +39,6 @@ export const achievementsZh: Record<keyof typeof achievementsEn, string> = {
   'ach.triple': '三杀',
   'ach.quad': '四杀',
   'ach.penta': '五杀',
-  'ach.hexa': '六杀',
   'ach.chain.how': '连续击倒 {n} 个敌人，每两次之间不超过 {s} 秒。',
   'ach.bounty': '赏金猎人',
   'ach.bounty.how': '击倒身上挂着赏金的玩家。',
