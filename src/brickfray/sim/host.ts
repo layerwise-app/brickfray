@@ -38,6 +38,8 @@ export class HostSim {
   events: GameEvent[] = [];
   traces: ShotTrace[] = [];
   time = 0;
+  /** Each hit that lands on someone from someone else, with where it came from (bots feel it as a player sees the damage indicator). */
+  onDamage: ((victim: HostPlayer, src: DamageSource) => void) | null = null;
   /** Rules hook: decides respawns, scoring and round flow (see match.ts). */
   onKill: ((victim: HostPlayer, killer: HostPlayer | null, weapon: KillCause, kill: KillEvent) => void) | null = null;
   damageEnabled = true;
@@ -223,6 +225,7 @@ export class HostSim {
     if (!self) victim.damagers.set(src.attacker, (victim.damagers.get(src.attacker) ?? 0) + amount);
     const fatal = victim.health <= 0;
     this.events.push({ type: 'damage', attacker: src.attacker, victim: victim.id, amount, kind: src.kind, from: src.from, fatal });
+    if (!self) this.onDamage?.(victim, src);
     if (!fatal) return;
     victim.health = 0;
     victim.alive = false;

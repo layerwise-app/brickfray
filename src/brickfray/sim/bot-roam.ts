@@ -1,4 +1,4 @@
-import { findPath, nearestWaypoint } from './bot-nav';
+import { findPath, nearestWaypoint, routeTree } from './bot-nav';
 import type { Band } from './bot-profile';
 import { PLAYER } from './constants';
 import type { HostSim } from './host';
@@ -26,12 +26,16 @@ export interface RoamState {
 export const HEADWAY = 1.5;
 /** Seconds a patrol goal is followed before the bot goes back to hunting. */
 const PATROL = 20;
-/** A sighting this recent (s) marks the last known fight, a place worth patrolling to. */
-const FIGHT_FRESH = 15;
 /** A waypoint this far (m) above the map's usual walking level is a high post: a wall walk, a bridge, a terrace. */
 const HIGH = 2;
-/** Share of patrols that head for a high post rather than a spawn or the last fight. */
-const HIGH_SHARE = 0.3;
+/**
+ * Where a bot with nobody to go for patrols: mostly the map's meeting places (the `count` waypoints most routes
+ * between spawns pass, `spacing` m apart); `high` of the time a high post; in team matches `theirs` of the time the
+ * way into the other team's spawns.
+ */
+const PATROLS = { count: 14, spacing: 12, high: 0.25, theirs: 0.2 };
+/** A corner check looks down the longest clear view from a waypoint, among waypoints within `reach` m (every `every`th). */
+const VIEWS = { reach: 60, every: 3 };
 /** An enemy this far (m) across or this far above or below the nearest waypoint stands where the graph can't take a bot. */
 const OFF_GRAPH = { across: 4, up: 1.5 };
 /** How far (m) to the side of an enemy a flanking bot aims to come from. */
@@ -47,23 +51,16 @@ const TRIES = 48;
  */
 const PERCH = { reach: 60, tries: 6, hold: 20, rest: 20, retry: 3 };
 
-/** Bot goals out of a fight: the last sighting, a patrol, or the nearest enemy; never nothing for long. */
+/** Bot goals out of a fight: the last sighting, a patrol, or what it believes of an enemy; never nothing for long. */
 export class BotRoam {
-  /** The latest place any bot saw an enemy. */
-  private fight: { at: Spot; time: number } | null = null;
-
   constructor(
     private readonly host: HostSim,
     private readonly random: () => number
   ) {}
 
-  saw(at: Spot) {
-    this.fight = { at, time: this.host.time };
-  }
-
   /**
-   * The last sighting (or the spot `toward` picks for it) until it is reached, a patrol while one runs, else whatever
-   * `hunt` finds, else a new patrol.
+   * The last sighting (or the spot `toward` picks for it) until it is reached, else whatever `hunt` finds (news of an
+   * enemy breaks off a patrol), else the patrol under way, else a new one.
    */
   goal(bot: PlayerState, b: RoamState, hunt: () => Spot | null, toward = (seen: Spot) => seen): Spot | null {
     const m = bot.move;
@@ -74,19 +71,19 @@ export class BotRoam {
       else return spot;
     }
     if (b.patrol && (this.host.time > b.patrolUntil || at(b.patrol))) b.patrol = null;
-    return b.patrol ?? hunt() ?? this.patrol(bot, b);
+    return hunt() ?? b.patrol ?? this.patrol(bot, b);
   }
 
-  /** Head for the other team's spawns (any spawn in free-for-all), a high post or the last known fight, away from here. */
+  /** Head for one of the map's meeting places, a high post or (team matches) the other team's side, away from here. */
   patrol(bot: PlayerState, b: RoamState): Spot | null {
     const m = bot.move;
     const away = (p: Spot) => Math.hypot(p[0] - m.x, p[2] - m.z) > 10 && p !== b.patrol;
     const spawns = this.host.layout.spawns;
-    const theirs = spawns.filter((s) => bot.team >= 0 && s.team !== undefined && s.team !== bot.team);
-    const spots = (theirs.length ? theirs : spawns).map((s) => s.position).filter(away);
-    if (this.fight && this.host.time - this.fight.time < FIGHT_FRESH && away(this.fight.at)) spots.push(this.fight.at);
+    const theirs = spawns.filter((s) => bot.team >= 0 && s.team !== undefined && s.team !== bot.team).map((s) => s.position).filter(away);
     const posts = this.highPosts().filter(away);
-    const pool = posts.length && this.random() < HIGH_SHARE ? posts : spots;
+    const hubs = this.hubs().filter(away);
+    const r = this.random();
+    const pool = posts.length && r < PATROLS.high ? posts : theirs.length && r < PATROLS.high + PATROLS.theirs ? theirs : hubs.length ? hubs : spawns.map((s) => s.position).filter(away);
     b.lastSeen = null;
     b.path = [];
     b.patrol = pool.length ? pool[Math.floor(this.random() * pool.length)]! : null;
@@ -242,6 +239,52 @@ export class BotRoam {
       bestD = d;
     }
     return best;
+  }
+
+  private meets: Spot[] | null = null;
+
+  /** The map's meeting places: the waypoints most shortest routes between spawns pass through, spread apart; found once. */
+  private hubs(): Spot[] {
+    if (!this.meets) {
+      const wps = this.host.layout.waypoints;
+      const starts = [...new Set(this.host.layout.spawns.map((s) => nearestWaypoint(wps, s.position[0], s.position[1], s.position[2])))];
+      const through = new Float64Array(wps.length);
+      for (const s of wps.length ? starts : []) {
+        const prev = routeTree(wps, s);
+        for (const t of starts) for (let n = prev[t]!; n >= 0 && n !== s; n = prev[n]!) through[n]!++;
+      }
+      const order = [...through.keys()].filter((i) => through[i]! > 0).sort((a, c) => through[c]! - through[a]!);
+      this.meets = [];
+      for (const i of order) {
+        const p = wps[i]!.position;
+        if (this.meets.every((q) => Math.hypot(q[0] - p[0], q[2] - p[2]) > PATROLS.spacing)) this.meets.push(p);
+        if (this.meets.length >= PATROLS.count) break;
+      }
+    }
+    return this.meets;
+  }
+
+  private views = new Map<number, number | null>();
+
+  /** The yaw down the longest clear view from waypoint `i` (an angle worth checking on the way past), found once each. */
+  longestView(i: number): number | null {
+    let yaw = this.views.get(i);
+    if (yaw === undefined) {
+      const wps = this.host.layout.waypoints;
+      const [x, y, z] = wps[i]!.position;
+      let far = 0;
+      yaw = null;
+      for (let k = i % VIEWS.every; k < wps.length; k += VIEWS.every) {
+        const q = wps[k]!.position;
+        const d = Math.hypot(q[0] - x, q[2] - z);
+        if (d > far && d < VIEWS.reach && this.host.world.clearLine(x, y + PLAYER.eye, z, q[0], q[1] + 1.2, q[2])) {
+          far = d;
+          yaw = Math.atan2(-(q[0] - x), -(q[2] - z));
+        }
+      }
+      this.views.set(i, yaw);
+    }
+    return yaw;
   }
 
   private posts: Spot[] | null = null;

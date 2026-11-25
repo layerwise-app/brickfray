@@ -44,14 +44,16 @@ describe('bots in a fight', () => {
     expect(bot.arms.ammo.ar).toBeGreaterThan(0);
   });
 
-  it('turn on an attacker shooting from behind at once', () => {
+  it('turn toward an attacker shooting from behind after a moment, find it and fight it', () => {
     const { sim, bots, bot, me, run } = duel('vega', 15, [0, 1]);
     run(0.2);
     expect(brainsOf(bots).get(bot.id)!.target).toBe(0);
     sim.damage(bot, 10, { attacker: me.id, weapon: 'ar', kind: 'body', from: [me.move.x, me.move.y + 1.6, me.move.z] });
     run(0.1);
+    // A hit says where from, not who or exactly where: no instant swing onto the shooter.
+    expect(brainsOf(bots).get(bot.id)!.target).toBe(0);
+    run(2);
     expect(brainsOf(bots).get(bot.id)!.target).toBe(me.id);
-    run(1);
     // Facing +Z, toward the attacker.
     expect(Math.abs(Math.atan2(Math.sin(bot.yaw - Math.PI), Math.cos(bot.yaw - Math.PI)))).toBeLessThan(0.3);
     expect(brainsOf(bots).get(bot.id)!.lostFor).toBe(0);

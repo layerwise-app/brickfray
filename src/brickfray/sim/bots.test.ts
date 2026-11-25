@@ -2,21 +2,28 @@ import { describe, expect, it } from 'vitest';
 import { MAPS } from '../world';
 import { TICK } from './constants';
 import { Match } from './match';
+import { BUTTON } from './types';
 
 const ALL_MAPS = ['plaza', 'fortress', 'docks', 'temple'] as const;
 
 describe.each(ALL_MAPS)('snapbots on %s', (id) => {
-  it('reach an idle player, open fire and never walk into the kill zone', () => {
-    const match = new Match(MAPS[id].layout(), { mode: 'solo', map: id, minutes: 0, seats: 0, difficulty: 'normal' });
-    const me = match.addHuman('Me', 'rivet');
+  it('find a player they can hear, open fire and never walk into the kill zone', () => {
+    const match = new Match(MAPS[id].layout(), { mode: 'solo', map: id, minutes: 0, seats: 0, difficulty: 'normal' }, 7919);
+    const me = match.addHuman('Me', 'vega');
     match.start();
     me.protectedUntil = Infinity;
     let shots = 0;
     let fell = 0;
+    let seq = 0;
     for (let t = 0; t < 60; t += TICK) {
+      // A shot into the air every two seconds: bots know of a player only by what they see and hear.
+      const fire = seq % 120 === 0 ? BUTTON.fire : 0;
+      // Firing ends spawn protection; this player is only bait.
+      me.protectedUntil = Infinity;
+      match.sim.applyCommand(me.id, { seq: ++seq, forward: 0, right: 0, yaw: me.yaw, pitch: 1.2, buttons: fire, slot: 0, viewTime: match.time, life: me.life });
       match.tick(TICK);
       const { events, traces } = match.sim.drain();
-      shots += traces.length;
+      shots += traces.filter((s) => s.shooter !== me.id).length;
       fell += events.filter((e) => e.type === 'kill' && e.killer === e.victim).length;
     }
     const far = [...match.sim.players.values()].filter((p) => p.bot && p.alive && Math.hypot(p.move.x - me.move.x, p.move.z - me.move.z) > 30);

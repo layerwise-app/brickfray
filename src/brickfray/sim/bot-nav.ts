@@ -16,6 +16,8 @@ export interface NavState {
   blocked: Map<number, number>;
   /** Host time until which the bot follows the graph instead of walking straight at its goal. */
   graphOnly: number;
+  /** The waypoint its route just passed (-1: none since this was last read). */
+  reached: number;
 }
 
 /** What getting unstuck keeps: how long the bot has pushed without moving, from where, and its sidestep round it. */
@@ -70,7 +72,8 @@ export class BotNav {
       const w = wps[b.path[0]!]!.position;
       const d = Math.hypot(w[0] - m.x, w[2] - m.z);
       if (d < 0.9 && Math.abs(w[1] - m.y) < 1.2) {
-        b.heading.delete(b.path.shift()!);
+        b.reached = b.path.shift()!;
+        b.heading.delete(b.reached);
         continue;
       }
       if (d < 1e-3) break;
@@ -136,9 +139,13 @@ export class BotNav {
   /** Duck under a low beam, else jump, when pushing without moving; after a while give up on that link and step aside. */
   unstick(bot: PlayerState, b: NavState & StuckState, cmd: Command) {
     const host = this.host;
+    // Progress is measured from where it last got clear: pressed into a corner, a body jitters a centimetre each way.
     const moved = Math.hypot(bot.move.x - b.lastPos[0], bot.move.z - b.lastPos[1]);
-    b.lastPos = [bot.move.x, bot.move.z];
-    b.stuck = Math.abs(cmd.forward) + Math.abs(cmd.right) > 0.3 && moved < 0.01 ? b.stuck + TICK : 0;
+    if (Math.abs(cmd.forward) + Math.abs(cmd.right) > 0.3 && moved < 0.1) b.stuck += TICK;
+    else {
+      b.lastPos = [bot.move.x, bot.move.z];
+      b.stuck = 0;
+    }
     if (b.stuck <= 0.25) return;
     if (this.ducks(bot, b.aimYaw, cmd.forward, cmd.right)) {
       b.crouchTime = 1.5;
@@ -254,6 +261,35 @@ export function nearestWaypoint(wps: readonly Waypoint[], x: number, y: number, 
     }
   });
   return best;
+}
+
+/** Shortest routes over the waypoint graph from `start`: each node's previous node on its route (-1: start or unreached). */
+export function routeTree(wps: readonly Waypoint[], start: number): Int32Array {
+  const dist = new Float64Array(wps.length).fill(Infinity);
+  const prev = new Int32Array(wps.length).fill(-1);
+  const heap: [number, number][] = [[0, start]];
+  dist[start] = 0;
+  while (heap.length) {
+    const [d, n] = heap.pop()!;
+    if (d > dist[n]!) continue;
+    const p = wps[n]!.position;
+    for (const next of wps[n]!.links) {
+      const q = wps[next]!.position;
+      const nd = d + Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]);
+      if (nd >= dist[next]!) continue;
+      dist[next] = nd;
+      prev[next] = n;
+      // Kept sorted farthest first, so the nearest pops off the end.
+      let i = heap.length;
+      heap.push([nd, next]);
+      while (i > 0 && heap[i - 1]![0] < nd) {
+        heap[i] = heap[i - 1]!;
+        i--;
+      }
+      heap[i] = [nd, next];
+    }
+  }
+  return prev;
 }
 
 /** A* over the waypoint graph, `extra` adding to the cost of entering a node; returns node indices excluding the start. */

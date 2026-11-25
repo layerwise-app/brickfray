@@ -115,7 +115,8 @@ describe('Zipbots', () => {
     match.sim.damageEnabled = true;
     const bot = match.sim.addPlayer('Zip', 'rusher', 'rusher');
     match.bots.add(bot);
-    match.sim.spawn(bot, { position: [0, 0, -25], yaw: 0 });
+    // Facing the player: it has to see someone to go for them.
+    match.sim.spawn(bot, { position: [0, 0, -25], yaw: Math.PI });
     let closest = Infinity;
     let crouched = false;
     let swungAt = -1;
