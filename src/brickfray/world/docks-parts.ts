@@ -49,22 +49,26 @@ export const PIER: Element<PierParams> = {
   }
 };
 
+/** Gangway width: two abreast, not a squeeze. */
+export const GANGWAY_W = 2.0;
+const GW = GANGWAY_W / 2;
+
 /** Two steps and a short bridge from quay level onto a deck 0.96 up, climbing toward +z. */
 export const GANGWAY: Element<{ x: number; z: number }> = {
   colliders(p) {
     const out: PlanCollider[] = METAL_STAIRS.colliders!(stair(p));
-    out.push(box([p.x - 0.6, 0.8, p.z + 1.6], [p.x + 0.6, 0.96, p.z + 2.6], 'metal', { walk: true }));
-    for (const s of [-1, 1]) out.push(box([p.x + s * 0.6 - 0.05, 0.96, p.z + 0.8], [p.x + s * 0.6 + 0.05, 0.96 + RAIL_H, p.z + 2.4], 'metal', { bulletsPass: true }));
+    out.push(box([p.x - GW, 0.8, p.z + 1.6], [p.x + GW, 0.96, p.z + 2.6], 'metal', { walk: true }));
+    for (const s of [-1, 1]) out.push(box([p.x + s * GW - 0.05, 0.96, p.z + 0.8], [p.x + s * GW + 0.05, 0.96 + RAIL_H, p.z + 2.4], 'metal', { bulletsPass: true }));
     return out;
   },
   nav: (p) => [[p.x, 0, p.z - 0.8], [p.x, 0.96, p.z + 2.2]],
   draw(d, p) {
     METAL_STAIRS.draw(d, stair(p));
     const t = new Pen(d, new Frame(p.x, 0, p.z));
-    t.box(0, 0.82, 2.1, 1.2, 0.14, 1.0, '#8a9096', 'metal', 0);
+    t.box(0, 0.82, 2.1, GANGWAY_W, 0.14, 1.0, '#8a9096', 'metal', 0);
     for (const s of [-1, 1]) {
-      t.box(s * 0.6, 0.9 + RAIL_H, 1.6, 0.06, 0.06, 1.6, '#f6c624', 'metal', 0);
-      for (const z of [0.8, 1.6, 2.4]) t.box(s * 0.6, z < 1.6 ? 0.48 : 0.96, z, 0.06, (z < 1.6 ? 0.48 : 0) + RAIL_H, 0.06, '#f6c624', 'metal', 0);
+      t.box(s * GW, 0.9 + RAIL_H, 1.6, 0.06, 0.06, 1.6, '#f6c624', 'metal', 0);
+      for (const z of [0.8, 1.6, 2.4]) t.box(s * GW, z < 1.6 ? 0.48 : 0.96, z, 0.06, (z < 1.6 ? 0.48 : 0) + RAIL_H, 0.06, '#f6c624', 'metal', 0);
     }
   }
 };
@@ -74,7 +78,7 @@ const stair = (p: { x: number; z: number }) => ({
   z: p.z,
   y0: 0,
   dir: 's' as const,
-  width: 1.2,
+  width: GANGWAY_W,
   steps: 2,
   rise: 0.48,
   run: 0.8,

@@ -67,6 +67,8 @@ export class Drawer {
   private scope: 'lasting' | 'distant' | null = null;
   readonly ground: GroundTile[] = [];
   readonly siding = new Siding();
+  /** Far scenery as plain boxes: one matte mesh, one draw, no shadows. */
+  readonly flat = new Siding(true);
   readonly anim: Anim;
   readonly rng: Rng;
   readonly detail: 0 | 1 | 2;
@@ -236,6 +238,8 @@ export function defineMap(spec: MapSpec): MapDefinition {
       root.add(scenery);
       const siding = d.siding.build(kit);
       if (siding) root.add(siding);
+      const flat = d.flat.build(kit);
+      if (flat) root.add(flat);
       const anim = d.anim.build();
       root.add(anim.root);
       const contact = kit.profile.shadows ? null : contactShadows(collectColliders(plan), spec.atmosphere.sunDirection);
@@ -248,6 +252,8 @@ export function defineMap(spec: MapSpec): MapDefinition {
           (ground.material as THREE.Material).dispose();
           siding?.geometry.dispose();
           (siding?.material as THREE.Material | undefined)?.dispose();
+          flat?.geometry.dispose();
+          (flat?.material as THREE.Material | undefined)?.dispose();
           for (const child of scenery.children) {
             if (child instanceof THREE.BatchedMesh) child.dispose();
             else if (child instanceof SceneryChunk) child.geometry.dispose();

@@ -31,6 +31,9 @@ diffuseColor.rgb *= 1.0 + 0.1 * ribK * cos(ribA);`;
  * faces, aligned in world space so neighbouring panels continue the same ribs.
  */
 export class Siding {
+  /** `plain`: matte boxes without ribs that cast and take no shadow, for far scenery nobody reaches. */
+  constructor(private readonly plain = false) {}
+
   private pos: number[] = [];
   private nor: number[] = [];
   private col: number[] = [];
@@ -67,6 +70,11 @@ export class Siding {
     g.setAttribute('rib', new THREE.Float32BufferAttribute(this.rib, 2));
     g.computeBoundingSphere();
     const p = kit.profile;
+    if (this.plain) {
+      const flat = new THREE.Mesh(g, p.pbr ? new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, metalness: 0 }) : new THREE.MeshLambertMaterial({ vertexColors: true }));
+      flat.name = 'far-scenery';
+      return flat;
+    }
     // Low has no shadow maps, so the sun reaches inside faces too: a matte sheet keeps a metal highlight off them.
     const material = p.pbr
       ? new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.4, metalness: 0.6, envMapIntensity: 0.8 })

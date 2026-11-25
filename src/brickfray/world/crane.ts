@@ -6,9 +6,11 @@ import { shade, type PlanCollider } from './util';
 const YELLOW = '#f2b01d';
 const DARK = '#2f363d';
 const WHITE = '#e9e6dc';
-const LEG_X = 3.6;
+const LEG_X = 3.3;
 const LEG_Z = 1.6;
 const PORTAL = 7.2;
+/** Bogie height: a step, not a jump, so a runner along the stack is not stopped by the crane's feet. */
+const BOGIE = 0.45;
 const HOUSE = 8.0;
 const PIVOT: [number, number, number] = [0, 10.0, 1.4];
 const TIP: [number, number, number] = [0, 17.6, 16.4];
@@ -27,8 +29,8 @@ export const CRANE: Element<CraneParams> = {
     const out: PlanCollider[] = [];
     for (const sx of [-1, 1]) {
       for (const sz of [-1, 1]) {
-        out.push(f.box([sx * LEG_X - 0.8, 0, sz * LEG_Z - 0.35], [sx * LEG_X + 0.8, 0.6, sz * LEG_Z + 0.35], 'metal'));
-        out.push(f.box([sx * LEG_X - 0.3, 0.6, sz * LEG_Z - 0.3], [sx * LEG_X + 0.3, PORTAL, sz * LEG_Z + 0.3], 'metal'));
+        out.push(f.box([sx * LEG_X - 0.8, 0, sz * LEG_Z - 0.35], [sx * LEG_X + 0.8, BOGIE, sz * LEG_Z + 0.35], 'metal'));
+        out.push(f.box([sx * LEG_X - 0.3, BOGIE, sz * LEG_Z - 0.3], [sx * LEG_X + 0.3, PORTAL, sz * LEG_Z + 0.3], 'metal'));
       }
     }
     out.push(f.box([-LEG_X - 0.6, PORTAL, -LEG_Z - 0.6], [LEG_X + 0.6, HOUSE, LEG_Z + 0.6], 'metal'));
@@ -40,9 +42,9 @@ export const CRANE: Element<CraneParams> = {
     const t = pen(d, p);
     for (const sx of [-1, 1]) {
       for (const sz of [-1, 1]) {
-        t.box(sx * LEG_X, 0, sz * LEG_Z, 1.6, 0.6, 0.7, DARK, 'metal', 0.04);
-        if (d.detail > 0) for (const wx of [-0.5, 0.5]) t.cylZ(sx * LEG_X + wx, 0.22, sz * LEG_Z, 0.22, 0.76, '#545c63', 'metal');
-        t.box(sx * LEG_X, 0.6, sz * LEG_Z, 0.6, PORTAL - 0.6, 0.6, YELLOW, 'metal', 0.03);
+        t.box(sx * LEG_X, 0, sz * LEG_Z, 1.6, BOGIE, 0.7, DARK, 'metal', 0.04);
+        if (d.detail > 0) for (const wx of [-0.5, 0.5]) t.cylZ(sx * LEG_X + wx, 0.2, sz * LEG_Z, 0.2, 0.76, '#545c63', 'metal');
+        t.box(sx * LEG_X, BOGIE, sz * LEG_Z, 0.6, PORTAL - BOGIE, 0.6, YELLOW, 'metal', 0.03);
       }
       t.box(sx * LEG_X, PORTAL - 0.8, 0, 0.5, 0.8, LEG_Z * 2, YELLOW, 'metal', 0.02);
       t.box(sx * LEG_X, 1.0, 0, 0.3, 0.3, LEG_Z * 2 - 0.6, YELLOW, 'metal', 0.02);

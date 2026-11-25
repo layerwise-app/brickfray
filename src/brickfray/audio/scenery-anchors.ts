@@ -1,4 +1,6 @@
 import { DOCKS_SHIPS } from '../world/backdrop-docks';
+import { BERTH, QUAY } from '../world/docks-layout';
+import { CRANE_Z } from '../world/docks-yard';
 import { fortressWorks } from '../world/fortress-works';
 import { MAPS } from '../world/index';
 import { FORTRESS_AMBIENCE } from '../world/map-fortress';
@@ -133,10 +135,11 @@ function fortress(): Spot[] {
   ];
 }
 
-/** Docks: gulls over the basin, the barges and the warehouse ridge; fenders and lines between hulls and quay; horns on the ships at sea. */
+/** Docks: gulls over the red ship, the quay and the crane; the tyre fenders between the berth and the hull, and on the quay edge; horns on the ships at sea. */
 function docks(): Spot[] {
-  const sky: Point[] = [[-18, 9, 17], [18, 9, 17], [-6, 9, 15], [6, 9, 15], [-12.8, 7.5, 13.4], [12.8, 7.5, 13.4], [0, 14, 17], [0, 11.2, -21], [-30, 8, 15], [30, 8, 15]];
-  const fenders: Point[] = [[-5.6, 0.4, 23.4], [5.2, 0.4, 23.4], [-16.6, 0.3, 10.6], [-9, 0.3, 10.6], [9, 0.3, 10.6], [16.6, 0.3, 10.6]];
+  const q = QUAY.z0;
+  const sky: Point[] = [[-18, 9, q + 6], [18, 9, q + 6], [-7, 10, q + 4], [7, 10, q + 4], [-12.8, 7.5, q + 7], [12.8, 7.5, q + 7], [0, 14, q + 6], [0, 11.2, CRANE_Z + 1.8], [-30, 8, q + 7], [30, 8, q + 7]];
+  const fenders: Point[] = [[-13, -0.3, BERTH.z1 + 0.2], [-5, -0.3, BERTH.z1 + 0.2], [5, -0.3, BERTH.z1 + 0.2], [13, -0.3, BERTH.z1 + 0.2], [-30, -0.3, QUAY.z1 + 0.2], [30, -0.3, QUAY.z1 + 0.2]];
   return [spot('docks', 'gull', 5, sky, 3), spot('docks', 'creak', 2, fenders), { spot: 'horn', weight: 0.5, at: DOCKS_SHIPS }];
 }
 
