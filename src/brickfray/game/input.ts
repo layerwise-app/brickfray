@@ -92,17 +92,23 @@ function ctrlClosesTab() {
   return !/mac|iphone|ipad|ipod/i.test(nav.userAgentData?.platform || nav.platform || nav.userAgent);
 }
 
+type KeyboardLock = { lock(codes?: string[]): Promise<void>; unlock(): void };
+const keyboardLock = () => (navigator as Navigator & { keyboard?: KeyboardLock }).keyboard;
+
+/** Chromium only: elsewhere Esc in fullscreen also leaves fullscreen, and Ctrl+W closes the tab. */
+export const canLockKeyboard = () => typeof keyboardLock()?.lock === 'function';
+
 /**
- * Ctrl+W, Ctrl+T, Ctrl+N, Ctrl+Q and Ctrl+Tab belong to the browser, and a page can't cancel them in a window. In
- * fullscreen, Keyboard Lock hands them to the game. Esc stays with the browser so it still frees the mouse and opens
- * the pause menu.
+ * Ctrl+W, Ctrl+T, Ctrl+N, Ctrl+Q, Ctrl+Tab and Esc belong to the browser, and a page can't cancel them in a window.
+ * During a fullscreen match, Keyboard Lock hands them to the game: Esc then only pauses, and holding it leaves
+ * fullscreen (the browser says so when fullscreen starts).
  */
 async function lockKeyboard(on: boolean) {
-  const keyboard = (navigator as Navigator & { keyboard?: { lock(codes?: string[]): Promise<void>; unlock(): void } }).keyboard;
+  const keyboard = keyboardLock();
   if (!keyboard) return;
   if (!on) return keyboard.unlock();
   try {
-    await keyboard.lock(['KeyW', 'KeyT', 'KeyN', 'KeyQ', 'Tab']);
+    await keyboard.lock(['KeyW', 'KeyT', 'KeyN', 'KeyQ', 'Tab', 'Escape']);
   } catch {
     // The browser refused (fullscreen not entered through the page, or no support).
   }
@@ -150,8 +156,21 @@ export class Input {
   onChat: (() => void) | null = null;
   onCtrlHint: (() => void) | null = null;
   private picker: Picker | null = null;
-  enabled = false;
+  private on = false;
+  private lockLostAt = -Infinity;
   private cleanup: (() => void)[] = [];
+
+  /** On during a match. */
+  get enabled() {
+    return this.on;
+  }
+
+  set enabled(on: boolean) {
+    this.on = on;
+    this.syncKeyboard();
+  }
+
+  private syncKeyboard = () => void lockKeyboard(this.on && !!document.fullscreenElement);
 
   constructor(
     private readonly element: HTMLElement,
@@ -175,11 +194,13 @@ export class Input {
     on(element, 'contextmenu', (e) => e.preventDefault());
     on(document, 'pointerlockchange', () => {
       this.pointerLocked = document.pointerLockElement === this.element;
-      if (!this.pointerLocked) this.down.clear();
+      if (!this.pointerLocked) {
+        this.down.clear();
+        this.lockLostAt = performance.now();
+      }
     });
     on(window, 'blur', () => this.down.clear());
-    on(document, 'fullscreenchange', () => void lockKeyboard(!!document.fullscreenElement));
-    if (document.fullscreenElement) void lockKeyboard(true);
+    on(document, 'fullscreenchange', this.syncKeyboard);
     this.cleanup.push(watchInputMode(), onInputMode(this.onMode), () => void lockKeyboard(false));
   }
 
@@ -261,8 +282,11 @@ export class Input {
     if (!this.enabled) return;
     const target = e.target as HTMLElement | null;
     if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) return;
-    if (down && e.code === 'Escape' && !this.pointerLocked) {
-      this.onMenu?.();
+    if (down && e.code === 'Escape') {
+      // With Esc locked (fullscreen match) the browser passes it on instead of freeing the mouse; freeing it pauses.
+      // The Esc that the browser itself used to free the mouse may still arrive here; it must not close the menu it opened.
+      if (this.pointerLocked) this.unlock();
+      else if (performance.now() - this.lockLostAt > 300) this.onMenu?.();
       return;
     }
     if (!this.active) return;

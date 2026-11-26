@@ -209,6 +209,11 @@ export const de: Dictionary = {
   'action.scoreboard': 'Punktetafel',
   'action.chat': 'Chat',
   fullscreen: 'Vollbild',
+  exitFullscreen: 'Vollbild beenden',
+  'browserTip.title': 'Brickfray läuft am besten in Chrome',
+  'browserTip.body': 'Im Vollbild pausiert Esc nur das Spiel, und Browser-Kürzel kommen dir nicht mehr in die Quere.',
+  'browserTip.get': 'Chrome holen',
+  'browserTip.ok': 'Verstanden',
   credits: 'Credits',
   'credits.madeBy': 'Ein Spiel von',
   'credits.builtWith': 'Entwickelt mit {tool}'

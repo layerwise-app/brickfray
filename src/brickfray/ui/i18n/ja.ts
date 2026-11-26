@@ -209,6 +209,11 @@ export const ja: Dictionary = {
   'action.scoreboard': 'スコアボード',
   'action.chat': 'チャット',
   fullscreen: '全画面',
+  exitFullscreen: '全画面を終了',
+  'browserTip.title': 'Brickfray は Chrome で遊ぶのがおすすめです',
+  'browserTip.body': '全画面では Esc で一時停止するだけになり、ブラウザのショートカットに邪魔されません。',
+  'browserTip.get': 'Chrome を入手',
+  'browserTip.ok': 'OK',
   credits: 'クレジット',
   'credits.madeBy': '制作',
   'credits.builtWith': '{tool} で開発'

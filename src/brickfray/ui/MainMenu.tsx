@@ -10,6 +10,7 @@ import { WEAPONS } from '../weapons/defs';
 import { weaponName } from './hud/names';
 import { LOADOUTS } from '../weapons/loadouts';
 import { BotIcon, CreditsIcon, ExitFullscreenIcon, FullscreenIcon, GearIcon, GlobeIcon, PlayIcon, UsersIcon, WeaponIcon } from './icons';
+import { BrowserTip } from './BrowserTip';
 import { RoomsPanel } from './RoomsPanel';
 import { Credits } from './Credits';
 import { useFullscreen } from './fullscreen';
@@ -173,7 +174,7 @@ export function MainMenu({ openSettings }: { openSettings: () => void }) {
           BRICKFRAY
         </h1>
         <div className='bf-menu-corner'>
-          <div ref={controls} className='bf-menu-tools'>
+          <div ref={controls} className='bf-menu-tools relative'>
             <LanguageButton />
             <FullscreenButton />
             <button className='bf-btn bf-btn-ghost bf-icon-btn' onClick={() => open('ranks')} aria-label={t('board.title')} title={t('board.title')}>
@@ -185,6 +186,7 @@ export function MainMenu({ openSettings }: { openSettings: () => void }) {
             <button className='bf-btn bf-btn-ghost bf-icon-btn' onClick={openSettings} aria-label={t('settings')} title={t('settings')}>
               <GearIcon size={24} />
             </button>
+            <BrowserTip />
           </div>
           <ProfileChip ref={me} character={character} open={overlay === 'profile'} onOpen={() => open('profile')} />
         </div>

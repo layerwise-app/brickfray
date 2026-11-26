@@ -3,13 +3,16 @@ import { mapName } from './board/format';
 import { StatIcon, type Stat } from './hud/stat-head';
 import { clock } from './hud/standings';
 import { useT } from './i18n';
-import { DoorIcon, GearIcon, PlayIcon } from './icons';
+import { DoorIcon, ExitFullscreenIcon, FullscreenIcon, GearIcon, PlayIcon } from './icons';
+import { useFullscreen } from './fullscreen';
+import { canFullscreen, setFullscreen } from '../game/touch-screen';
 
 /** Paused: what is paused (mode, map, the clock or wave), the player's numbers so far, then Resume, Settings, Leave. */
 export function PauseMenu({ openSettings }: { openSettings: () => void }) {
   const game = useGame();
   const hud = useHud();
   const { t, lang } = useT();
+  const fullscreen = useFullscreen();
   const s = hud.settings;
   const me = hud.rows.find((r) => r.me);
   const solo = s?.mode === 'solo';
@@ -52,6 +55,12 @@ export function PauseMenu({ openSettings }: { openSettings: () => void }) {
           <GearIcon size={20} />
           <span className='font-semibold'>{t('settings')}</span>
         </button>
+        {canFullscreen() && (
+          <button className='bf-btn bf-btn-ghost' onClick={() => void setFullscreen(!fullscreen)}>
+            {fullscreen ? <ExitFullscreenIcon size={20} /> : <FullscreenIcon size={20} />}
+            <span className='font-semibold'>{fullscreen ? t('exitFullscreen') : t('fullscreen')}</span>
+          </button>
+        )}
         <button className='bf-btn bf-btn-red' onClick={() => game.leave()}>
           <DoorIcon size={20} />
           <span className='font-semibold'>{t('leaveMatch')}</span>

@@ -27,6 +27,11 @@ export function canFullscreen() {
   return typeof document !== 'undefined' && document.fullscreenEnabled === true && typeof document.documentElement.requestFullscreen === 'function';
 }
 
+/** The player switched fullscreen off themselves. */
+export function fullscreenDeclined() {
+  return declined;
+}
+
 export function isFullscreen() {
   return typeof document !== 'undefined' && !!document.fullscreenElement;
 }

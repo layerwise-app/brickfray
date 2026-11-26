@@ -209,6 +209,11 @@ export const zh: Dictionary = {
   'action.scoreboard': '计分板',
   'action.chat': '聊天',
   fullscreen: '全屏',
+  exitFullscreen: '退出全屏',
+  'browserTip.title': '用 Chrome 玩 Brickfray 体验最佳',
+  'browserTip.body': '全屏时按 Esc 只会暂停，浏览器快捷键也不会打断游戏。',
+  'browserTip.get': '下载 Chrome',
+  'browserTip.ok': '知道了',
   credits: '制作人员',
   'credits.madeBy': '制作人',
   'credits.builtWith': '使用 {tool} 开发'

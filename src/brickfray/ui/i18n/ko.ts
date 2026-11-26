@@ -209,6 +209,11 @@ export const ko: Dictionary = {
   'action.scoreboard': '점수판',
   'action.chat': '채팅',
   fullscreen: '전체 화면',
+  exitFullscreen: '전체 화면 종료',
+  'browserTip.title': 'Brickfray는 Chrome에서 가장 잘 돌아가요',
+  'browserTip.body': '전체 화면에서 Esc는 일시 정지만 하고, 브라우저 단축키가 게임을 방해하지 않아요.',
+  'browserTip.get': 'Chrome 받기',
+  'browserTip.ok': '확인',
   credits: '크레딧',
   'credits.madeBy': '제작',
   'credits.builtWith': '{tool}로 개발'

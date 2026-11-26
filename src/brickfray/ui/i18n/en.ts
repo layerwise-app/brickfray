@@ -208,6 +208,11 @@ export const en = {
   'action.scoreboard': 'Scoreboard',
   'action.chat': 'Chat',
   fullscreen: 'Fullscreen',
+  exitFullscreen: 'Exit fullscreen',
+  'browserTip.title': 'Brickfray plays best in Chrome',
+  'browserTip.body': 'In fullscreen, Esc only pauses the game and browser shortcuts stay out of your way.',
+  'browserTip.get': 'Get Chrome',
+  'browserTip.ok': 'Got it',
   credits: 'Credits',
   'credits.madeBy': 'Made by',
   'credits.builtWith': 'Built with {tool}'

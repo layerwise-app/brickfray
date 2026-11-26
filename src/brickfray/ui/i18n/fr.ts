@@ -209,6 +209,11 @@ export const fr: Dictionary = {
   'action.scoreboard': 'Tableau des scores',
   'action.chat': 'Discussion',
   fullscreen: 'Plein écran',
+  exitFullscreen: 'Quitter le plein écran',
+  'browserTip.title': 'Brickfray est plus agréable dans Chrome',
+  'browserTip.body': 'En plein écran, Échap met simplement le jeu en pause et les raccourcis du navigateur ne vous gênent plus.',
+  'browserTip.get': 'Obtenir Chrome',
+  'browserTip.ok': 'Compris',
   credits: 'Crédits',
   'credits.madeBy': 'Créé par',
   'credits.builtWith': 'Développé avec {tool}'

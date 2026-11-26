@@ -17,7 +17,8 @@ import type { ViewCue, ViewModel } from '../weapons/types';
 import type { MapId } from '../world/types';
 import { AppStore, type AppError } from './app-store';
 import { HudStore } from './hud';
-import { Input } from './input';
+import { canLockKeyboard, Input } from './input';
+import { fullscreenDeclined, setFullscreen } from './touch-screen';
 import { MatchView } from './match-view';
 import { MAP_IDS, saveSettings, type Settings } from './settings';
 import { enemyInSights } from './touch-aim';
@@ -107,6 +108,7 @@ export class Game {
     document.addEventListener('visibilitychange', this.onVisibility);
     window.addEventListener('beforeunload', this.onUnload);
     window.addEventListener('pagehide', this.onPageHide);
+    document.addEventListener('fullscreenchange', this.onFullscreen);
     // Dev aid: ?net=150,30,0.05 adds latency (ms), jitter (ms) and packet loss to every link.
     const net = new URLSearchParams(location.search).get('net')?.split(',').map(Number);
     if (net?.length) Object.assign(netConditions, { latency: net[0] || 0, jitter: net[1] || 0, loss: net[2] || 0 });
@@ -145,6 +147,13 @@ export class Game {
   /** Ctrl+W closes tabs outside fullscreen; the browser asks first while a match runs, and Cancel keeps playing. */
   private onUnload = (e: BeforeUnloadEvent) => {
     if (this.app.state.screen === 'match' || this.host) e.preventDefault();
+  };
+
+  /** Where Keyboard Lock is missing, the Esc that pauses also leaves fullscreen; Resume brings it back. */
+  private refullscreen = false;
+  private onFullscreen = () => {
+    if (document.fullscreenElement) this.refullscreen = false;
+    else this.refullscreen = this.app.state.screen === 'match' && !canLockKeyboard() && !fullscreenDeclined();
   };
 
   /** The page is really going: tell the room's players the host left. */
@@ -361,6 +370,7 @@ export class Game {
     this.showroom.enter();
     this.input.enabled = false;
     this.input.unlock();
+    this.refullscreen = false;
     this.hud.reset();
     this.audio.setScene?.(null);
     this.audio.playMusic?.('menu');
@@ -380,6 +390,7 @@ export class Game {
   resume() {
     this.chatting = false;
     void this.input.lock();
+    if (this.refullscreen) void setFullscreen(true);
   }
 
   /** Free the mouse to type without opening the pause menu. */
@@ -485,6 +496,7 @@ export class Game {
     document.removeEventListener('visibilitychange', this.onVisibility);
     window.removeEventListener('beforeunload', this.onUnload);
     window.removeEventListener('pagehide', this.onPageHide);
+    document.removeEventListener('fullscreenchange', this.onFullscreen);
     window.removeEventListener('resize', this.resize);
     this.boxWatch.disconnect();
     this.input.dispose();
