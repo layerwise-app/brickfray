@@ -106,6 +106,7 @@ export class Game {
     document.addEventListener('pointerlockchange', this.onLockChange);
     document.addEventListener('visibilitychange', this.onVisibility);
     window.addEventListener('beforeunload', this.onUnload);
+    window.addEventListener('pagehide', this.onPageHide);
     // Dev aid: ?net=150,30,0.05 adds latency (ms), jitter (ms) and packet loss to every link.
     const net = new URLSearchParams(location.search).get('net')?.split(',').map(Number);
     if (net?.length) Object.assign(netConditions, { latency: net[0] || 0, jitter: net[1] || 0, loss: net[2] || 0 });
@@ -141,13 +142,13 @@ export class Game {
     if (!halted) this.client?.resyncClock();
   }
 
-  /** Ctrl+W closes tabs outside fullscreen; the browser asks first while a match runs. */
+  /** Ctrl+W closes tabs outside fullscreen; the browser asks first while a match runs, and Cancel keeps playing. */
   private onUnload = (e: BeforeUnloadEvent) => {
-    if (this.app.state.screen === 'match' || this.host) {
-      e.preventDefault();
-      this.host?.close();
-    }
+    if (this.app.state.screen === 'match' || this.host) e.preventDefault();
   };
+
+  /** The page is really going: tell the room's players the host left. */
+  private onPageHide = () => this.host?.close();
 
   private hintShown = false;
   private ctrlHint() {
@@ -483,6 +484,7 @@ export class Game {
     document.removeEventListener('pointerlockchange', this.onLockChange);
     document.removeEventListener('visibilitychange', this.onVisibility);
     window.removeEventListener('beforeunload', this.onUnload);
+    window.removeEventListener('pagehide', this.onPageHide);
     window.removeEventListener('resize', this.resize);
     this.boxWatch.disconnect();
     this.input.dispose();

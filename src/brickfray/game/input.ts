@@ -92,6 +92,22 @@ function ctrlClosesTab() {
   return !/mac|iphone|ipad|ipod/i.test(nav.userAgentData?.platform || nav.platform || nav.userAgent);
 }
 
+/**
+ * Ctrl+W, Ctrl+T, Ctrl+N, Ctrl+Q and Ctrl+Tab belong to the browser, and a page can't cancel them in a window. In
+ * fullscreen, Keyboard Lock hands them to the game. Esc stays with the browser so it still frees the mouse and opens
+ * the pause menu.
+ */
+async function lockKeyboard(on: boolean) {
+  const keyboard = (navigator as Navigator & { keyboard?: { lock(codes?: string[]): Promise<void>; unlock(): void } }).keyboard;
+  if (!keyboard) return;
+  if (!on) return keyboard.unlock();
+  try {
+    await keyboard.lock(['KeyW', 'KeyT', 'KeyN', 'KeyQ', 'Tab']);
+  } catch {
+    // The browser refused (fullscreen not entered through the page, or no support).
+  }
+}
+
 const HINT_SEEN = 'brickfray.ctrlHintSeen';
 let hintSeenFallback = false;
 
@@ -162,7 +178,9 @@ export class Input {
       if (!this.pointerLocked) this.down.clear();
     });
     on(window, 'blur', () => this.down.clear());
-    this.cleanup.push(watchInputMode(), onInputMode(this.onMode));
+    on(document, 'fullscreenchange', () => void lockKeyboard(!!document.fullscreenElement));
+    if (document.fullscreenElement) void lockKeyboard(true);
+    this.cleanup.push(watchInputMode(), onInputMode(this.onMode), () => void lockKeyboard(false));
   }
 
   get touchMode() {
@@ -360,15 +378,6 @@ export class Input {
     return f;
   }
 
-  /** In fullscreen, Keyboard Lock lets Ctrl+W and Esc reach the game instead of the browser. */
-  static async lockKeyboard() {
-    const keyboard = (navigator as Navigator & { keyboard?: { lock(codes?: string[]): Promise<void> } }).keyboard;
-    try {
-      await keyboard?.lock(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ControlLeft', 'Tab', 'Escape']);
-    } catch {
-      // Not supported outside fullscreen or in this browser.
-    }
-  }
 
   dispose() {
     for (const fn of this.cleanup) fn();
