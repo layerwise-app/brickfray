@@ -109,6 +109,7 @@ export class Game {
     window.addEventListener('beforeunload', this.onUnload);
     window.addEventListener('pagehide', this.onPageHide);
     document.addEventListener('fullscreenchange', this.onFullscreen);
+    document.addEventListener('contextmenu', this.onContextMenu);
     // Dev aid: ?net=150,30,0.05 adds latency (ms), jitter (ms) and packet loss to every link.
     const net = new URLSearchParams(location.search).get('net')?.split(',').map(Number);
     if (net?.length) Object.assign(netConditions, { latency: net[0] || 0, jitter: net[1] || 0, loss: net[2] || 0 });
@@ -154,6 +155,12 @@ export class Game {
   private onFullscreen = () => {
     if (document.fullscreenElement) this.refullscreen = false;
     else this.refullscreen = this.app.state.screen === 'match' && !canLockKeyboard() && !fullscreenDeclined();
+  };
+
+  /** Right-click is aim: a stray one on a menu or the results must not open the browser's menu. Text fields keep it for paste. */
+  private onContextMenu = (e: MouseEvent) => {
+    const target = e.target as HTMLElement | null;
+    if (!target?.closest('input, textarea, [contenteditable="true"]')) e.preventDefault();
   };
 
   /** The page is really going: tell the room's players the host left. */
@@ -497,6 +504,7 @@ export class Game {
     window.removeEventListener('beforeunload', this.onUnload);
     window.removeEventListener('pagehide', this.onPageHide);
     document.removeEventListener('fullscreenchange', this.onFullscreen);
+    document.removeEventListener('contextmenu', this.onContextMenu);
     window.removeEventListener('resize', this.resize);
     this.boxWatch.disconnect();
     this.input.dispose();
