@@ -216,5 +216,6 @@ export const fr: Dictionary = {
   'browserTip.ok': 'Compris',
   credits: 'Crédits',
   'credits.madeBy': 'Créé par',
+  'credits.source': 'Code source',
   'credits.builtWith': 'Développé avec {tool}'
 };

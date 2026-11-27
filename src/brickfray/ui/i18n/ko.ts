@@ -216,5 +216,6 @@ export const ko: Dictionary = {
   'browserTip.ok': '확인',
   credits: '크레딧',
   'credits.madeBy': '제작',
+  'credits.source': '소스 코드',
   'credits.builtWith': '{tool}로 개발'
 };

@@ -215,6 +215,7 @@ export const en = {
   'browserTip.ok': 'Got it',
   credits: 'Credits',
   'credits.madeBy': 'Made by',
+  'credits.source': 'Source code',
   'credits.builtWith': 'Built with {tool}'
 } as const;
 

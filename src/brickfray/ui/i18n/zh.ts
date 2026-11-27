@@ -216,5 +216,6 @@ export const zh: Dictionary = {
   'browserTip.ok': '知道了',
   credits: '制作人员',
   'credits.madeBy': '制作人',
+  'credits.source': '源代码',
   'credits.builtWith': '使用 {tool} 开发'
 };

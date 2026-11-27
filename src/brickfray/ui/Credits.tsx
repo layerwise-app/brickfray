@@ -1,10 +1,13 @@
 import { useEffect, useRef } from 'react';
 import { useT } from './i18n';
-import { BackIcon, ExternalIcon } from './icons';
+import { BackIcon, ExternalIcon, GitHubIcon } from './icons';
 import './menu-credits.css';
 
-const AUTHOR = 'devrsi0n';
-const AUTHOR_URL = 'https://x.com/devrsi0n';
+const AUTHOR = 'Qing';
+const AUTHOR_HANDLE = 'devrsi0n';
+const AUTHOR_URL = `https://x.com/${AUTHOR_HANDLE}`;
+const REPO = 'layerwise-app/brickfray';
+const REPO_URL = `https://github.com/${REPO}`;
 const TOOL = 'Fable 5.2';
 
 /** Who made the game, in a small card over the menu; Esc or a tap outside closes it. */
@@ -36,9 +39,23 @@ export function Credits({ onClose }: { onClose: () => void }) {
         <div className='bf-credits-block'>
           <p className='bf-credits-label'>{t('credits.madeBy')}</p>
           <a className='bf-credits-author' href={AUTHOR_URL} target='_blank' rel='noopener noreferrer'>
+            <img className='bf-credits-avatar' src='/credits/qing.jpg' alt='' width={56} height={56} />
             <span className='bf-credits-who'>
               <span className='bf-display bf-credits-name'>{AUTHOR}</span>
-              <span className='bf-credits-url'>x.com/{AUTHOR}</span>
+              <span className='bf-credits-url'>x.com/{AUTHOR_HANDLE}</span>
+            </span>
+            <ExternalIcon size={20} />
+          </a>
+        </div>
+        <div className='bf-credits-block'>
+          <p className='bf-credits-label'>{t('credits.source')}</p>
+          <a className='bf-credits-author' href={REPO_URL} target='_blank' rel='noopener noreferrer'>
+            <span className='bf-credits-repo-icon'>
+              <GitHubIcon size={28} />
+            </span>
+            <span className='bf-credits-who'>
+              <span className='bf-credits-repo'>GitHub</span>
+              <span className='bf-credits-url'>{REPO}</span>
             </span>
             <ExternalIcon size={20} />
           </a>

@@ -5,7 +5,6 @@ import { loadSettings } from '../game/settings';
 import { Connecting, ErrorBanner } from './Connecting';
 import { Hud } from './hud/Hud';
 import { Lobby } from './Lobby';
-
 import { MainMenu } from './MainMenu';
 import { PauseMenu } from './PauseMenu';
 import { LeftRunUnlocks } from './achievements/LeftRunUnlocks';
@@ -94,7 +93,6 @@ function Screens({ openSettings }: { openSettings: () => void }) {
   return (
     <>
       {app.screen === 'menu' && <MainMenu openSettings={openSettings} />}
-
       {app.screen === 'connecting' && <Connecting />}
       {app.screen === 'lobby' && <Lobby />}
       {app.screen === 'match' && <Hud />}

@@ -53,9 +53,8 @@
 .bf-credits-author {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 14px 16px;
+  gap: 14px;
+  padding: 12px 16px 12px 12px;
   border-radius: 14px;
   background: rgba(0, 0, 0, 0.28);
   box-shadow:
@@ -77,11 +76,43 @@
   outline: 3px solid #fff;
   outline-offset: 2px;
 }
+.bf-credits-author > svg:last-child {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.bf-credits-avatar,
+.bf-credits-repo-icon {
+  width: 56px;
+  height: 56px;
+  flex-shrink: 0;
+  border-radius: 50%;
+}
+.bf-credits-avatar {
+  object-fit: cover;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.85);
+}
+.bf-credits-repo-icon {
+  display: grid;
+  place-items: center;
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--bf-text);
+}
 .bf-credits-who {
   display: flex;
   min-width: 0;
   flex-direction: column;
   gap: 4px;
+}
+.bf-credits-repo {
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--bf-text);
+}
+.bf-credits-url {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .bf-credits-name {
   font-size: 32px;

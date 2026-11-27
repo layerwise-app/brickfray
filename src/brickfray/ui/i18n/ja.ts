@@ -216,5 +216,6 @@ export const ja: Dictionary = {
   'browserTip.ok': 'OK',
   credits: 'クレジット',
   'credits.madeBy': '制作',
+  'credits.source': 'ソースコード',
   'credits.builtWith': '{tool} で開発'
 };
