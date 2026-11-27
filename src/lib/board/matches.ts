@@ -34,13 +34,14 @@ export async function storeMatches(db: BoardDb, player: PlayerRef, reports: Matc
   return reports.map((r) => r.key);
 }
 
-const ENTRY = sql`m.id, m.mode, m.map, m.difficulty, m.wave, m.character, m.ended_at, m.duration_s, m.score, m.kills, m.deaths, m.assists, m.headshots, m.placement, m.players, m.result`;
+const ENTRY = sql`m.id, m.mode, m.map, m.difficulty, m.minutes, m.wave, m.character, m.ended_at, m.duration_s, m.score, m.kills, m.deaths, m.assists, m.headshots, m.placement, m.players, m.result`;
 
 interface EntryRow {
   id: number;
   mode: BoardEntry['mode'];
   map: string;
   difficulty: BoardEntry['difficulty'];
+  minutes: BoardEntry['minutes'];
   wave: number;
   character: string;
   ended_at: number;
@@ -78,6 +79,7 @@ function entry(r: EntryRow): BoardEntry {
     mode: r.mode,
     map: r.map,
     difficulty: r.difficulty,
+    minutes: r.minutes,
     wave: r.wave,
     character: r.character,
     endedAt: r.ended_at,
@@ -109,7 +111,7 @@ export async function leaderboard(db: BoardDb, q: LeaderboardQuery, profileId: s
     WITH best AS (
       SELECT m.*, ROW_NUMBER() OVER (PARTITION BY m.profile_id ORDER BY ${order(q.mode)}) AS pick
       FROM board_match m
-      WHERE m.mode = ${q.mode} ${q.difficulty ? sql`AND m.difficulty = ${q.difficulty}` : sql``} ${q.map ? sql`AND m.map = ${q.map}` : sql``}
+      WHERE m.mode = ${q.mode} ${q.difficulty ? sql`AND m.difficulty = ${q.difficulty}` : sql``} ${q.minutes ? sql`AND m.minutes = ${q.minutes}` : sql``} ${q.map ? sql`AND m.map = ${q.map}` : sql``}
     ), ranked AS (
       SELECT m.*, ROW_NUMBER() OVER (ORDER BY ${order(q.mode)}) AS rank, COUNT(*) OVER () AS total
       FROM best m WHERE m.pick = 1

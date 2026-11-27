@@ -1,4 +1,4 @@
-import type { BoardMode, SoloLevel } from './contract';
+import type { BoardMode, MatchMinutes, SoloLevel } from './contract';
 import { newId } from './db';
 
 // A match ticket: the server's signed note that this player started this kind of match at this time. A report only
@@ -11,6 +11,8 @@ export interface Ticket {
   mode: BoardMode;
   map: string;
   difficulty: SoloLevel | null;
+  /** Rooms: the time limit. Missing from tickets signed before it was kept. */
+  minutes?: MatchMinutes | null;
   /** Server clock when the match was started (ms). */
   issuedAt: number;
 }

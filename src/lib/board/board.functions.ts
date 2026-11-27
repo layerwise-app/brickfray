@@ -51,7 +51,7 @@ function ticketSecret() {
 
 /** Called as a match starts: the ticket its report will need (see ticket.ts). */
 export const startMatch = createServerFn({ method: 'POST' })
-  .validator((raw: { playerId: string; mode: string; map: string; difficulty: string | null }) => parseMatchStart(raw))
+  .validator((raw: { playerId: string; mode: string; map: string; difficulty: string | null; minutes: number | null }) => parseMatchStart(raw))
   .handler(async ({ data }): Promise<MatchStart | { refused: 'rate' | 'off' }> => {
     const secret = ticketSecret();
     if (!secret) return { refused: 'off' };

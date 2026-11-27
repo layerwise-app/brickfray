@@ -132,6 +132,8 @@ export const boardMatch = sqliteTable(
     mode: text('mode', { enum: ['solo', 'ffa', 'tdm'] }).notNull(),
     map: text('map').notNull(),
     difficulty: text('difficulty', { enum: ['easy', 'normal', 'hard'] }),
+    /** A room's time limit (contract.ts MATCH_MINUTES); null for solo and for rooms stored before it was kept, which no board ranks. */
+    minutes: integer('minutes'),
     wave: integer('wave').notNull(),
     character: text('character').notNull(),
     endedAt: integer('ended_at').notNull(),
@@ -155,7 +157,7 @@ export const boardMatch = sqliteTable(
   },
   (t) => [
     uniqueIndex('board_match_player_key_uq').on(t.playerId, t.matchKey),
-    index('board_match_board_idx').on(t.mode, t.difficulty, t.map),
+    index('board_match_board_idx').on(t.mode, t.difficulty, t.minutes, t.map),
     index('board_match_profile_idx').on(t.profileId, t.endedAt),
     index('board_match_uncounted_idx')
       .on(t.profileId)

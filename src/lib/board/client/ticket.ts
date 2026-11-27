@@ -7,7 +7,7 @@ import { getPlayerId } from './identity';
 export async function requestTicket(settings: MatchSettings): Promise<MatchStart | null> {
   try {
     const solo = settings.mode === 'solo';
-    const result = await startMatch({ data: { playerId: getPlayerId(), mode: settings.mode, map: settings.map, difficulty: solo ? settings.difficulty : null } });
+    const result = await startMatch({ data: { playerId: getPlayerId(), mode: settings.mode, map: settings.map, difficulty: solo ? settings.difficulty : null, minutes: solo ? null : settings.minutes } });
     return 'refused' in result ? null : result;
   } catch {
     return null;

@@ -3,7 +3,7 @@ import type { CharacterId } from '~/brickfray/characters/types';
 import type { HudState } from '~/brickfray/game/hud';
 import type { GameEvent, MatchSettings } from '~/brickfray/sim/types';
 import { fitFeats } from '../../achievements/feats';
-import type { MatchDetail, MatchReport, MatchResult, MatchStart } from '../contract';
+import type { MatchDetail, MatchMinutes, MatchReport, MatchResult, MatchStart } from '../contract';
 import { publishOutcome } from './outcome';
 
 /**
@@ -73,6 +73,7 @@ export class MatchTally {
       mode: this.settings.mode,
       map: this.settings.map,
       difficulty: solo ? this.settings.difficulty : null,
+      minutes: solo ? null : (this.settings.minutes as MatchMinutes),
       wave: solo ? Math.max(1, hud.wave) : 0,
       character: CHARACTER_IDS.includes(me.character as CharacterId) ? me.character : this.character,
       endedAt: Date.now(),

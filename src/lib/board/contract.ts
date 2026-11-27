@@ -10,6 +10,10 @@ export type BoardMode = (typeof MODES)[number];
 export const SOLO_LEVELS = ['easy', 'normal', 'hard'] as const;
 export type SoloLevel = (typeof SOLO_LEVELS)[number];
 
+/** A room's time limits (the lobby's choices); each length is its own board. */
+export const MATCH_MINUTES = [3, 5, 10, 15] as const;
+export type MatchMinutes = (typeof MATCH_MINUTES)[number];
+
 export type MatchResult = 'win' | 'loss' | 'draw';
 
 export const LEADERBOARD_PAGE = 20;
@@ -30,6 +34,8 @@ export interface MatchReport {
   map: string;
   /** Solo only. */
   difficulty: SoloLevel | null;
+  /** Rooms only: the time limit. Null from a client older than it. */
+  minutes: MatchMinutes | null;
   /** Solo: the wave the run reached; 0 otherwise. */
   wave: number;
   character: string;
@@ -92,6 +98,7 @@ export interface BoardEntry {
   mode: BoardMode;
   map: string;
   difficulty: SoloLevel | null;
+  minutes: MatchMinutes | null;
   wave: number;
   character: string;
   endedAt: number;
@@ -119,11 +126,13 @@ export interface RankedEntry extends Omit<BoardEntry, 'endedAt'>, BoardPlayer {
   mine: boolean;
 }
 
-/** All-time boards, one per mode (solo: per difficulty), on one map or all of them. */
+/** All-time boards, one per mode (solo: per difficulty, rooms: per time limit), on one map or all of them. */
 export interface LeaderboardQuery {
   mode: BoardMode;
   /** Solo boards are kept per difficulty. */
   difficulty: SoloLevel | null;
+  /** Room boards are kept per time limit. */
+  minutes: MatchMinutes | null;
   /** Null: every map. */
   map: string | null;
   page: number;
@@ -170,10 +179,11 @@ export interface MatchView {
   detail: MatchDetail | null;
 }
 
-/** Where a just-stored match leaves its player on the all-time board of its mode (solo: its difficulty), every map. */
+/** Where a just-stored match leaves its player on the all-time board of its mode (solo: its difficulty, rooms: its time limit), every map. */
 export interface MatchRank {
   mode: BoardMode;
   difficulty: SoloLevel | null;
+  minutes: MatchMinutes | null;
   /** The player's place now (their best match there), out of `total` ranked players. */
   rank: number;
   total: number;

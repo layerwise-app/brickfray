@@ -1,7 +1,7 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { getLeaderboard } from '../../../lib/board/board.functions';
-import { MODES, SOLO_LEVELS, type BoardMode, type RankedEntry, type SoloLevel } from '../../../lib/board/contract';
+import { MATCH_MINUTES, MODES, SOLO_LEVELS, type BoardMode, type MatchMinutes, type RankedEntry, type SoloLevel } from '../../../lib/board/contract';
 import { ROSTER } from '../../characters/roster';
 import type { CharacterId } from '../../characters/types';
 import { MAP_IDS } from '../../game/settings';
@@ -17,6 +17,8 @@ import type { OpenMatch } from './ScorePanel';
 export interface RankFilter {
   mode: BoardMode;
   difficulty: SoloLevel;
+  /** Rooms: the time limit (each length is its own board). */
+  minutes: MatchMinutes;
   /** Null: every map. */
   map: MapId | null;
 }
@@ -33,7 +35,7 @@ export function Rankings({ filter, setFilter, onOpen }: { filter: RankFilter; se
   const playerId = usePlayerId();
   const [page, setPage] = useState(0);
   const solo = filter.mode === 'solo';
-  const query = { mode: filter.mode, difficulty: solo ? filter.difficulty : null, map: filter.map, page, playerId };
+  const query = { mode: filter.mode, difficulty: solo ? filter.difficulty : null, minutes: solo ? null : filter.minutes, map: filter.map, page, playerId };
   const board = useQuery({
     queryKey: [...BOARD, 'ranks', query],
     queryFn: () => getLeaderboard({ data: query }),
@@ -70,6 +72,15 @@ export function Rankings({ filter, setFilter, onOpen }: { filter: RankFilter; se
               ))}
             </select>
           )}
+          {!solo && (
+            <select aria-label={t('timeLimit')} value={filter.minutes} onChange={(e) => choose({ minutes: Number(e.target.value) as MatchMinutes })}>
+              {MATCH_MINUTES.map((m) => (
+                <option key={m} value={m}>
+                  {t('minutes', { n: m })}
+                </option>
+              ))}
+            </select>
+          )}
           <select aria-label={t('map')} value={filter.map ?? ''} onChange={(e) => choose({ map: (e.target.value || null) as MapId | null })}>
             {[null, ...MAP_IDS].map((m) => (
               <option key={m ?? 'all'} value={m ?? ''}>
@@ -84,6 +95,15 @@ export function Rankings({ filter, setFilter, onOpen }: { filter: RankFilter; se
               {SOLO_LEVELS.map((d) => (
                 <button key={d} aria-pressed={filter.difficulty === d} onClick={() => choose({ difficulty: d })}>
                   {t(`difficulty.${d}`)}
+                </button>
+              ))}
+            </div>
+          )}
+          {!solo && (
+            <div className='bf-seg bf-board-minutes' role='group' aria-label={t('timeLimit')}>
+              {MATCH_MINUTES.map((m) => (
+                <button key={m} aria-pressed={filter.minutes === m} onClick={() => choose({ minutes: m })}>
+                  {t('minutes', { n: m })}
                 </button>
               ))}
             </div>

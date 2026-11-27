@@ -2,7 +2,7 @@ import { CHARACTER_IDS } from '~/brickfray/characters/roster';
 import { MATCH } from '~/brickfray/sim/constants';
 import { botsThrough, secondsToReach } from '~/brickfray/sim/waves';
 import { parseFeats } from '../achievements/feats';
-import { BoardError, MODES, SOLO_LEVELS, UPLOAD_BATCH, type BoardMode, type LeaderboardQuery, type MatchReport, type MatchResult, type SoloLevel } from './contract';
+import { BoardError, MATCH_MINUTES, MODES, SOLO_LEVELS, UPLOAD_BATCH, type BoardMode, type LeaderboardQuery, type MatchMinutes, type MatchReport, type MatchResult, type SoloLevel } from './contract';
 import { maxScore, OVER, parseDetail } from './detail';
 import { cleanName } from './names';
 import type { Ticket } from './ticket';
@@ -38,6 +38,14 @@ function oneOf<T extends string>(value: unknown, options: readonly T[], field: s
   return value as T;
 }
 
+function minutesOf(value: unknown): MatchMinutes {
+  if (!MATCH_MINUTES.includes(value as MatchMinutes)) throw new BoardError('invalid', 'minutes unknown');
+  return value as MatchMinutes;
+}
+
+/** Seconds a room's report may run past its time limit: loading, the warm-up and the results screen. */
+const LIMIT_SLACK = 180;
+
 export function isPlayerId(value: unknown): value is string {
   return typeof value === 'string' && ID.test(value);
 }
@@ -57,6 +65,8 @@ export function parseReport(raw: unknown, now: number): MatchReport {
   const solo = mode === 'solo';
   const difficulty: SoloLevel | null = solo ? oneOf(r.difficulty, SOLO_LEVELS, 'difficulty') : null;
   const result: MatchResult | null = solo ? null : oneOf(r.result, RESULTS, 'result');
+  // A client older than time-limit boards sends none: the match is kept, outside every board.
+  const minutes = solo || r.minutes === undefined || r.minutes === null ? null : minutesOf(r.minutes);
   if (typeof r.endedAt !== 'number' || !Number.isFinite(r.endedAt) || r.endedAt < now - 60 * DAY) throw new BoardError('invalid', 'bad time');
   const durationS = count(r.durationS, 'durationS', MAX_SECONDS[mode]);
   const wave = count(r.wave, 'wave', 1000);
@@ -74,6 +84,7 @@ export function parseReport(raw: unknown, now: number): MatchReport {
   if (durationS < 5) fail('too short');
   if (players < 1 || placement < 1 || placement > players) fail('bad placement');
   if (solo && (wave < 1 || deaths > 1 || players !== 1)) fail('bad solo run');
+  if (minutes && durationS > minutes * 60 + LIMIT_SLACK) fail('longer than its time limit');
   if (!solo && wave !== 0) fail('wave outside solo');
   if (headshots > kills) fail('headshots over kills');
   // Kills and assists at most one every 1.5 s, deaths one per respawn (3 s).
@@ -101,6 +112,7 @@ export function parseReport(raw: unknown, now: number): MatchReport {
     mode,
     map: r.map,
     difficulty,
+    minutes,
     wave,
     character,
     endedAt: Math.min(Math.round(r.endedAt), now),
@@ -129,6 +141,7 @@ export function admit(report: MatchReport, ticket: Ticket | null, uploader: stri
   if (!ticket) return fail('no ticket');
   if (ticket.playerId !== uploader || ticket.key !== report.key) fail('ticket of another match');
   if (ticket.mode !== report.mode || ticket.map !== report.map || ticket.difficulty !== report.difficulty) fail('ticket of another match');
+  if ((ticket.minutes ?? null) !== report.minutes) fail('ticket of another match');
   if (ticket.issuedAt > now || now - ticket.issuedAt > TICKET_DAYS * DAY) fail('ticket out of date');
   // A late upload keeps its own end time when the server can believe it; the span is the real time the match had.
   const endedAt = report.endedAt >= ticket.issuedAt && report.endedAt <= now ? report.endedAt : now;
@@ -162,7 +175,15 @@ export function parseMatchStart(raw: unknown) {
   const r = record(raw);
   const mode = oneOf(r.mode, MODES, 'mode');
   if (typeof r.map !== 'string' || !SLUG.test(r.map)) throw new BoardError('invalid', 'bad map');
-  return { playerId: playerId(r.playerId), mode, map: r.map, difficulty: mode === 'solo' ? oneOf(r.difficulty, SOLO_LEVELS, 'difficulty') : null };
+  const solo = mode === 'solo';
+  return {
+    playerId: playerId(r.playerId),
+    mode,
+    map: r.map,
+    difficulty: solo ? oneOf(r.difficulty, SOLO_LEVELS, 'difficulty') : null,
+    // A client older than time-limit boards asks without one; its match is then kept outside every board.
+    minutes: solo || r.minutes === undefined || r.minutes === null ? null : minutesOf(r.minutes)
+  };
 }
 
 export function parseLeaderboardQuery(raw: unknown): LeaderboardQuery {
@@ -173,6 +194,8 @@ export function parseLeaderboardQuery(raw: unknown): LeaderboardQuery {
   return {
     mode,
     difficulty: mode === 'solo' ? oneOf(r.difficulty, SOLO_LEVELS, 'difficulty') : null,
+    // A page loaded before time-limit boards asks without one: the lobby's default length.
+    minutes: mode === 'solo' ? null : r.minutes === undefined ? 5 : minutesOf(r.minutes),
     map,
     page: count(r.page, 'page', 10_000),
     playerId: isPlayerId(r.playerId) ? r.playerId : null

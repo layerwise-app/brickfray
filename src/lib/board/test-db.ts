@@ -23,6 +23,7 @@ export function report(over: Partial<MatchReport> = {}): MatchReport {
     mode: 'ffa',
     map: 'plaza',
     difficulty: null,
+    minutes: 10,
     wave: 0,
     character: 'rivet',
     endedAt: 1_800_000_000_000,
@@ -42,5 +43,5 @@ export function report(over: Partial<MatchReport> = {}): MatchReport {
 }
 
 export function soloReport(over: Partial<MatchReport> = {}): MatchReport {
-  return report({ mode: 'solo', difficulty: 'normal', wave: 5, result: null, players: 1, placement: 1, deaths: 1, ...over });
+  return report({ mode: 'solo', difficulty: 'normal', minutes: null, wave: 5, result: null, players: 1, placement: 1, deaths: 1, ...over });
 }

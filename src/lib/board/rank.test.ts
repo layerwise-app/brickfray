@@ -28,7 +28,15 @@ describe('the rank of a stored match', () => {
     await play(3, report({ score: 1000 }));
     const better = report({ score: 2500 });
     await play(4, report({ score: 500 }), better);
-    expect(await matchRank(db, id(4), better.key, 'ffa')).toEqual({ mode: 'ffa', difficulty: null, rank: 2, total: 4, before: 4, run: 2 });
+    expect(await matchRank(db, id(4), better.key, 'ffa')).toEqual({ mode: 'ffa', difficulty: null, minutes: 10, rank: 2, total: 4, before: 4, run: 2 });
+  });
+
+  it('ranks a room match only against matches of its time limit', async () => {
+    await play(1, report({ score: 3000, minutes: 15 }));
+    await play(2, report({ score: 2000, minutes: 5 }));
+    const mine = report({ score: 1000, minutes: 5 });
+    await play(3, mine);
+    expect(await matchRank(db, id(3), mine.key, 'ffa')).toMatchObject({ minutes: 5, rank: 2, total: 2 });
   });
 
   it('keeps the rank of a better earlier match, and places the new one on its own', async () => {
@@ -43,7 +51,7 @@ describe('the rank of a stored match', () => {
     await play(1, soloReport({ wave: 9 }));
     const first = soloReport({ wave: 4 });
     await play(2, soloReport({ wave: 12, difficulty: 'hard' }), first);
-    expect(await matchRank(db, id(2), first.key, 'solo')).toEqual({ mode: 'solo', difficulty: 'normal', rank: 2, total: 2, before: null, run: 2 });
+    expect(await matchRank(db, id(2), first.key, 'solo')).toEqual({ mode: 'solo', difficulty: 'normal', minutes: null, rank: 2, total: 2, before: null, run: 2 });
   });
 
   it('agrees with the leaderboard on every row', async () => {
@@ -53,7 +61,7 @@ describe('the rank of a stored match', () => {
       await play(n, ...runs);
       keys.push([n, runs[1]!.key]);
     }
-    const page = await leaderboard(db, { mode: 'solo', difficulty: 'normal', map: null, page: 0, playerId: null }, null);
+    const page = await leaderboard(db, { mode: 'solo', difficulty: 'normal', minutes: null, map: null, page: 0, playerId: null }, null);
     for (const [n, key] of keys) {
       const rank = await matchRank(db, id(n), key, 'solo');
       expect(rank?.rank).toBe(page.rows.find((r) => r.name === `P${n}`)?.rank);

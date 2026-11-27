@@ -221,6 +221,9 @@
 .bf-board-filter-row > .bf-seg {
   flex: 3 1 0;
 }
+.bf-board-filter-row > .bf-board-minutes {
+  flex: 4 1 0;
+}
 .bf-board-filter-row > .bf-board-maps {
   flex: 5 1 0;
 }

@@ -82,7 +82,12 @@ function Ranked({ rank, solo }: { rank: MatchRank; solo: boolean }) {
   const tier = tierOf(rank.rank);
   const first = rank.before === null;
   const up = !first && rank.before! > rank.rank ? rank.before! - rank.rank : 0;
-  const board = solo && rank.difficulty ? `${t('board.mode.solo')} · ${t(`difficulty.${rank.difficulty}`)}` : t(`board.mode.${rank.mode}`);
+  const board =
+    solo && rank.difficulty
+      ? `${t('board.mode.solo')} · ${t(`difficulty.${rank.difficulty}`)}`
+      : rank.minutes
+        ? `${t(`board.mode.${rank.mode}`)} · ${t('minutes', { n: rank.minutes })}`
+        : t(`board.mode.${rank.mode}`);
   const detail = [`${t('board.title')} · ${board}`, `#${number(lang, rank.rank)} ${t('rank.total', { n: number(lang, rank.total) })}`];
   if (rank.run !== rank.rank) detail.push(t(solo ? 'rank.runSolo' : 'rank.runRoom', { n: number(lang, rank.run) }));
   const tierText: Record<Exclude<RankTier, null>, MessageKey> = { top1: 'rank.top1', top10: 'rank.top10', top100: 'rank.top100' };

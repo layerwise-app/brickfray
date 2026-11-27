@@ -25,7 +25,8 @@ async function play(n: number, name: string, ...reports: ReturnType<typeof repor
 }
 
 function board(over: Partial<LeaderboardQuery> = {}): LeaderboardQuery {
-  return { mode: 'ffa', difficulty: null, map: null, page: 0, playerId: null, ...over };
+  const q: LeaderboardQuery = { mode: 'ffa', difficulty: null, minutes: 10, map: null, page: 0, playerId: null, ...over };
+  return q.mode === 'solo' ? { ...q, minutes: null } : q;
 }
 
 async function addUser(userId: string) {
@@ -62,6 +63,20 @@ describe('leaderboard', () => {
     ]);
     expect(page.total).toBe(3);
     expect(page.me?.rank).toBe(2);
+  });
+
+  it('keeps a board per time limit; rooms stored before limits were kept are on none', async () => {
+    await play(1, 'Ace', report({ score: 2100, minutes: 15 }), report({ score: 900, minutes: 5 }));
+    await play(2, 'Bolt', report({ score: 1500, minutes: 5 }));
+    await play(3, 'Cog', report({ score: 9000, minutes: null }));
+    const five = await leaderboard(db, board({ minutes: 5 }), null);
+    expect(five.rows.map((r) => [r.name, r.score, r.minutes])).toEqual([
+      ['Bolt', 1500, 5],
+      ['Ace', 900, 5]
+    ]);
+    const fifteen = await leaderboard(db, board({ minutes: 15 }), null);
+    expect(fifteen.rows.map((r) => r.name)).toEqual(['Ace']);
+    expect((await leaderboard(db, board({ minutes: 10 }), null)).total).toBe(0);
   });
 
   it('ranks waves by the wave reached, then score, per difficulty', async () => {

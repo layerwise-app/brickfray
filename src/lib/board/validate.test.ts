@@ -20,7 +20,7 @@ function refused(raw: unknown) {
 const PLAYER = 'p'.repeat(22);
 
 function admitted(report: ReturnType<typeof soloReport>, ticket: Partial<Ticket> | null, now = NOW) {
-  const full: Ticket | null = ticket && { key: report.key, playerId: PLAYER, mode: report.mode, map: report.map, difficulty: report.difficulty, issuedAt: NOW - 3600_000, ...ticket };
+  const full: Ticket | null = ticket && { key: report.key, playerId: PLAYER, mode: report.mode, map: report.map, difficulty: report.difficulty, minutes: report.minutes, issuedAt: NOW - 3600_000, ...ticket };
   try {
     return admit(report, full, PLAYER, now);
   } catch (error) {
@@ -60,6 +60,15 @@ describe('match tickets', () => {
     expect(admitted(run, { issuedAt: NOW + 60_000 })).toBe('ticket out of date');
   });
 
+  it('ties a room report to the time limit its ticket was signed for', () => {
+    const match = report({ minutes: 10, durationS: 600, endedAt: NOW - 1000 });
+    expect(admitted(match, {})).toMatchObject({ minutes: 10 });
+    expect(admitted(match, { minutes: 15 })).toBe('ticket of another match');
+    // A ticket signed before time limits were kept goes only with a report that has none either.
+    expect(admitted(match, { minutes: undefined })).toBe('ticket of another match');
+    expect(admitted({ ...match, minutes: null }, { minutes: undefined })).toMatchObject({ minutes: null });
+  });
+
   it('refuses more play than the time since the ticket allows', () => {
     const minute = { issuedAt: NOW - 60_000 };
     expect(admitted(soloReport({ wave: 1, durationS: 600, kills: 3, score: 300, endedAt: NOW }), minute)).toBe('longer than its ticket');
@@ -84,6 +93,17 @@ describe('match reports', () => {
     expect(parseReport(report(), NOW).score).toBe(1200);
     const kills = botsThrough('normal', 12) - 2;
     expect(parseReport(soloReport({ wave: 12, durationS: 900, kills, assists: 0, score: 110 * kills }), NOW).wave).toBe(12);
+  });
+
+  it('reads a room time limit from the lobby choices; solo runs have none', () => {
+    expect(parseReport(report({ minutes: 3, durationS: 180 }), NOW).minutes).toBe(3);
+    expect(refused(report({ minutes: 7 as never }))).toBe('minutes unknown');
+    expect(refused(report({ minutes: 3, durationS: 600 }))).toBe('longer than its time limit');
+    // An older client sends none: kept, outside every board.
+    const { minutes: _, ...old } = report();
+    expect(parseReport(old, NOW).minutes).toBeNull();
+    const kills = botsThrough('normal', 12) - 2;
+    expect(parseReport(soloReport({ wave: 12, durationS: 900, kills, assists: 0, score: 110 * kills, minutes: 10 as never }), NOW).minutes).toBeNull();
   });
 
   it('refuses malformed fields', () => {
@@ -151,7 +171,9 @@ describe('match reports', () => {
 describe('board queries', () => {
   it('all-time boards: solo ones need a difficulty, room ones drop it; a map narrows any of them', () => {
     expect(() => parseLeaderboardQuery({ mode: 'solo', map: null, page: 0 })).toThrow('difficulty unknown');
-    expect(parseLeaderboardQuery({ mode: 'ffa', map: null, page: 2, difficulty: 'hard', playerId: 'bad' })).toEqual({ mode: 'ffa', difficulty: null, map: null, page: 2, playerId: null });
+    expect(parseLeaderboardQuery({ mode: 'ffa', map: null, page: 2, difficulty: 'hard', minutes: 10, playerId: 'bad' })).toEqual({ mode: 'ffa', difficulty: null, minutes: 10, map: null, page: 2, playerId: null });
+    expect(() => parseLeaderboardQuery({ mode: 'tdm', map: null, page: 0, minutes: 4 })).toThrow('minutes unknown');
+    expect(parseLeaderboardQuery({ mode: 'solo', map: null, page: 0, difficulty: 'easy', minutes: 10 })).toMatchObject({ minutes: null });
     expect(parseLeaderboardQuery({ mode: 'solo', map: 'temple', page: 0, difficulty: 'easy', playerId: null })).toMatchObject({ map: 'temple', difficulty: 'easy' });
     expect(() => parseLeaderboardQuery({ mode: 'ffa', map: '../x', page: 0 })).toThrow('bad map');
     // A page loaded before the map filter asks without one (and with the period it no longer has): every map.

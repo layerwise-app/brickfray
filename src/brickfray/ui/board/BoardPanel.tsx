@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { localMatches } from '../../../lib/board/client/history';
+import { MATCH_MINUTES, type MatchMinutes } from '../../../lib/board/contract';
 import type { Game } from '../../game/game';
 import { useGame } from '../App';
 import { useT } from '../i18n';
@@ -18,7 +19,8 @@ export type BoardView = 'ranks' | 'history';
 /** Opens on the board of the last thing played, every map. */
 function firstFilter(game: Game): RankFilter {
   const last = localMatches().at(-1);
-  return { mode: last?.mode ?? 'solo', difficulty: last?.difficulty ?? game.settings.difficulty, map: null };
+  const minutes = [last?.minutes, game.settings.room.minutes].find((m): m is MatchMinutes => MATCH_MINUTES.includes(m as MatchMinutes)) ?? 5;
+  return { mode: last?.mode ?? 'solo', difficulty: last?.difficulty ?? game.settings.difficulty, minutes, map: null };
 }
 
 /**
