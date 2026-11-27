@@ -18,6 +18,9 @@ import { Eyelids } from './hero-blink';
 import { HeroLife } from './hero-life';
 import { aimed, blobTexture, KEY_DIRECTION, STUDIO_LIGHTS, studioEnvironment } from './studio';
 
+/** Their faces are behind a visor: lids sweeping over eyes there look painted on. */
+const HELMETED: ReadonlySet<CharacterId> = new Set(['clack', 'nova']);
+
 /** Seeds for each hero's own breathing and glancing rate (`Animator.vary`): Clack and Coral slow and heavy, Rivet quick. */
 const TEMPO: Record<CharacterId, number> = { rivet: 1, vega: 8, clack: 13, coral: 2, moss: 7, nova: 3 };
 
@@ -138,7 +141,7 @@ export class HeroDisplay {
     const frame = new THREE.Group().add(rig.root);
     const outline = measure(rig, frame);
     frame.remove(rig.root);
-    const figure = { rig, gun, melee, lids: rig instanceof Rig ? Eyelids.fit(rig) : null, outline };
+    const figure = { rig, gun, melee, lids: rig instanceof Rig && !HELMETED.has(id) ? Eyelids.fit(rig) : null, outline };
     this.figures.set(id, figure);
     return figure;
   }
