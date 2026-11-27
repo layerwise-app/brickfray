@@ -182,7 +182,10 @@ export class Remotes {
         if (seen) r.rig.assemble();
       }
       r.alive = s.alive;
-      r.position.set(a.x + (b.x - a.x) * k + a.vx * extra, a.y + (b.y - a.y) * k, a.z + (b.z - a.z) * k + a.vz * extra);
+      // Across a death or respawn the two snapshots are different places: blending them would put the respawn
+      // between the body and the spawn point.
+      if (a.alive !== b.alive) r.position.set(s.x, s.y, s.z);
+      else r.position.set(a.x + (b.x - a.x) * k + a.vx * extra, a.y + (b.y - a.y) * k, a.z + (b.z - a.z) * k + a.vz * extra);
       const aim = lerpAngle(a.yaw, b.yaw, k);
       if (respawn || !seen || Math.abs(r.aim) > 1e3) r.aim = r.yaw = aim;
       else r.aim += Math.atan2(Math.sin(aim - r.aim), Math.cos(aim - r.aim));
