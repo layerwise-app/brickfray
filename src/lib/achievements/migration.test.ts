@@ -47,8 +47,8 @@ describe('achievements migration', () => {
 
     await migrate(db, { migrationsFolder: 'drizzle' });
     const after = client.prepare('SELECT * FROM board_match ORDER BY id').all() as Record<string, unknown>[];
-    // Later migrations add columns of their own (the time limit), empty on these old rows.
-    expect(after.map(({ tally: _, counted: __, minutes, ...rest }) => (expect(minutes).toBeNull(), rest))).toEqual(before);
+    // Later migrations add and fill columns of their own (the time limit; see board/minutes-migration.test.ts).
+    expect(after.map(({ tally: _, counted: __, minutes: ___, ...rest }) => rest)).toEqual(before);
     expect(after.map((m) => [m.tally, m.counted])).toEqual([
       [null, 0],
       [null, 0],
