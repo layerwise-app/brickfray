@@ -13,7 +13,7 @@ export const PLAYER = {
   stepHeight: 0.52,
   health: 100,
   spawnProtection: 1.5,
-  respawnDelay: 3
+  respawnDelay: 5
 } as const;
 
 /** Seconds to get one thrown grenade back, in every mode; solo upgrades lower a player's own. */
