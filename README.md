@@ -2,7 +2,7 @@
 
 **A fast, colorful first-person shooter built from toy bricks. It runs in the browser with nothing to install.**
 
-[Play now](https://brickfray.layerwise.site) · [Source](https://github.com/layerwise-app/brickfray)
+[Play now](https://brickfray.layerwise.site) · [Source](https://github.com/layerwise-app/brickfray) · [License: AGPL-3.0](LICENSE)
 
 ![Brickfray main menu](docs/screenshots/menu.jpg)
 
@@ -117,3 +117,11 @@ Made by [Qing](https://x.com/devrsi0n), built with Fable 5.2 on [Layerwise](http
 Every sound is cut from recordings released under CC0 1.0 or dedicated to the public domain: BigSoundBank, Kenney, OpenGameArt, Freesound, The Free Firearm Sound Library and VSCO 2 Community Edition. The music was composed for Brickfray from single recorded notes of real instruments. Sources for every file are listed in `public/audio/CREDITS-*.md`.
 
 Brickfray is an original game. It is not affiliated with or endorsed by any toy brick manufacturer.
+
+## License
+
+Copyright © 2026 Qing.
+
+Brickfray's source code is licensed under the [GNU Affero General Public License v3.0](LICENSE). You may use, modify and share it. If you run a modified version as a network service, you must offer its players the source of that version under the same license.
+
+The audio in `public/audio/` keeps its original CC0 1.0 or public-domain status, as listed in the credits files.
