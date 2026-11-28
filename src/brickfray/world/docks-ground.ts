@@ -37,7 +37,7 @@ export function docksGround(p: Plan) {
     p.add(FLOOR, { x0: r[0], z0: r[1], x1: r[2], z1: r[3], y: 0, color: CONCRETE, surface: 'stone' });
   }
   const plate = (r: Rect, color: string, smooth = false, matte = false, y = 0) => p.add(DECAL, { x0: r[0], z0: r[1], x1: r[2], z1: r[3], y, color, surface: 'stone', smooth, matte });
-  const paint = (r: Rect, color: string) => plate(r, color, true, false, PAINT);
+  const paint = (r: Rect, color: string, y = PAINT) => plate(r, color, true, false, y);
   for (const r of mirror([-LAND.x, SHED_ROAD.z0, -BASE_IN, QUAY.z1])) plate(r, BASE_ASPHALT, true, true);
   for (const r of mirror([-BASE_IN, SHED_ROAD.z0, -WH.x1, SHED_ROAD.z1])) plate(r, SHED_ASPHALT, true, true);
   for (const r of mirror([-RAIL_YARD.x1, RAIL_YARD.z0, -RAIL_YARD.x0, RAIL_YARD.z1])) plate(r, BALLAST);
@@ -77,7 +77,7 @@ export function docksGround(p: Plan) {
     for (const [z0, z1] of [[SHED_ROAD.z0 + 0.4, SHED_ROAD.z1 - 0.4], [YARD_ROAD.z0 + 0.4, YARD_ROAD.z1 - 0.4], [QUAY.z0 + 0.4, QUAY.z1 - 1.0]] as const) paint([Math.min(x, x + s * 0.45), z0, Math.max(x, x + s * 0.45), z1], WHITE);
     const kerb = (a: number, b: number, z0: number, z1: number) => {
       paint([Math.min(s * a, s * b), z0, Math.max(s * a, s * b), z1], WHITE);
-      for (let u = a; u + 1.2 <= b; u += 2.4) paint([Math.min(s * u, s * (u + 1.2)), z0 - 0.001, Math.max(s * u, s * (u + 1.2)), z1 + 0.001], RED);
+      for (let u = a; u + 1.2 <= b; u += 2.4) paint([Math.min(s * u, s * (u + 1.2)), z0, Math.max(s * u, s * (u + 1.2)), z1], RED, PAINT * 2);
     };
     kerb(PASSAGE.a1, BASE_IN, CUSTOMS.z0 - 0.3, CUSTOMS.z0);
     kerb(WH.x1, PASSAGE.a0, CUSTOMS.z0 - 0.3, CUSTOMS.z0);

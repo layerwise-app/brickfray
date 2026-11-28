@@ -37,12 +37,12 @@ export function plazaGround(p: Plan) {
   for (const s of [-1, 1]) {
     const W = s < 0;
     // Market Street cobbles, the square's border and stone squares.
-    paint([s * STREET.x0, STREET.z0, s * STREET.x1, STREET.z1], W ? '#9a8f80' : '#8a8f94');
+    paint([s * STREET.x0, STREET.z0, s * SQ.bay, STREET.z1], W ? '#9a8f80' : '#8a8f94');
     paint([s * SQ.bay, SQ.z0, s * SQ.x1, SQ.z1], W ? '#c4553a' : '#3f6f8a');
     checker([s * (SQ.x0 + 0.8), SQ.z0 + 0.8, s * (SQ.x1 - 0.8), SQ.z1 - 0.8], W ? '#ebe1cb' : '#e6ecef', W ? '#dccfb3' : '#d3dde2', 3.2);
     checker([s * SQ.bay, STREET.z1, s * SQ.x0, SQ.z1 - 0.8], W ? '#ebe1cb' : '#e6ecef', W ? '#dccfb3' : '#d3dde2', 2.4);
     // Base road setts, yard gravel, alley cobbles, hall and shop floors.
-    paint([s * BASE, LAND.north, s * LAND.x, LAND.south], '#a39684');
+    paint([s * BASE, LAND.north, s * LAND.x, QUAY.z0], '#a39684');
     paint([s * YARD.x0, YARD.z0 - 8, s * YARD.x1, YARD.z1], '#b9a888');
     paint([s * ALLEY.x0, YARD.z1, s * ALLEY.x1, QUAY.z0], '#9a8f80');
     checker([s * (HALL.x0 + 0.8), HALL.z0 + 0.8, s * (HALL.x1 - 0.8), HALL.z1 - 0.8], W ? '#c4553a' : '#dfe9ef', W ? '#e3d6bc' : '#3f6f8a', 1.6);
