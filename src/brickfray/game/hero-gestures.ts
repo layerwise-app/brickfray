@@ -54,7 +54,7 @@ const q = new THREE.Quaternion();
 const q2 = new THREE.Quaternion();
 const DOWN = new THREE.Vector3(0, -1, 0);
 const UP = new THREE.Vector3(0, 1, 0);
-const MOSS_LOW = { drop: 0.75, turn: 0.45 };
+const MOSS_LOW = { drop: 0.6, turn: 0.45, below: 0.35 };
 
 /** Smootherstep: no jump in acceleration where a move starts or stops. */
 const smooth = (x: number) => (x <= 0 ? 0 : x >= 1 ? 1 : x * x * x * (x * (6 * x - 15) + 10));
@@ -89,9 +89,13 @@ function twist(rotation: THREE.Quaternion, axis: V3, angle: number) {
   rotation.multiply(q2.setFromAxisAngle(v.set(...axis), angle));
 }
 
-/** Tips the gun in the right hand about the shoulder: muzzle down by `drop` (negative raises it), rolled by `roll` about the barrel. */
-function tipGun(rotation: THREE.Quaternion, pose: Pose, pivot: THREE.Vector3, turn: THREE.Quaternion, drop: number, roll = 0) {
+/**
+ * Tips the gun in the right hand about the shoulder: muzzle down by `drop` (negative raises it), rolled by `roll` about
+ * the barrel. A pivot `below` the shoulder swings the hands out in front as the muzzle drops instead of into the belly.
+ */
+function tipGun(rotation: THREE.Quaternion, pose: Pose, pivot: THREE.Vector3, turn: THREE.Quaternion, drop: number, roll = 0, below = 0) {
   pivot.copy(pose.mp[BONE.upperArmR]!);
+  pivot.y -= below;
   w.set(0, 0, -1).applyQuaternion(rotation);
   turn.setFromAxisAngle(w, roll).premultiply(q.setFromAxisAngle(v.crossVectors(w, DOWN).normalize(), drop));
   return true;
@@ -215,7 +219,7 @@ export const GESTURES: Record<CharacterId, readonly Gesture[]> = {
       // as the chest comes round, so it never points out of the screen or swings its stock through the glove.
       gun(u, _wrist, rotation, pose, pivot, turn) {
         const e = span(u, 0, 0.28, 0.7, 1);
-        tipGun(rotation, pose, pivot, turn, MOSS_LOW.drop * e);
+        tipGun(rotation, pose, pivot, turn, MOSS_LOW.drop * e, 0, MOSS_LOW.below);
         turn.premultiply(q.setFromAxisAngle(UP, MOSS_LOW.turn * e));
         return true;
       }
