@@ -2,8 +2,8 @@ import { masonryFaces, slab, type Opening } from './blocks';
 import { facadeHole } from './facade';
 import type { Drawer } from './plan';
 import type { Piece } from './plaza-layout';
-import { TOWER } from './plaza-middle';
-import { IRON, QUAY, STONE } from './plaza-style';
+import { PORTICO, TOWER } from './plaza-middle';
+import { IRON, QUAY, STONE, WOOD } from './plaza-style';
 import { pieceFrame } from './plaza-things';
 import { Pen } from './props-kit';
 import { faceFrame, Frame, Rng, shade, type Face } from './util';
@@ -11,49 +11,83 @@ import { faceFrame, Frame, Rng, shade, type Face } from './util';
 const WORLD = new Frame(0, 0, 0, 0);
 
 /**
- * Town hall above its council hall (the walls and the facade over the ceiling are pieces): a roof balustrade, door
- * frames on the main axis, and the clock tower over the middle with a belfry and a copper spire.
+ * Town hall above its council hall (walls and the facade over the ceiling are pieces): a roof balustrade, door frames,
+ * a pediment over the portico, and the clock tower over the north half with a clock on every face, an open belfry and
+ * a copper spire: the landmark every street points at.
  */
 export function townHall(d: Drawer) {
-  const { x0: hx0, x1: hx1, hall, tunnel, tunnelTop, top, towerX0: x0, shaftX1, belfryTop } = TOWER;
+  const { x0: hx0, x1: hx1, z0, z1, top, door, doorTop, shaft, belfryTop } = TOWER;
   const style = { ...STONE, colors: ['#efe5cf', '#e3d6bc', '#f5eedc'] };
   const W = new Pen(d, WORLD);
-  for (const [a, b, c, e] of [[hx0, -hall, hx1, -hall + 0.3], [hx0, hall - 0.3, hx1, hall], [hx0, -hall, hx0 + 0.3, hall], [hx1 - 0.3, -hall, hx1, hall]] as const) W.span(a, top, b, c, top + 0.9, e, '#e3d6bc', undefined, 0.03);
-  W.span(hx0 + 0.3, top, -hall + 0.3, hx1 - 0.3, top + 0.08, hall - 0.3, '#8a8f94');
-  for (const face of ['e', 'w'] as Face[]) {
-    const { f, length } = faceFrame(face, hx0, -hall, hx1, hall);
-    const t = new Pen(d, f);
-    t.frame(length / 2, 0, 0.02, 2 * tunnel + 0.4, tunnelTop + 0.3, 0.3, 0.16, '#c9b48a');
-    t.box(length / 2, tunnelTop + 0.3, 0.06, 0.6, 0.6, 0.12, '#c9b48a', undefined, 0.02);
-  }
-  const tz = TOWER.z;
-  const tx = (x0 + shaftX1) / 2;
-  const tw = shaftX1 - x0;
-  masonryFaces(d, [x0, top, -tz], [shaftX1, belfryTop - 2.4, tz], style, ['n', 's', 'e', 'w']);
-  slab(d, [x0 + 0.05, top, -tz + 0.05], [shaftX1 - 0.05, belfryTop - 2.4, tz - 0.05], shade(style.colors[0]!, -0.3));
-  for (const [face, rot] of [['n', 2], ['s', 0], ['e', 1], ['w', 3]] as const) {
-    const out = face === 'n' || face === 's' ? tz : tw / 2;
-    const f = new Frame(tx, 0, 0, rot).child(0, 0, out);
-    const t = new Pen(d, f);
-    const cy = belfryTop - 3.8;
-    t.cylZ(0, cy, 0.08, 1.15, 0.16, '#c9b48a', undefined, 0.04);
-    t.cylZ(0, cy, 0.18, 1.0, 0.04, '#f5eedc', undefined, 0);
+  for (const [a, b, c, e] of [[hx0, z0, hx1, z0 + 0.3], [hx0, z1 - 0.3, hx1, z1], [hx0, z0, hx0 + 0.3, z1], [hx1 - 0.3, z0, hx1, z1]] as const) W.span(a, top, b, c, top + 0.9, e, '#e3d6bc', undefined, 0.03);
+  W.span(hx0 + 0.3, top, z0 + 0.3, hx1 - 0.3, top + 0.08, z1 - 0.3, '#8a8f94');
+  const north = new Pen(d, faceFrame('n', hx0, z0, hx1, z1).f);
+  north.frame((hx1 - hx0) / 2, 0, 0.02, 2 * door + 0.4, doorTop + 0.3, 0.3, 0.16, '#c9b48a');
+  north.box((hx1 - hx0) / 2, doorTop + 0.3, 0.06, 0.6, 0.6, 0.12, '#c9b48a', undefined, 0.02);
+  // Pediment over the portico roof, its tympanum in town red.
+  const pz = PORTICO.z1;
+  const py = PORTICO.deck + 3.52;
+  W.prism('pediment', [[-hx1, 0], [hx1, 0], [0, 2.2]], 0.5, 0, py, pz - 0.25, '#efe5cf', undefined, Math.PI / 2);
+  W.prism('tympanum', [[-hx1 + 1.2, 0.2], [hx1 - 1.2, 0.2], [0, 1.7]], 0.1, 0, py, pz + 0.02, '#c4553a', undefined, Math.PI / 2);
+  const tx = (shaft.x0 + shaft.x1) / 2;
+  const tz = (shaft.z0 + shaft.z1) / 2;
+  const hw = (shaft.x1 - shaft.x0) / 2;
+  const hd = (shaft.z1 - shaft.z0) / 2;
+  const bell = belfryTop - 2.4;
+  masonryFaces(d, [shaft.x0, top, shaft.z0], [shaft.x1, bell, shaft.z1], style, ['n', 's', 'e', 'w']);
+  slab(d, [shaft.x0 + 0.05, top, shaft.z0 + 0.05], [shaft.x1 - 0.05, bell, shaft.z1 - 0.05], shade(style.colors[0]!, -0.3));
+  for (const [rot, out] of [[2, hd], [0, hd], [1, hw], [3, hw]] as const) {
+    const t = new Pen(d, new Frame(tx, 0, tz, rot).child(0, 0, out));
+    const cy = bell - 1.6;
+    t.cylZ(0, cy, 0.08, 1.35, 0.16, '#c9b48a', undefined, 0.04);
+    t.cylZ(0, cy, 0.18, 1.2, 0.04, '#f5eedc', undefined, 0);
     for (let k = 0; k < 12; k++) {
       const a = (k / 12) * Math.PI * 2;
-      t.box(Math.sin(a) * 0.85, cy + Math.cos(a) * 0.85 - 0.06, 0.2, 0.06, 0.12, 0.03, IRON, undefined, 0);
+      t.box(Math.sin(a) * 1.02, cy + Math.cos(a) * 1.02 - 0.06, 0.2, 0.07, 0.14, 0.03, IRON, undefined, 0);
     }
-    t.box(0, cy, 0.22, 0.07, 0.75, 0.03, IRON, 'metal', 0);
-    t.box(0.2, cy - 0.04, 0.24, 0.5, 0.07, 0.03, IRON, 'metal', 0);
-    // Belfry: four corner piers and an open arch on every side.
-    t.box(0, belfryTop - 2.4, 0, (face === 'n' || face === 's' ? tw : 2 * tz) + 0.2, 0.24, 0.3, '#c9b48a', undefined, 0.02);
+    t.box(0, cy, 0.22, 0.08, 0.9, 0.03, IRON, 'metal', 0);
+    t.box(0.24, cy - 0.04, 0.24, 0.6, 0.08, 0.03, IRON, 'metal', 0);
+    t.box(0, bell, 0, 2 * (rot % 2 ? hd : hw) + 0.2, 0.24, 0.3, '#c9b48a', undefined, 0.02);
   }
-  for (const sx of [x0 + 0.3, shaftX1 - 0.3]) for (const sz of [-tz + 0.3, tz - 0.3]) W.span(sx - 0.3, belfryTop - 2.4, sz - 0.3, sx + 0.3, belfryTop, sz + 0.3, '#e3d6bc', undefined, 0.03);
-  W.span(x0 - 0.15, belfryTop, -tz - 0.15, shaftX1 + 0.15, belfryTop + 0.3, tz + 0.15, '#c9b48a', undefined, 0.03);
-  W.box(tx, belfryTop - 2.3, 0, 1.0, 1.0, 1.0, '#c99a3e', 'chrome', 0.1);
-  W.cone(tx, belfryTop + 0.3, 0, Math.min(tw, 2 * tz) * 0.62, 0.08, 3.8, '#4f9a8a', undefined, 4, Math.PI / 4);
-  W.ball(tx, belfryTop + 4.2, 0, 0.22, '#c99a3e', undefined, 0, 1, 'chrome');
-  d.anim.flag([hx1 - 0.8, top + 0.9, 0], 0, 1.6, 1.0, ['#c8231b', '#f2f2ee', '#c8231b'], false, 'bands');
-  W.cyl(hx1 - 0.8, top, 0, 0.05, 2.9, IRON, 'metal');
+  for (const sx of [shaft.x0 + 0.35, shaft.x1 - 0.35]) for (const sz of [shaft.z0 + 0.35, shaft.z1 - 0.35]) W.span(sx - 0.35, bell, sz - 0.35, sx + 0.35, belfryTop, sz + 0.35, '#e3d6bc', undefined, 0.03);
+  W.span(shaft.x0 - 0.15, belfryTop, shaft.z0 - 0.15, shaft.x1 + 0.15, belfryTop + 0.3, shaft.z1 + 0.15, '#c9b48a', undefined, 0.03);
+  W.box(tx, bell + 0.1, tz, 1.1, 1.1, 1.1, '#c99a3e', 'chrome', 0.1);
+  W.cone(tx, belfryTop + 0.3, tz, Math.min(hw, hd) * 1.25, 0.08, 4.6, '#4f9a8a', undefined, 4, Math.PI / 4);
+  W.ball(tx, belfryTop + 5.0, tz, 0.24, '#c99a3e', undefined, 0, 1, 'chrome');
+  d.anim.flag([hx1 - 0.8, top + 0.9, z1 - 1.2], 0, 1.6, 1.0, ['#c8231b', '#f2f2ee', '#c8231b'], false, 'bands');
+  W.cyl(hx1 - 0.8, top, z1 - 1.2, 0.05, 2.9, IRON, 'metal');
+}
+
+/** Glass station roof: a ribbed glazed barrel stepped over iron arches, a clerestory along the ridge. */
+export function stationRoof(d: Drawer, p: Piece) {
+  const [x0, y0, z0] = p.min;
+  const [x1, , z1] = p.max;
+  const W = new Pen(d, WORLD);
+  W.span(x0 - 0.3, y0, z0 - 0.3, x1 + 0.3, y0 + 0.4, z1 + 0.3, '#dfe9ef', undefined, 0.03);
+  const steps = 4;
+  for (let k = 0; k < steps; k++) {
+    const inset = (k * (z1 - z0)) / (2 * steps + 2);
+    W.span(x0 + 0.1, y0 + 0.4 + k * 0.6, z0 + inset, x1 - 0.1, y0 + 1.0 + k * 0.6, z1 - inset, '#8fb9cf', 'glass');
+  }
+  for (let x = x0 + 0.8; x <= x1 - 0.79; x += 2.4) for (let k = 0; k < steps; k++) {
+    const inset = (k * (z1 - z0)) / (2 * steps + 2);
+    W.span(x - 0.06, y0 + 0.4 + k * 0.6, z0 + inset - 0.02, x + 0.06, y0 + 1.02 + k * 0.6, z1 - inset + 0.02, '#2f363d', 'metal');
+  }
+  W.span(x0, y0 + 0.4 + steps * 0.6, (z0 + z1) / 2 - 0.4, x1, y0 + 0.6 + steps * 0.6, (z0 + z1) / 2 + 0.4, '#3f5a6e', undefined, 0.02);
+}
+
+/** Yard well (west) or pump house (east): a stone drum, posts, a little tiled roof and a bucket on its rope. */
+export function well(d: Drawer, p: Piece) {
+  const { f, len, wid, h } = pieceFrame(p);
+  const t = new Pen(d, f);
+  const r = Math.min(len, wid) / 2;
+  t.cyl(0, 0, 0, r, 1.0, p.tag === 'well' ? '#b9ae98' : '#8a8f94', undefined, 0.05);
+  t.cyl(0, 1.0, 0, r + 0.05, 0.1, '#e3d6bc', undefined, 0.03);
+  for (const s of [-1, 1]) t.box(s * (r - 0.12), 1.1, 0, 0.16, h - 1.5, 0.16, WOOD, undefined, 0.01);
+  t.box(0, h - 0.5, 0, len + 0.2, 0.12, wid * 0.4, WOOD, undefined, 0.01);
+  t.prism('well-roof', [[-wid / 2 - 0.2, 0], [wid / 2 + 0.2, 0], [0, 0.42]], len + 0.3, 0, h - 0.42, 0, '#a8321f', undefined, 0);
+  t.box(0, 1.4, 0, 0.02, h - 1.9, 0.02, '#e3d6bc', undefined, 0);
+  t.cyl(0, 1.25, 0, 0.16, 0.24, IRON, 'metal');
 }
 
 /** Tram on its rails: red skirts, cream body, a band of windows, doors toward the gate, a pantograph on the roof. */

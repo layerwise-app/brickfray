@@ -25,8 +25,11 @@ export function styleOf(p: Piece): Masonry {
   switch (p.tag) {
     case 'hall':
     case 'shed':
-    case 'park':
       return BRICK;
+    case 'station':
+      return plaster('#dfe9ef');
+    case 'townwall':
+      return { colors: ['#b9ae98', '#a89e88', '#c4baa4'], variance: 0.22, lens: [3, 4, 2] };
     case 'bakery':
       return plaster('#f2c94c');
     case 'laundrette':
@@ -34,6 +37,7 @@ export function styleOf(p: Piece): Masonry {
     case 'site':
       return BLOCKWORK;
     case 'canal':
+    case 'fence':
       return QUAY;
     case 'stalls':
       return TIMBER;

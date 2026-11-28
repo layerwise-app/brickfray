@@ -1,1 +1,2 @@
-export { ARCADE, TOWER } from './plaza-middle';
+export { TOWER } from './plaza-middle';
+export { ARCADE } from './plaza-south';

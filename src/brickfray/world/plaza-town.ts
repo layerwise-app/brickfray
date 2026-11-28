@@ -2,7 +2,7 @@ import { drawBlock } from './blocks';
 import type { Element } from './plan';
 import { passageFronts } from './plaza-buildings';
 import { plazaInteriors } from './plaza-interiors';
-import { basin, bridge, canalBed, canopy, fountainColumn, hallGables, hallRoof, plinth, stage, townHall, tram } from './plaza-landmarks';
+import { basin, bridge, canalBed, canopy, fountainColumn, hallGables, hallRoof, plinth, stage, stationRoof, townHall, tram, well } from './plaza-landmarks';
 import type { Layout, Piece } from './plaza-layout';
 import { CONCRETE, masonryBox, sidesOf, STONE, styleOf, TIMBER, TRIM } from './plaza-style';
 import { counter, garden, hoarding, kiosk, pieceFrame, railing, shelf, stack } from './plaza-things';
@@ -10,7 +10,6 @@ import { Pen } from './props-kit';
 import type { Surface } from './types';
 import { box, Frame, Rng, shade, type PlanCollider } from './util';
 import type { Drawer } from './plan';
-import { HALL } from './plaza-middle';
 
 /** The town's own pieces: what players bump into is what they see. Outer blocks are BUILDING elements. */
 export const PLAZA_TOWN: Element<Layout> = {
@@ -22,9 +21,10 @@ export const PLAZA_TOWN: Element<Layout> = {
   draw(d, L) {
     for (const p of L.pieces) piece(d, p);
     townHall(d);
+    lanterns(d, L);
     passageFronts(d, L);
     plazaInteriors(d, L);
-    for (const s of [-1, 1] as const) hallGables(d, HALL.x0, HALL.x1, s * HALL.z1, s, HALL.top);
+    for (const r of L.pieces) if (r.kind === 'roof' && (r.tag === 'hall' || r.tag === 'station')) for (const s of [-1, 1] as const) hallGables(d, r.min[0], r.max[0], s < 0 ? r.min[2] : r.max[2], s, r.min[1]);
   }
 };
 
@@ -66,7 +66,7 @@ function piece(d: Drawer, p: Piece) {
     case 'frame':
       return column(d, p);
     case 'kiosk':
-      return p.tag === 'site-office' ? cabin(d, p) : kiosk(d, p);
+      return p.tag === 'site-office' ? cabin(d, p) : p.tag === 'well' || p.tag === 'pump' ? well(d, p) : kiosk(d, p);
     case 'counter':
       return counter(d, p);
     case 'shelf':
@@ -136,16 +136,17 @@ function floor(d: Drawer, p: Piece) {
 
 function roof(d: Drawer, p: Piece) {
   if (p.tag === 'hall') return hallRoof(d, p);
+  if (p.tag === 'station') return stationRoof(d, p);
   if (p.tag === 'square' || p.tag === 'park') return canopy(d, p);
   const t = new Pen(d, new Frame(0, 0, 0, 0));
   const [x0, y0, z0] = p.min;
   const [x1, y1, z1] = p.max;
-  if (p.tag === 'terminus') {
+  if (p.tag === 'shelter') {
     t.span(x0, y0, z0, x1, y1, z1, '#8fb9cf', 'glass');
     for (let x = x0; x <= x1 + 0.01; x += (x1 - x0) / 4) t.span(x - 0.05, y0 - 0.02, z0, x + 0.05, y1 + 0.02, z1, '#2f363d');
     return;
   }
-  const color = p.tag === 'arcade' ? '#a8321f' : p.tag === 'site' ? '#9a9fa3' : '#7a1712';
+  const color = p.tag === 'arcade' ? '#a8321f' : p.tag === 'portico' ? '#4f9a8a' : '#7a1712';
   t.span(x0, y0, z0, x1, y1, z1, color, undefined, 0.03);
   t.span(x0 - 0.1, y0 - 0.02, z0 - 0.1, x1 + 0.1, y0 + 0.16, z1 + 0.1, TRIM, undefined, 0.02);
   if (p.tag === 'arcade' && d.detail > 0) for (let x = x0 + 0.4; x < x1; x += 0.8) t.span(x, y1, z0 + 0.2, x + 0.4, y1 + 0.5, z1 - 0.2, shade(color, -0.08), undefined, 0.02);
@@ -220,5 +221,16 @@ function shelter(d: Drawer, p: Piece) {
   for (const s of [-1, 1]) {
     t.box(-len / 4, 0.4, s * (wid * 0.15 + 0.01), len / 2 - 0.4, h - 0.9, 0.02, s > 0 ? '#f6c624' : '#c43a85', undefined, 0);
     t.box(len / 4, 0.4, s * (wid * 0.15 + 0.01), len / 2 - 0.4, h - 0.9, 0.02, s > 0 ? '#1fa7a0' : '#f58a1f', undefined, 0);
+  }
+}
+
+/** Wall lanterns on brackets by the house doors (drawn only: nothing to bump into). */
+function lanterns(d: Drawer, L: Layout) {
+  for (const [x, z, turns] of L.lamps) {
+    const t = new Pen(d, new Frame(x, 0, z, turns));
+    t.box(0, 3.0, 0.2, 0.06, 0.06, 0.4, '#2f363d', 'metal', 0);
+    t.box(0, 2.62, 0.38, 0.26, 0.36, 0.26, '#fff3d0', 'glass', 0.01);
+    t.box(0, 2.7, 0.38, 0.12, 0.2, 0.12, '#ffe2a0', 'glow', 0);
+    t.cone(0, 2.98, 0.38, 0.2, 0.04, 0.14, '#2f363d', 'metal');
   }
 }

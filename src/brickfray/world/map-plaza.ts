@@ -4,13 +4,13 @@ import type { LabView } from './lab-map';
 import { defineMap, Plan } from './plan';
 import { plazaBackdrop } from './plaza-backdrop';
 import { townBuildings } from './plaza-buildings';
-import { edgeDistrict } from './plaza-edges';
-import { EDGE, Layout } from './plaza-layout';
-import { middleDistrict } from './plaza-middle';
-import { northDistrict } from './plaza-north';
+import { CANAL, edgeDistrict } from './plaza-edges';
 import { plazaGround } from './plaza-ground';
+import { BASE, BLVD, LAND, Layout, QUAY, STREET } from './plaza-layout';
+import { middleDistrict, PORTICO } from './plaza-middle';
+import { CAFE, northDistrict } from './plaza-north';
 import { plazaProps } from './plaza-props';
-import { southDistrict } from './plaza-south';
+import { ARCADE, southDistrict } from './plaza-south';
 import { PLAZA_TOWN } from './plaza-town';
 import { yawToward } from './util';
 
@@ -25,41 +25,50 @@ export function plazaLayout() {
   return L;
 }
 
-/** Team 1 waits at the station and the terminus wings (north), team 0 in the park, the alley and the site road (south); none on the quay, whose 42 m field would put the two sides in sight within 3 s. */
-const TEAM1: [number, number][] = [[-41.6, -37.6], [-37.6, -36.0], [-25.6, -38.4], [-17.6, -38.4], [-6.4, -37.6], [6.4, -37.6], [12.0, -38.4], [16.0, -38.4], [24.0, -38.4], [28.8, -38.4]];
-const TEAM0: [number, number][] = [[-41.6, 37.6], [-37.6, 36.0], [-28.0, 37.6], [-17.6, 37.6], [-2.4, 37.6], [8.8, 37.6], [17.6, 37.6], [22.4, 38.4], [28.0, 37.6], [-9.6, 38.4]];
-/** FFA spawns stand in the open where nobody upstairs sees them: a spawn hidden in a shop or behind a stall looks safe with an enemy a few metres round the corner. */
-const FFA: [number, number][] = [
-  [-40.0, -24.0], [-36.0, -15.2], [-27.2, -26.4], [0.0, -26.4], [27.2, -26.4], [38.4, -29.6], [-16.0, 9.6], [11.2, 16.0], [32.0, 4.8], [4.8, 11.2],
-  [14.4, -14.4], [9.6, -4.8], [22.0, 7.2], [-7.2, -36.0], [7.2, -33.6], [42.4, -16.0], [37.6, -4.8], [35.2, 13.6], [42.4, 9.6], [-40.0, 24.0],
-  [-27.2, 26.4], [-12.0, 30.4], [10.4, 30.4], [25.6, 24.0], [38.4, 28.0], [-37.6, 32.0]
-];
-
+/**
+ * Team spawns in the base roads (west team 0, east team 1): four by the boulevard mouth, two by Market Street, four by
+ * the quay mouth, each behind a corner block so no lane looks down on it (shortest routes then use every lane). Free-for-all spawns spread over every district (never up high), mirrored.
+ */
 function spawns(p: Plan) {
-  for (const [x, z] of TEAM1) p.spawn(x, 0, z, Math.PI, 1);
-  for (const [x, z] of TEAM0) p.spawn(x, 0, z, 0, 0);
-  for (const [x, z] of FFA) p.spawn(x, 0, z, yawToward([x, z], [0, 0]));
+  const team: [number, number][] = [
+    [-61.6, -29.6], [-58.4, -28.0], [-61.6, -25.6], [-58.4, -23.2],
+    [-61.6, -13.6], [-58.4, 4.8],
+    [-61.6, 17.6], [-58.4, 20.0], [-61.6, 23.2], [-58.4, 25.6]
+  ];
+  for (const [x, z] of team) {
+    p.spawn(x, 0, z, yawToward([x, z], [0, z]), 0);
+    p.spawn(-x, 0, z, yawToward([-x, z], [0, z]), 1);
+  }
+  const ffa: [number, number][] = [
+    [-59.2, -38.4], [-59.2, 30.4], [-46.4, -36.0], [-34.4, -22.4], [-50.4, -4.0], [-25.6, -17.2], [-26.4, 14.4],
+    [-13.6, -15.2], [-42.4, 10.4], [-46.8, 24.0], [-44.0, 33.6], [-24.0, 37.6], [-11.2, 31.2]
+  ];
+  for (const [x, z] of ffa) for (const s of [-1, 1]) p.spawn(s * x, 0, z, yawToward([s * x, z], [0, 0]));
 }
 
+const MID_BLVD = (BLVD.z0 + BLVD.z1) / 2;
+const MID_ST = (STREET.z0 + STREET.z1) / 2;
+const MID_QUAY = (QUAY.z0 + QUAY.side) / 2;
 export const PLAZA_VIEWS: LabView[] = [
-  { name: 'overview', cam: [52, 66, 70], target: [0, 0, 0], fov: 50 },
-  { name: 'top', cam: [0, 120, 0.1], target: [0, 0, 0], fov: 45 },
-  { name: 'overview-north', cam: [-44, 58, -68], target: [0, 0, 0], fov: 50 },
-  { name: 'square', cam: [-15.2, 1.62, 13.6], target: [6, 3, -8], fov: 70 },
-  { name: 'terminus', cam: [-40, 1.62, -26], target: [0, 2, -36], fov: 70 },
-  { name: 'station', cam: [-9.2, 1.62, -32.0], target: [9, 1.6, -38], fov: 75 },
-  { name: 'hall', cam: [-41.6, 1.62, -10.4], target: [-30, 1.8, 8], fov: 75 },
-  { name: 'townhall', cam: [20.8, 1.62, -8.8], target: [20.8, 2, 9], fov: 75 },
-  { name: 'quay', cam: [33.6, 1.62, -19.6], target: [40, 1.2, 20], fov: 70 },
-  { name: 'canal', cam: [28.0, 1.62, -8.0], target: [44, 1, 2], fov: 70 },
-  { name: 'site', cam: [32, 1.62, 12], target: [24, 3, 26], fov: 70 },
-  { name: 'park', cam: [-22.4, 1.62, 24.0], target: [-6, 1.5, 36], fov: 70 },
-  { name: 'alley', cam: [-38.4, 1.62, 38.4], target: [-38.4, 3, 14], fov: 70 },
-  { name: 'loggia', cam: [11.2, 5.46, -7.2], target: [-8, 1, -1], fov: 70 },
-  { name: 'edge-north', cam: [-22, 1.62, -38.6], target: [-8, -2.5, -50], fov: 70 },
-  { name: 'edge-east', cam: [42.0, 1.62, 8.8], target: [58, -0.5, 18], fov: 70 },
-  { name: 'edge-south', cam: [24.0, 1.62, 37.0], target: [30, 0.8, 60], fov: 70 },
-  { name: 'edge-west', cam: [-36, 1.62, -26], target: [-62, 3, -32], fov: 70 }
+  { name: 'overview', cam: [64, 70, 78], target: [0, 0, -2], fov: 50 },
+  { name: 'top', cam: [0, 150, 0.1], target: [0, 0, -2], fov: 50 },
+  { name: 'overview-north', cam: [-58, 64, -82], target: [0, 0, -2], fov: 50 },
+  { name: 'overview-west', cam: [-96, 56, 30], target: [0, 0, -2], fov: 50 },
+  { name: 'boulevard', cam: [-BASE + 2, 1.62, MID_BLVD], target: [0, 1.6, MID_BLVD], fov: 70 },
+  { name: 'street', cam: [-BASE + 2, 1.62, MID_ST], target: [-10, 1.6, MID_ST], fov: 70 },
+  { name: 'quay', cam: [-BASE + 2, 1.62, MID_QUAY], target: [0, 1.6, MID_QUAY], fov: 70 },
+  { name: 'square-w', cam: [-27, 1.62, 14], target: [-12, 2.5, -12], fov: 75 },
+  { name: 'square-e', cam: [27, 1.62, -17], target: [12, 2.5, 8], fov: 75 },
+  { name: 'tower-street', cam: [-24, 1.62, -17.6], target: [10, 2.5, -15.2], fov: 75 },
+  { name: 'portico', cam: [-6, PORTICO.deck + 1.62, 7.2], target: [6, 1.0, 14], fov: 75 },
+  { name: 'gallery', cam: [-10, ARCADE.deck + 1.62, 27.6], target: [-30, 1.0, 36], fov: 75 },
+  { name: 'balcony', cam: [-10, CAFE.deck + 1.62, (CAFE.z0 + CAFE.z1) / 2], target: [-30, 1.0, -42], fov: 75 },
+  { name: 'hall', cam: [-36.8, 1.62, -21.2], target: [-22, 1.8, -29], fov: 75 },
+  { name: 'yard', cam: [-37, 1.62, 18.4], target: [-48, 2, 9], fov: 75 },
+  { name: 'edge-west', cam: [-56, 1.62, -2], target: [-80, 2, -2], fov: 70 },
+  { name: 'edge-east', cam: [56, 1.62, -6], target: [80, 2, -10], fov: 70 },
+  { name: 'edge-south', cam: [-20, 1.62, 38], target: [-12, 1.5, 60], fov: 70 },
+  { name: 'card', cam: [38, 22, 26], target: [0, 8, -4], fov: 55 }
 ];
 
 export const PLAZA = defineMap({
@@ -72,11 +81,11 @@ export const PLAZA = defineMap({
     sunColor: '#ffecd0',
     sunIntensity: 3.0,
     sunDirection: new THREE.Vector3(0.5, 0.62, 0.42).normalize(),
-    fogNear: 85,
+    fogNear: 95,
     clouds: { count: 11, seed: 3 }
   },
-  bounds: { min: [-EDGE.x - 0.4, -6, -EDGE.z - 0.4], max: [EDGE.x + 0.4, 40, EDGE.z + 0.4] },
-  killY: -4,
+  bounds: { min: [-LAND.x - 0.4, -6, LAND.north - BLVD.jog - 0.4], max: [LAND.x + 0.4, 40, LAND.south + 0.4] },
+  killY: CANAL.water - 3,
   seed: 11,
   plan() {
     const p = new Plan();

@@ -1,142 +1,80 @@
-import { EDGE, type Layout } from './plaza-layout';
+import { BASE, BLVD, halves, houses, type Layout, NROW, type Side, STREET, SQ } from './plaza-layout';
 
-const Z = EDGE.z;
+/** Market hall (west) and the tram station hall (east) between the boulevard and the square: the north connector. */
+export const HALL = { x0: -38.4, x1: -20.8, z0: NROW.z0, z1: NROW.z1, wall: 0.8, top: 7.2, north: [-36.0, -32.0], south: [-26.4, -22.4] } as const;
+/** Grand Café: the middle of the north row, its first-floor balcony over the boulevard (raised place R3). */
+export const CAFE = { x: 12.8, deck: 3.6, z0: BLVD.z1 - BLVD.jog - 2.2, z1: BLVD.z1 - BLVD.jog, h: 13.92, back: -21.6 } as const;
+/** The parked tram on the north kerb in the boulevard's middle. */
+export const TRAM = { x: 8.0, z0: BLVD.z0 - BLVD.jog, z1: BLVD.z0 - BLVD.jog + 2.4, h: 3.2 } as const;
 
-/** Station concourse on the north edge: a hall the length of the forecourt, three doors, windows over the cutting. */
-export const STATION = { x0: -11.2, x1: 11.2, z0: -Z - 0.8, z1: -29.6, wall: 0.8, top: 6.4, roof: 14.4 } as const;
-/** North row between the terminus and the square: bakery shop, Gate Street under its arch, the boatyard. */
-export const NORTH_ROW = { z0: -22.4, z1: -16.0 } as const;
-
-/** Tram Terminus (team 1), Bakery Lane, the station, the north row with the bakery, the Town Gate and the flower shop, the boatyard. */
+/** The tram boulevard (north lane), the north row of houses, both halls, the Grand Café and its balcony. */
 export function northDistrict(L: Layout) {
-  row(L);
-  station(L);
-  terminus(L);
-  bakery(L);
-  gate(L);
-  florist(L);
-  boatyard(L);
+  halves(L, (S) => {
+    row(S);
+    hall(S);
+    boulevard(S);
+  });
+  cafe(L);
 }
 
-function row(L: Layout) {
-  const { z0, z1 } = NORTH_ROW;
-  L.block(-21.6, z0, -18.4, z1, 10.56, ['n', 's'], 'row-n');
-  L.block(-8.8, z0, 2.4, z1, 10.56, ['n', 's', 'w'], 'row-n');
-  L.block(13.6, z0, 20.8, z1, 10.56, ['n', 's'], 'row-n');
-}
-
-/** Walk-through flower shop east of the gate: doors at opposite corners and a plant stand between, so no line runs through. */
-function florist(L: Layout) {
-  const { z0, z1 } = NORTH_ROW;
-  const top = 3.6;
-  const tag = 'florist';
-  L.run('wall', true, 2.4, 13.6, z0, z0 + 0.8, 0, top, [[8.8, 11.2, 2.72]], { tag });
-  L.run('wall', true, 2.4, 13.6, z1 - 0.8, z1, 0, top, [[4.8, 7.2, 2.72]], { tag });
-  L.add('wall', 2.4, 0, z0 + 0.8, 3.2, top, z1 - 0.8, { tag });
-  L.add('wall', 12.8, 0, z0 + 0.8, 13.6, top, z1 - 0.8, { tag });
-  L.add('ceiling', 2.4, top, z0, 13.6, 13.92, z1, { tag });
-  L.add('shelf', 5.6, 0, -19.6, 9.6, 2.4, -18.8, { tag });
-  L.add('counter', 10.4, 0, -18.4, 12.0, 1.28, -17.6, { tag });
-  for (const [x, z] of [[4.4, -20.4], [4.4, -18.0], [8.0, -20.8], [10.8, -20.0], [8.0, -17.6], [11.6, -19.6]] as const) L.seed(x, 0, z);
-}
-
-/** Concourse: doors to the forecourt and both platforms, a ticket booth and benches, iron columns. */
-function station(L: Layout) {
-  const { x0, x1, z0, z1, wall: w, top } = STATION;
-  const tag = 'station';
-  // North wall: tall windows over the railway cutting (bars stop players, not bullets or eyes).
-  const win: [number, number][] = [[-8.8, -6.4], [-4.0, -1.6], [1.6, 4.0], [6.4, 8.8]];
-  let at: number = x0;
-  for (const [a, b] of win) {
-    L.add('wall', at, 0, z0, a, top, z0 + w, { tag });
-    L.add('wall', a, 0, z0, b, 1.2, z0 + w, { tag });
-    L.add('lintel', a, 4.0, z0, b, top, z0 + w, { tag });
-    L.add('rail', a, 1.2, z0, b, 4.0, z0 + w, { pass: true, surface: 'metal', tag });
-    at = b;
-  }
-  L.add('wall', at, 0, z0, x1, top, z0 + w, { tag });
-  L.run('wall', true, x0, x1, z1 - w, z1, 0, top, [[-1.6, 1.6, 3.2]], { tag });
-  L.run('wall', false, z0 + w, z1 - w, x0, x0 + w, 0, top, [[-36.8, -33.6, 3.2]], { tag });
-  L.run('wall', false, z0 + w, z1 - w, x1 - w, x1, 0, top, [[-36.8, -33.6, 3.2]], { tag });
-  L.add('ceiling', x0, top, z0, x1, STATION.roof, z1, { tag });
-  L.add('kiosk', -1.6, 0, -37.6, 1.6, 2.72, -33.6, { tag });
-  for (const x of [-5.6, 5.6]) L.add('pillar', x - 0.3, 0, -35.9, x + 0.3, top, -35.3, { surface: 'metal', tag });
-  for (const x of [-8.0, 8.0]) L.add('counter', x - 1.2, 0, -33.2, x + 1.2, 1.28, -32.4, { tag: 'bench' });
-  for (const [x, z] of [[-8.0, -38.4], [-4.0, -38.4], [4.0, -38.4], [8.0, -38.4], [-4.0, -32.0], [4.0, -32.0], [-8.0, -35.2], [8.0, -35.2]] as const) L.seed(x, 0, z);
-}
-
-/** Forecourt and the two platform wings: trams on their tracks, shelters and kiosks break the open ground. */
-function terminus(L: Layout) {
-  const tag = 'terminus';
-  L.add('tram', -30.4, 0, -36.0, -18.4, 3.2, -33.6, { surface: 'metal', tag });
-  L.add('tram', 18.4, 0, -36.0, 30.4, 3.2, -33.6, { surface: 'metal', tag });
-  for (const [x0, x1] of [[-28.0, -22.4], [21.6, 27.2]] as const) {
-    L.add('shelter', x0, 0, -28.8, x1, 2.32, -28.0, { surface: 'glass', tag });
-    L.add('roof', x0, 2.32, -28.8, x1, 2.48, -26.4, { surface: 'glass', tag });
-  }
-  // News and flower stands in staggered pairs cut the forecourt into a west and an east half.
-  L.add('kiosk', -16.0, 0, -31.2, -13.6, 2.72, -25.2, { tag });
-  L.add('kiosk', -14.4, 0, -25.6, -12.0, 2.72, -22.4, { tag });
-  L.add('kiosk', 13.6, 0, -31.2, 16.0, 2.72, -25.2, { tag });
-  L.add('kiosk', 12.0, 0, -25.6, 14.4, 2.72, -22.4, { tag });
-  // Platform cover: crates on the west wing, ticket booths at both ends (too tall to climb, out of reach of the railings).
-  for (const [a, b] of [[-38.4, -33.6], [-36.0, -28.0]] as const) L.add('stack', a, 0, b, a + 1.6, 1.28, b + 1.6, { surface: 'wood', tag: 'crates' });
-  for (const [a, b] of [[-34.4, -39.2], [39.2, -38.4]] as const) L.add('kiosk', a, 0, b, a + 1.6 + (a > 0 ? 0.8 : 0), 2.72, b + 1.6, { tag });
-  // A pump house in Bakery Lane against the west houses: no line runs down the lane into the market hall.
-  L.add('kiosk', -44.0, 0, -20.0, -38.4, 2.72, -17.6, { tag: 'lane' });
-}
-
-/** Walk-through bakery: doors at opposite corners and shelves between them, so no line runs through. */
-function bakery(L: Layout) {
-  const { z0, z1 } = NORTH_ROW;
-  const top = 3.6;
-  const tag = 'bakery';
-  L.run('wall', true, -32.8, -21.6, z0, z0 + 0.8, 0, top, [[-31.2, -28.0, 2.72]], { tag });
-  L.run('wall', true, -32.8, -21.6, z1 - 0.8, z1, 0, top, [[-25.6, -22.4, 2.72]], { tag });
-  L.add('wall', -32.8, 0, z0 + 0.8, -32.0, top, z1 - 0.8, { tag });
-  L.add('wall', -22.4, 0, z0 + 0.8, -21.6, top, z1 - 0.8, { tag });
-  L.add('ceiling', -32.8, top, z0, -21.6, 10.56, z1, { tag });
-  L.add('shelf', -28.8, 0, -20.0, -25.6, 2.4, -19.2, { tag });
-  L.add('counter', -31.2, 0, -18.4, -29.6, 1.28, -16.8, { tag });
-  for (const [x, z] of [[-29.6, -20.8], [-26.8, -20.8], [-23.2, -20.8], [-27.2, -17.6], [-23.6, -17.6]] as const) L.seed(x, 0, z);
-}
-
-/** Town Gate: Gate Street runs under a double arch in the north row from the terminus into the square's north-west corner. */
-function gate(L: Layout) {
-  const { z0, z1 } = NORTH_ROW;
-  L.add('ceiling', -18.4, 5.6, z0, -8.8, 13.92, z1, { tag: 'gate' });
-  L.add('wall', -14.4, 0, z0, -12.8, 5.6, z1, { tag: 'gate' });
+function row(S: Side) {
+  // North-west corner block: house fronts on the boulevard and the base road, on Market Street and the square.
+  houses(S, -BASE, HALL.x0, NROW.z0, -25.2, [10.56, 13.92, 12.24], 'n', S.tag('old', 'stn'), ['w']);
+  S.block(-BASE, -25.2, HALL.x0, NROW.z1, 10.56, ['w'], S.tag('old', 'stn'));
+  houses(S, -BASE, SQ.x0, NROW.z1, STREET.z0, [12.24, 10.56, 13.92, 10.56], 's', S.tag('old', 'stn'), ['w', 'e']);
 }
 
 /**
- * Boatyard on the quay: high walls open to the sky (grenades lob in), a loft along the north wall with a stair up
- * each end, a boat on its cradle inside the boat doors to the quay.
+ * Hall of iron columns and stall rows: the boulevard door at its west end, the square door at its east end, so the
+ * line between them runs diagonally across the floor (15 m) past the columns.
  */
-function boatyard(L: Layout) {
-  const H = 7.2;
-  const tag = 'shed';
-  const x0 = 20.8;
-  const x1 = 30.4;
-  const z0 = -28.8;
-  const z1 = -16.0;
-  L.run('wall', true, x0, x1, z0, z0 + 0.8, 0, H, [[24.0, 26.4, 2.72]], { tag });
-  L.add('wall', x0, 0, z0 + 0.8, x0 + 0.8, H, z1, { tag });
-  L.run('wall', true, x0 + 0.8, x1, z1 - 0.8, z1, 0, H, [[24.0, 26.4, 2.72]], { tag });
-  // Quay wall: the boat doors.
-  L.run('wall', false, z0 + 0.8, z1 - 0.8, x1 - 0.8, x1, 0, H, [[-22.4, -19.2, 3.04]], { tag });
-  // Loft over the north half: a stair up each end wall, a solid balustrade over the floor.
-  L.add('slab', x0 + 0.8, 2.8, z0 + 0.8, x1 - 0.8, 3.2, -24.8, { walk: true, surface: 'wood', tag });
-  L.add('parapet', 23.2, 3.2, -25.0, 28.0, 4.16, -24.8, { surface: 'wood', tag });
-  L.add('rail', 23.2, 4.16, -25.0, 28.0, 4.64, -24.8, { pass: true, surface: 'wood', tag });
-  L.flight(22.4, -18.4, 0, 'n', 1.6, 8, 0.4, tag);
-  L.flight(28.8, -18.4, 0, 'n', 1.6, 8, 0.4, tag);
-  // The west flight climbs behind a boarded wall (an approach the loft cannot watch); the east one has a banister.
-  L.add('wall', 23.2, 0, -24.8, 23.4, 4.8, -18.4, { surface: 'wood', tag });
-  L.add('rail', 27.8, 0, -24.8, 28.0, 4.8, -18.4, { pass: true, surface: 'wood', tag });
-  // The boat on its cradle: waist-high cover, no line in from the quay doors to the west door.
-  L.add('stack', 24.8, 0, -22.4, 26.4, 1.6, -18.4, { surface: 'wood', tag });
-  // Timber stood by the street door: nothing sees from the boatyard across the square into the market hall.
-  L.add('stack', 23.2, 0, -16.0, 24.0, 2.4, -14.8, { surface: 'wood', tag: 'crates' });
-  for (const [x, z] of [[27.2, -17.6], [25.6, -23.2], [22.4, -16.9], [29.0, -16.9], [25.2, -27.2]] as const) L.seed(x, 0, z);
-  L.seed(25.6, 3.2, -26.4).seed(29.0, 3.2, -26.4);
+function hall(S: Side) {
+  const { x0, x1, z0, z1, wall: w, top } = HALL;
+  const tag = S.tag('hall', 'station');
+  S.run('wall', true, x0, x1, z0, z0 + w, 0, top, [[HALL.north[0], HALL.north[1], 3.6]], { tag });
+  S.run('wall', true, x0, x1, z1 - w, z1, 0, top, [[HALL.south[0], HALL.south[1], 3.6]], { tag });
+  S.add('wall', x0, 0, z0 + w, x0 + w, top, z1 - w, { tag });
+  S.add('wall', x1 - w, 0, z0 + w, x1, top, z1 - w, { tag });
+  S.add('roof', x0, top, z0, x1, top + 0.4, z1, { tag });
+  // Iron columns down the middle, stall counters (waist high) along the walls.
+  for (const x of [-34.4, -28.0, -24.8]) S.add('pillar', x - 0.3, 0, -25.5, x + 0.3, top, -24.9, { tag, surface: 'metal' });
+  S.add('counter', -37.6, 0, -20.8, -34.4, 1.32, -20.0, { tag });
+  S.add('counter', -27.2, 0, -30.4, -24.0, 1.32, -29.6, { tag });
+  for (const [x, z] of [[-35.2, -28.0], [-32.0, -26.8], [-27.2, -22.0], [-23.2, -26.0], [-33.6, -21.6], [-25.6, -24.4]] as const) S.seed(x, 0, z);
+}
+
+/**
+ * Boulevard cover, west half (the east mirrors it): a news kiosk with a planter against the corner block at the base
+ * mouth, a tram shelter on the north kerb, a delivery van on the pavement at the market hall, an advert column
+ * mid-street; the middle has the tram, the ticket kiosk and the café planters.
+ */
+function boulevard(S: Side) {
+  const z1 = BLVD.z1;
+  S.add('kiosk', -50.4, 0, z1 - 2.4, -48.0, 2.72, z1, { tag: 'news' });
+  S.add('garden', -52.8, 0, z1 - 1.2, -50.4, 1.32, z1, { tag: 'planter' });
+  S.add('shelter', -37.2, 0, BLVD.z0, -32.4, 2.4, BLVD.z0 + 1.6, { surface: 'glass', tag: 'tram' });
+  S.add('roof', -37.6, 2.4, BLVD.z0, -32.0, 2.56, BLVD.z0 + 2.4, { surface: 'glass', tag: 'shelter' });
+  S.add('garden', -48.0, 0, BLVD.z0, -45.6, 1.32, BLVD.z0 + 1.2, { tag: 'planter' });
+  S.add('stack', -30.4, 0, z1 - 2.0, -25.6, 2.4, z1, { surface: 'metal', tag: 'van' });
+  S.add('stack', -25.6, 0, z1 - 1.2, -24.0, 1.32, z1, { surface: 'wood', tag: 'crates' });
+  S.add('pillar', -26.4, 0, -38.8, -25.2, 2.72, -37.6, { tag: 'poster' });
+}
+
+/** The café front between the halls; its balcony over the boulevard with an iron stair down each end along the front. */
+function cafe(L: Layout) {
+  const { x, deck, z0, z1, h } = CAFE;
+  const front = NROW.z0 - BLVD.jog;
+  L.block(HALL.x1, front, -x, CAFE.back, 12.24, ['n', 's', 'w'], 'cafe-w');
+  L.block(-x, front, x, CAFE.back, h, ['n', 's'], 'cafe');
+  L.block(x, front, -HALL.x1, CAFE.back, 12.24, ['n', 's', 'e'], 'cafe-e');
+  L.add('slab', -x, deck - 0.4, z0, x, deck, z1, { walk: true, surface: 'stone', tag: 'balcony' });
+  L.add('parapet', -x, deck, z0, x, deck + 1.0, z0 + 0.4, { tag: 'balcony' });
+  L.add('rail', -x, deck + 1.0, z0, x, deck + 1.6, z0 + 0.4, { pass: true, surface: 'metal', tag: 'balcony' });
+  L.flight(-x - 7.2, z1 - 0.8, 0, 'e', 1.6, 9, deck / 9, 'balcony');
+  L.flight(x + 7.2, z1 - 0.8, 0, 'w', 1.6, 9, deck / 9, 'balcony');
+  for (const sx of [-8, -2.4, 2.4, 8]) L.seed(sx, deck, (z0 + z1) / 2 + 0.2);
+  // Middle of the boulevard: the tram on the north kerb, the ticket kiosk in the street, café planters by the front.
+  L.add('tram', -TRAM.x, 0, TRAM.z0, TRAM.x, TRAM.h, TRAM.z1, { surface: 'metal', tag: 'tram' });
+  L.add('kiosk', -1.2, 0, -41.6, 1.2, 2.72, -39.2, { tag: 'tickets' });
+  for (const s of [-1, 1]) L.add('garden', s * 3.2, 0, z0 - 2.0, s * 5.6, 1.32, z0 - 0.8, { tag: 'planter' });
 }
