@@ -21,8 +21,8 @@ export interface Belief {
 
 export interface BeliefState {
   beliefs: Map<number, Belief>;
-  /** A look toward something heard or felt out of view: the yaw, from when, until when. */
-  glance: { yaw: number; from: number; until: number } | null;
+  /** A look toward something heard or felt out of view: the yaw, from when, until when, and how fast it turns (rad/s; default the look pace). */
+  glance: { yaw: number; from: number; until: number; turn?: number } | null;
 }
 
 /** How fast (m/s) a believed spot grows less sure: an enemy keeps moving, not always away. */

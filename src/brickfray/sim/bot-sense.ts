@@ -53,9 +53,10 @@ const TRADING = 1.5;
 const RETURN_FIRE = { within: 3, range: 50 };
 /**
  * Being hit tells the direction of the shot to within `spread` rad (the damage indicator), not who or how far: with
- * nothing better the shooter is guessed `guess` m off, give or take `err`. It turns to look `react` s later.
+ * nothing better the shooter is guessed `guess` m off, give or take `err`. It turns to look `react` s later, swinging
+ * round at `turn` rad/s as a hit player whips round, not at the pace it looks about.
  */
-const HIT = { spread: 0.12, guess: 20, err: 12, react: [0.2, 0.35] as const, look: 1.2 };
+const HIT = { spread: 0.12, guess: 20, err: 12, react: [0.2, 0.35] as const, look: 1.2, turn: 9 };
 /**
  * A heard sound gives a bearing to within `spread` rad and a distance to within `range` of itself: a shot is placed
  * better than a step, a sound through a wall worse (it comes round the opening, muffled and seeming farther), several
@@ -154,7 +155,7 @@ export class BotSense {
       believe(b, attacker.id, attacker.life, [eye[0] - Math.sin(yaw) * d, bot.move.y, eye[2] - Math.cos(yaw) * d], along > 1 ? Math.max(known!.err, d * HIT.spread) : HIT.err, now, react, false);
       if (b.target === attacker.id && b.lostFor === 0) continue;
       if (b.target && b.lostFor === 0 && now - (b.hurtAt.get(b.target) ?? -99) < TRADING) continue;
-      b.glance = { yaw, from: react, until: react + HIT.look };
+      b.glance = { yaw, from: react, until: react + HIT.look, turn: HIT.turn };
       b.think = Math.min(b.think, react - now);
     }
   }

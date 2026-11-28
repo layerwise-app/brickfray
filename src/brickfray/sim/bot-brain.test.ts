@@ -54,8 +54,9 @@ describe('bots in a fight', () => {
     expect(brainsOf(bots).get(bot.id)!.target).toBe(0);
     run(2);
     expect(brainsOf(bots).get(bot.id)!.target).toBe(me.id);
-    // Facing +Z, toward the attacker.
-    expect(Math.abs(Math.atan2(Math.sin(bot.yaw - Math.PI), Math.cos(bot.yaw - Math.PI)))).toBeLessThan(0.3);
+    // Facing the attacker (it strafes once it fights, so measured from where it stands now).
+    const toMe = Math.atan2(-(me.move.x - bot.move.x), -(me.move.z - bot.move.z));
+    expect(Math.abs(Math.atan2(Math.sin(bot.yaw - toMe), Math.cos(bot.yaw - toMe)))).toBeLessThan(0.3);
     expect(brainsOf(bots).get(bot.id)!.lostFor).toBe(0);
   });
 

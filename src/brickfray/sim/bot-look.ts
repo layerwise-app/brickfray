@@ -44,6 +44,7 @@ export function look(host: HostSim, roam: BotRoam, bot: PlayerState, b: Looker, 
   const now = host.time;
   if (b.glance && now >= b.glance.until) b.glance = null;
   const glance = b.glance && now >= b.glance.from ? b.glance.yaw : null;
+  const turn = (glance !== null ? (b.glance!.turn ?? LOOK_TURN) : LOOK_TURN) * TICK;
   if (!visible && !lost && b.reached >= 0 && glance === null && !watch && now - b.checked > CHECK.every && steer) {
     const view = roam.longestView(b.reached);
     if (view !== null && Math.abs(wrap(view - Math.atan2(-steer[0], -steer[1]))) > CHECK.off) {
@@ -62,7 +63,7 @@ export function look(host: HostSim, roam: BotRoam, bot: PlayerState, b: Looker, 
       return;
     }
     const eyes = glance ?? (watch ? yawTo(watch) : moveYaw);
-    b.aimYaw += clamp(wrap(eyes - b.aimYaw), -LOOK_TURN * TICK, LOOK_TURN * TICK);
+    b.aimYaw += clamp(wrap(eyes - b.aimYaw), -turn, turn);
     b.aimPitch *= 0.9;
     // It walks the route while it turns to it: walking the way it still faces can step off the quay it was aiming across.
     const ahead = wrap(moveYaw - b.aimYaw);
@@ -73,7 +74,7 @@ export function look(host: HostSim, roam: BotRoam, bot: PlayerState, b: Looker, 
   } else if (!visible && !lost) {
     // Arrived where the enemy should be in sight: face it, or it stays out of the bot's view cone behind it.
     const eyes = glance ?? (watch ? yawTo(watch) : b.approach ? yawTo(b.approach.for) : null);
-    if (eyes !== null) b.aimYaw += clamp(wrap(eyes - b.aimYaw), -LOOK_TURN * TICK, LOOK_TURN * TICK);
+    if (eyes !== null) b.aimYaw += clamp(wrap(eyes - b.aimYaw), -turn, turn);
   }
 }
 

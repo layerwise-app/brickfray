@@ -54,8 +54,8 @@ const SCOUT = { after: 15, err: 12 };
  */
 export class BotDirector {
   private brains = new Map<number, Brain>();
-  /** 0 = easy … 1 = sharp; solo raises it each wave. */
-  skill = 0.4;
+  /** 0 = easy … 1 = sharp: match fill bots play at this; solo sets it each wave. */
+  skill = 0.5;
   /** Seconds the aim trails a moving target (solo: early waves miss a strafing player); 0 aims where it is. */
   lag = 0;
   private readonly nav: BotNav;
