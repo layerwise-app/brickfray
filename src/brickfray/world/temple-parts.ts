@@ -7,7 +7,7 @@ import { board, floorJoists, galleryRafters, naveCeiling } from './temple-interi
 import { marketShed, ROOF_BLUE, villageLoad } from './temple-landmarks';
 import { clerestory, pavilionRoof, ROOF_CLAY, ROOF_JADE, tiledRoof } from './temple-ornament';
 import { screen } from './temple-screens';
-import { prop } from './temple-things';
+import { prop, propSolid } from './temple-things';
 import { templeGeometry } from './temple-geometry';
 import { CAMP, T, type Kind, type Piece } from './temple-layout';
 import { box, Frame, Rng, shade, type Face } from './util';
@@ -313,7 +313,7 @@ const DRAW: Record<Kind, (d: Drawer, q: Piece, e: Exposure) => void> = {
 };
 
 export const TEMPLE: Element<{ pieces: Piece[] }> = {
-  colliders: (p) => p.pieces.map((q) => box(q.min, q.max, q.surface ?? 'stone', { walk: q.walk, bulletsPass: q.bulletsPass })),
+  colliders: (p) => p.pieces.flatMap((q) => (q.solid ?? (q.kind === 'prop' ? propSolid(q) : undefined) ?? [[q.min, q.max]]).map(([a, b]) => box(a, b, q.surface ?? 'stone', { walk: q.walk, bulletsPass: q.bulletsPass }))),
   draw(d, p) {
     houses = 0;
     for (const q of p.pieces) DRAW[q.kind](d, q, exposure(q, p.pieces));

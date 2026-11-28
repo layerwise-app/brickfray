@@ -21,6 +21,7 @@ export const playZh: Record<keyof typeof playEn, string> = {
   'feed.self': '把自己淘汰了',
   'death.streak': '连杀',
   'paused.title': '已暂停',
+  'paused.live': '对局进行中',
   'notFound.title': '这里什么都没有',
   'notFound.body': '这个页面不存在。',
   'notFound.home': '返回游戏'

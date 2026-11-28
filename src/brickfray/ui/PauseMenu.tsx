@@ -7,7 +7,7 @@ import { DoorIcon, ExitFullscreenIcon, FullscreenIcon, GearIcon, PlayIcon } from
 import { useFullscreen } from './fullscreen';
 import { canFullscreen, setFullscreen } from '../game/touch-screen';
 
-/** Paused: what is paused (mode, map, the clock or wave), the player's numbers so far, then Resume, Settings, Leave. */
+/** The Esc menu: paused in solo, still running online. What is being played (mode, map, the clock or wave), the player's numbers so far, then Resume, Settings, Leave. */
 export function PauseMenu({ openSettings }: { openSettings: () => void }) {
   const game = useGame();
   const hud = useHud();
@@ -23,7 +23,7 @@ export function PauseMenu({ openSettings }: { openSettings: () => void }) {
     <div className='bf-screen-in absolute inset-0 z-20 grid place-items-center overflow-y-auto bg-[#0b1222]/55 py-3 backdrop-blur-sm'>
       <div className='bf-panel bf-studs bf-pop flex w-[360px] max-w-[calc(100%-32px)] flex-col gap-4 p-6 [@media(max-height:500px)]:gap-2.5 [@media(max-height:500px)]:p-4'>
         <div className='flex flex-col items-center gap-1 text-center'>
-          <h2 className='bf-display text-4xl leading-none [@media(max-height:500px)]:text-3xl'>{t('paused.title')}</h2>
+          <h2 className='bf-display text-4xl leading-none [@media(max-height:500px)]:text-3xl'>{t(solo ? 'paused.title' : 'paused.live')}</h2>
           {where && (
             <p className='text-sm font-semibold text-[var(--bf-muted)]'>
               {where}

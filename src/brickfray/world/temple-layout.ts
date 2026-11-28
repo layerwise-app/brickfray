@@ -83,6 +83,8 @@ export interface Piece {
   walk?: boolean;
   surface?: Surface;
   bulletsPass?: boolean;
+  /** Collider boxes that follow an open shape (a statue, a roofed burner) instead of its bounds. */
+  solid?: [Vec3, Vec3][];
   /** Drawing hint for pieces of one kind that look different (a house's district, a block's use). */
   tag?: string;
 }

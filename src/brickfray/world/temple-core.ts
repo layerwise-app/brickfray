@@ -1,4 +1,6 @@
 import { balustrade, box, doorways, run, T, type Flight, type Piece } from './temple-layout';
+import { STATUE_PLINTH } from './temple-art';
+import type { Vec3 } from './util';
 
 /**
  * The great hall at the centre, west half (the geometry mirrors it). It lies across the processional way: a 12 m nave
@@ -55,8 +57,30 @@ function hall(p: Piece[], f: Flight[], c: Piece[]) {
  */
 function altar(c: Piece[]) {
   c.push(box('dais', -3.6, 0, -3.6, 3.6, 0.48, 3.6));
-  c.push(box('statue', -2.8, 0.48, -2.8, 2.8, 6.4, 2.8));
-  for (const s of [-1, 1]) c.push(box('burner', -1.2, 0, s * 2.8, 1.2, 3.2, s * 6.8));
+  // Collision follows the drawn shapes (temple-art greatStatue and burner) so shots pass where they look open.
+  const y = 0.48;
+  const f = y + STATUE_PLINTH;
+  const statue: [Vec3, Vec3][] = [
+    [[-2.8, y, -2.8], [2.8, f + 0.4, 2.8]],
+    [[-1.85, f + 0.4, -1.85], [1.85, f + 0.9, 1.85]],
+    [[-2.58, f + 0.4, -1], [2.58, f + 0.9, 1]],
+    [[-1, f + 0.4, -2.58], [1, f + 0.9, 2.58]],
+    [[-2.4, f + 0.9, -1.5], [2.4, f + 1.7, 1.9]],
+    [[-1.95, f + 1.7, -1], [1.95, f + 3.2, 1]],
+    [[-0.65, f + 3.2, -0.65], [0.65, f + 4.9, 0.65]],
+    [[-1.5, f + 2.1, -0.62], [1.5, f + 5.1, -0.38]]
+  ];
+  c.push({ ...box('statue', -2.8, y, -2.8, 2.8, f + 5.1, 2.8), solid: statue });
+  for (const s of [-1, 1]) {
+    const [z0, z1] = s < 0 ? [-6.8, -2.8] : [2.8, 6.8];
+    const zc = (z0 + z1) / 2;
+    const legs: [Vec3, Vec3][] = [-1, 1].flatMap((sx) => [-1, 1].map((sz): [Vec3, Vec3] => {
+      const [lx, lz] = [sx * 0.8, zc + sz * 1.6];
+      return [[lx - 0.18, 0.3, lz - 0.18], [lx + 0.18, 1.0, lz + 0.18]];
+    }));
+    const solid: [Vec3, Vec3][] = [[[-1.2, 0, z0], [1.2, 0.3, z1]], ...legs, [[-1.15, 1.0, z0 + 0.05], [1.15, 2.24, z1 - 0.05]], [[-1.2, 2.8, z0], [1.2, 3.2, z1]]];
+    c.push({ ...box('burner', -1.2, 0, z0, 1.2, 3.2, z1), solid });
+  }
 }
 
 /** The end vestibules: side doors onto the porch yards, the nave door, the outer wall against the rock and the pagoda. */

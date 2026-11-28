@@ -21,6 +21,7 @@ export const playFr: Record<keyof typeof playEn, string> = {
   'feed.self': 's’est éliminé tout seul',
   'death.streak': 'Série',
   'paused.title': 'Pause',
+  'paused.live': 'Partie en cours',
   'notFound.title': 'Rien à construire ici',
   'notFound.body': 'Cette page n’existe pas.',
   'notFound.home': 'Retour au jeu'

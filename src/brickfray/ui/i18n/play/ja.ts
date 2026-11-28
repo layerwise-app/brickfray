@@ -21,6 +21,7 @@ export const playJa: Record<keyof typeof playEn, string> = {
   'feed.self': '自滅した',
   'death.streak': '連続キル',
   'paused.title': '一時停止中',
+  'paused.live': '対戦中',
   'notFound.title': 'ここには何もありません',
   'notFound.body': 'このページは存在しません。',
   'notFound.home': 'ゲームに戻る'

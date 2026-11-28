@@ -21,6 +21,7 @@ export const playKo: Record<keyof typeof playEn, string> = {
   'feed.self': '스스로 쓰러졌습니다',
   'death.streak': '연속 처치',
   'paused.title': '일시 정지',
+  'paused.live': '경기 진행 중',
   'notFound.title': '여기에는 아무것도 없어요',
   'notFound.body': '존재하지 않는 페이지입니다.',
   'notFound.home': '게임으로 돌아가기'

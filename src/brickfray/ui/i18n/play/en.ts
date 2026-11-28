@@ -20,6 +20,7 @@ export const playEn = {
   'feed.self': 'took themselves out',
   'death.streak': 'Streak',
   'paused.title': 'Paused',
+  'paused.live': 'Match in progress',
   'notFound.title': 'Nothing to build here',
   'notFound.body': 'This page doesn’t exist.',
   'notFound.home': 'Back to the game'

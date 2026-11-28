@@ -18,14 +18,18 @@ const TIMBER = '#5a3424';
 const centre = (q: Piece) => [(q.min[0] + q.max[0]) / 2, (q.min[2] + q.max[2]) / 2] as const;
 const size = (q: Piece) => [q.max[0] - q.min[0], q.max[1] - q.min[1], q.max[2] - q.min[2]] as const;
 
+/** The great statue's plinth under its throne: too tall to jump onto. */
+export const STATUE_PLINTH = 0.9;
+
 /**
  * The great statue on the nave's axis: a seated jade guardian on a gold lotus throne, a flame halo behind its head
- * so it reads from both ends of the nave. Drawn once over both halves of its collider.
+ * so it reads from both ends of the nave.
  */
 export function greatStatue(d: Drawer, q: Piece) {
-  if (q.min[0] < 0) return;
-  const t = new Pen(d, new Frame(0, q.min[1], 0));
-  const W = q.max[0] * 2;
+  const [cx, cz] = centre(q);
+  const W = size(q)[0];
+  new Pen(d, new Frame(cx, q.min[1], cz)).box(0, 0, 0, W, STATUE_PLINTH, W, shade(SAND, -0.08), undefined, 0.06);
+  const t = new Pen(d, new Frame(cx, q.min[1] + STATUE_PLINTH, cz));
   t.box(0, 0, 0, W, 0.4, W, SAND, undefined, 0.04);
   t.cyl(0, 0.4, 0, W * 0.46, 0.5, GOLD, 'metal', 0.04, d.detail === 0 ? 8 : 16);
   if (d.detail > 0) for (let i = 0; i < 12; i++) {
