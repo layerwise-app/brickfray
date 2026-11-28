@@ -2,7 +2,7 @@ import type { Drawer } from './plan';
 import { Pen } from './props-kit';
 import type { Piece } from './temple-layout';
 import { pavilionRoof, ROOF_CLAY, ROOF_JADE } from './temple-ornament';
-import { Frame, Rng, shade, type Vec3 } from './util';
+import { Frame, Rng, shade } from './util';
 
 /**
  * The temple's cover props, each drawn inside its collider box: bell frames, handcarts, firewood stacks, offering
@@ -192,38 +192,6 @@ function boat(d: Drawer, q: Piece) {
 const DRAW: Record<string, (d: Drawer, q: Piece) => void> = { bell, cart, firewood, table, lantern, well, stall, ferry, boulder, planter, boat, cauldron, altar, bed };
 
 /** Draws a 'prop' piece by its tag. */
-/**
- * Collider boxes for the open props (a roof on posts over a low solid part), matching what `prop` draws, so shots pass
- * under their roofs. Other props keep their bounds.
- */
-export function propSolid(q: Piece): [Vec3, Vec3][] | undefined {
-  const [cx, cz] = centre(q);
-  const [w, h, dd] = size(q);
-  const along = w >= dd;
-  const L = Math.max(w, dd);
-  const D = Math.min(w, dd);
-  const y0 = q.min[1];
-  /** A box centred `off` along the long side, half-extents `hl` (long) and `hd` (short), from y a to b above the foot. */
-  const part = (off: number, hl: number, hd: number, a: number, b: number): [Vec3, Vec3] => {
-    const [x, z, hx, hz] = along ? [cx + off, cz, hl, hd] : [cx, cz + off, hd, hl];
-    return [[x - hx, y0 + a, z - hz], [x + hx, y0 + b, z + hz]];
-  };
-  const roof = (a: number) => part(0, L / 2, D / 2, a, h);
-  const posts = (off: number, r: number, a: number, b: number) => [part(-off, r, r, a, b), part(off, r, r, a, b)];
-  switch (q.tag) {
-    case 'bell':
-      return [part(0, L / 2, D / 2, 0, 0.4), part(0, D * 0.45, D * 0.45, 0.4, h - 0.7), ...posts(L / 2 - 0.2, 0.16, 0.4, h - 0.4), roof(h - 0.5)];
-    case 'well':
-      return [part(0, L / 2 - 0.1, D / 2 - 0.1, 0, 0.9), ...posts(L / 2 - 0.25, 0.1, 0.9, h - 0.8), roof(h - 0.8)];
-    case 'stall':
-      return [part(0, L / 2, D / 2, 0, 1.0), roof(h - 0.2)];
-    case 'cart':
-      return [part(0, L / 2, D / 2, 0, h - 0.4)];
-    default:
-      return undefined;
-  }
-}
-
 export function prop(d: Drawer, q: Piece) {
   (DRAW[q.tag ?? 'boulder'] ?? boulder)(d, q);
 }

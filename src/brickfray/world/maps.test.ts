@@ -82,7 +82,8 @@ describe('fortress nav', () => {
 });
 
 describe('temple edges', () => {
-  const tall = TEMPLE.layout().colliders.filter((c) => c.max[1] > 1.4);
+  // Rails' player barriers reach higher than the rails but stop no bullets and are not seen: they do not close an edge.
+  const tall = TEMPLE.layout().colliders.filter((c) => c.max[1] > 1.4 && !c.bulletsPass);
   // Share of an edge (along `alongX` from -half to half) that a tall collider touching it closes.
   const closed = (touches: (c: (typeof tall)[number]) => boolean, alongX: boolean, half: number) => {
     const at = tall.filter(touches);

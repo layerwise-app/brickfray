@@ -6,6 +6,7 @@ import { bellTower, riverShrine, ROOF_BLUE } from './temple-landmarks';
 import { pavilionRoof, ROOF_CLAY, ROOF_JADE } from './temple-ornament';
 import { GUARDIAN } from './temple-props';
 import type { Piece } from './temple-layout';
+import { RAIL_POST_STEP } from './temple-solids';
 import { Frame, mix, Rng, shade, type Face } from './util';
 
 const GOLD = '#e0b040';
@@ -153,13 +154,12 @@ export function rail(d: Drawer, q: Piece) {
   const c = (along ? z0 + z1 : x0 + x1) / 2;
   slab(d, [x0, 0, z0], [x1, 0.24, z1], '#7f8577');
   slab(d, [along ? x0 : x0 + 0.06, h - 0.2, along ? z0 + 0.06 : z0], [along ? x1 : x1 - 0.06, h, along ? z1 - 0.06 : z1], '#d6c69c');
-  const step = d.detail === 0 ? 3.2 : 1.6;
-  for (let a = (along ? x0 : z0) + 0.2; a <= (along ? x1 : z1); a += step) {
+  for (let a = (along ? x0 : z0) + 0.2; a <= (along ? x1 : z1); a += RAIL_POST_STEP) {
     const [x, z] = along ? [a, c] : [c, a];
     t.box(x, 0.24, z, 0.3, h - 0.24, 0.3, '#c8b98f', undefined, 0.03);
     if (d.detail > 0) t.ball(x, h + 0.08, z, 0.1, GOLD, undefined, 0, 1, 'metal');
   }
-  if (d.detail > 0) slab(d, [along ? x0 : x0 + 0.1, 0.5, along ? z0 + 0.1 : z0], [along ? x1 : x1 - 0.1, 0.62, along ? z1 - 0.1 : z1], '#b8a882');
+  slab(d, [along ? x0 : x0 + 0.1, 0.5, along ? z0 + 0.1 : z0], [along ? x1 : x1 - 0.1, 0.62, along ? z1 - 0.1 : z1], '#b8a882');
 }
 
 /** Bamboo fence between village houses: poles, two rails and a gate in the middle; bullets pass through. */
