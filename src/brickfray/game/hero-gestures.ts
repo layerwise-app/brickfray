@@ -19,8 +19,11 @@ export interface Gesture {
   length: number;
   /** Adds to the body's offsets at gesture time `u` (0…1). */
   body?(u: number, life: GestureBody, stance: Stance, viewer: number): void;
-  /** Turns the gun and both hands on it together: sets `pivot` and `turn` from the right hand's target; false leaves them. */
-  gun?(u: number, wrist: THREE.Vector3, rotation: THREE.Quaternion, pose: Pose, pivot: THREE.Vector3, turn: THREE.Quaternion): boolean;
+  /**
+   * Turns the gun and both hands on it together: sets `pivot` and `turn` from the right hand's target, and may `shift`
+   * them after the turn; false leaves them.
+   */
+  gun?(u: number, wrist: THREE.Vector3, rotation: THREE.Quaternion, pose: Pose, pivot: THREE.Vector3, turn: THREE.Quaternion, shift: THREE.Vector3): boolean;
   /** Moves the left hand alone. */
   left?(u: number, wrist: THREE.Vector3, rotation: THREE.Quaternion, pose: Pose): void;
 }
@@ -54,7 +57,7 @@ const q = new THREE.Quaternion();
 const q2 = new THREE.Quaternion();
 const DOWN = new THREE.Vector3(0, -1, 0);
 const UP = new THREE.Vector3(0, 1, 0);
-const MOSS_LOW = { drop: 0.6, turn: 0.45, below: 0.35 };
+const MOSS_LOW = { drop: 0.68, turn: 0.45, out: [0.18, 0.02, -0.15] as V3 };
 
 /** Smootherstep: no jump in acceleration where a move starts or stops. */
 const smooth = (x: number) => (x <= 0 ? 0 : x >= 1 ? 1 : x * x * x * (x * (6 * x - 15) + 10));
@@ -89,13 +92,9 @@ function twist(rotation: THREE.Quaternion, axis: V3, angle: number) {
   rotation.multiply(q2.setFromAxisAngle(v.set(...axis), angle));
 }
 
-/**
- * Tips the gun in the right hand about the shoulder: muzzle down by `drop` (negative raises it), rolled by `roll` about
- * the barrel. A pivot `below` the shoulder swings the hands out in front as the muzzle drops instead of into the belly.
- */
-function tipGun(rotation: THREE.Quaternion, pose: Pose, pivot: THREE.Vector3, turn: THREE.Quaternion, drop: number, roll = 0, below = 0) {
+/** Tips the gun in the right hand about the shoulder: muzzle down by `drop` (negative raises it), rolled by `roll` about the barrel. */
+function tipGun(rotation: THREE.Quaternion, pose: Pose, pivot: THREE.Vector3, turn: THREE.Quaternion, drop: number, roll = 0) {
   pivot.copy(pose.mp[BONE.upperArmR]!);
-  pivot.y -= below;
   w.set(0, 0, -1).applyQuaternion(rotation);
   turn.setFromAxisAngle(w, roll).premultiply(q.setFromAxisAngle(v.crossVectors(w, DOWN).normalize(), drop));
   return true;
@@ -216,11 +215,13 @@ export const GESTURES: Record<CharacterId, readonly Gesture[]> = {
         aim(life, stance, [viewer, -0.06, 0], span(u, 0.06, 0.3, 0.7, 0.94));
       },
       // The rifle comes down off the eye to a low ready: muzzle dipped toward the ground ahead and kept turned off the viewer
-      // as the chest comes round, so it never points out of the screen or swings its stock through the glove.
-      gun(u, _wrist, rotation, pose, pivot, turn) {
+      // as the chest comes round, so it never points out of the screen or swings its stock through the glove. Tipped about
+      // the shoulder alone it would fold the hands back into the belly, so it is carried out in front and to his right.
+      gun(u, _wrist, rotation, pose, pivot, turn, shift) {
         const e = span(u, 0, 0.28, 0.7, 1);
-        tipGun(rotation, pose, pivot, turn, MOSS_LOW.drop * e, 0, MOSS_LOW.below);
+        tipGun(rotation, pose, pivot, turn, MOSS_LOW.drop * e);
         turn.premultiply(q.setFromAxisAngle(UP, MOSS_LOW.turn * e));
+        shift.set(...MOSS_LOW.out).applyQuaternion(pose.mq[BONE.chest]!).multiplyScalar(e);
         return true;
       }
     }

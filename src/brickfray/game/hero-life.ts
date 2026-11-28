@@ -32,6 +32,7 @@ export class HeroLife implements StanceLife {
   private carry = false;
   private readonly pivot = new THREE.Vector3();
   private readonly turn = new THREE.Quaternion();
+  private readonly shift = new THREE.Vector3();
   /** The figure's heading toward the lens, in its own frame. */
   private viewer = -0.5;
 
@@ -85,10 +86,10 @@ export class HeroLife implements StanceLife {
 
   hand(side: 'L' | 'R', wrist: THREE.Vector3, rotation: THREE.Quaternion, pose: Pose) {
     if (this.u < 0) return;
-    if (side === 'R') this.carry = this.gesture.gun?.(this.u, wrist, rotation, pose, this.pivot, this.turn) ?? false;
+    if (side === 'R') this.carry = this.gesture.gun?.(this.u, wrist, rotation, pose, this.pivot, this.turn, this.shift.set(0, 0, 0)) ?? false;
     // A melee weapon in the left hand stays put while the gun turns.
     if (this.carry && (side === 'R' || !this.stance.melee)) {
-      wrist.sub(this.pivot).applyQuaternion(this.turn).add(this.pivot);
+      wrist.sub(this.pivot).applyQuaternion(this.turn).add(this.pivot).add(this.shift);
       rotation.premultiply(this.turn);
     }
     if (side === 'L') this.gesture.left?.(this.u, wrist, rotation, pose);
