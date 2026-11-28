@@ -9,7 +9,6 @@ export const FORTRESS_TRIM: Element<Works> = {
     for (const o of w.openings) surround(d, o);
     battlements(d, w.pieces);
     for (const r of w.roofs) if (!r.small) beams(d, r);
-    for (const g of GLAZING) lancet(d, ...g);
   }
 };
 
@@ -26,28 +25,10 @@ function beams(d: Drawer, r: Roof) {
   }
 }
 
-/** Glazed lancets in the solid long walls of the great hall and the chapel: [x, sill, head]. */
-export const GLAZING: [number, number, number][] = [
-  [-11.6, 4.0, 5.6],
-  [0.4, 4.0, 5.6],
-  [8.0, 2.4, 4.6],
-  [10.4, 2.4, 4.6]
-];
-
-/** A tall narrow window of dark glass in a stone surround, inside and out, in both long walls of the hall row. */
-function lancet(d: Drawer, u: number, sill: number, head: number) {
-  const [z0, z1, wall] = [F.hall, F.bandN, 0.8];
-  for (const f of [new Frame(u, 0, z1, 0), new Frame(u, 0, z0, 2), new Frame(u, 0, z0 + wall, 0), new Frame(u, 0, z1 - wall, 2)]) {
-    const t = new Pen(d, f);
-    t.box(0, sill, 0.01, 0.56, head - sill, 0.06, '#2d4a6e', 'glass', 0);
-    for (const s of [-1, 1]) t.box(s * 0.4, sill - 0.1, 0.05, 0.22, head - sill + 0.2, 0.12, '#e9e1cc', undefined, 0.02);
-    t.box(0, head, 0.05, 1.02, 0.22, 0.14, '#e9e1cc', undefined, 0.02);
-    t.box(0, sill - 0.2, 0.06, 1.0, 0.14, 0.18, '#e9e1cc', undefined, 0.02);
-  }
-}
-
 const SURROUND: Partial<Record<Kind, string>> = {
   hall: '#e9e1cc',
+  rubble: '#9c9588',
+  bank: '#7d786c',
   timber: '#5e3f27',
   tower: '#9a9da0',
   curtain: '#b3b5b4',
@@ -79,7 +60,8 @@ function surround(d: Drawer, o: Opening) {
   const color = SURROUND[o.kind];
   if (!color) return;
   const mid = (o.a0 + o.a1) / 2;
-  const frames = o.alongX ? [new Frame(mid, 0, o.c1, 0), new Frame(mid, 0, o.c0, 2)] : [new Frame(o.c1, 0, mid, 1), new Frame(o.c0, 0, mid, 3)];
+  const both = o.alongX ? [new Frame(mid, 0, o.c1, 0), new Frame(mid, 0, o.c0, 2)] : [new Frame(o.c1, 0, mid, 1), new Frame(o.c0, 0, mid, 3)];
+  const frames = o.blind ? [both[o.face === 1 ? 0 : 1]!] : both;
   const w = o.a1 - o.a0;
   const h = o.y1 - o.y0;
   const bar = o.kind === 'timber' ? 0.2 : 0.24;
@@ -88,6 +70,12 @@ function surround(d: Drawer, o: Opening) {
     const t = new Pen(d, f);
     for (const s of [-1, 1]) t.box(s * (w / 2 + bar / 2), o.y0, out / 2 - 0.02, bar, h + bar, out, color, undefined, 0.02);
     t.box(0, o.y1, out / 2 - 0.02, w + bar * 2 + 0.12, bar, out + 0.04, color, undefined, 0.02);
+    if (o.blind) {
+      // A shut oak door with its iron straps, or a leaded window with a mullion, set into the solid front.
+      t.box(0, o.y0, 0.03, w, h, 0.06, o.door ? '#6e4a2f' : '#2e3a44', undefined, 0);
+      if (o.door) for (const y of [o.y0 + h * 0.25, o.y0 + h * 0.7]) t.box(0, y, 0.07, w - 0.1, 0.1, 0.03, '#3a3f45', 'metal', 0);
+      else t.box(0, o.y0, 0.07, 0.08, h, 0.04, color, undefined, 0);
+    }
     if (!o.door) t.box(0, o.y0 - 0.12, out / 2, w + bar * 2 + 0.16, 0.12, out + 0.1, color, undefined, 0.02);
     else if (o.kind === 'curtain' || o.kind === 'tower') t.box(0, o.y1 + bar, out / 2 - 0.02, 0.36, 0.3, out + 0.06, color, undefined, 0.02);
   }

@@ -1,70 +1,9 @@
 import { drawBlock, type Masonry } from './blocks';
 import { CASTLE_STONE } from './castle-parts';
-import { F, type Piece, type Works } from './fortress-plan';
+import { F, type Piece } from './fortress-plan';
 import type { Drawer } from './plan';
 import { Pen } from './props-kit';
 import { Frame, mix, Rng, shade } from './util';
-
-/**
- * Where the playable ground ends, side by side (rule 9: no wall ring). North the upper ward stands on a crag over a
- * gorge behind a breastwork; north-east the crag's rock shoulder; east the river runs on past a line of oak stakes;
- * south the barbican looks over its moat through a low wall and a portcullis onto the road, the lists end at a paling;
- * west the village: the stables and tithe barn turn their backs to the street, the orchard and yard close with a
- * paling and a gate, a hedge between orchard and kitchen garden. Every see-through stretch is on a straight side,
- * the corners are solid, so no line leaves the map and comes back in.
- */
-export const EDGE = {
-  /** North breastwork line (z) and its height: chest high, over a jump. */
-  crag: -48.8,
-  breast: 1.36,
-  /** East stake line (x) and the south end of the ford (z). */
-  stakes: 44.8,
-  fordEnd: 40.0,
-  /** The lists' paling (z), the barbican's moat wall (z) and its gate. */
-  lists: 40.4,
-  moat: 44.8,
-  gate: [-7.2, -0.8] as const,
-  /** West: fence and building backs (x), hedge between orchard and kitchen garden (z). */
-  west: -48.0,
-  hedge: -27.2,
-  garden: -34.4,
-  /** Fences and gates stand well over a jump from anything beside them. */
-  paling: 2.64,
-  yardGate: [8.8, 16.0] as const
-} as const;
-
-/** Centres (z) of the half-doors in the stables' back wall, one per stall, and of the barn's street windows. */
-export const STABLE_DOORS = [-6.0, -2.0, 2.0, 6.0] as const;
-export const BARN_WINDOWS = [19.6, 24.0] as const;
-
-export function edges(w: Works) {
-  const { crag, breast, west } = EDGE;
-  const thin = 0.4;
-  // North: breastwork on the crag from the garden to the rock shoulder, which closes the postern lane and the ford's head.
-  w.box('breast', EDGE.garden - thin, 0, crag, 32.0, breast, F.ward);
-  w.box('rock', 32.0, 0, -50.4, 47.2, 6.4, F.bandN);
-  // East: oak stakes driven into the river bed down the far side of the ford and across its foot.
-  w.box('stakes', EDGE.stakes, F.ford - 1.92, F.bandN, EDGE.stakes + thin, 2.4, EDGE.fordEnd + thin);
-  w.box('stakes', F.ford0, F.ford - 1.92, EDGE.fordEnd, EDGE.stakes, 2.4, EDGE.fordEnd + thin);
-  // South: the lists' paling, the barbican's wall over the moat with the outer gate.
-  w.box('paling', 10.4, 0, EDGE.lists, F.ford0 + thin, EDGE.paling, EDGE.lists + thin);
-  const [g0, g1] = EDGE.gate;
-  w.box('breast', -28.0, 0, EDGE.moat, g0 - 3.2, breast, EDGE.moat + 0.8);
-  w.box('breast', g1 + 3.2, 0, EDGE.moat, 10.4, breast, EDGE.moat + 0.8);
-  for (const [a, b] of [[g0 - 3.2, g0], [g1, g1 + 3.2]] as const) w.box('tower', a, 0, EDGE.moat, b, 8.0, EDGE.moat + 3.2);
-  w.box('tower', g0, 4.8, EDGE.moat, g1, 8.0, EDGE.moat + 3.2);
-  w.box('grille', g0, 0, EDGE.moat + 0.4, g1, 4.8, EDGE.moat + 0.8);
-  // West: orchard paling, hedge to the garden, the garden's paling, the stables' and barn's back walls, the yard gate.
-  w.box('paling', west - thin, 0, EDGE.hedge, west, EDGE.paling, -8.8);
-  w.box('hedge', west - thin, 0, EDGE.hedge - 0.8, EDGE.garden, 2.88, EDGE.hedge);
-  w.box('paling', EDGE.garden - thin, 0, crag, EDGE.garden, EDGE.paling, EDGE.hedge - 0.8);
-  // Stable half-doors (the lower leaf shut, over a jump) and barn windows: the street shows through the village's backs.
-  w.windows('timber', false, -8.8, 8.8, west - 0.8, west, 0, F.inner, STABLE_DOORS.map((z): [number, number, number, number] => [z - 0.8, z + 0.8, F.rail, 2.4]));
-  w.box('gate', west - thin, 0, EDGE.yardGate[0], west, F.inner, EDGE.yardGate[1]);
-  w.windows('timber', false, 16.0, F.bandS + 0.8, west - 0.8, west, 0, F.inner, BARN_WINDOWS.map((z): [number, number, number, number] => [z - 1.2, z + 1.2, F.rail, 2.4]));
-  w.box('timber', west - 0.8, 0, F.bandS, -36.0, F.inner, F.bandS + 0.8);
-  w.box('paling', -36.0, 0, F.bandS, -28.0, EDGE.paling, F.bandS + thin);
-}
 
 /** Pieces of these kinds let shots and sight through their gaps. */
 export const SEE_THROUGH = new Set<Piece['kind']>(['stakes', 'paling', 'grille', 'gate']);

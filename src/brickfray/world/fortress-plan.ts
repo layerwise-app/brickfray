@@ -2,44 +2,51 @@ import type { Surface } from './types';
 import type { Face, Vec3 } from './util';
 
 /**
- * Sunset Keep gameplay geometry. North (-z) is the upper ward where team 1 spawns, south the barbican for team 0;
- * between them a band of three lanes (orchard and stables to the west, the courts round the keep in the middle, the
- * river terrace and mill to the east), each broken half way by a building you can walk through.
+ * Sunset Keep gameplay geometry. The teams camp at the west and east ends (x): the town square and the farm. Three
+ * lanes run between them: the crag street along the north under the village and the crag, the gate road through each
+ * team's gatehouse into the castle's baileys and round the closed keep, and the river path along the south bank past
+ * the mill and its ford. The castle's ranges keep the lanes apart; each team joins them by its own postern and water
+ * gate. Gameplay is mirrored about x = 0; the dressing of the two halves differs.
  */
 export const F = {
+  /** Playable half-extents: the moats at |x|, the crag field wall (north) and the river wall (south) at |z|. */
+  edgeX: 62.4,
+  edge: 44.8,
   /** Curtain walls: too tall to see over from anywhere a player stands. */
-  curtain: 7.2,
-  /** Walls between districts and of single-storey buildings. */
+  curtain: 6.4,
+  /** Walls of single-storey buildings. */
   inner: 4.8,
-  /** Upper floors (gate room, gallery, tower top). */
+  /** Gate room floor; loft and mill gallery floor. */
   storey: 3.84,
+  loft: 3.36,
   slab: 0.48,
   door: 2.88,
   /** Railings and parapets: just higher than a jump, so nobody stands on them. */
   rail: 1.28,
   rise: 0.48,
   run: 0.8,
-  /** River bed and water surface: the ford is wadeable everywhere, and shallow enough that bots (sim/bot-nav treats a
-   * floor under killY + 0.4 as deadly) walk it too. */
+  /** Ford bed and water surface: wadeable, shallow enough that bots walk it too. */
   ford: -0.32,
   water: -0.14,
-  /** Middle band (z) and its rows. */
-  bandN: -27.2,
-  bandS: 27.2,
-  rowN: -9.6,
-  rowS: 9.6,
-  /** Columns (x). */
-  west: -48,
-  core0: -20,
-  core1: 20,
-  terrace: 22.4,
-  ford0: 36.8,
-  ford1: 44.8,
-  /** North ward and south barbican (z). */
-  ward: -48,
-  hall: -38.4,
-  gate: 34.4,
-  barbican: 44.8
+  /** The crag street stands on a terrace this high, from `terrace` (|x|) to the middle. */
+  street: 0.96,
+  terrace: 46.4,
+  /** The knoll the crag street crests on at the ruin, and the raised quay on the east river path. */
+  knoll: 1.44,
+  quay: 0.48,
+  /** The east half's crag street and river path are wider: its ranges stand back from the lanes. */
+  laneNE: -28.0,
+  laneSE: 27.2,
+  /** Bands (z): the crag street's south side, the ranges' inner faces. */
+  laneN: -30.4,
+  rangeN: -21.6,
+  rangeS: 21.6,
+  laneS: 30.4,
+  /** Columns (x, west half): the camp's inner edge, the curtain's outer and inner faces, the keep's half size. */
+  camp: -48.0,
+  castle: -36.8,
+  wallIn: -35.2,
+  keep: 9.6
 } as const;
 
 export type Kind =
@@ -67,7 +74,10 @@ export type Kind =
   | 'paling'
   | 'gate'
   | 'grille'
-  | 'hedge';
+  | 'hedge'
+  | 'rail'
+  | 'barrier'
+  | 'prop';
 
 export interface Piece {
   kind: Kind;
@@ -76,6 +86,10 @@ export interface Piece {
   walk?: boolean;
   surface?: Surface;
   bulletsPass?: boolean;
+  /** Collider boxes that follow an open shape (a cart, a well) instead of its bounds. */
+  solid?: [Vec3, Vec3][];
+  /** What a prop is, or which building a block belongs to, for the drawing. */
+  tag?: string;
 }
 
 /** A straight flight of steps (blocks.ts STAIRS without the style). */
@@ -118,10 +132,12 @@ export interface Opening {
   y1: number;
   /** Sill at the run's foot: a door. */
   door: boolean;
+  /** A shut door or a glazed window drawn on a solid front: only the `face` side (-1 = c0, 1 = c1) gets the trim. */
+  blind?: boolean;
+  face?: -1 | 1;
 }
 
-const DIR: Record<Face, [number, number]> = { n: [0, -1], s: [0, 1], e: [1, 0], w: [-1, 0] };
-const BACK: Record<Face, Face> = { n: 's', s: 'n', e: 'w', w: 'e' };
+const FLIP: Record<Face, Face> = { n: 'n', s: 's', e: 'w', w: 'e' };
 
 /** Collects the pieces, stairs, roofs and extra bot waypoints of the whole map. */
 export class Works {
@@ -167,34 +183,14 @@ export class Works {
     return this;
   }
 
-  stairs(f: Flight) {
-    this.flights.push(f);
+  /** Shut doors and windows drawn on a solid front at c, facing `face`: [from, to, sill, top] along the front. */
+  blind(kind: Kind, alongX: boolean, c: number, face: -1 | 1, holes: [number, number, number, number][]) {
+    for (const [a0, a1, y0, y1] of holes) this.openings.push({ kind, alongX, a0, a1, c0: c, c1: c, y0, y1, door: y0 <= 1.0, blind: true, face });
     return this;
   }
 
-  /**
-   * Stair turning back on itself in a well 3.2 wide: `steps` up going `dir` from (x, z) (the outer corner of the first
-   * flight), a landing, the same back; the second flight sits on a solid fill, so nobody walks under it.
-   */
-  /** Two flights turning on a landing, with a wall between them so neither can be left halfway up. */
-  uStair(x: number, z: number, dir: Face, steps: number, kind: Kind, y0 = 0) {
-    const [dx, dz] = DIR[dir];
-    const [px, pz] = [-dz, dx];
-    const P = (u: number, v: number): [number, number] => [x + px * u + dx * v, z + pz * u + dz * v];
-    const rect = (u0: number, v0: number, u1: number, v1: number, y1: number, walk: boolean, k: Kind = 'block') => {
-      const [ax, az] = P(u0, v0);
-      const [bx, bz] = P(u1, v1);
-      this.box(k, ax, y0, az, bx, y1, bz, { walk });
-    };
-    const len = steps * F.run;
-    const mid = y0 + steps * F.rise;
-    const [f1x, f1z] = P(0.8, 0);
-    this.stairs({ x: f1x, z: f1z, y0, dir, width: 1.6, steps });
-    rect(0, len, 3.2, len + 1.6, mid, true);
-    rect(1.6, 0, 3.2, len, mid, false);
-    const [f2x, f2z] = P(2.4, len);
-    this.stairs({ x: f2x, z: f2z, y0: mid, dir: BACK[dir], width: 1.6, steps });
-    rect(1.5, F.run, 1.7, len, y0 + 2 * steps * F.rise + F.rail, false, kind);
+  stairs(f: Flight) {
+    this.flights.push(f);
     return this;
   }
 
@@ -204,13 +200,39 @@ export class Works {
   }
 
   /** A closed outbuilding: a solid block under a gable roof whose ridge runs along its longer side. */
-  shed(kind: Kind, x0: number, z0: number, x1: number, z1: number, top: number, color: string) {
-    this.box(kind, x0, 0, z0, x1, top, z1);
+  shed(kind: Kind, x0: number, z0: number, x1: number, z1: number, top: number, color: string, tag?: string) {
+    this.box(kind, x0, 0, z0, x1, top, z1, { tag });
     return this.roof({ x0, z0, x1, z1, base: top, face: x1 - x0 >= z1 - z0 ? 's' : 'e', color, wall: kind === 'timber' ? '#9a6a3f' : '#d3ccbb', small: true });
   }
 
   seed(x: number, y: number, z: number) {
     this.seeds.push([x, y, z]);
+    return this;
+  }
+
+  /** Adds the mirror image across x = 0 of everything collected so far (the west half becomes the east half too). */
+  mirror() {
+    const nx = (a: number, b: number): [number, number] => [-b, -a];
+    for (const q of [...this.pieces]) {
+      const [x0, x1] = nx(q.min[0], q.max[0]);
+      const solid = q.solid?.map(([a, b]): [Vec3, Vec3] => [[-b[0], a[1], a[2]], [-a[0], b[1], b[2]]]);
+      this.pieces.push({ ...q, min: [x0, q.min[1], q.min[2]], max: [x1, q.max[1], q.max[2]], ...(solid ? { solid } : {}) });
+    }
+    for (const f of [...this.flights]) this.flights.push({ ...f, x: -f.x, dir: FLIP[f.dir] });
+    for (const r of [...this.roofs]) {
+      const [x0, x1] = nx(r.x0, r.x1);
+      this.roofs.push({ ...r, x0, x1, face: FLIP[r.face] });
+    }
+    for (const s of [...this.seeds]) this.seeds.push([-s[0], s[1], s[2]]);
+    for (const o of [...this.openings]) {
+      if (o.alongX) {
+        const [a0, a1] = nx(o.a0, o.a1);
+        this.openings.push({ ...o, a0, a1 });
+      } else {
+        const [c0, c1] = nx(o.c0, o.c1);
+        this.openings.push({ ...o, c0, c1 });
+      }
+    }
     return this;
   }
 }

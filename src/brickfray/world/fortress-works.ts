@@ -1,25 +1,17 @@
 import { drawBlock, slab, STAIRS, type Masonry, type StairParams } from './blocks';
 import { CASTLE_STONE, WALK_TILE } from './castle-parts';
-import { core } from './fortress-core';
-import { east } from './fortress-east';
-import { north } from './fortress-north';
+import { layout } from './fortress-layout';
 import { F, Works, type Flight, type Kind, type Piece, type Roof } from './fortress-plan';
-import { south } from './fortress-south';
-import { drawEdge, edges, SEE_THROUGH } from './fortress-edge';
+import { drawEdge, SEE_THROUGH } from './fortress-edge';
+import { drawProp } from './fortress-props';
 import { exposure, FORTRESS_TRIM, shedRoof } from './fortress-trim';
-import { west } from './fortress-west';
 import type { Drawer, Element } from './plan';
 import { drawRoof, roofHeight } from './roofs';
 import { box, type PlanCollider } from './util';
 
 export function fortressWorks(): Works {
   const w = new Works();
-  north(w);
-  west(w);
-  core(w);
-  east(w);
-  south(w);
-  edges(w);
+  layout(w);
   return w;
 }
 
@@ -33,30 +25,31 @@ const STYLE: Partial<Record<Kind, Masonry>> = {
   timber: TIMBER,
   stall: TIMBER,
   pillar: TIMBER,
+  deck: TIMBER,
   tower: { colors: ['#7f8287', '#717479', '#8c8f93', '#676a6f'], variance: 0.3, lens: [3, 4, 2, 5] },
   rubble: { colors: ['#8f897c', '#7f796d', '#9c9588'], variance: 0.4, lens: [2, 3] },
   bank: { colors: ['#7d8276', '#6f7469', '#878c80'], variance: 0.4, lens: [2, 3, 5] },
   hay: { colors: ['#e3c25a', '#d6b24a', '#ecd06a'], variance: 0.3, lens: [2, 3], course: 0.64 }
 };
 const PLAIN: Masonry = { colors: ['#b8b1a3', '#a8a294'], variance: 0.25 };
-/** Each district keeps its own stone for its low walls: mossy in the west lane, river grey in the east, ochre in the upper ward, red sandstone in the barbican. */
+/** Each district keeps its own stone for its low walls: ochre on the crag street, river grey on the river path, red sandstone in the west camp, mossy at the east farm. */
 const MOSSY: Masonry = { colors: ['#8e9a7e', '#828f74', '#9aa588', '#76845f'], variance: 0.35, lens: [2, 3, 4] };
 const RIVER: Masonry = { colors: ['#8f989c', '#848c91', '#9aa2a5', '#7a8287'], variance: 0.35, lens: [2, 3, 4] };
 const SANDSTONE: Masonry = { colors: ['#b98f72', '#aa8269', '#c59d7f'], variance: 0.3, lens: [3, 4, 2] };
 const OCHRE: Masonry = { colors: ['#c09a70', '#b38d66', '#caa67c', '#a7835e'], variance: 0.3, lens: [3, 4, 2] };
-const LOCAL = new Set<Kind>(['wall', 'screen', 'parapet', 'block']);
+const LOCAL = new Set<Kind>(['wall', 'screen', 'parapet', 'block', 'prop']);
 
 function styleOf(q: Piece): Masonry {
   const base = STYLE[q.kind] ?? PLAIN;
   if (!LOCAL.has(q.kind)) return base;
   const [x, z] = [(q.min[0] + q.max[0]) / 2, (q.min[2] + q.max[2]) / 2];
-  if (x < F.core0 - 1.0) return MOSSY;
-  if (x > F.core1 + 1.0) return RIVER;
-  if (z > F.bandS) return SANDSTONE;
-  if (z < F.hall) return OCHRE;
+  if (z < F.laneNE) return OCHRE;
+  if (z > F.laneSE) return RIVER;
+  if (x < F.castle) return SANDSTONE;
+  if (x > -F.castle) return MOSSY;
   return base;
 }
-const SURFACE: Partial<Record<Kind, 'wood' | 'foliage' | 'metal'>> = { timber: 'wood', deck: 'wood', stakes: 'wood', paling: 'wood', gate: 'wood', hay: 'foliage', hedge: 'foliage', grille: 'metal' };
+const SURFACE: Partial<Record<Kind, 'wood' | 'foliage' | 'metal'>> = { timber: 'wood', deck: 'wood', stakes: 'wood', paling: 'wood', gate: 'wood', hay: 'foliage', hedge: 'foliage', grille: 'metal', rail: 'wood' };
 
 const stairParams = (f: Flight): StairParams => ({
   ...f,
@@ -67,13 +60,30 @@ const stairParams = (f: Flight): StairParams => ({
   topColor: f.wood ? '#b98a5a' : WALK_TILE
 });
 
-const roofCollider = (r: Roof) => box([r.x0, r.base, r.z0], [r.x1, r.base + roofHeight('gable', r) - 0.3, r.z1], 'stone');
+/** A gable roof as three stacked boxes: eaves to eaves, then narrowing under the slopes, so shots meet what is drawn. */
+function roofColliders(r: Roof): PlanCollider[] {
+  const H = roofHeight('gable', r) - 0.3;
+  const acrossZ = r.face === 'n' || r.face === 's';
+  const [a0, a1] = acrossZ ? [r.z0, r.z1] : [r.x0, r.x1];
+  const mid = (a0 + a1) / 2;
+  return [0, 1, 2].map((k) => {
+    const half = ((a1 - a0) / 2) * (1 - k / 3);
+    const [lo, hi] = [mid - half, mid + half];
+    const [y0, y1] = [r.base + (H * k) / 3, r.base + (H * (k + 1)) / 3];
+    return acrossZ ? box([r.x0, y0, lo], [r.x1, y1, hi], 'stone') : box([lo, y0, r.z0], [hi, y1, r.z1], 'stone');
+  });
+}
 
 export const WORKS: Element<Works> = {
   colliders(w) {
-    const out: PlanCollider[] = w.pieces.map((q) => box(q.min, q.max, q.surface ?? SURFACE[q.kind] ?? 'stone', { walk: q.walk, bulletsPass: q.bulletsPass ?? (SEE_THROUGH.has(q.kind) || undefined) }));
+    const out: PlanCollider[] = [];
+    for (const q of w.pieces) {
+      const surface = q.surface ?? SURFACE[q.kind] ?? 'stone';
+      const extra = { walk: q.walk, bulletsPass: q.bulletsPass ?? (SEE_THROUGH.has(q.kind) || undefined) };
+      for (const [a, b] of q.solid ?? [[q.min, q.max]]) out.push(box(a, b, surface, extra));
+    }
     for (const f of w.flights) out.push(...STAIRS.colliders!(stairParams(f)));
-    for (const r of w.roofs) out.push(roofCollider(r));
+    for (const r of w.roofs) out.push(...roofColliders(r));
     return out;
   },
   nav: (w) => [...w.seeds, ...w.flights.flatMap((f) => STAIRS.nav!(stairParams(f)))],
@@ -89,7 +99,8 @@ export const WORKS: Element<Works> = {
 };
 
 function drawPiece(d: Drawer, q: Piece, all: Piece[]) {
-  if (q.kind === 'wheel' || drawEdge(d, q)) return;
+  if (q.kind === 'wheel' || q.kind === 'barrier' || drawEdge(d, q)) return;
+  if (q.kind === 'prop') return drawProp(d, q);
   if (q.kind === 'ford') {
     d.anim.water(q.min[0], q.min[2], q.max[0], q.max[2], F.water, '#3f8f96');
     drawBlock(d, { min: q.min, max: q.max, surface: 'stone', style: { colors: ['#6f6a5c'], variance: 0.2 }, faces: [], top: 'studs', topColor: '#7d7560' });

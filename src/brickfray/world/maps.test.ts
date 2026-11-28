@@ -76,7 +76,7 @@ describe('fortress nav', () => {
         if (!world.clearLine(wx, wy + 0.6, wz, x, y + 0.6, z) && !world.clearLine(wx, wy + 1.6, wz, x, y + 1.2, z)) unseen.push(`${x.toFixed(1)},${y.toFixed(1)},${z.toFixed(1)}`);
       }
     }
-    expect(spots).toBeGreaterThan(5000);
+    expect(spots).toBeGreaterThan(3000);
     expect(unseen.length).toBeLessThan(spots * 0.01);
   });
 });
