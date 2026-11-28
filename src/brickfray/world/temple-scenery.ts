@@ -1,12 +1,12 @@
 import { slab } from './blocks';
 import type { Drawer } from './plan';
 import { Pen } from './props-kit';
-import { T } from './temple-layout';
+import { BAND, RAVINE, T } from './temple-layout';
 import { Frame, mix, Rng } from './util';
 
 /**
- * The world beyond the temple's four edges, no colliders: the cliff over the waterfall stream (north), the gorge
- * (west), the river below the ghats (south). The village is temple-village.ts. Strata step back as they rise and
+ * The world beyond the temple's four edges, no colliders: the gorge and the ravine (north), the river below the ghats
+ * (south), the cliffs behind the camps (west and east). The far bank's village is temple-village.ts. Strata step back as they rise and
  * are broken along their length, so a rock face reads as rock from the edge on every tier.
  */
 export const HAZE = '#efe0bc';
@@ -98,76 +98,121 @@ function waterfall(d: Drawer, x: number, z: number, y0: number, y1: number, w: n
 }
 
 /**
- * North: the stream along the cliff foot, a wooded bank beyond it, then the cliff with two waterfalls dropping into
- * pools that spill into the stream, and jungle on top: four depths of scenery from the camp's balustrade.
+ * North: the gorge below the rim balustrade, the stream at its bottom, the far wall with two waterfalls and jungle on
+ * top; the ravine under the stone bridge with the waterfall from the rock behind it, its stream running out into the gorge.
  */
-export function northCliff(d: Drawer) {
-  const Z = T.edge;
-  const W = -T.edgeX - 0.4;
-  const top = 20.8;
-  const bank = 0.8;
-  const [s0, s1, c] = [-Z - 2.4, -Z - 10.4, -Z - 19.2];
-  slab(d, [W, STREAM_Y - 0.3, s0], [130, -0.02, -Z], '#6f7469');
-  d.anim.water(W, s1, 130, s0, STREAM_Y, STREAM);
-  d.anim.foam.edge(W, s0, 130, s0, STREAM_Y, 0, -1, 0.6);
-  // The stream spills into the gorge at the north-west corner.
-  waterfall(d, W - 0.2, (s0 + s1) / 2, GORGE_Y, STREAM_Y, 7.2, false);
-  const falls: [number, number][] = [[-14.4, 3.2], [20.8, 2.4]];
-  let x = W;
-  for (const [fx, w] of [...falls, [131, 0] as [number, number]]) {
-    const a = fx - w / 2 - 0.8;
-    if (a > x) {
-      slab(d, [x, STREAM_Y - 0.3, c], [a, bank, s1], '#7d8276');
-      grove(d, x + 1, c + 1.6, a - 1, s1 - 1.6, bank, Math.max(1, Math.round((a - x) / 9)), Math.round(a * 7));
-    }
-    if (w > 0) {
-      d.anim.water(fx - w / 2 - 0.8, c, fx + w / 2 + 0.8, s1, bank - 0.3, STREAM);
-      waterfall(d, fx, s1 - 0.2, STREAM_Y, bank - 0.3, w + 1.6, true);
-      waterfall(d, fx, c - 0.4, bank - 0.3, top - 1.2, w, true);
-    }
-    x = fx + w / 2 + 0.8;
-  }
-  const t = new Pen(d, new Frame(0, 0, 0));
-  const rng = new Rng(83);
-  for (let bx = -36; bx < 40; bx += d.detail === 0 ? 9.6 : 5.6) t.ball(bx + rng.range(-1.6, 1.6), bank, s1 - rng.range(0.8, 2.4), rng.range(0.8, 1.6), rng.pick(ROCK), [1.3, 0.7, 1.1], 0.25, rng.int(1, 5));
-  rockFace(d, true, c, 1, -130, 130, bank - 0.4, top, 17);
-  slab(d, [-320, top - 1.2, -320], [320, top - 0.2, c - 9.6], mix('#4f8a3a', HAZE, 0.15));
-  grove(d, -110, c - 40, 110, c - 11, top - 0.2, 70, 41);
-}
-
-/** West: the gorge below the rim balustrade, the river at its bottom, the far wall with a waterfall and jungle. */
 export function gorge(d: Drawer) {
-  const X = T.edgeX;
-  const far = X + 20;
+  const Z = T.edge;
+  const X = T.edgeX + 3.2;
+  const far = Z + 26;
   const top = 12.8;
-  rockFace(d, false, -X - 0.4, -1, -T.edge - 2.4, T.edge + 6.4, GORGE_Y, -0.1, 23, 0);
-  d.anim.water(-far, -T.edge - 12.8, -X - 0.4, T.edge + 3.2, GORGE_Y, STREAM);
-  slab(d, [-far - 2, GORGE_Y - 0.4, T.edge + 3.2], [-X - 0.4, RIVER_Y + 0.6, T.edge + 6.4], '#73806a');
-  d.anim.foam.edge(-X - 0.4, -T.edge - 2.4, -X - 0.4, T.edge + 6.4, GORGE_Y, -1, 0, 0.6);
-  rockFace(d, false, -far, 1, -T.edge - 12.8, T.edge + 6.4, GORGE_Y, top, 29);
-  waterfall(d, -far - 0.4, -6.4, GORGE_Y, top - 1.2, 2.8, false);
-  slab(d, [-320, top - 1.2, -160], [-far - 6, top - 0.2, T.edge + 6.4], mix('#4f8a3a', HAZE, 0.2));
-  grove(d, -140, -60, -far - 8, T.edge, top - 0.2, 45, 43);
+  for (const [a0, a1] of [[-X, -RAVINE], [RAVINE, X]] as const) rockFace(d, true, -Z - 0.4, -1, a0, a1, GORGE_Y, -0.1, 23 + Math.round(a0), 0);
+  d.anim.water(-130, -far, 130, -Z - 0.4, GORGE_Y, STREAM);
+  d.anim.foam.edge(-X, -Z - 0.4, X, -Z - 0.4, GORGE_Y, 0, -1, 0.6);
+  rockFace(d, true, -far, 1, -130, 130, GORGE_Y, top, 29);
+  for (const x of [-38, 26]) waterfall(d, x, -far + 0.4, GORGE_Y, top - 1.2, 2.8, true);
+  slab(d, [-320, top - 1.2, -320], [320, top - 0.2, -far - 6], mix('#4f8a3a', HAZE, 0.2));
+  grove(d, -130, -far - 40, 130, -far - 8, top - 0.2, 60, 43);
+  // The ravine: rock walls under its rails, the stream, the waterfall off the ravine head.
+  const head = BAND.north;
+  rockFace(d, false, -RAVINE, 1, -Z - 0.4, head, GORGE_Y, -0.1, 31, 0);
+  rockFace(d, false, RAVINE, -1, -Z - 0.4, head, GORGE_Y, -0.1, 37, 0);
+  d.anim.water(-RAVINE, -Z - 0.4, RAVINE, head, GORGE_Y + 0.2, STREAM);
+  waterfall(d, 0, head - 0.4, GORGE_Y + 0.2, 7.6, 2.4, true);
 }
 
-/** South: ghat steps down from the terrace balustrade to the river, the far bank's jungle and stupa, two boats. */
+/** South: ghat steps down from the terrace balustrade to the river, the far bank's village and jungle, boats. */
 export function river(d: Drawer) {
   const Z = T.edge;
+  const X = T.edgeX + 3.2;
   const steps = 4;
-  for (let k = 1; k <= steps; k++) slab(d, [-31.2, -0.48 * k - 0.48, Z + (k - 1) * 1.2], [31.2, -0.48 * k, Z + k * 1.2], k % 2 ? '#d8c49a' : '#cdb98e');
-  slab(d, [-31.2, RIVER_Y - 0.6, Z + steps * 1.2], [31.2, -0.48 * steps - 0.48, Z + steps * 1.2 + 0.6], '#bfae86');
+  for (let k = 1; k <= steps; k++) slab(d, [-X, -0.48 * k - 0.48, Z + (k - 1) * 1.2], [X, -0.48 * k, Z + k * 1.2], k % 2 ? '#d8c49a' : '#cdb98e');
+  slab(d, [-X, RIVER_Y - 0.6, Z + steps * 1.2], [X, -0.48 * steps - 0.48, Z + steps * 1.2 + 0.6], '#bfae86');
   const z0 = Z + steps * 1.2;
-  d.anim.water(-160, z0, 160, 150, RIVER_Y, RIVER);
-  d.anim.foam.edge(-31.2, z0, 31.2, z0, RIVER_Y, 0, 1, 0.5);
-  for (const s of [-1, 1]) slab(d, [s > 0 ? T.edgeX - 7.2 : -T.edgeX - 2.4, RIVER_Y - 0.4, Z], [s > 0 ? T.edgeX + 60 : -T.edgeX + 7.2, 0.4, Z + 3.2], '#7d8276');
-  const bank = 118;
+  d.anim.water(-200, z0, 200, 160, RIVER_Y, RIVER);
+  d.anim.foam.edge(-X, z0, X, z0, RIVER_Y, 0, 1, 0.5);
+  const bank = 112;
   slab(d, [-320, RIVER_Y - 0.4, bank], [320, 1.2, 320], mix('#6f9a4a', HAZE, 0.3));
-  grove(d, -150, bank + 4, 150, bank + 40, 1.2, 60, 47);
+  grove(d, -150, bank + 14, 150, bank + 50, 1.2, 60, 47);
   const t = new Pen(d, new Frame(0, 0, 0));
   const rng = new Rng(53);
-  for (let i = 0; i < (d.detail === 0 ? 6 : 12); i++) palm(t, d, rng, rng.range(-120, 120), 1.2, bank + rng.range(1, 4), rng.range(0.9, 1.3));
-  stupa(t, -36, 1.2, bank + 16, 1.0);
-  for (const [x, z, yaw] of [[-18, 74, 0.3], [27, 92, -0.2]] as const) boat(t, x, z, yaw);
+  for (let i = 0; i < (d.detail === 0 ? 6 : 12); i++) palm(t, d, rng, rng.range(-140, 140), 1.2, bank + rng.range(1, 4), rng.range(0.9, 1.3));
+  stupa(t, 44, 1.2, bank + 26, 1.0);
+  for (const [x, z, yaw] of [[-18, 70, 0.3], [27, 88, -0.2], [-52, 96, 0.1]] as const) boat(t, x, z, yaw);
+}
+
+/**
+ * Behind the camps: the cliff tops above the camp cliffs with jungle, the west cliff's waterfall into the pool in its
+ * recess, and the east's terraced slopes climbing to a stupa.
+ */
+export function campCliffs(d: Drawer) {
+  const X = T.edgeX;
+  const back = X + 30;
+  const top = 18;
+  for (const s of [-1, 1]) {
+    // The terrace wall under the rail, the pool or paddies at its foot, the cliff behind with jungle on top.
+    rockFace(d, false, s * (X + 0.4), s < 0 ? -1 : 1, -T.edge - 4, T.edge + 4, -2.4, -0.1, 71 + s, 0);
+    d.anim.water(s < 0 ? -back : X + 0.4, -T.edge - 4, s < 0 ? -X - 0.4 : back, T.edge + 4, -2.0, STREAM);
+    rockFace(d, false, s * back, s < 0 ? 1 : -1, -T.edge - 40, T.edge + 40, -2.4, top, 73 + s);
+    slab(d, [s < 0 ? -320 : back, top - 1.2, -T.edge - 60], [s < 0 ? -back : 320, top - 0.2, T.edge + 60], mix('#4f8a3a', HAZE, 0.15));
+  }
+  for (const z of [-14, 18]) waterfall(d, -back - 0.4, z, -2.0, top - 0.8, z < 0 ? 3.6 : 2.4, false);
+  grove(d, -160, -70, -back - 8, 70, top - 0.2, 40, 53);
+  const t = new Pen(d, new Frame(0, 0, 0));
+  const steps = d.detail === 0 ? 5 : 8;
+  for (let k = 0; k < steps; k++) {
+    const x = back + 4 + k * 5.6;
+    const y = top + k * 1.6;
+    const f = fade(x, 0);
+    t.box(x + 30, y - 2, -8, 60, 2.0 + 0.02, 110 - k * 8, mix(k % 2 ? '#6f9a4a' : '#5f8a3a', HAZE, f), undefined, 0);
+    if (d.detail > 0) t.box(x + 1.6, y + 0.01, -8, 2.4, 0.02, 102 - k * 8, mix('#9fc8c0', HAZE, f + 0.1), 'glass', 0);
+  }
+  for (let k = 0; k < 6; k++) t.box(X + 8 + k * 3.2, -2.0 + 0.01, (k - 2.5) * 14, 2.8, 0.3, 12, mix('#8fb86a', HAZE, 0.2), undefined, 0);
+  stupa(t, back + 4 + steps * 5.6 + 8, top + steps * 1.6 - 0.1, -10, 1.1);
+}
+
+/**
+ * Rock knolls and spits outside the rails, so the terrace's outline reads as a ridge in the valley rather than a
+ * rectangle: big ones round each corner, smaller ones at uneven steps along the gorge and the camp edges, each a few
+ * stepped blocks with moss and a shrub or two on top. Out of reach beyond the rails; no colliders.
+ */
+export function outcrops(d: Drawer) {
+  const X = T.edgeX + 0.4;
+  const Z = T.edge + 0.4;
+  const rng = new Rng(83);
+  const t = new Pen(d, new Frame(0, 0, 0));
+  const knoll = (x0: number, z0: number, x1: number, z1: number, top: number, foot: number) => {
+    const tiers = d.detail === 0 ? 2 : 3;
+    for (let k = 0; k < tiers; k++) {
+      const i = k * 0.9;
+      const ya = foot + ((top - foot) * k) / tiers;
+      const yb = foot + ((top - foot) * (k + 1)) / tiers;
+      slab(d, [x0 + i + rng.range(0, 0.4), ya, z0 + i + rng.range(0, 0.4)], [x1 - i - rng.range(0, 0.4), yb, z1 - i - rng.range(0, 0.4)], rng.pick(ROCK));
+    }
+    const i = tiers * 0.9 - 0.9;
+    slab(d, [x0 + i + 0.2, top - 0.02, z0 + i + 0.2], [x1 - i - 0.2, top + 0.22, z1 - i - 0.2], MOSS);
+    if (d.detail > 0 && x1 - x0 > 4 && z1 - z0 > 4) jungleTree(t, d, rng, (x0 + x1) / 2 + rng.range(-1, 1), top + 0.2, (z0 + z1) / 2 + rng.range(-1, 1), rng.range(0.6, 0.9));
+  };
+  for (const s of [-1, 1]) {
+    // Corners: the gorge corner drops toward the gorge water, the river corner to the river.
+    knoll(s < 0 ? -X - 14 : X, -Z - 12, s < 0 ? -X : X + 14, -Z + 6, 1.6, GORGE_Y);
+    knoll(s < 0 ? -X - 10 : X, Z - 8, s < 0 ? -X : X + 10, Z + 9, 1.2, RIVER_Y - 0.4);
+    // Along the camp edge, between the corners.
+    for (let z = -Z + 10; z < Z - 12; ) {
+      const w = rng.range(4, 9);
+      const out = rng.range(2.4, 7.2);
+      knoll(s < 0 ? -X - out : X, z, s < 0 ? -X : X + out, z + w, rng.range(-1.2, 0.8), -2.4);
+      z += w + rng.range(4, 14);
+    }
+    // Along the gorge rim, west of the ravine.
+    for (let a = 16; a < X - 16; ) {
+      const w = rng.range(5, 10);
+      const out = rng.range(2.4, 8);
+      const x0 = s * a;
+      knoll(Math.min(x0, x0 + s * w), -Z - out, Math.max(x0, x0 + s * w), -Z, rng.range(-2.4, 0.4), GORGE_Y);
+      a += w + rng.range(6, 16);
+    }
+  }
 }
 
 /** Corncob temple tower: stepped storeys, a lotus bud and a gold finial, tinted toward the haze by distance. */

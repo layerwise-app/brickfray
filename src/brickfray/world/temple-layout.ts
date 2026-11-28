@@ -2,43 +2,48 @@ import type { Surface } from './types';
 import type { Face, Vec3 } from './util';
 
 /**
- * Jade Temple plan: a great hall (nave, aisles, galleries over the aisles) along the team axis at the middle, a court
- * either side of it, a forecourt and a range of halls at each end before the camps, and long open strips along the
- * gorge (west) and the village (east). The gameplay core is symmetric under a half turn about the centre (north team
- * ↔ south team); the four edges are each their own kind.
+ * Jade Temple plan. The teams camp at the west and east ends (x); three lanes run between them: the gorge path along
+ * the north rim with the stone bridge at its middle, the processional way through the lotus courts and the great hall,
+ * and the village street along the river terrace in the south. Solid blocks 12 m deep keep the lanes apart; each team
+ * joins them through its own sutra passage and village lane. Gameplay is mirrored about x = 0; the dressing of the two
+ * halves differs. The great hall at the centre is symmetric both ways (the audio rooms rely on it).
  */
 export const T = {
-  /** Playable half-extents: gorge rim and village fronts at |x|, cliff foot and river terrace at |z|. */
-  edgeX: 38.4,
-  edge: 41.6,
+  /** Playable half-extents: the camps' cliffs at |x|, the gorge rail (north) and river rail (south) at |z|. */
+  edgeX: 64.8,
+  edge: 44.8,
   /** Gallery floor. */
   high: 3.84,
   slab: 0.48,
   /** River and gorge water, far below the terrace. */
   water: -6.4,
-  /** Across the hall (|x|): nave floor, column row, aisle to the arcade piers, court, court outer wall. */
-  shrine: 6.0,
+  /** Across the hall (|x|): column row, gallery from the columns to its back wall, arcade outer face. */
   col: 6.8,
   galleryIn: 6.8,
   galleryOut: 12.0,
   arcade: 12.8,
-  court: 25.6,
-  courtOut: 26.4,
-  /** Along the hall (|z|): end walls, the gate hall's camp mouth, the camp's front (the yards' back). */
-  hallZ: 20.8,
-  row: 21.6,
-  gate: 36.8,
-  rangeOut: 34.4,
-  /** Gallery roof (out of reach), nave roof, range roofs. */
+  /** Along the hall (|z|): end walls, the end vestibules' outer wall. */
+  hallZ: 12.8,
+  row: 13.6,
+  gate: 20.8,
+  /** Gallery roof (out of reach), nave roof, vestibule roofs. */
   roofTop: 7.2,
   hallTop: 9.6,
   rangeTop: 4.8,
-  /** Court and terrace walls a player cannot get onto, and the rails along drops. */
-  courtWall: 3.2,
   parapet: 1.28,
   rise: 0.48,
   run: 0.8
 } as const;
+
+/** Lane bands (z) and the blocks between them. */
+export const BAND = { north: -28.8, midN: -17.6, midS: 17.6, south: 28.8 } as const;
+/** West camp's inner edge, the processional road's half width, the lotus court (|x|), the guest hall / refectory. */
+export const CAMP = 52.0;
+export const ROAD = 7.2;
+export const COURT = { x0: 12.8, x1: 34.4, wall: 35.2 } as const;
+/** The ravine under the stone bridge (|x|) and the bridge deck (z). */
+export const RAVINE = 7.2;
+export const BRIDGE = { z0: -43.2, z1: -33.6 } as const;
 
 export type Kind =
   | 'cliff'
@@ -67,7 +72,9 @@ export type Kind =
   | 'house'
   | 'fence'
   | 'planter'
-  | 'dais';
+  | 'dais'
+  | 'deck'
+  | 'prop';
 
 export interface Piece {
   kind: Kind;
@@ -76,6 +83,8 @@ export interface Piece {
   walk?: boolean;
   surface?: Surface;
   bulletsPass?: boolean;
+  /** Drawing hint for pieces of one kind that look different (a house's district, a block's use). */
+  tag?: string;
 }
 
 /** A straight flight of steps (blocks.ts STAIRS params without the style). */
@@ -88,15 +97,15 @@ export interface Flight {
   steps: number;
 }
 
-const FLIP: Record<Face, Face> = { n: 's', s: 'n', e: 'w', w: 'e' };
+const FLIP: Record<Face, Face> = { n: 'n', s: 's', e: 'w', w: 'e' };
 
-/** The half-turn copy of a piece (x, z) → (-x, -z). */
-export function turned(p: Piece): Piece {
-  return { ...p, min: [-p.max[0], p.min[1], -p.max[2]], max: [-p.min[0], p.max[1], -p.min[2]] };
+/** The mirror copy of a piece across x = 0 (west half to east half). */
+export function mirrored(p: Piece): Piece {
+  return { ...p, min: [-p.max[0], p.min[1], p.min[2]], max: [-p.min[0], p.max[1], p.max[2]] };
 }
 
-export function turnedFlight(f: Flight): Flight {
-  return { ...f, x: -f.x, z: -f.z, dir: FLIP[f.dir] };
+export function mirroredFlight(f: Flight): Flight {
+  return { ...f, x: -f.x, dir: FLIP[f.dir] };
 }
 
 export const box = (kind: Kind, x0: number, y0: number, z0: number, x1: number, y1: number, z1: number, extra: Partial<Piece> = {}): Piece => ({
@@ -113,9 +122,9 @@ export type Door = [number, number, number];
 export const doorways: Vec3[] = [];
 
 /** Wall along x (`alongX`) or z from a0 to a1, cross-section c0..c1, with doors and lintels over them. */
-export function run(kind: Kind, alongX: boolean, a0: number, a1: number, c0: number, c1: number, y0: number, y1: number, doors: Door[] = []): Piece[] {
+export function run(kind: Kind, alongX: boolean, a0: number, a1: number, c0: number, c1: number, y0: number, y1: number, doors: Door[] = [], extra: Partial<Piece> = {}): Piece[] {
   const out: Piece[] = [];
-  const mk = (s: number, e: number, b: number, t: number, k: Kind = kind) => out.push(alongX ? box(k, s, b, c0, e, t, c1) : box(k, c0, b, s, c1, t, e));
+  const mk = (s: number, e: number, b: number, t: number, k: Kind = kind) => out.push(alongX ? box(k, s, b, c0, e, t, c1, extra) : box(k, c0, b, s, c1, t, e, extra));
   let at = a0;
   for (const [from, to, top] of [...doors].sort((a, b) => a[0] - b[0])) {
     if (from > at) mk(at, from, y0, y1);
@@ -128,12 +137,20 @@ export function run(kind: Kind, alongX: boolean, a0: number, a1: number, c0: num
   return out;
 }
 
+/**
+ * A balustrade along an edge of a raised floor at `y`: a solid stone wall to y + 1.0 (cover for whoever holds the floor)
+ * and a see-through handrail on it to y + 1.6, so nobody stands on the wall's top.
+ */
+export function balustrade(x0: number, z0: number, x1: number, z1: number, y: number, tag?: string): Piece[] {
+  return [box('parapet', x0, y, z0, x1, y + 1.0, z1, { tag }), box('rail', x0, y + 1.0, z0, x1, y + 1.6, z1, { bulletsPass: true, tag: 'handrail' })];
+}
+
 /** Balustrade blocks (0.8 m long) along an edge every 1.6 m, skipping the given gaps. */
-export function parapet(alongX: boolean, a0: number, a1: number, c0: number, c1: number, y: number, skip: [number, number][] = []): Piece[] {
+export function parapet(alongX: boolean, a0: number, a1: number, c0: number, c1: number, y: number, skip: [number, number][] = [], h: number = T.parapet): Piece[] {
   const out: Piece[] = [];
   for (let a = a0 + 0.4; a + 0.8 <= a1 - 0.2; a += 1.6) {
     if (skip.some(([s, e]) => a + 0.8 > s && a < e)) continue;
-    out.push(alongX ? box('parapet', a, y, c0, a + 0.8, y + T.parapet, c1) : box('parapet', c0, y, a, c1, y + T.parapet, a + 0.8));
+    out.push(alongX ? box('parapet', a, y, c0, a + 0.8, y + h, c1) : box('parapet', c0, y, a, c1, y + h, a + 0.8));
   }
   return out;
 }

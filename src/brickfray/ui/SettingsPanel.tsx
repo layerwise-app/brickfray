@@ -6,7 +6,6 @@ import { useFullscreen } from './fullscreen';
 import { LANGUAGES, setLang, useT, type MessageKey } from './i18n';
 import { BackIcon } from './icons';
 import { Range, SwitchRow } from './SettingControls';
-import { touchCapable } from '../game/input-mode';
 import { canFullscreen, setFullscreen } from '../game/touch-screen';
 import { TouchSettings } from './touch/TouchSettings';
 import { useTouchMode } from './touch/useInputMode';
@@ -135,7 +134,7 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
             )}
             {tab === 'controls' && (
               <>
-                {touchCapable() && <TouchSettings s={s} slider={slider} toggle={toggle} />}
+                {touchMode && <TouchSettings s={s} slider={slider} toggle={toggle} />}
                 {!touchMode && slider('sensitivity', s.input.sensitivity, 0.2, 8, 0.05, (sensitivity) => ({ ...s, input: { ...s.input, sensitivity } }))}
                 {slider('adsSensitivity', s.input.adsSensitivity, 0.3, 2, 0.05, (adsSensitivity) => ({ ...s, input: { ...s.input, adsSensitivity } }))}
                 {toggle('invertY', s.input.invertY, (invertY) => ({ ...s, input: { ...s.input, invertY } }))}

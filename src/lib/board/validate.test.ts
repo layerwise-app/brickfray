@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { BoardError } from './contract';
+import { MATCH } from '~/brickfray/sim/constants';
 import { report, soloReport } from './test-db';
 import { BOUNTY, KILL_SCORE } from '~/brickfray/sim/streaks';
 import { botsThrough, secondsToReach } from '~/brickfray/sim/waves';
@@ -127,7 +128,7 @@ describe('match reports', () => {
     expect(refused(report({ deaths: 80, durationS: 120 }))).toBe('too many deaths');
     expect(refused(report({ score: 999999 }))).toBe('score over its kills');
     expect(refused(report({ placement: 7, players: 6 }))).toBe('bad placement');
-    expect(refused(report({ players: 11 }))).toBe('players out of range');
+    expect(refused(report({ players: MATCH.maxPlayers + 1 }))).toBe('players out of range');
     expect(refused(report({ wave: 3 }))).toBe('wave outside solo');
     expect(refused(soloReport({ deaths: 2 }))).toBe('bad solo run');
     expect(refused(soloReport({ wave: 0 }))).toBe('bad solo run');

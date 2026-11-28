@@ -6,7 +6,7 @@ import { bellTower, riverShrine, ROOF_BLUE } from './temple-landmarks';
 import { pavilionRoof, ROOF_CLAY, ROOF_JADE } from './temple-ornament';
 import { GUARDIAN } from './temple-props';
 import type { Piece } from './temple-layout';
-import { Frame, mix, Rng, shade } from './util';
+import { Frame, mix, Rng, shade, type Face } from './util';
 
 const GOLD = '#e0b040';
 const BRONZE = '#6f5a3a';
@@ -98,7 +98,7 @@ export function stele(d: Drawer, q: Piece, strip: boolean) {
   }
 }
 
-/** Kiosks by where they stand: drum towers at the court corners, the court's shrine pavilion, watch shrines in the camps, the grotto. */
+/** Kiosks by where they stand: drum towers at the court corners, the court's shrine pavilion, watch shrines in the camps, the bridge shrine. */
 export function kiosk(d: Drawer, q: Piece) {
   const [cx, cz] = centre(q);
   const [w, h, dd] = size(q);
@@ -107,20 +107,11 @@ export function kiosk(d: Drawer, q: Piece) {
   const grotto = Math.abs(cx) < 0.1;
   if (grotto && cz > 0) return riverShrine(d, q);
   if (h > 5 && cx > 0) return bellTower(d, q);
-  if (grotto) {
-    slab(d, [x0, 0, z0], [x1, h, z1], '#6f7469');
-    slab(d, [x0 + 0.6, 0, z1 - 0.3], [x1 - 0.6, h - 1.2, z1 + 0.02], '#2c2f2a');
-    const t = new Pen(d, new Frame(cx, 0, z1 - 0.6));
-    t.box(0, 0, 0, 1.4, 0.6, 0.8, SAND, undefined, 0.03);
-    t.ball(0, 1.2, 0, 0.45, JADE, [1, 1.3, 1]);
-    t.box(0, 0.6, 0.25, 0.9, 0.08, 0.2, '#ffb54a', 'glow', 0);
-    return;
-  }
   const tower = h > 5;
   const base = tower ? 2.4 : 1.0;
   slab(d, [x0, 0, z0], [x1, base, z1], shade(SAND, -0.08));
   // The camp watch shrines take their team's colour; the west court's shrine is whitewashed under blue tiles.
-  const camp = Math.abs(cz) > 37;
+  const camp = Math.abs(cz) > 37 && !grotto;
   const westShrine = !tower && !camp && cx < 0;
   const body = tower ? RED : camp ? (cz < 0 ? '#d0622c' : '#3f6f9a') : westShrine ? '#efe8d8' : RED;
   slab(d, [x0 + 0.1, base, z0 + 0.1], [x1 - 0.1, h, z1 - 0.1], body);
@@ -180,7 +171,7 @@ export function fence(d: Drawer, q: Piece) {
 }
 
 /** Village house front facing the play area: plaster, shutters, a door and a tiled roof (facade's building, drawn only). */
-export function house(d: Drawer, q: Piece, i: number) {
+export function house(d: Drawer, q: Piece, i: number, face: Face = 'w') {
   const walls = [['#ece4d2', '#e3d9c4'], ['#e8c89a', '#dcbb8a'], ['#d9a89a', '#cf9a8c'], ['#cfe0d0', '#c2d4c3']][i % 4]!;
   BUILDING.draw?.(d, {
     x0: q.min[0],
@@ -188,7 +179,7 @@ export function house(d: Drawer, q: Piece, i: number) {
     x1: q.max[0],
     z1: q.max[2],
     height: q.max[1],
-    face: 'w',
+    face,
     wall: walls,
     trim: '#7a4a2a',
     roof: 'gable',

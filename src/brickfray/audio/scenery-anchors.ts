@@ -9,10 +9,9 @@ import { Plan } from '../world/plan';
 import { plazaProps } from '../world/plaza-props';
 import { TREE } from '../world/props-nature';
 import { roofHeight } from '../world/roofs';
-import { templeCover } from '../world/temple-cover';
 import { templeGeometry } from '../world/temple-geometry';
-import { T } from '../world/temple-layout';
-import { LOTUS_POOL } from '../world/temple-props';
+import { BAND, T } from '../world/temple-layout';
+import { PAVILION, VLANE } from '../world/temple-lanes';
 import type { MapId } from '../world/types';
 import type { AmbientSpot } from './types';
 
@@ -144,59 +143,34 @@ function docks(): Spot[] {
 }
 
 /**
- * Temple: jungle calls from the vine-hung spurs and cliff-foot boulders, birds in the rim shrubs, on the drum towers and
- * the village eaves, bamboo at the village fences, the lotus pools' fountains, chimes and a gong at the drum towers,
- * prayer flags on the strings from each drum tower to its court shrine, crows on the hall and gallery eaves.
+ * Temple: jungle calls from the camp cliffs, birds on the gorge rail and the house eaves, the ravine's waterfall and the
+ * camp pools, chimes and a gong at the bell pavilions, prayer flags over the courts, bamboo in the village lanes, crows
+ * on the hall and gallery eaves.
  */
 function temple(): Spot[] {
   const { pieces } = templeGeometry();
   const of = (kind: string, test: (b: Box) => boolean = () => true) => pieces.filter((q) => q.kind === kind && test(q));
-  const towers = of('kiosk', (b) => b.max[1]! >= 6);
-  const shrines = of('kiosk', (b) => b.max[1]! < 3.5 && Math.abs(b.min[2]! + b.max[2]!) < 1);
-  const spurs = of('spur').map((b): Point => {
-    const [x, y, z] = centre(b);
-    return [x - Math.sign(x) * ((b.max[0]! - b.min[0]!) / 2 - 0.6), y + 0.4, z - Math.sign(z) * ((b.max[2]! - b.min[2]!) / 2 - 0.6)];
-  });
-  const boulders = of('rock', (b) => b.min[2]! < -T.edge - 1).map((b): Point => [centre(b)[0], b.max[1]! + 0.4, -T.edge - 0.2]);
-  const rim = [-28, -16, -4, 8, 20, 32].map((z): Point => [-T.edgeX + 0.8, 0.6, z]);
-  const houses = of('house').map((b): Point => [b.min[0]! + 0.15, b.max[1]! + 0.3, (b.min[2]! + b.max[2]!) / 2]);
-  const fences = of('fence').map((b): Point => [b.min[0]! - 0.4, 1.6, (b.min[2]! + b.max[2]!) / 2]);
-  const cover = new Plan();
-  templeCover(cover);
-  const pools = cover.items.filter((i) => i.el === LOTUS_POOL).map((i): Point => [(i.p as { x: number }).x, 0.9, (i.p as { z: number }).z]);
-  const toward = (b: Box, dx: number, dz: number, y: number): Point => {
-    const [x, , z] = centre(b);
-    return [x + dx * ((b.max[0]! - b.min[0]!) / 2 + 0.3), y, z + dz * ((b.max[2]! - b.min[2]!) / 2 + 0.3)];
-  };
-  const inward = (b: Box) => [-Math.sign(centre(b)[0]), -Math.sign(centre(b)[2])] as const;
-  const chimes = towers.flatMap((b) => {
-    const [dx, dz] = inward(b);
-    return [toward(b, dx, 0, b.max[1]! - 0.8), toward(b, 0, dz, b.max[1]! - 0.8)];
-  });
-  const gongs = towers.map((b) => toward(b, inward(b)[0], 0, b.max[1]! - 2));
-  const perches = towers.map((b): Point => [centre(b)[0], b.max[1]! + 0.3, centre(b)[2]]);
-  const flags = towers.flatMap((b) => {
-    const shrine = shrines.reduce((a, s) => (Math.abs(centre(s)[0] - centre(b)[0]) < Math.abs(centre(a)[0] - centre(b)[0]) ? s : a));
-    const a = centre(b);
-    const s = centre(shrine);
-    const end: Point = [s[0], s[1] + 2, s[2]];
-    const sag = Math.hypot(end[0] - a[0], end[2] - a[2]) * 0.06;
-    return [0.35, 0.65].map((u): Point => [a[0] + (end[0] - a[0]) * u, a[1] + (end[1] - a[1]) * u - sag * 4 * u * (1 - u) - 0.3, a[2] + (end[2] - a[2]) * u]);
-  });
+  const sides = [-1, 1] as const;
+  const cliff = sides.flatMap((s) => [-36, -24, -14, 14, 24, 36].map((z): Point => [s * (T.edgeX - 1.6), 1.8, z]));
+  const rim = [-56, -44, -32, -20, 20, 32, 44, 56].map((x): Point => [x, 0.6, -T.edge + 0.8]);
+  const houses = pieces.filter((q) => q.kind === 'roof' && (q.tag === 'village' || q.tag === 'river')).map((b): Point => [(b.min[0] + b.max[0]) / 2, b.max[1] + 0.3, (b.min[2] + b.max[2]) / 2]);
+  const pools: Point[] = [[0, -1.2, BAND.north - 0.6], ...sides.map((s): Point => [s * (T.edgeX - 0.8), 0.6, 0])];
+  const bells = sides.map((s): Point => [s * (PAVILION.x0 + PAVILION.x1) / 2, PAVILION.floor + 2.4, (PAVILION.z0 + PAVILION.z1) / 2]);
+  const lanes = sides.map((s): Point => [s * (VLANE[0] + VLANE[1]) / 2, 1.6, (VLANE[2] + VLANE[3]) / 2]);
+  const flags: Point[] = [[-22, 6.2, -17], [22, 6.2, 17]];
   const roofs = of('roof', (b) => b.max[1]! > 7);
-  const crows = [...eaves('temple', roofs, 8), ...perches];
+  const crows = [...eaves('temple', roofs, 8), ...bells];
   return [
-    spot('temple', 'jungle', 2.5, spurs, 1.2),
-    spot('temple', 'jungle', 1.5, boulders),
+    spot('temple', 'jungle', 2.5, cliff, 1.2),
     spot('temple', 'bird', 0.5, rim, 0.4),
     spot('temple', 'bird', 0.5, houses),
-    spot('temple', 'bird', 0.5, perches, 0.8),
-    spot('temple', 'bamboo', 2, fences),
+    spot('temple', 'bird', 0.5, bells, 0.8),
+    spot('temple', 'bamboo', 2, lanes),
     spot('temple', 'water', 1.5, pools, 0.3),
-    spot('temple', 'chime', 1, chimes),
+    spot('temple', 'chime', 1, bells),
     spot('temple', 'flag', 1, flags),
     spot('temple', 'crow', 0.5, crows, 0.8),
-    spot('temple', 'gong', 0.4, gongs)
+    spot('temple', 'gong', 0.4, bells)
   ];
 }
 

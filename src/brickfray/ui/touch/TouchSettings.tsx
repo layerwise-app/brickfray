@@ -17,7 +17,7 @@ export function TouchSettings({ s, slider, toggle }: { s: Settings; slider: Slid
   return (
     <>
       <span className='text-xs font-semibold uppercase tracking-[0.2em] text-[var(--bf-muted)]'>{t('touch.section')}</span>
-      {slider('touch.sensitivity', touch.sensitivity, 0.01, 3, 0.01, (sensitivity) => set({ sensitivity }), percent)}
+      {slider('touch.sensitivity', touch.sensitivity, 0.3, 3, 0.05, (sensitivity) => set({ sensitivity }), percent)}
       {slider('touch.buttonSize', touch.buttonSize, 0.8, 1.4, 0.05, (buttonSize) => set({ buttonSize }), percent)}
       {toggle('touch.leftHanded', touch.leftHanded, (leftHanded) => set({ leftHanded }), 'touch.leftHandedHint')}
       {toggle('touch.autoFire', touch.autoFire, (autoFire) => set({ autoFire }), 'touch.autoFireHint')}

@@ -166,7 +166,7 @@ function SeatCount({ humans, settings }: { humans: number; settings: MatchSettin
 }
 
 /**
- * The room's size, never below the players already in it: a free-for-all 1 to 10 seats, a team match 1 to 5 players
+ * The room's size, never below the players already in it: a free-for-all 1 to 12 seats, a team match 1 to 6 players
  * per side ("3 v 3", sent as the room's total). The number large, a tick for every size.
  */
 function SeatsSlider({ settings, humans, disabled, onSeats }: { settings: MatchSettings; humans: number; disabled: boolean; onSeats: (seats: number) => void }) {

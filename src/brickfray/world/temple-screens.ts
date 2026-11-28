@@ -33,7 +33,6 @@ function lookOf(q: Piece): string {
   const cz = (q.min[2] + q.max[2]) / 2;
   if (Math.abs(cx) < 4.1 && Math.abs(cz) > T.hallZ - 2 && Math.abs(cz) < T.hallZ) return 'nave';
   if (Math.abs(cz) > T.gate - 0.5) return cz < 0 ? 'north' : 'south';
-  if (Math.abs(cx) > T.courtOut) return cx > 0 ? 'village' : 'gorge';
   return cx > 0 ? 'east' : 'west';
 }
 

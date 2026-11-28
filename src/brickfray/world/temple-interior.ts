@@ -14,7 +14,7 @@ const RED = '#a83a2c';
 const GREEN = '#2f6f5a';
 const TEAL = '#2f6f8a';
 const TIMBER = '#5a3424';
-const BAYS = [-20.8, -16.8, -12.0, -7.2, -2.4, 2.4, 7.2, 12.0, 16.8, 20.8];
+const BAYS = [-12.8, -9.6, -4.8, 0, 4.8, 9.6, 12.8];
 
 /** Coffered nave ceiling under the hall roof: cross beams at every column bay, purlins along the hall, gilded medallions. */
 export function naveCeiling(d: Drawer) {

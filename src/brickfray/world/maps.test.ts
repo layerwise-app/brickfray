@@ -5,6 +5,7 @@ import { DOCKS } from './map-docks';
 import { FORTRESS } from './map-fortress';
 import { PLAZA } from './map-plaza';
 import { TEMPLE } from './map-temple';
+import { T } from './temple-layout';
 import { ColliderIndex } from './nav';
 import type { MapDefinition } from './types';
 import { validateLayout } from './validate';
@@ -81,21 +82,20 @@ describe('fortress nav', () => {
 });
 
 describe('temple edges', () => {
-  // The gorge (west) and river (south) sides are open: only the rail stands there, so the view runs out over the edge.
-  test('the gorge and river sides carry a rail, not a wall', () => {
-    const tall = TEMPLE.layout().colliders.filter((c) => {
-      const west = c.max[0] < -37.2 && c.min[2] > -35.2 && c.max[2] < 35.2;
-      const south = c.min[2] > 40.4 && c.min[0] > -31.2 && c.max[0] < 31.2;
-      return (west || south) && c.max[1] > 1.3;
-    });
-    expect(tall).toEqual([]);
-  });
+  const tall = TEMPLE.layout().colliders.filter((c) => c.max[1] > 1.4);
+  // Share of an edge (along `alongX` from -half to half) that a tall collider touching it closes.
+  const closed = (touches: (c: (typeof tall)[number]) => boolean, alongX: boolean, half: number) => {
+    const at = tall.filter(touches);
+    let shut = 0;
+    for (let a = -half; a < half; a += 0.4) if (at.some((c) => (alongX ? a > c.min[0] && a < c.max[0] : a > c.min[2] && a < c.max[2]))) shut += 0.4;
+    return shut / (2 * half);
+  };
 
-  // The cliff side is boulders with balustrade between them: at least a third of it is open to the stream.
-  test('the cliff side is not one wall', () => {
-    const tall = TEMPLE.layout().colliders.filter((c) => c.min[2] < -40.4 && c.max[0] > -31.2 && c.min[0] < 31.2 && c.max[1] > 1.3);
-    let closed = 0;
-    for (let x = -31.0; x < 31.2; x += 0.4) if (tall.some((c) => x > c.min[0] && x < c.max[0])) closed += 0.4;
-    expect(closed / 62.4).toBeLessThan(0.67);
+  // The gorge (north), the river (south) and the camps' terrace edges (west, east) are mostly railed, open to the view.
+  test('no side of the map is one wall', () => {
+    expect(closed((c) => c.min[2] < -T.edge + 0.01, true, T.edgeX)).toBeLessThan(0.25);
+    expect(closed((c) => c.max[2] > T.edge - 0.01, true, T.edgeX)).toBeLessThan(0.5);
+    expect(closed((c) => c.min[0] < -T.edgeX + 0.01, false, T.edge)).toBeLessThan(0.25);
+    expect(closed((c) => c.max[0] > T.edgeX - 0.01, false, T.edge)).toBeLessThan(0.25);
   });
 });

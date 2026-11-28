@@ -42,7 +42,7 @@ export const MOVE = {
 } as const;
 
 export const MATCH = {
-  maxPlayers: 10,
+  maxPlayers: 12,
   ffaKills: 30,
   tdmKills: 50,
   defaultMinutes: 10,

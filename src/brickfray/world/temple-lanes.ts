@@ -1,70 +1,102 @@
-import { box, T, type Piece } from './temple-layout';
+import { balustrade, BAND, box, BRIDGE, CAMP, COURT, doorways, RAVINE, ROAD, run, T, type Flight, type Piece } from './temple-layout';
 
 /**
- * The east strip from camp to camp along the village (the west strip is its half turn, along the gorge): outcrops
- * from the rim and towers and screens from the court wall alternate, so the open lane bends and no line runs its
- * whole length; boulders, ruins and stelae stand between them every 6-8 m.
+ * The west half outside the great hall (the geometry mirrors it east). Between the camp and the lotus court the guest
+ * hall (north) and the refectory (south) flank the processional way; the sutra library and the ravine head close the
+ * court from the gorge path, the village houses and the pagoda close it from the village street. Each block leaves one
+ * bent way through: the sutra passage (north) and the village lane (south).
  */
-const E = T.edgeX;
-const W = T.courtOut;
+const N = BAND.north;
+const NM = BAND.midN;
+const SM = BAND.midS;
+const S = BAND.south;
+const X = T.edgeX;
+const Z = T.edge;
+const W = COURT.wall;
+const C = COURT.x1;
+const STOREY = 5.6;
 
-export function eastStrip(): Piece[] {
-  const p: Piece[] = [];
-  for (const s of [-1, 1]) {
-    // Each end: a spur (cliff to the north, river bluff to the south) and a tower in the camp's corner.
-    p.push(box('spur', 31.2, 0, s * T.edge, E, 7.2, s * 35.2));
-    p.push(box('kiosk', 27.2, 0, s * T.edge, 31.2, 4.8, s * 38.4));
-    // A drum tower at each court corner, where the strip opens into the end yard.
-    p.push(box('kiosk', W, 0, s * 24.0, 28.8, 6.4, s * T.row));
-  }
-  // Screens before the court gates: from the strip a gate is seen only from close by.
-  p.push(box('screen', 28.8, 0, -14.4, 29.6, 2.88, -8.0));
-  p.push(box('screen', 28.8, 0, 5.6, 29.6, 2.88, 11.2));
-  // The waist: an outcrop from the rim and a fallen gate tower from the court wall overlap across the lane with a
-  // 3.2 m way between them, so the strip is two long lanes and no line runs from end to end.
-  p.push(box('rock', 30.4, 0, -5.6, E, 4.0, -1.6));
-  p.push(box('ruin', W, 0, 1.6, 31.2, 2.4, 4.0));
-  // Waist-high cover every 6-8 m, alternating sides, kept 4.8 m off the rim so nothing climbed reaches the edge.
-  p.push(box('ruin', W, 0, -18.4, 29.6, 1.36, -17.6));
-  p.push(box('boulder', 32.0, 0, -12.0, 33.6, 1.44, -10.4));
-  p.push(box('boulder', 32.0, 0, -27.2, 33.6, 1.44, -25.6));
-  p.push(box('ruin', 28.0, 0, -32.8, 31.2, 1.36, -32.0));
-  p.push(box('boulder', 32.0, 0, 9.6, 33.6, 1.44, 11.2));
-  p.push(box('ruin', W, 0, 17.6, 31.2, 2.4, 18.4));
-  p.push(box('boulder', 31.2, 0, 26.4, 32.8, 1.44, 28.0));
-  p.push(box('ruin', 28.0, 0, 31.2, 31.2, 1.36, 32.0));
-  return p;
+/**
+ * The sutra passage (from the gorge path's mouth past the guest hall) and the village lane (from the street's mouth past
+ * the refectory) down to the forecourt: [x0, x1, z0, z1]. They are 8 m apart in x so no line runs from one into the other.
+ */
+export const SUTRA = [-48.0, -44.0, N, -ROAD] as const;
+export const VLANE = [-40.0, -36.0, ROAD, S] as const;
+/** Raised places: the bell pavilion's platform over the gorge path, the village balcony over the street. */
+export const PAVILION = { x0: -29.6, x1: -17.6, z0: -33.6, z1: N, floor: 3.36 } as const;
+export const BALCONY = { x0: -27.2, x1: -12.8, z0: S, z1: 32.0, floor: 3.36 } as const;
+
+function blocks(p: Piece[]) {
+  const roofed = (kind: 'hall' | 'house', x0: number, z0: number, x1: number, z1: number, h: number, tag: string) => {
+    p.push(box(kind, x0, 0, z0, x1, h, z1, { tag }));
+    p.push(box('roof', x0 - 0.4, h, z0 - 0.4, x1 + 0.4, h + 0.48, z1 + 0.4, { tag }));
+  };
+  // Guest hall and refectory between the camp and the court, each split by its team's passage; the Mountain Gate,
+  // kept shut, closes the forecourt from the camp. Its gatehouse and the camp storehouse overlap across the camp so the
+  // way between its yards bends and no line runs along the camp from the gorge path into the village street.
+  roofed('hall', -CAMP, N, SUTRA[0], -ROAD, STOREY, 'guest');
+  roofed('hall', SUTRA[1], N, -W, -ROAD, STOREY, 'guest');
+  roofed('hall', -CAMP, ROAD, VLANE[0], S, STOREY, 'refectory');
+  roofed('hall', -CAMP, -ROAD, -48.8, ROAD, STOREY, 'gate');
+  roofed('hall', -59.2, 2.0, -CAMP, ROAD, STOREY, 'gate');
+  roofed('hall', -X, -ROAD, -57.6, -2.0, STOREY, 'gate');
+  doorways.push([(SUTRA[0] + SUTRA[1]) / 2, 0, -ROAD + 1], [(VLANE[0] + VLANE[1]) / 2, 0, ROAD - 1]);
+  // The court's west wall: its gate from the forecourt, then the wall between the village lane and the court.
+  p.push(...run('cloister', false, -ROAD, ROAD, -W, -C, 0, 3.2, [[-4.0, 4.0, 3.2]]));
+  p.push(box('cloister', VLANE[1], 0, ROAD, -W, 3.2, SM));
+  // Sutra library between the gorge path and the court.
+  roofed('hall', -W, N, -12.8, NM, STOREY, 'library');
+  // Ravine head: the rock the waterfall leaves, behind the bridge, round the north vestibule.
+  p.push(box('cliff', -12.8, 0, N, 0, 8.0, -T.gate, { tag: 'head' }));
+  p.push(box('cliff', -12.8, 0, -T.gate, -3.2, 8.0, NM, { tag: 'head' }));
+  // Village houses between the court and the street, back to back: one row fronts the court, the other the street.
+  roofed('house', VLANE[1], SM, -12.8, 23.2, 6.4, 'court');
+  roofed('house', VLANE[1], 23.2, -12.8, S, STOREY, 'village');
+  roofed('hall', -12.8, T.gate, 0, S, 6.4, 'pagoda');
+  roofed('hall', -12.8, SM, -3.2, T.gate, 6.4, 'pagoda');
+  // Gorge spur: the rim rock standing out over the gorge path's mouth, so the path bends past it.
+  p.push(box('spur', -CAMP, 0, -Z, -44.0, 4.8, -36.8, { tag: 'spur' }));
+  // River houses on the street's south side by its mouth, standing out into it; the ghat east of them.
+  roofed('house', -48.8, 36.8, -41.6, Z, STOREY, 'river');
+  roofed('house', -41.6, 36.8, -33.6, Z, STOREY, 'river');
 }
 
-/**
- * The four edges, each its own kind and each open to the world beyond: boulders and balustrade over the waterfall
- * stream at the cliff foot (north), the gorge rim (west), village fronts (east), the river terrace over the ghats (south).
- */
-/**
- * The village's house blocks along the east edge (front houses here, the blocks behind them in temple-village.ts); the
- * gaps between them are lanes running east behind bamboo fences, two of them wide enough to read as village streets.
- */
-export const VILLAGE_BLOCKS: [number, number][] = [[-35.2, -28.0], [-25.6, -18.4], [-13.6, -8.8], [-6.4, 1.6], [4.0, 11.2], [16.0, 20.8], [23.2, 35.2]];
+function raised(p: Piece[], f: Flight[]) {
+  // Bell pavilion: a platform on the library's face over the gorge path, a stair up each end along the wall.
+  const v = PAVILION;
+  p.push(box('hall', v.x0, 0, v.z0, v.x1, v.floor, v.z1, { walk: true, tag: 'pavilion' }));
+  p.push(...balustrade(v.x0, v.z0, v.x1, v.z0 + 0.4, v.floor, 'pavilion'));
+  f.push({ x: v.x0 - 7 * T.run, z: v.z1 - 0.8, y0: 0, dir: 'e', width: 1.6, steps: 7 });
+  f.push({ x: v.x1 + 7 * T.run, z: v.z1 - 0.8, y0: 0, dir: 'w', width: 1.6, steps: 7 });
+  // Village balcony: a timber gallery on the houses' street front, a stair up each end along the front.
+  const b = BALCONY;
+  p.push(box('deck', b.x0, b.floor - 0.48, b.z0, b.x1, b.floor, b.z1, { walk: true, surface: 'wood', tag: 'balcony' }));
+  p.push(...balustrade(b.x0, b.z1 - 0.4, b.x1, b.z1, b.floor, 'balcony'));
+  f.push({ x: b.x0 - 7 * T.run, z: b.z0 + 0.8, y0: 0, dir: 'e', width: 1.6, steps: 7 });
+  f.push({ x: b.x1 + 7 * T.run, z: b.z0 + 0.8, y0: 0, dir: 'w', width: 1.6, steps: 7 });
+}
 
-export function edges(): Piece[] {
-  const p: Piece[] = [];
-  const Zs = T.edge;
-  // North: fallen boulders from the cliff with balustrade between them, the stream and the cliff beyond.
-  const north: [number, number, number][] = [[-27.2, -23.2, 3.6], [-15.2, -11.2, 4.4], [-5.6, -2.4, 3.2], [2.4, 6.4, 4.0], [14.4, 18.4, 3.2], [24.0, 27.2, 4.4]];
-  let x = -27.2;
-  for (const [x0, x1, h] of north) {
-    if (x0 > x + 0.1) p.push(box('rail', x, 0, -Zs - 0.4, x0, T.parapet, -Zs));
-    p.push(box('rock', x0, 0, -Zs - 2.4, x1, h, -Zs));
-    x = x1 === -2.4 ? 2.4 : x1;
-  }
-  p.push(box('rail', -E - 0.4, 0, -35.2, -E, T.parapet, 35.2));
-  p.push(box('rail', -31.2, 0, Zs, 31.2, T.parapet, Zs + 0.4));
-  const houses = VILLAGE_BLOCKS;
-  let z = houses[0]![0];
-  for (const [z0, z1] of houses) {
-    if (z0 > z) p.push(box('fence', E, 0, z, E + 0.2, 2.4, z0, { surface: 'wood', bulletsPass: true }));
-    p.push(box('house', E, 0, z0, E + 7.2, 6.4, z1));
-    z = z1;
-  }
-  return p;
+/** The ravine under the bridge, the gorge rail (north), the river rail (south) and the camp cliff (west). */
+function edges(p: Piece[], c: Piece[]) {
+  const RH = 1.36;
+  p.push(box('rail', -X, 0, -Z - 0.4, -RAVINE, RH, -Z));
+  p.push(box('rail', -RAVINE - 0.4, 0, -Z, -RAVINE, RH, BRIDGE.z0));
+  p.push(box('rail', -RAVINE - 0.4, 0, BRIDGE.z1, -RAVINE, RH, N));
+  c.push(box('deck', -RAVINE, -0.48, BRIDGE.z0, RAVINE, 0, BRIDGE.z1, { walk: true, tag: 'bridge' }));
+  c.push(box('rail', -RAVINE, 0, BRIDGE.z0, RAVINE, RH, BRIDGE.z0 + 0.4, { tag: 'bridge' }));
+  c.push(box('rail', -RAVINE, 0, BRIDGE.z1 - 0.4, RAVINE, RH, BRIDGE.z1, { tag: 'bridge' }));
+  // A stone shrine at the bridge's middle splits the deck in two ways over: nothing sees down the whole gorge path.
+  c.push(box('kiosk', -1.6, 0, -40.0, 1.6, 3.2, -36.8));
+  // The pagoda's porch out over the street at the ghat: the street passes south of it, the line along it is broken.
+  c.push(box('hall', -2.4, 0, S, 2.4, 4.0, 37.6, { tag: 'porch' }), box('roof', -2.8, 4.0, S, 2.8, 4.48, 38.0, { tag: 'porch' }));
+  // River rail between the river houses.
+  for (const [x0, x1] of [[-X, -48.8], [-33.6, 0]] as const) p.push(box('rail', x0, 0, Z, x1, RH, Z + 0.4));
+  // Camp terrace edge: a rail over the drop to the waterfall pool (west) or the paddies (east), the cliff far behind.
+  p.push(box('rail', -X - 0.4, 0, -Z, -X, RH, Z, { tag: 'camp' }));
+}
+
+export function templeLanes(p: Piece[], f: Flight[], c: Piece[]) {
+  blocks(p);
+  raised(p, f);
+  edges(p, c);
 }

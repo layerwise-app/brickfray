@@ -23,7 +23,7 @@ export const Route = createFileRoute('/')({
     const head = seo({
       title: 'Brickfray — Small bricks. Big battles.',
       description:
-        'An original brick-built online FPS. Battle with up to 10 players or survive waves of Snapbots in colorful arenas.',
+        'An original brick-built online FPS. Battle with up to 12 players or survive waves of Snapbots in colorful arenas.',
       path: '/'
     });
     return { ...head, meta: [...head.meta, ...gameShell] };
