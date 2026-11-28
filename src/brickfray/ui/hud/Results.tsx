@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { ScoreRow } from '../../game/hud';
 import { useApp, useGame, useHud } from '../App';
 import { TrophyIcon } from '../board/icons';
@@ -8,6 +8,7 @@ import { awardMedals, MedalIcon, type Medal } from './Medal';
 import { Podium } from './Podium';
 import { UnlockStrip } from '../achievements/UnlockStrip';
 import { RankBadge, useOutcome } from './RankCallout';
+import { useResultsBoard } from './ResultsBoard';
 import { AssistsIcon, Confetti, KillsIcon, Ribbon, Tip, type RibbonTone } from './results-art';
 import { CountUp, IntroSkipped, useIntro } from './results-intro';
 import { medalKey, ResultsTable } from './ResultsTable';
@@ -21,7 +22,6 @@ import './results-table.css';
 import './results-run.css';
 import './results-compact.css';
 
-const BoardPanel = lazy(() => import('../board/BoardPanel'));
 
 /**
  * The end of every match, said with shapes rather than sentences: a ribbon with the result, then for a room the
@@ -36,7 +36,7 @@ export function Results() {
   const outcome = useOutcome(hud.settings);
   const root = useRef<HTMLDivElement>(null);
   const skipped = useIntro(root);
-  const [board, setBoard] = useState(false);
+  const board = useResultsBoard();
   const first = useRef<HTMLButtonElement>(null);
   const mode = hud.settings?.mode;
   const solo = mode === 'solo';
@@ -71,27 +71,9 @@ export function Results() {
   // The keyboard starts on the first action.
   useEffect(() => first.current?.focus({ preventScroll: true }), []);
 
-  // Esc closes the board over the results instead of opening the pause menu (Input listens on window, bubbling).
-  useEffect(() => {
-    if (!board) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape') return;
-      e.stopImmediatePropagation();
-      game.audio.play('uiBack');
-      setBoard(false);
-    };
-    window.addEventListener('keydown', onKey, true);
-    return () => window.removeEventListener('keydown', onKey, true);
-  }, [board, game]);
-
-  const openBoard = () => {
-    game.audio.play('uiClick');
-    setBoard(true);
-  };
-
   return (
     <>
-      <div ref={root} className='bf-results pointer-events-auto' data-mode={mode} data-won={won || undefined} inert={board}>
+      <div ref={root} className='bf-results pointer-events-auto' data-mode={mode} data-won={won || undefined} inert={board.open}>
         <IntroSkipped value={skipped}>
           {won && <Confetti />}
           <div className='bf-results-grid'>
@@ -132,7 +114,7 @@ export function Results() {
                   <span className='font-bold'>{t('playAgain')}</span>
                 </button>
               )}
-              <button ref={solo ? undefined : first} className='bf-btn bf-btn-blue' onClick={openBoard} aria-label={t('board.title')}>
+              <button ref={solo ? undefined : first} className='bf-btn bf-btn-blue' onClick={board.show} aria-label={t('board.title')}>
                 <TrophyIcon size={19} />
                 <span className='font-semibold'>{t('board.title')}</span>
               </button>
@@ -145,19 +127,6 @@ export function Results() {
           </div>
         </IntroSkipped>
       </div>
-      {board && (
-        <Suspense fallback={null}>
-          <div className='pointer-events-auto absolute inset-0 z-40'>
-            <BoardPanel
-              onClose={() => {
-                game.audio.play('uiBack');
-                setBoard(false);
-              }}
-              onName={() => {}}
-            />
-          </div>
-        </Suspense>
-      )}
     </>
   );
 }

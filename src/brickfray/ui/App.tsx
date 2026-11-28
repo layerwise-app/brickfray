@@ -8,6 +8,7 @@ import { Lobby } from './Lobby';
 import { MainMenu } from './MainMenu';
 import { PauseMenu } from './PauseMenu';
 import { LeftRunUnlocks } from './achievements/LeftRunUnlocks';
+import { ResultsBoard } from './hud/ResultsBoard';
 import { RunSaved } from './hud/RunSaved';
 import { SettingsPanel } from './SettingsPanel';
 import { watchFrame } from './touch/landscape';
@@ -92,11 +93,13 @@ function Screens({ openSettings }: { openSettings: () => void }) {
   const app = useApp();
   return (
     <>
-      {app.screen === 'menu' && <MainMenu openSettings={openSettings} />}
-      {app.screen === 'connecting' && <Connecting />}
-      {app.screen === 'lobby' && <Lobby />}
-      {app.screen === 'match' && <Hud />}
-      {app.screen === 'match' && app.paused && <PauseMenu openSettings={openSettings} />}
+      <ResultsBoard>
+        {app.screen === 'menu' && <MainMenu openSettings={openSettings} />}
+        {app.screen === 'connecting' && <Connecting />}
+        {app.screen === 'lobby' && <Lobby />}
+        {app.screen === 'match' && <Hud />}
+        {app.screen === 'match' && app.paused && <PauseMenu openSettings={openSettings} />}
+      </ResultsBoard>
       <RunSaved />
       <LeftRunUnlocks />
       {app.error && <ErrorBanner error={app.error} />}
